@@ -1,0 +1,16 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"plugins": [ "plugin-check" ],
+	"steps": [
+		{
+			"step": "defineWpConfigConsts",
+			"consts": {
+				"WP_DEBUG": true
+			}
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require_once 'wp-load.php'; require_once 'wp-content/plugins/pattern-manager/includes/sample-content.php';"
+		}
+	]
+}

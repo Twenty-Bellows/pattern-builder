@@ -1,0 +1,37 @@
+{
+	"name": "pattern-manager",
+	"version": "1.0.0",
+	"description": "Manage patterns in WordPress",
+	"author": "twentybellows",
+	"license": "GPL-2.0-or-later",
+	"main": "build/index.js",
+	"scripts": {
+		"build": "wp-scripts build --webpack-copy-php --experimental-modules",
+		"watch": "wp-scripts start --webpack-copy-php --experimental-modules",
+		"format": "wp-scripts format",
+		"lint:css": "wp-scripts lint-style",
+		"lint:js": "wp-scripts lint-js",
+		"packages-update": "wp-scripts packages-update",
+		"plugin-zip": "wp-scripts plugin-zip",
+		"plugin-unpack": "rm -rf ./release && mkdir -p ./release && unzip -o ./pattern-manager.zip -d ./release/pattern-manager",
+		"plugin-test-env": "wp-now start --blueprint=plugin-test-blueprint.json --path=./release/pattern-manager",
+		"plugin-test": "npm run build && npm run plugin-zip && npm run plugin-unpack && npm run plugin-test-env",
+		"start": "wp-env start --xdebug",
+		"stop": "wp-env stop",
+		"clean": "wp-env clean all",
+		"test:unit": "wp-scripts test-unit-js",
+		"test:unit:watch": "wp-scripts test-unit-js --watch"
+	},
+	"devDependencies": {
+		"@jest/globals": "^29.7.0",
+		"@wordpress/e2e-test-utils-playwright": "^1.16.0",
+		"@wordpress/env": "^8.13.0",
+		"@wordpress/icons": "^10.22.0",
+		"@wordpress/interactivity": "^6.14.0",
+		"@wordpress/prettier-config": "^4.17.0",
+		"@wordpress/private-apis": "^1.22.0",
+		"@wordpress/scripts": "^30.3.0",
+		"@wp-now/wp-now": "^0.1.74",
+		"prettier": "npm:wp-prettier@^3.0.3"
+	}
+}
