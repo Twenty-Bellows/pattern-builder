@@ -19,6 +19,7 @@ if (! defined('ABSPATH')) {
 }
 
 require_once __DIR__ . '/includes/class-pattern-manager.php';
+require_once __DIR__ . '/includes/class-pattern-manager-admin.php';
 
 add_action('enqueue_block_editor_assets', function () {
 	wp_enqueue_script(
