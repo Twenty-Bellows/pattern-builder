@@ -23,8 +23,8 @@ require_once __DIR__ . '/includes/class-pattern-manager.php';
 add_action('enqueue_block_editor_assets', function () {
 	wp_enqueue_script(
 		'pattern-manager',
-		plugins_url('build/pattern-manager.js', __FILE__),
+		plugins_url('build/pattern-manager-editor-tools.js', __FILE__),
 		array('wp-blocks', 'wp-element', 'wp-components', 'wp-editor'),
-		filemtime(plugin_dir_path(__FILE__) . 'build/pattern-manager.js')
+		filemtime(plugin_dir_path(__FILE__) . 'build/pattern-manager-editor-tools.js')
 	);
 });

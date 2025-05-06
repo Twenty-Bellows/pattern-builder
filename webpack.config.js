@@ -4,7 +4,7 @@ defaultConfig[ 0 ] = {
 	...defaultConfig[ 0 ],
 	...{
 		entry: {
-			'pattern-manager': './src/pattern-manager.js',
+			'pattern-manager-editor-tools': './src/pattern-manager-editor-tools.js',
 		},
 	},
 };

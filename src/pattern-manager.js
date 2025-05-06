@@ -1,36 +1,12 @@
-/**
- * WordPress dependencies
- */
-import { registerPlugin } from '@wordpress/plugins';
-import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
-import { _x } from '@wordpress/i18n';
-import { tool } from '@wordpress/icons';
+import { __, _x } from '@wordpress/i18n';
 
-export default function PatternManager() {
+const PatternManager = () => {
 	return (
-		<>
-			<PluginSidebarMoreMenuItem
-				target="pattern-manager-sidebar"
-				icon={ tool }
-			>
-				{ _x( 'Pattern Manager', 'UI String', 'pattern-manager' ) }
-			</PluginSidebarMoreMenuItem>
-
-			<PluginSidebar
-				name="pattern-manager-sidebar"
-				icon={ tool }
-				title={ _x(
-					'Pattern Manager',
-					'UI String',
-					'pattern-manager'
-				) }
-			>
-				<h2>Hello Pattern Manager</h2>
-			</PluginSidebar>
-		</>
+		<div className="pattern-manager-modal">
+			<h2>{_x('Hello Pattern Manager', 'UI String', 'pattern-manager')}</h2>
+			<p>{_x('This is the Pattern Manager modal.', 'UI String', 'pattern-manager')}</p>
+		</div>
 	);
 }
 
-registerPlugin( 'pattern-manager', {
-	render: PatternManager,
-} );
+export default PatternManager;
