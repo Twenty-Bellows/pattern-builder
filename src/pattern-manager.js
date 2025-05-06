@@ -1,6 +1,6 @@
 import { __, _x } from '@wordpress/i18n';
 import { useEffect, useState } from '@wordpress/element';
-import apiFetch from '@wordpress/api-fetch';
+import { getAllPatterns } from './resolvers';
 
 const PatternManager = () => {
 	const [patterns, setPatterns] = useState([]);
@@ -8,7 +8,7 @@ const PatternManager = () => {
 	const [error, setError] = useState(null);
 
 	useEffect(() => {
-		apiFetch({ path: '/pattern-manager/v1/patterns' })
+		getAllPatterns()
 			.then((data) => {
 				setPatterns(data);
 				setIsLoading(false);
