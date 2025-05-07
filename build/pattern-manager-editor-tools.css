@@ -1,1 +1,21 @@
-.pattern-manager_container .pattern-manager_preview-grid{display:grid;gap:2rem;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}.pattern-manager_container .pattern-manager_preview-grid .pattern-manager_preview-grid-item{background-color:#f9f9f9;border-radius:8px;cursor:pointer;padding:1rem;transition:background-color .3s ease,box-shadow .3s ease}.pattern-manager_container .pattern-manager_preview-grid .pattern-manager_preview-grid-item:hover{background-color:#f0f0f0;box-shadow:0 1px 8px rgba(0,0,0,.2)}
+/*!*************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/pattern-manager.scss ***!
+  \*************************************************************************************************************************************************************************************************************************************************/
+.pattern-manager_container .pattern-manager_preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+.pattern-manager_container .pattern-manager_preview-grid .pattern-manager_preview-grid-item {
+  padding: 1rem;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+.pattern-manager_container .pattern-manager_preview-grid .pattern-manager_preview-grid-item:hover {
+  background-color: #f0f0f0;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.2);
+}
+
+/*# sourceMappingURL=pattern-manager-editor-tools.css.map*/

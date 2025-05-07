@@ -2,7 +2,7 @@ import { BlockPreview } from '@wordpress/block-editor';
 import { parse } from '@wordpress/blocks';
 import { Composite } from '@wordpress/components';
 
-const PatternPreview = ({ pattern }) => {
+const PatternPreview = ({ pattern, onClick }) => {
 
 	const { title, content } = pattern;
 	const blocks = parse(content);
@@ -11,6 +11,9 @@ const PatternPreview = ({ pattern }) => {
 		<Composite
 			onClick={ () => {
 				console.log( 'Pattern clicked:', pattern );
+				if ( onClick ) {
+					onClick( pattern );
+				}
 			} }
 		>
 			<p>{title}</p>
