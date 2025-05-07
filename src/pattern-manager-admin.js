@@ -1,7 +1,6 @@
 import { createRoot } from '@wordpress/element';
 import PatternManager from './pattern-manager';
 
-
 export default function PatternManagerAdmin() {
 	return (
 		<PatternManager />

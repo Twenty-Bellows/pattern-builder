@@ -1,4 +1,5 @@
 import apiFetch from '@wordpress/api-fetch';
+import Pattern from './objects/Pattern';
 
 export async function getAllPatterns() {
 	return apiFetch( {
@@ -7,5 +8,10 @@ export async function getAllPatterns() {
 		headers: {
 			'Content-Type': 'application/json',
 		},
-	} );
+	} )
+	.then( ( response ) => {
+		return response.map( ( pattern ) => {
+			return new Pattern( pattern );
+		} );
+	});
 }

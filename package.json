@@ -24,6 +24,8 @@
 	},
 	"devDependencies": {
 		"@jest/globals": "^29.7.0",
+		"@wordpress/block-library": "^9.22.0",
+		"@wordpress/block-serialization-default-parser": "^5.22.0",
 		"@wordpress/e2e-test-utils-playwright": "^1.16.0",
 		"@wordpress/env": "^8.13.0",
 		"@wordpress/icons": "^10.22.0",
@@ -32,6 +34,7 @@
 		"@wordpress/private-apis": "^1.22.0",
 		"@wordpress/scripts": "^30.3.0",
 		"@wp-now/wp-now": "^0.1.74",
+		"clean-webpack-plugin": "^4.0.0",
 		"prettier": "npm:wp-prettier@^3.0.3"
 	}
 }

@@ -2,11 +2,14 @@
  * WordPress dependencies
  */
 import { registerPlugin } from '@wordpress/plugins';
-import { PluginSidebar, PluginSidebarItem, PluginSidebarMoreMenuItem } from '@wordpress/editor';
+import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
 import { Modal, Button } from '@wordpress/components';
 import { __, _x } from '@wordpress/i18n';
 import { tool, code } from '@wordpress/icons';
 import { useState } from '@wordpress/element';
+import { BlockPreview } from '@wordpress/block-editor';
+import { parse } from '@wordpress/block-serialization-default-parser';
+
 import PatternManager from './pattern-manager';
 
 const PatternManagerModal = ( { onRequestClose } ) => {
@@ -24,6 +27,7 @@ const PatternManagerModal = ( { onRequestClose } ) => {
 export default function PatternManagerEditorTools() {
 
 	const [ isPatternManagerOpen, setIsPatternManagerOpen ] = useState( false );
+	const blocks = parse('<!-- wp:paragraph --><p>Hello from BlockPreview!</p><!-- /wp:paragraph -->');
 
 	return (
 		<>
@@ -54,6 +58,7 @@ export default function PatternManagerEditorTools() {
 						'create-block-theme'
 					)}
 				</Button>
+				<BlockPreview blocks={blocks} viewportWidth={300} minHeight={300}/>
 			</PluginSidebar>
 
 			{ isPatternManagerOpen && (
