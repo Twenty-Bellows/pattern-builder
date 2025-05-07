@@ -10,7 +10,6 @@ const PatternPreview = ({ pattern, onClick }) => {
 	return (
 		<Composite
 			onClick={ () => {
-				console.log( 'Pattern clicked:', pattern );
 				if ( onClick ) {
 					onClick( pattern );
 				}

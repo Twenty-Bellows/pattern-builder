@@ -16,6 +16,7 @@ const PatternManagerModal = ( { onRequestClose } ) => {
 	return (
 		<Modal
 			title={ _x( 'Pattern Manager', 'UI String', 'pattern-manager' ) }
+			className="pattern-manager_modal"
 			onRequestClose={ onRequestClose }
 			isFullScreen
 		>

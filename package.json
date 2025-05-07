@@ -7,7 +7,7 @@
 	"main": "build/index.js",
 	"scripts": {
 		"build": "wp-scripts build --webpack-copy-php --experimental-modules",
-		"watch": "wp-scripts start --webpack-copy-php --experimental-modules",
+		"watch": "wp-scripts start --webpack-copy-php --experimental-modules --hot",
 		"format": "wp-scripts format",
 		"lint:css": "wp-scripts lint-style",
 		"lint:js": "wp-scripts lint-js",
@@ -24,6 +24,7 @@
 	},
 	"devDependencies": {
 		"@jest/globals": "^29.7.0",
+		"@wordpress/block-editor": "^14.18.0",
 		"@wordpress/block-library": "^9.22.0",
 		"@wordpress/block-serialization-default-parser": "^5.22.0",
 		"@wordpress/e2e-test-utils-playwright": "^1.16.0",

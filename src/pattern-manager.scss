@@ -21,4 +21,45 @@
 		}
 
 	}
+
+	.pattern-manager_editor {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+
+		.pattern-editor_header {
+			padding: 1rem;
+			font-weight: bold;
+			border-bottom: 1px solid #ddd;
+		}
+
+		.pattern-editor_body {
+			display: flex;
+			flex: 1;
+			overflow: hidden;
+
+			.pattern-editor_content {
+				flex: 3;
+				padding: 1rem;
+				overflow-y: auto;
+				border-right: 1px solid #ddd;
+			}
+
+			.pattern-editor_sidebar {
+				flex: 1;
+				padding: 1rem 0;
+				overflow-y: auto;
+				min-width: 280px;
+				max-width: 400px;
+			}
+		}
+
+	}
+}
+
+.pattern-manager_modal {
+	.components-modal__content {
+		padding-left: 0;
+		padding-right: 0;
+	}
 }

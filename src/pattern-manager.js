@@ -2,7 +2,7 @@ import { __, _x } from '@wordpress/i18n';
 import { useState } from '@wordpress/element';
 
 import PatternGrid from './components/PatternGrid';
-import PatternPreview from './components/PatternPreview';
+import PatternEditor from './components/PatternEditor';
 
 import './pattern-manager.scss';
 
@@ -14,7 +14,7 @@ const PatternManager = () => {
 		<div className="pattern-manager_container">
 
 		{ selectedPattern ? (
-			<PatternPreview pattern={selectedPattern} />
+			<PatternEditor pattern={selectedPattern} />
 		) : (
 			<PatternGrid onPatternClick={setSelectedPattern} />
 		) }
