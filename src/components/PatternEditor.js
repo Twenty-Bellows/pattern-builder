@@ -1,23 +1,17 @@
 import {
+	BlockCanvas,
 	BlockEditorProvider,
-	BlockInspector
+	BlockInspector,
+	__experimentalListView as ListView,
+	__experimentalLibrary as InserterLibrary
 } from '@wordpress/block-editor';
 import { Panel, TabPanel } from '@wordpress/components';
 import { useState, useEffect } from '@wordpress/element';
 import { parse } from '@wordpress/blocks';
-import { __experimentalListView as ListView } from '@wordpress/block-editor';
-import { __experimentalLibrary as InserterLibrary } from '@wordpress/block-editor';
-import { useCallback, useRef } from '@wordpress/element';
-import { BlockToolbar, BlockCanvas } from '@wordpress/block-editor';
-import { SlotFillProvider } from '@wordpress/components';
-import { Slot } from '@wordpress/components';
-import apiFetch from '@wordpress/api-fetch';
 
 import { getEditorSettings } from '../resolvers';
 
-const EditorSidebar = ({ pattern }) => {
-
-	const libraryRef = useRef();
+const EditorSidebar = () => {
 
 	return (
 		<div className="pattern-sidebar">
@@ -48,8 +42,7 @@ const EditorSidebar = ({ pattern }) => {
 						)}
 						{tab.name === 'block' && (
 							<Panel>
-									<BlockInspector />
-
+								<BlockInspector />
 							</Panel>
 						)}
 						{tab.name === 'add' && (
@@ -66,8 +59,8 @@ const EditorSidebar = ({ pattern }) => {
 
 export const PatternEditor = ({ pattern }) => {
 
-	const [ blocks, setBlocks ] = useState( parse( pattern.content ) );
-	const [ editorSettings, setEditorSettings ] = useState( null );
+	const [blocks, setBlocks] = useState(parse(pattern.content));
+	const [editorSettings, setEditorSettings] = useState(null);
 
 	// TODO: Optimize me
 	useEffect(() => {
@@ -77,7 +70,7 @@ export const PatternEditor = ({ pattern }) => {
 			});
 	}, []);
 
-	if ( ! editorSettings) {
+	if (!editorSettings) {
 		return (
 			<div className="pattern-manager_editor">
 				Loading...
@@ -87,32 +80,28 @@ export const PatternEditor = ({ pattern }) => {
 
 	return (
 		<div className="pattern-manager_editor">
-			<SlotFillProvider>
-				<BlockEditorProvider
-					value={blocks}
-					onInput={setBlocks}
-					onChange={setBlocks}
-					settings={editorSettings}
-				>
-					<div className="pattern-editor_header">
-						Editor
+			<BlockEditorProvider
+				value={blocks}
+				onInput={setBlocks}
+				onChange={setBlocks}
+				settings={editorSettings}
+			>
+				<div className="pattern-editor_header">
+					Editor
+				</div>
+
+				<div className="pattern-editor_body">
+					<div className="pattern-editor_list-view">
+						<ListView />
 					</div>
-
-					<div className="pattern-editor_body">
-						<div className="pattern-editor_list-view">
-							<ListView />
-						</div>
-						<div className="pattern-editor_content">
-							<BlockCanvas height="100%" />
-
-						</div>
-						<div className="pattern-editor_sidebar">
-
-							<EditorSidebar />
-						</div>
+					<div className="pattern-editor_content">
+						<BlockCanvas height="100%" />
 					</div>
-				</BlockEditorProvider>
-			</SlotFillProvider>
+					<div className="pattern-editor_sidebar">
+						<EditorSidebar />
+					</div>
+				</div>
+			</BlockEditorProvider>
 		</div>
 	);
 };

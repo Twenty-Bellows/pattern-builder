@@ -18,8 +18,8 @@ const PatternPreview = ({ pattern, onClick }) => {
 			<p>{title}</p>
 			<BlockPreview
 				blocks={ blocks }
-				viewportWidth={ 400 }
-				minHeight={ 200 }
+				viewportWidth={ 500 }
+				minHeight={ 150 }
 			/>
 		</Composite>
 	);

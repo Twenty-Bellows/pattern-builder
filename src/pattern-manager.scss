@@ -5,8 +5,9 @@
 	.pattern-manager_preview-grid {
 
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-		gap: 2rem;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: 1rem;
+		padding: 1rem;
 
 		.pattern-manager_preview-grid-item {
 			padding: 1rem;
