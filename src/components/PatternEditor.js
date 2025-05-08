@@ -1,22 +1,21 @@
 import {
 	BlockEditorProvider,
-	BlockList,
-	WritingFlow,
-	ObserveTyping,
 	BlockInspector
 } from '@wordpress/block-editor';
-import { Panel, PanelBody, TabPanel } from '@wordpress/components';
-import { useState } from '@wordpress/element';
+import { Panel, TabPanel } from '@wordpress/components';
+import { useState, useEffect } from '@wordpress/element';
 import { parse } from '@wordpress/blocks';
 import { __experimentalListView as ListView } from '@wordpress/block-editor';
 import { __experimentalLibrary as InserterLibrary } from '@wordpress/block-editor';
 import { useCallback, useRef } from '@wordpress/element';
+import { BlockToolbar, BlockCanvas } from '@wordpress/block-editor';
+import { SlotFillProvider } from '@wordpress/components';
+import { Slot } from '@wordpress/components';
+import apiFetch from '@wordpress/api-fetch';
+
+import { getEditorSettings } from '../resolvers';
 
 const EditorSidebar = ({ pattern }) => {
-
-	const onBlockSelect = ( block ) => {
-		console.log( 'Block selected:', block );
-	}
 
 	const libraryRef = useRef();
 
@@ -35,12 +34,8 @@ const EditorSidebar = ({ pattern }) => {
 						title: 'Block',
 					},
 					{
-						name: 'list',
-						title: 'List View',
-					},
-					{
 						name: 'add',
-						title: 'Add Block',
+						title: 'Add',
 					},
 				]}
 			>
@@ -53,21 +48,13 @@ const EditorSidebar = ({ pattern }) => {
 						)}
 						{tab.name === 'block' && (
 							<Panel>
-								<BlockInspector />
-							</Panel>
-						)}
-						{tab.name === 'list' && (
-							<Panel>
-								<p>List View</p>
-								<ListView />
+									<BlockInspector />
+
 							</Panel>
 						)}
 						{tab.name === 'add' && (
 							<Panel>
-								<InserterLibrary
-									showMostUsedBlocks
-									ref={ libraryRef }
-									onSelect={ onBlockSelect }/>
+								<InserterLibrary />
 							</Panel>
 						)}
 					</>
@@ -80,37 +67,52 @@ const EditorSidebar = ({ pattern }) => {
 export const PatternEditor = ({ pattern }) => {
 
 	const [ blocks, setBlocks ] = useState( parse( pattern.content ) );
+	const [ editorSettings, setEditorSettings ] = useState( null );
 
-	const settings = {
-		hasFixedToolbar: true,
-	};
+	// TODO: Optimize me
+	useEffect(() => {
+		getEditorSettings()
+			.then((data) => {
+				setEditorSettings(data);
+			});
+	}, []);
 
+	if ( ! editorSettings) {
+		return (
+			<div className="pattern-manager_editor">
+				Loading...
+			</div>
+		);
+	}
 
 	return (
 		<div className="pattern-manager_editor">
-			<BlockEditorProvider
-				value={ blocks }
-				onInput={ setBlocks }
-				onChange={ setBlocks }
-				settings={ settings }
-			>
-				<div className="pattern-editor_header">
-					Editor
-				</div>
+			<SlotFillProvider>
+				<BlockEditorProvider
+					value={blocks}
+					onInput={setBlocks}
+					onChange={setBlocks}
+					settings={editorSettings}
+				>
+					<div className="pattern-editor_header">
+						Editor
+					</div>
 
-				<div className="pattern-editor_body">
-					<div className="pattern-editor_content">
-					<WritingFlow>
-						<ObserveTyping>
-							<BlockList />
-						</ObserveTyping>
-					</WritingFlow>
+					<div className="pattern-editor_body">
+						<div className="pattern-editor_list-view">
+							<ListView />
+						</div>
+						<div className="pattern-editor_content">
+							<BlockCanvas height="100%" />
+
+						</div>
+						<div className="pattern-editor_sidebar">
+
+							<EditorSidebar />
+						</div>
 					</div>
-					<div className="pattern-editor_sidebar">
-						<EditorSidebar/>
-					</div>
-				</div>
-			</BlockEditorProvider>
+				</BlockEditorProvider>
+			</SlotFillProvider>
 		</div>
 	);
 };

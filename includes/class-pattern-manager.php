@@ -33,6 +33,22 @@ if (!class_exists('Twenty_Bellows_Pattern_Manager')) {
 					return true;
 				},
 			]);
+
+			register_rest_route('pattern-manager/v1', '/global-styles', [
+				'methods'  => 'GET',
+				'callback' => [$this, 'get_global_styles'],
+				'permission_callback' => function () {
+					return true;
+				},
+			]);
+		}
+
+		function get_global_styles($request){
+
+			$editor_context = new WP_Block_Editor_Context( array( 'name' => 'core/edit-site' ) );
+			$settings = get_block_editor_settings( [], $editor_context );
+
+			return rest_ensure_response($settings);
 		}
 
 		function get_patterns($request)

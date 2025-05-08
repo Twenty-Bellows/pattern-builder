@@ -15,3 +15,13 @@ export async function getAllPatterns() {
 		} );
 	});
 }
+
+export async function getEditorSettings() {
+	return apiFetch({ path: `/pattern-manager/v1/global-styles` })
+		.then((data) => {
+			return data;
+		})
+		.catch((error) => {
+			console.error('Error fetching global styles:', error);
+		});
+}

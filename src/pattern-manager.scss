@@ -1,5 +1,7 @@
 .pattern-manager_container {
 
+	height: 100%;
+
 	.pattern-manager_preview-grid {
 
 		display: grid;
@@ -38,19 +40,22 @@
 			flex: 1;
 			overflow: hidden;
 
+			.pattern-editor_list-view {
+				padding: 1rem;
+				overflow-y: auto;
+				width: 300px;
+			}
+
 			.pattern-editor_content {
 				flex: 3;
 				padding: 1rem;
-				overflow-y: auto;
-				border-right: 1px solid #ddd;
+				background-color: #eee;
 			}
 
 			.pattern-editor_sidebar {
-				flex: 1;
 				padding: 1rem 0;
 				overflow-y: auto;
-				min-width: 280px;
-				max-width: 400px;
+				width: 370px;
 			}
 		}
 
@@ -61,5 +66,12 @@
 	.components-modal__content {
 		padding-left: 0;
 		padding-right: 0;
+		padding-bottom: 0;
+
+		*:has(> .pattern-manager_container) {
+			height: 100%;
+		}
+
 	}
 }
+
