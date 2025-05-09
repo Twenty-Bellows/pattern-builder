@@ -28,18 +28,12 @@ class Twenty_Bellows_Pattern_Manager_API
 			},
 		]);
 
-		register_rest_route(self::$base_route, '/pattern/(?P<slug>[\w-]+)', [
+		register_rest_route(self::$base_route, '/pattern', [
 			'methods'  => 'PUT',
 			'callback' => [$this, 'save_block_pattern'],
 			'permission_callback' => function () {
 				return true;
 			},
-			'args'     => [
-				'slug' => [
-					'required' => true,
-					'type'     => 'string',
-				],
-			],
 		]);
 
 	}
@@ -48,17 +42,12 @@ class Twenty_Bellows_Pattern_Manager_API
 
 	function save_block_pattern($request)
 	{
-		$slug = $request->get_param('slug');
 		$pattern = $request->get_body();
 
 		$pattern = new Abstract_Pattern( json_decode($pattern, true) );
 
 		if (empty($pattern)) {
 			return new WP_Error('no_patterns', 'No pattern to save', array('status' => 400));
-		}
-
-		if ($slug !== $pattern->name) {
-			return new WP_Error('invalid_pattern', 'Pattern slug does not match', array('status' => 400));
 		}
 
 		if ($pattern->source === 'user') {
@@ -100,11 +89,33 @@ class Twenty_Bellows_Pattern_Manager_API
 
 	function update_theme_pattern ( $pattern ) {
 
-		// TODO: update the pattern file in the theme
 		$theme = wp_get_theme();
-		$path = $theme->get_stylesheet_directory() . '/patterns/' . $pattern->name . '.php';
+
+		$filename = basename($pattern->name);
+		$path = $theme->get_stylesheet_directory() . '/patterns/' . $filename . '.php';
+		$file_content = $this->build_pattern_file_metadata($pattern) . $pattern->content;
+		$response = file_put_contents($path, $file_content);
+
+		if ( ! $response ) {
+			return new WP_Error('file_creation_failed', 'Failed to create pattern file', array('status' => 500));
+		}
 
 		return $pattern;
+	}
+
+	function build_pattern_file_metadata ( $pattern ) {
+		return <<<METADATA
+			<?php
+			/**
+			 * Title: $pattern->title
+			 * Slug: $pattern->name
+			 * Description: $pattern->description
+			 * Categories:
+			 * Synced: $pattern->synced ? 'yes' : 'no'
+			 */
+			?>
+
+			METADATA;
 	}
 
 	function update_user_pattern ( $pattern ) {

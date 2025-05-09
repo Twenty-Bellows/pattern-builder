@@ -28,7 +28,7 @@ export async function getEditorSettings() {
 
 export async function savePattern(pattern) {
 	return apiFetch( {
-		path: '/pattern-manager/v1/pattern/' + pattern.name,
+		path: '/pattern-manager/v1/pattern',
 		method: 'PUT',
 		body: JSON.stringify( pattern ),
 		headers: {
