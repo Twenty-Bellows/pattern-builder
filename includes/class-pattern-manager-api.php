@@ -1,8 +1,9 @@
 <?php
 
-
+require_once __DIR__ . '/class-pattern-manager-abstract-pattern.php';
 class Twenty_Bellows_Pattern_Manager_API
 {
+	private static $base_route = 'pattern-manager/v1';
 
 	public function __construct()
 	{
@@ -11,7 +12,7 @@ class Twenty_Bellows_Pattern_Manager_API
 
 	public function register_routes()
 	{
-		register_rest_route('pattern-manager/v1', '/patterns', [
+		register_rest_route(self::$base_route, '/patterns', [
 			'methods'  => 'GET',
 			'callback' => [$this, 'get_patterns'],
 			'permission_callback' => function () {
@@ -19,13 +20,46 @@ class Twenty_Bellows_Pattern_Manager_API
 			},
 		]);
 
-		register_rest_route('pattern-manager/v1', '/global-styles', [
+		register_rest_route(self::$base_route, '/global-styles', [
 			'methods'  => 'GET',
 			'callback' => [$this, 'get_global_styles'],
 			'permission_callback' => function () {
 				return true;
 			},
 		]);
+
+		register_rest_route(self::$base_route, '/pattern/(?P<slug>[\w-]+)', [
+			'methods'  => 'PUT',
+			'callback' => [$this, 'save_block_pattern'],
+			'permission_callback' => function () {
+				return true;
+			},
+			'args'     => [
+				'slug' => [
+					'required' => true,
+					'type'     => 'string',
+				],
+			],
+		]);
+
+	}
+
+	function save_block_pattern($request)
+	{
+		$slug = $request->get_param('slug');
+		$pattern = $request->get_body();
+
+		$pattern = new Abstract_Pattern( json_decode($pattern, true) );
+
+		if (empty($pattern)) {
+			return new WP_Error('no_patterns', 'No pattern to save', array('status' => 400));
+		}
+
+		if ($slug !== $pattern->name) {
+			return new WP_Error('invalid_pattern', 'Pattern slug does not match', array('status' => 400));
+		}
+
+		return rest_ensure_response($pattern);
 	}
 
 	function get_global_styles($request)
@@ -57,9 +91,11 @@ class Twenty_Bellows_Pattern_Manager_API
 			$unsynced_patterns[] = [
 				'name'     => $pattern['name'],
 				'title'    => $pattern['title'],
+				'description'    => $pattern['description'],
 				'source'   => $pattern['source'] ?? 'theme',
 				'content'  => $pattern['content'],
 				'synced'   => false,
+				'inserter' => true,
 			];
 		}
 
@@ -83,8 +119,11 @@ class Twenty_Bellows_Pattern_Manager_API
 			$patterns[] = [
 				'name'     => $post->post_name,
 				'title'    => $post->post_title,
+				'description' => $post->post_excerpt,
 				'content'  => $post->post_content,
 				'synced'   => $metadata['wp_pattern_sync_status'][0] !== 'unsynced' ?? false,
+				'inserter' => true,
+				'source'   => 'user',
 			];
 		}
 

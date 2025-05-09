@@ -1,5 +1,5 @@
 import apiFetch from '@wordpress/api-fetch';
-import Pattern from './objects/Pattern';
+import AbstractPattern from './objects/AbstractPattern';
 
 export async function getAllPatterns() {
 	return apiFetch( {
@@ -11,7 +11,7 @@ export async function getAllPatterns() {
 	} )
 	.then( ( response ) => {
 		return response.map( ( pattern ) => {
-			return new Pattern( pattern );
+			return new AbstractPattern( pattern );
 		} );
 	});
 }
@@ -27,5 +27,15 @@ export async function getEditorSettings() {
 }
 
 export async function savePattern(pattern) {
-	console.log('saving pattern', pattern);
+	return apiFetch( {
+		path: '/pattern-manager/v1/pattern/' + pattern.name,
+		method: 'PUT',
+		body: JSON.stringify( pattern ),
+		headers: {
+			'Content-Type': 'application/json',
+		},
+	} )
+	.then( ( response ) => {
+		return new AbstractPattern( response );
+	});
 }
