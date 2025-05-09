@@ -1,6 +1,6 @@
 <?php
 
-class Pattern_Manager_Admin_Landing {
+class Twenty_Bellows_Pattern_Manager_Admin {
 
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'create_admin_menu' ) );
@@ -10,13 +10,12 @@ class Pattern_Manager_Admin_Landing {
 		$landing_page_slug       = 'pattern-manager';
 		$landing_page_title      = _x( 'Pattern Manager', 'UI String', 'pattern-manager' );
 		$landing_page_menu_title = $landing_page_title;
-		add_theme_page( $landing_page_title, $landing_page_menu_title, 'edit_theme_options', $landing_page_slug, array( $this, 'admin_menu_page' ) );
-
+		add_theme_page( $landing_page_title, $landing_page_menu_title, 'edit_theme_options', $landing_page_slug, array( $this, 'create_admin_menu_page' ) );
 	}
 
-	public static function admin_menu_page() {
+	public static function create_admin_menu_page() {
 
-		$asset_file = include plugin_dir_path( __DIR__ ) . 'build/pattern-manager-admin.asset.php';
+		$asset_file = include plugin_dir_path( __DIR__ ) . '../build/pattern-manager-admin.asset.php';
 
 		// Load our app.js.
 		wp_enqueue_script( 'pattern-manager-app', plugins_url( 'build/pattern-manager-admin.js', __DIR__ ), $asset_file['dependencies'], $asset_file['version'] );
@@ -28,4 +27,3 @@ class Pattern_Manager_Admin_Landing {
 	}
 }
 
-$admin_landing = new Pattern_Manager_Admin_Landing();

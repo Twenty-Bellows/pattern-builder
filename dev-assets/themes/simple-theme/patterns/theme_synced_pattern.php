@@ -3,7 +3,7 @@
  * Title: Theme Synced Pattern
  * Slug: synced-patterns-test/theme-synced-pattern
  * Categories: text
- * Description: A group block with a blue background and text.
+ * Description: A SYNCED pattern that comes with the theme to be used for testing.
  * Synced: yes
  */
 

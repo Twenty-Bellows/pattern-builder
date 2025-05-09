@@ -3,7 +3,7 @@
  * Title: Theme Unsynced Pattern
  * Slug: synced-patterns-test/theme-unsynced-pattern
  * Categories: text
- * Description: A group block with a blue background and text.
+ * Description: An unsynced pattern provided with the theme to use for testing.
  */
 
 ?>

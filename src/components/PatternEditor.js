@@ -1,3 +1,4 @@
+// @WordPress dependencies
 import {
 	BlockCanvas,
 	BlockEditorProvider,
@@ -6,56 +7,15 @@ import {
 	__experimentalLibrary as InserterLibrary
 } from '@wordpress/block-editor';
 import { Panel, TabPanel, Button } from '@wordpress/components';
+import { EditorHistoryRedo, EditorHistoryUndo } from '@wordpress/editor';
 import { useState, useEffect } from '@wordpress/element';
-import { parse } from '@wordpress/blocks';
+import { parse, serialize } from '@wordpress/blocks';
 import { chevronLeft } from '@wordpress/icons';
-import { getEditorSettings } from '../resolvers';
+import { ToolbarButton, ToolbarItem } from '@wordpress/components';
 
-const EditorSidebar = () => {
+import { getEditorSettings, savePattern } from '../resolvers';
+import { PatternDetails } from '../components/PatternDetails';
 
-	return (
-		<div className="pattern-sidebar">
-			<TabPanel
-				className="pattern-tabs"
-				activeClass="is-active"
-				tabs={[
-					{
-						name: 'pattern',
-						title: 'Pattern',
-					},
-					{
-						name: 'block',
-						title: 'Block',
-					},
-					{
-						name: 'add',
-						title: 'Add',
-					},
-				]}
-			>
-				{(tab) => (
-					<>
-						{tab.name === 'pattern' && (
-							<Panel>
-								<p>Pattern Details</p>
-							</Panel>
-						)}
-						{tab.name === 'block' && (
-							<Panel>
-								<BlockInspector />
-							</Panel>
-						)}
-						{tab.name === 'add' && (
-							<Panel>
-								<InserterLibrary />
-							</Panel>
-						)}
-					</>
-				)}
-			</TabPanel>
-		</div>
-	);
-};
 
 export const PatternEditor = ({ pattern, onClose }) => {
 
@@ -91,8 +51,27 @@ export const PatternEditor = ({ pattern, onClose }) => {
 						onClick={onClose}
 						icon={chevronLeft}
 						label="Back"
-					>
-					</Button>
+					/>
+					<ToolbarItem
+						as={EditorHistoryUndo}
+						variant={'tertiary'}
+						size="compact"
+					/>
+					<ToolbarItem
+						as={EditorHistoryRedo}
+						variant={'tertiary'}
+						size="compact"
+					/>
+					<div style={{ flexGrow: 1 }} />
+					<Button
+						variant="primary"
+						onClick={() => {
+							savePattern({
+								...pattern,
+								content: serialize(blocks),
+							})
+						}}
+					>Save</Button>
 				</div>
 
 				<div className="pattern-editor_body">
@@ -103,7 +82,54 @@ export const PatternEditor = ({ pattern, onClose }) => {
 						<BlockCanvas height="100%" />
 					</div>
 					<div className="pattern-editor_sidebar">
-						<EditorSidebar />
+						<div className="pattern-sidebar">
+							<TabPanel
+								className="pattern-tabs"
+								activeClass="is-active"
+								tabs={[
+									{
+										name: 'pattern',
+										title: 'Pattern',
+									},
+									{
+										name: 'block',
+										title: 'Block',
+									},
+									{
+										name: 'add',
+										title: 'Add',
+									},
+									{
+										name: 'bindings',
+										title: 'Bindings',
+									},
+									{
+										name: 'history',
+										title: 'History',
+									},
+								]}
+							>
+								{(tab) => (
+									<>
+										{tab.name === 'pattern' && (
+											<Panel>
+												<PatternDetails pattern={ pattern } />
+											</Panel>
+										)}
+										{tab.name === 'block' && (
+											<Panel>
+												<BlockInspector />
+											</Panel>
+										)}
+										{tab.name === 'add' && (
+											<Panel>
+												<InserterLibrary />
+											</Panel>
+										)}
+									</>
+								)}
+							</TabPanel>
+						</div>
 					</div>
 				</div>
 			</BlockEditorProvider>

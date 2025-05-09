@@ -35,6 +35,7 @@ export default function PatternManagerEditorTools() {
 			<PluginSidebarMoreMenuItem
 				target="pattern-manager-sidebar"
 				icon={ tool }
+				onClick={ () => setIsPatternManagerOpen( true ) }
 			>
 				{ _x( 'Pattern Manager', 'UI String', 'pattern-manager' ) }
 			</PluginSidebarMoreMenuItem>

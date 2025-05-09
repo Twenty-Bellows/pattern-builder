@@ -25,3 +25,7 @@ export async function getEditorSettings() {
 			console.error('Error fetching global styles:', error);
 		});
 }
+
+export async function savePattern(pattern) {
+	console.log('saving pattern', pattern);
+}
