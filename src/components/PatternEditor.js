@@ -5,10 +5,10 @@ import {
 	__experimentalListView as ListView,
 	__experimentalLibrary as InserterLibrary
 } from '@wordpress/block-editor';
-import { Panel, TabPanel } from '@wordpress/components';
+import { Panel, TabPanel, Button } from '@wordpress/components';
 import { useState, useEffect } from '@wordpress/element';
 import { parse } from '@wordpress/blocks';
-
+import { chevronLeft } from '@wordpress/icons';
 import { getEditorSettings } from '../resolvers';
 
 const EditorSidebar = () => {
@@ -57,7 +57,7 @@ const EditorSidebar = () => {
 	);
 };
 
-export const PatternEditor = ({ pattern }) => {
+export const PatternEditor = ({ pattern, onClose }) => {
 
 	const [blocks, setBlocks] = useState(parse(pattern.content));
 	const [editorSettings, setEditorSettings] = useState(null);
@@ -87,7 +87,12 @@ export const PatternEditor = ({ pattern }) => {
 				settings={editorSettings}
 			>
 				<div className="pattern-editor_header">
-					Editor
+					<Button
+						onClick={onClose}
+						icon={chevronLeft}
+						label="Back"
+					>
+					</Button>
 				</div>
 
 				<div className="pattern-editor_body">

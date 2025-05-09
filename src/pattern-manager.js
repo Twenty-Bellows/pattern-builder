@@ -14,7 +14,10 @@ const PatternManager = () => {
 		<div className="pattern-manager_container">
 
 		{ selectedPattern ? (
-			<PatternEditor pattern={selectedPattern} />
+			<PatternEditor
+				pattern={selectedPattern}
+				onClose={ () => setSelectedPattern(null) }
+			/>
 		) : (
 			<PatternGrid onPatternClick={setSelectedPattern} />
 		) }

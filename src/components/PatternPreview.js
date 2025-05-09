@@ -19,7 +19,6 @@ const PatternPreview = ({ pattern, onClick }) => {
 			<BlockPreview
 				blocks={ blocks }
 				viewportWidth={ 500 }
-				minHeight={ 150 }
 			/>
 		</Composite>
 	);
