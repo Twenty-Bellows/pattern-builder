@@ -44,6 +44,8 @@ class Twenty_Bellows_Pattern_Manager_API
 
 	}
 
+	// Callback functions //////////
+
 	function save_block_pattern($request)
 	{
 		$slug = $request->get_param('slug');
@@ -59,7 +61,20 @@ class Twenty_Bellows_Pattern_Manager_API
 			return new WP_Error('invalid_pattern', 'Pattern slug does not match', array('status' => 400));
 		}
 
-		return rest_ensure_response($pattern);
+		if ($pattern->source === 'user') {
+			$response = $this->update_user_pattern( $pattern );
+		}
+
+		else if( $pattern->source === 'theme' ) {
+			$response = $this->update_theme_pattern( $pattern );
+		}
+
+		else {
+			return new WP_Error('invalid_pattern', 'Pattern source is not valid', array('status' => 400));
+		}
+
+		return rest_ensure_response($response);
+
 	}
 
 	function get_global_styles($request)
@@ -81,6 +96,35 @@ class Twenty_Bellows_Pattern_Manager_API
 		return rest_ensure_response($all_patterns);
 	}
 
+	// Utility functions //////////
+
+	function update_theme_pattern ( $pattern ) {
+
+		// TODO: update the pattern file in the theme
+		$theme = wp_get_theme();
+		$path = $theme->get_stylesheet_directory() . '/patterns/' . $pattern->name . '.php';
+
+		return $pattern;
+	}
+
+	function update_user_pattern ( $pattern ) {
+
+		$post = get_page_by_path($pattern->name, OBJECT, 'wp_block');
+
+		if (empty($post)) {
+			return new WP_Error('no_patterns', 'No pattern to save', array('status' => 400));
+		}
+
+		wp_update_post([
+			'ID'           => $post->ID,
+			'post_title'   => $pattern->title,
+			'post_content' => $pattern->content,
+			'post_excerpt' => $pattern->description,
+		]);
+
+		return $pattern;
+	}
+
 	function get_block_patterns_from_registry()
 	{
 		$patterns = WP_Block_Patterns_Registry::get_instance()->get_all_registered();
@@ -88,15 +132,7 @@ class Twenty_Bellows_Pattern_Manager_API
 		$unsynced_patterns = [];
 
 		foreach ($patterns as $pattern) {
-			$unsynced_patterns[] = [
-				'name'     => $pattern['name'],
-				'title'    => $pattern['title'],
-				'description'    => $pattern['description'],
-				'source'   => $pattern['source'] ?? 'theme',
-				'content'  => $pattern['content'],
-				'synced'   => false,
-				'inserter' => true,
-			];
+			$unsynced_patterns[] = Abstract_Pattern::from_registry($pattern);
 		}
 
 		return $unsynced_patterns;
@@ -104,27 +140,15 @@ class Twenty_Bellows_Pattern_Manager_API
 
 	function get_block_patterns_from_database()
 	{
-		$args = [
+		$query = new WP_Query([
 			'post_type'   => 'wp_block',
-		];
-
-		$query = new WP_Query($args);
+		]);
 
 		$patterns = [];
 
 		foreach ($query->posts as $post) {
-
 			$metadata = get_post_meta($post->ID);
-
-			$patterns[] = [
-				'name'     => $post->post_name,
-				'title'    => $post->post_title,
-				'description' => $post->post_excerpt,
-				'content'  => $post->post_content,
-				'synced'   => $metadata['wp_pattern_sync_status'][0] !== 'unsynced' ?? false,
-				'inserter' => true,
-				'source'   => 'user',
-			];
+			$patterns[] = Abstract_Pattern::from_post($post, $metadata);
 		}
 
 		return $patterns;

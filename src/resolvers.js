@@ -36,6 +36,7 @@ export async function savePattern(pattern) {
 		},
 	} )
 	.then( ( response ) => {
+		// TODO: Clear pattern data in the editor so it picks up the changes
 		return new AbstractPattern( response );
 	});
 }
