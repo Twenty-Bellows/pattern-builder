@@ -1,175 +1,192 @@
 <?php
 
 require_once __DIR__ . '/class-pattern-manager-abstract-pattern.php';
-class Twenty_Bellows_Pattern_Manager_API
-{
-	private static $base_route = 'pattern-manager/v1';
 
-	public function __construct()
-	{
-		add_action('rest_api_init', array($this, 'register_routes'));
-	}
+class Twenty_Bellows_Pattern_Manager_API {
+    private static $base_route = 'pattern-manager/v1';
 
-	public function register_routes()
-	{
-		register_rest_route(self::$base_route, '/patterns', [
-			'methods'  => 'GET',
-			'callback' => [$this, 'get_patterns'],
-			'permission_callback' => function () {
-				return true;
-			},
-		]);
+    public function __construct() {
+        add_action('rest_api_init', [$this, 'register_routes']);
+    }
 
-		register_rest_route(self::$base_route, '/global-styles', [
-			'methods'  => 'GET',
-			'callback' => [$this, 'get_global_styles'],
-			'permission_callback' => function () {
-				return true;
-			},
-		]);
+    /**
+     * Registers REST API routes for the pattern manager.
+     */
+    public function register_routes(): void {
+        register_rest_route(self::$base_route, '/patterns', [
+            'methods'  => 'GET',
+            'callback' => [$this, 'get_patterns'],
+            'permission_callback' => [$this, 'default_permission_callback'],
+        ]);
 
-		register_rest_route(self::$base_route, '/pattern', [
-			'methods'  => 'PUT',
-			'callback' => [$this, 'save_block_pattern'],
-			'permission_callback' => function () {
-				return true;
-			},
-		]);
+        register_rest_route(self::$base_route, '/global-styles', [
+            'methods'  => 'GET',
+            'callback' => [$this, 'get_global_styles'],
+            'permission_callback' => [$this, 'default_permission_callback'],
+        ]);
 
-	}
+        register_rest_route(self::$base_route, '/pattern', [
+            'methods'  => 'PUT',
+            'callback' => [$this, 'save_block_pattern'],
+            'permission_callback' => [$this, 'default_permission_callback'],
+        ]);
+    }
 
-	// Callback functions //////////
+    /**
+     * Default permission callback for all routes.
+     */
+    private function default_permission_callback(): bool {
+        return true;
+    }
 
-	function save_block_pattern($request)
-	{
-		$pattern = $request->get_body();
+    // Callback functions //////////
 
-		$pattern = new Abstract_Pattern( json_decode($pattern, true) );
+    /**
+     * Saves a block pattern.
+     *
+     * @param WP_REST_Request $request The REST request object.
+     * @return WP_REST_Response|WP_Error
+     */
+    public function save_block_pattern(WP_REST_Request $request) {
+        $pattern_data = json_decode($request->get_body(), true);
 
-		if (empty($pattern)) {
-			return new WP_Error('no_patterns', 'No pattern to save', array('status' => 400));
-		}
+        if (empty($pattern_data)) {
+            return new WP_Error('no_patterns', 'No pattern to save', ['status' => 400]);
+        }
 
-		if ($pattern->source === 'user') {
-			$response = $this->update_user_pattern( $pattern );
-		}
+        $pattern = new Abstract_Pattern($pattern_data);
 
-		else if( $pattern->source === 'theme' ) {
-			$response = $this->update_theme_pattern( $pattern );
-		}
+        if ($pattern->source === 'user') {
+            $response = $this->update_user_pattern($pattern);
+        } elseif ($pattern->source === 'theme') {
+            $response = $this->update_theme_pattern($pattern);
+        } else {
+            return new WP_Error('invalid_pattern', 'Pattern source is not valid', ['status' => 400]);
+        }
 
-		else {
-			return new WP_Error('invalid_pattern', 'Pattern source is not valid', array('status' => 400));
-		}
+        return rest_ensure_response($response);
+    }
 
-		return rest_ensure_response($response);
+    /**
+     * Retrieves global styles.
+     *
+     * @param WP_REST_Request $request The REST request object.
+     * @return WP_REST_Response
+     */
+    public function get_global_styles(WP_REST_Request $request): WP_REST_Response {
+        $editor_context = new WP_Block_Editor_Context(['name' => 'core/edit-site']);
+        $settings = get_block_editor_settings([], $editor_context);
 
-	}
+        return rest_ensure_response($settings);
+    }
 
-	function get_global_styles($request)
-	{
+    /**
+     * Retrieves all block patterns.
+     *
+     * @param WP_REST_Request $request The REST request object.
+     * @return WP_REST_Response
+     */
+    public function get_patterns(WP_REST_Request $request): WP_REST_Response {
+        $unsynced_patterns = $this->get_block_patterns_from_registry();
+        $synced_patterns = $this->get_block_patterns_from_database();
 
-		$editor_context = new WP_Block_Editor_Context(array('name' => 'core/edit-site'));
-		$settings = get_block_editor_settings([], $editor_context);
+        $all_patterns = array_merge($unsynced_patterns, $synced_patterns);
 
-		return rest_ensure_response($settings);
-	}
+        return rest_ensure_response($all_patterns);
+    }
 
-	function get_patterns($request)
-	{
-		$unsynced_patterns = $this->get_block_patterns_from_registry();
-		$synced_patterns = $this->get_block_patterns_from_database();
+    // Utility functions //////////
 
-		$all_patterns = array_merge($unsynced_patterns, $synced_patterns);
+    /**
+     * Updates a theme pattern.
+     *
+     * @param Abstract_Pattern $pattern The pattern to update.
+     * @return Abstract_Pattern|WP_Error
+     */
+    private function update_theme_pattern(Abstract_Pattern $pattern) {
+        $path = $pattern->filePath ?? wp_get_theme()->get_stylesheet_directory() . '/patterns/' . basename($pattern->name) . '.php';
 
-		return rest_ensure_response($all_patterns);
-	}
+        $file_content = $this->build_pattern_file_metadata($pattern) . $pattern->content . "\n";
+        $response = file_put_contents($path, $file_content);
 
-	// Utility functions //////////
+        if (!$response) {
+            return new WP_Error('file_creation_failed', 'Failed to create pattern file', ['status' => 500]);
+        }
 
-	function update_theme_pattern ( $pattern ) {
+        return $pattern;
+    }
 
-		$path = $pattern->filePath;
-		if ( ! $path ) {
-			$theme = wp_get_theme();
-			$filename = basename($pattern->name);
-			$path = $theme->get_stylesheet_directory() . '/patterns/' . $filename . '.php';
-		}
+    /**
+     * Builds metadata for a pattern file.
+     *
+     * @param Abstract_Pattern $pattern The pattern object.
+     * @return string
+     */
+    private function build_pattern_file_metadata(Abstract_Pattern $pattern): string {
+        $synced = $pattern->synced ? ' * Synced: yes' : '';
+        $inserter = $pattern->inserter ? '' : ' * Inserter: no';
+        $categories = $pattern->categories ? ' * Categories: ' . implode(', ', $pattern->categories) : '';
+        $keywords = $pattern->keywords ? ' * Keywords: ' . implode(', ', $pattern->keywords) : '';
 
-		$file_content = $this->build_pattern_file_metadata($pattern) . $pattern->content . "\n";
-		$response = file_put_contents($path, $file_content);
+        return <<<METADATA
+            <?php
+            /**
+             * Title: $pattern->title
+             * Slug: $pattern->name
+             * Description: $pattern->description$synced$inserter$categories$keywords
+             */
+            ?>
+        METADATA;
+    }
 
-		if ( ! $response ) {
-			return new WP_Error('file_creation_failed', 'Failed to create pattern file', array('status' => 500));
-		}
+    /**
+     * Updates a user pattern.
+     *
+     * @param Abstract_Pattern $pattern The pattern to update.
+     * @return Abstract_Pattern|WP_Error
+     */
+    private function update_user_pattern(Abstract_Pattern $pattern) {
+        $post = get_page_by_path($pattern->name, OBJECT, 'wp_block');
 
-		return $pattern;
-	}
+        if (empty($post)) {
+            return new WP_Error('no_patterns', 'No pattern to save', ['status' => 400]);
+        }
 
-	function build_pattern_file_metadata ( $pattern ) {
+        wp_update_post([
+            'ID'           => $post->ID,
+            'post_title'   => $pattern->title,
+            'post_content' => $pattern->content,
+            'post_excerpt' => $pattern->description,
+        ]);
 
-		$synced = $pattern->synced ? ' * Synced: yes' : '';
-		$inserter = $pattern->inserter ? '' : ' * Inserter: no';
-		$categories = '';
-		$keywords = '';
+        return $pattern;
+    }
 
-		return <<<METADATA
-			<?php
-			/**
-			 * Title: $pattern->title
-			 * Slug: $pattern->name
-			 * Description: $pattern->description$synced$inserter$categories$keywords
-			 */
+    /**
+     * Retrieves block patterns from the registry.
+     *
+     * @return array
+     */
+    private function get_block_patterns_from_registry(): array {
+        $patterns = WP_Block_Patterns_Registry::get_instance()->get_all_registered();
 
-			?>
+        return array_map([Abstract_Pattern::class, 'from_registry'], $patterns);
+    }
 
-			METADATA;
-	}
+    /**
+     * Retrieves block patterns from the database.
+     *
+     * @return array
+     */
+    private function get_block_patterns_from_database(): array {
+        $query = new WP_Query(['post_type' => 'wp_block']);
+        $patterns = [];
 
-	function update_user_pattern ( $pattern ) {
+        foreach ($query->posts as $post) {
+            $metadata = get_post_meta($post->ID);
+            $patterns[] = Abstract_Pattern::from_post($post, $metadata);
+        }
 
-		$post = get_page_by_path($pattern->name, OBJECT, 'wp_block');
-
-		if (empty($post)) {
-			return new WP_Error('no_patterns', 'No pattern to save', array('status' => 400));
-		}
-
-		wp_update_post([
-			'ID'           => $post->ID,
-			'post_title'   => $pattern->title,
-			'post_content' => $pattern->content,
-			'post_excerpt' => $pattern->description,
-		]);
-
-		return $pattern;
-	}
-
-	function get_block_patterns_from_registry()
-	{
-		$patterns = WP_Block_Patterns_Registry::get_instance()->get_all_registered();
-
-		$unsynced_patterns = [];
-
-		foreach ($patterns as $pattern) {
-			$unsynced_patterns[] = Abstract_Pattern::from_registry($pattern);
-		}
-
-		return $unsynced_patterns;
-	}
-
-	function get_block_patterns_from_database()
-	{
-		$query = new WP_Query([
-			'post_type'   => 'wp_block',
-		]);
-
-		$patterns = [];
-
-		foreach ($query->posts as $post) {
-			$metadata = get_post_meta($post->ID);
-			$patterns[] = Abstract_Pattern::from_post($post, $metadata);
-		}
-
-		return $patterns;
-	}
+        return $patterns;
+    }
 }

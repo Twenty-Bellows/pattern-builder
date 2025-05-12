@@ -2,28 +2,51 @@
 
 class Twenty_Bellows_Pattern_Manager_Admin {
 
-	public function __construct() {
-		add_action( 'admin_menu', array( $this, 'create_admin_menu' ) );
-	}
+    private const PAGE_SLUG = 'pattern-manager';
+    private const PAGE_TITLE = 'Pattern Manager';
 
-	function create_admin_menu() {
-		$landing_page_slug       = 'pattern-manager';
-		$landing_page_title      = _x( 'Pattern Manager', 'UI String', 'pattern-manager' );
-		$landing_page_menu_title = $landing_page_title;
-		add_theme_page( $landing_page_title, $landing_page_menu_title, 'edit_theme_options', $landing_page_slug, array( $this, 'create_admin_menu_page' ) );
-	}
+    /**
+     * Constructor to initialize admin hooks.
+     */
+    public function __construct() {
+        add_action('admin_menu', [$this, 'create_admin_menu']);
+    }
 
-	public static function create_admin_menu_page() {
+    /**
+     * Creates the admin menu for the Pattern Manager.
+     */
+    public function create_admin_menu(): void {
+        add_theme_page(
+            _x(self::PAGE_TITLE, 'UI String', 'pattern-manager'),
+            _x(self::PAGE_TITLE, 'UI String', 'pattern-manager'),
+            'edit_theme_options',
+            self::PAGE_SLUG,
+            [$this, 'render_admin_menu_page']
+        );
+    }
 
-		$asset_file = include plugin_dir_path( __DIR__ ) . '../build/pattern-manager-admin.asset.php';
+    /**
+     * Renders the admin menu page.
+     */
+    public function render_admin_menu_page(): void {
+        $this->enqueue_assets();
+        echo '<div id="pattern-manager-app"></div>';
+    }
 
-		// Load our app.js.
-		wp_enqueue_script( 'pattern-manager-app', plugins_url( 'build/pattern-manager-admin.js', __DIR__ ), $asset_file['dependencies'], $asset_file['version'] );
+    /**
+     * Enqueues the necessary assets for the admin page.
+     */
+    private function enqueue_assets(): void {
+        $asset_file = include plugin_dir_path(__DIR__) . '../build/pattern-manager-admin.asset.php';
 
-		// Enable localization in the app.
-		wp_set_script_translations( 'pattern-manager-app', 'pattern-manager' );
+        wp_enqueue_script(
+            'pattern-manager-app',
+            plugins_url('build/pattern-manager-admin.js', __DIR__),
+            $asset_file['dependencies'],
+            $asset_file['version']
+        );
 
-		echo '<div id="pattern-manager-app"></div>';
-	}
+        wp_set_script_translations('pattern-manager-app', 'pattern-manager');
+    }
 }
 
