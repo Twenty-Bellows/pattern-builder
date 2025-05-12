@@ -1,5 +1,6 @@
 import { useState } from '@wordpress/element'
 import { TextControl, TextareaControl, SelectControl, ToggleControl } from '@wordpress/components';
+import { Button } from '@wordpress/components';
 
 export const PatternDetails = ({ pattern, onChange }) => {
 
@@ -27,7 +28,14 @@ export const PatternDetails = ({ pattern, onChange }) => {
 				onChange={(value) => handleChange('description', value)}
 				__nextHasNoMarginBottom
 			/>
-
+			<div className="components-base-control">
+				<label className="components-base-control__label">Synced Pattern</label>
+				<ToggleControl
+					checked={editablePattern.synced || false}
+					onChange={(value) => handleChange('synced', value)}
+					__nextHasNoMarginBottom
+				/>
+			</div>
 
 			<details>
 				<summary>Advanced</summary>
@@ -42,14 +50,6 @@ export const PatternDetails = ({ pattern, onChange }) => {
 				__next40pxDefaultSize
 				__nextHasNoMarginBottom
 			/>
-			<div className="components-base-control">
-				<label className="components-base-control__label">Synced Pattern</label>
-				<ToggleControl
-					checked={editablePattern.synced || false}
-					onChange={(value) => handleChange('synced', value)}
-					__nextHasNoMarginBottom
-				/>
-			</div>
 			<SelectControl
 				label="Source"
 				value={editablePattern.source || ''}
@@ -62,6 +62,18 @@ export const PatternDetails = ({ pattern, onChange }) => {
 				__nextHasNoMarginBottom
 				__next40pxDefaultSize
 			/>
+			<Button
+				isDestructive
+				variant='secondary'
+				label='Delete Pattern'
+				onClick={() => {
+					console.log('Delete pattern:', editablePattern);
+				}}
+				__next40pxDefaultSize
+				__nextHasNoMarginBottom
+			>
+				Delete Pattern
+			</Button>
 			</details>
 
 		</div>

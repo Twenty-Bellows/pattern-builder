@@ -149,15 +149,28 @@ class Twenty_Bellows_Pattern_Manager_API {
         $post = get_page_by_path($pattern->name, OBJECT, 'wp_block');
 
         if (empty($post)) {
-            return new WP_Error('no_patterns', 'No pattern to save', ['status' => 400]);
-        }
 
-        wp_update_post([
-            'ID'           => $post->ID,
-            'post_title'   => $pattern->title,
-            'post_content' => $pattern->content,
-            'post_excerpt' => $pattern->description,
-        ]);
+			$post = [
+				'post_title'   => $pattern->title,
+				'post_name'    => $pattern->name,
+				'post_content' => $pattern->content,
+				'post_excerpt' => $pattern->description,
+				'post_type'    => 'wp_block',
+				'post_status'  => 'publish',
+			];
+
+			$post_id = wp_insert_post($post);
+
+        } else {
+			wp_update_post([
+				'ID'           => $post->ID,
+				'post_title'   => $pattern->title,
+				'post_content' => $pattern->content,
+				'post_excerpt' => $pattern->description,
+			]);
+		}
+
+
 
         return $pattern;
     }

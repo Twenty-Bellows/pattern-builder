@@ -17,11 +17,11 @@ class Abstract_Pattern
 
 	public function __construct( $args = array() )
 	{
-		// required
-		$this->name = $args['name'];
 		$this->title = $args['title'];
-		$this->description = $args['description'];
-		$this->content = $args['content'];
+
+		$this->name = $args['name'] ?? sanitize_title( $args['title'] );
+		$this->description = $args['description'] ?? '';
+		$this->content = $args['content'] ?? '';
 
 		$this->source = $args['source'] ?? 'theme';
 		$this->synced = $args['synced'] ?? false;

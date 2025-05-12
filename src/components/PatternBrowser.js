@@ -1,10 +1,11 @@
 import { __ } from '@wordpress/i18n';
 import { useEffect, useState } from '@wordpress/element';
 import { BlockEditorProvider } from '@wordpress/block-editor';
+
 import { getAllPatterns, getEditorSettings } from '../resolvers';
 import PatternPreview from './PatternPreview';
 import { PatternBrowserPanel } from './PatternBrowserPanel';
-
+import { AbstractPattern } from '../objects/AbstractPattern';
 /**
  * PatternGrid Component
  * Displays a grid of pattern previews.
@@ -76,6 +77,14 @@ export const PatternBrowser = ({ onPatternClick }) => {
 
     };
 
+	const handleCreatePattern = (newPattern) => {
+		onPatternClick(new AbstractPattern( {
+			...newPattern,
+			synced: true,
+			source: 'user',
+		}));
+	}
+
     return (
         <div className="pattern-manager__pattern-browser">
 
@@ -94,6 +103,7 @@ export const PatternBrowser = ({ onPatternClick }) => {
                         patterns={patterns}
                         editorSettings={editorSettings}
                         onFilterChange={handleFilterChange}
+						onCreatePattern={handleCreatePattern}
                     />
                 </>
             )}

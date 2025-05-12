@@ -1,17 +1,21 @@
 import { __ } from '@wordpress/i18n';
-import { PanelBody, SelectControl, TextControl } from '@wordpress/components';
+import { PanelBody, SelectControl, TextControl, TextareaControl, CheckboxControl, Button } from '@wordpress/components';
 import { useState } from '@wordpress/element';
 
 /**
  * PatternBrowserPanel Component
  * Displays a sidebar for filters or additional controls.
  */
-export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange }) => {
+export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, onCreatePattern }) => {
     const [filterOptions, setFilterOptions] = useState({
         source: 'all',
         synced: 'both',
         category: 'all',
         keyword: '',
+    });
+
+    const [newPattern, setNewPattern] = useState({
+        title: '',
     });
 
     const updateFilterOptions = (key, value) => {
@@ -20,6 +24,19 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange }
         if (onFilterChange) {
             onFilterChange(updatedFilters);
         }
+    };
+
+    const updateNewPattern = (key, value) => {
+        setNewPattern({ ...newPattern, [key]: value });
+    };
+
+    const handleCreatePattern = () => {
+        if (onCreatePattern) {
+            onCreatePattern(newPattern);
+        }
+        setNewPattern({
+	    title: '',
+        });
     };
 
     return (
@@ -69,6 +86,23 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange }
                     placeholder={__('Search by keyword...', 'pattern-manager')}
                     onChange={(value) => updateFilterOptions('keyword', value)}
                 />
+            </PanelBody>
+
+            {/* New Pattern Creation Panel */}
+            <PanelBody title={__('Create New Pattern', 'pattern-manager')} initialOpen={true}>
+                <TextControl
+                    label={__('Name', 'pattern-manager')}
+                    value={newPattern.title}
+                    placeholder={__('Enter pattern name...', 'pattern-manager')}
+                    onChange={(value) => updateNewPattern('title', value)}
+                />
+                <Button
+		    		variant="primary"
+                    onClick={handleCreatePattern}
+                    disabled={!newPattern.title}
+                >
+                    {__('Create Pattern', 'pattern-manager')}
+                </Button>
             </PanelBody>
         </div>
     );
