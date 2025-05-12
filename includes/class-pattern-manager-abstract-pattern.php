@@ -13,6 +13,7 @@ class Abstract_Pattern
 	public $source;
 	public $synced;
 	public $inserter;
+	public $filePath;
 
 	public function __construct( $args = array() )
 	{
@@ -25,6 +26,8 @@ class Abstract_Pattern
 		$this->source = $args['source'] ?? 'theme';
 		$this->synced = $args['synced'] ?? false;
 		$this->inserter = $args['inserter'] ?? true;
+
+		$this->filePath = $args['filePath'] ?? null;
 	}
 
 	public static function from_registry( $pattern )
@@ -38,6 +41,7 @@ class Abstract_Pattern
 				'source'      => 'theme',
 				'synced'      => false,
 				'inserter'    => true,
+				'filePath'    => $pattern['filePath'] ?? null,
 			)
 		);
 	}

@@ -89,11 +89,14 @@ class Twenty_Bellows_Pattern_Manager_API
 
 	function update_theme_pattern ( $pattern ) {
 
-		$theme = wp_get_theme();
+		$path = $pattern->filePath;
+		if ( ! $path ) {
+			$theme = wp_get_theme();
+			$filename = basename($pattern->name);
+			$path = $theme->get_stylesheet_directory() . '/patterns/' . $filename . '.php';
+		}
 
-		$filename = basename($pattern->name);
-		$path = $theme->get_stylesheet_directory() . '/patterns/' . $filename . '.php';
-		$file_content = $this->build_pattern_file_metadata($pattern) . $pattern->content;
+		$file_content = $this->build_pattern_file_metadata($pattern) . $pattern->content . "\n";
 		$response = file_put_contents($path, $file_content);
 
 		if ( ! $response ) {
@@ -104,15 +107,20 @@ class Twenty_Bellows_Pattern_Manager_API
 	}
 
 	function build_pattern_file_metadata ( $pattern ) {
+
+		$synced = $pattern->synced ? ' * Synced: yes' : '';
+		$inserter = $pattern->inserter ? '' : ' * Inserter: no';
+		$categories = '';
+		$keywords = '';
+
 		return <<<METADATA
 			<?php
 			/**
 			 * Title: $pattern->title
 			 * Slug: $pattern->name
-			 * Description: $pattern->description
-			 * Categories:
-			 * Synced: $pattern->synced ? 'yes' : 'no'
+			 * Description: $pattern->description$synced$inserter$categories$keywords
 			 */
+
 			?>
 
 			METADATA;

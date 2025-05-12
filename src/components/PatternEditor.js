@@ -19,6 +19,7 @@ import { PatternDetails } from '../components/PatternDetails';
 
 export const PatternEditor = ({ pattern, onClose }) => {
 
+	const [updatedPattern, setUpdatedPattern] = useState(pattern);
 	const [blocks, setBlocks] = useState(parse(pattern.content));
 	const [editorSettings, setEditorSettings] = useState(null);
 
@@ -29,6 +30,19 @@ export const PatternEditor = ({ pattern, onClose }) => {
 				setEditorSettings(data);
 			});
 	}, []);
+
+	const handleSavePattern = () => {
+		savePattern({
+			...updatedPattern,
+			content: serialize(blocks),
+		})
+		.then((response) => {
+			alert('Pattern saved successfully');
+		})
+		.catch((error) => {
+			alert('Error saving pattern');
+		});
+	}
 
 	if (!editorSettings) {
 		return (
@@ -65,12 +79,7 @@ export const PatternEditor = ({ pattern, onClose }) => {
 					<div style={{ flexGrow: 1 }} />
 					<Button
 						variant="primary"
-						onClick={() => {
-							savePattern({
-								...pattern,
-								content: serialize(blocks),
-							})
-						}}
+						onClick={ handleSavePattern }
 					>Save</Button>
 				</div>
 
@@ -113,7 +122,7 @@ export const PatternEditor = ({ pattern, onClose }) => {
 									<>
 										{tab.name === 'pattern' && (
 											<Panel>
-												<PatternDetails pattern={ pattern } />
+												<PatternDetails pattern={ updatedPattern } onChange={ setUpdatedPattern } />
 											</Panel>
 										)}
 										{tab.name === 'block' && (

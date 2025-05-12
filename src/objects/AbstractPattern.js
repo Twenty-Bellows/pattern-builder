@@ -15,6 +15,8 @@ export class AbstractPattern {
 	synced = false;
 	inserter = false;
 
+	filePath = null;
+
 	constructor( options ) {
 		this.title = options.title || '';
 		this.name = options.name;
@@ -24,6 +26,8 @@ export class AbstractPattern {
 		this.source = options.source || '';
 		this.synced = options.synced || false;
 		this.inserter = options.inserter || false;
+
+		this.filePath = options.filePath || null;
 	}
 
 }
