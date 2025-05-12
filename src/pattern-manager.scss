@@ -2,8 +2,21 @@
 
 	height: 100%;
 
-	.pattern-manager__preview-grid {
+	.pattern-manager__pattern-browser {
+		display: flex;
+		gap: 1rem;
+		padding: 1rem;
+		box-sizing: border-box;
 
+		.pattern-manager__sidebar {
+			width: 300px;
+			padding: 1rem;
+		}
+
+	}
+
+	.pattern-manager__preview-grid {
+		flex: 1;
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 		gap: 1rem;
