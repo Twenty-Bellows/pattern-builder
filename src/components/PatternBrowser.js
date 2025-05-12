@@ -60,19 +60,21 @@ export const PatternBrowser = ({ onPatternClick }) => {
     }, []);
 
     const handleFilterChange = (filters) => {
-        const { source } = filters;
 
         const updatedFilteredPatterns = patterns
 		.filter((pattern) => {
         	// Filter patterns based on the source
-            if (source === 'all') return true; // Show all patterns
-            return pattern.source === source; // Match the source
+            if (filters.source === 'all') return true; // Show all patterns
+            return pattern.source === filters.source; // Match the source
         })
 		.filter((pattern) => {
 			// Filter patterns based on the synced status
 			if (filters.synced === 'all') return true; // Show all patterns
 			return pattern.synced === (filters.synced === 'yes'); // Match the synced status
-		})
+		});
+
+		console.log('Filtered patterns:', updatedFilteredPatterns);
+
         setFilteredPatterns(updatedFilteredPatterns);
 
     };

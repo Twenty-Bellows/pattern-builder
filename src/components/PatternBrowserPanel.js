@@ -9,7 +9,7 @@ import { useState } from '@wordpress/element';
 export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, onCreatePattern }) => {
     const [filterOptions, setFilterOptions] = useState({
         source: 'all',
-        synced: 'both',
+        synced: 'all',
         category: 'all',
         keyword: '',
     });
