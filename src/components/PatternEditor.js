@@ -60,7 +60,7 @@ export const PatternEditor = ({ pattern, onClose }) => {
 				onChange={setBlocks}
 				settings={editorSettings}
 			>
-				<div className="pattern-editor_header">
+				<div className="pattern-editor__header">
 					<Button
 						onClick={onClose}
 						icon={chevronLeft}
@@ -83,14 +83,14 @@ export const PatternEditor = ({ pattern, onClose }) => {
 					>Save</Button>
 				</div>
 
-				<div className="pattern-editor_body">
-					<div className="pattern-editor_list-view">
+				<div className="pattern-editor__body">
+					<div className="pattern-editor__list-view">
 						<ListView />
 					</div>
-					<div className="pattern-editor_content">
+					<div className="pattern-editor__content">
 						<BlockCanvas height="100%" />
 					</div>
-					<div className="pattern-editor_sidebar">
+					<div className="pattern-editor__sidebar">
 						<div className="pattern-sidebar">
 							<TabPanel
 								className="pattern-tabs"

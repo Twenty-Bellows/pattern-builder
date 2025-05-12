@@ -35,7 +35,7 @@ class Twenty_Bellows_Pattern_Manager_API {
     /**
      * Default permission callback for all routes.
      */
-    private function default_permission_callback(): bool {
+    public function default_permission_callback(): bool {
         return true;
     }
 
