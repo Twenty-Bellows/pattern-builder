@@ -13,7 +13,7 @@ export const PatternDetails = ({ pattern, onChange }) => {
 	};
 
 	return (
-		<div className="pattern-manager_pattern-details">
+		<div className="pattern-manager__pattern-details">
 			<TextControl
 				label="Title"
 				value={editablePattern.title || ''}

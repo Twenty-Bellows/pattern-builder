@@ -35,14 +35,14 @@ export const PatternGrid = ({onPatternClick}) => {
 				isPreviewMode: true,
 				focusMode: false,
 			}}>
-		<div className="pattern-manager_preview-grid">
+		<div className="pattern-manager__preview-grid">
 
 			{isLoading && <p>{__('Loading patterns...', 'pattern-manager')}</p>}
 
 			{error && <p style={{ color: 'red' }}>{error}</p>}
 
 			{patterns.map((pattern, index) => (
-				<div className="pattern-manager_preview-grid-item" key={index}>
+				<div className="pattern-manager__preview-grid-item" key={index}>
 					<PatternPreview onClick={onPatternClick} pattern={pattern} />
 				</div>
 			))}

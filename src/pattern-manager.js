@@ -11,7 +11,7 @@ const PatternManager = () => {
 	const [selectedPattern, setSelectedPattern] = useState(null);
 
 	return (
-		<div className="pattern-manager_container">
+		<div className="pattern-manager__container">
 
 		{ selectedPattern ? (
 			<PatternEditor

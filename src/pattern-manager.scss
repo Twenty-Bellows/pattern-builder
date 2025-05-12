@@ -1,15 +1,15 @@
-.pattern-manager_container {
+.pattern-manager__container {
 
 	height: 100%;
 
-	.pattern-manager_preview-grid {
+	.pattern-manager__preview-grid {
 
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 		gap: 1rem;
 		padding: 1rem;
 
-		.pattern-manager_preview-grid-item {
+		.pattern-manager__preview-grid-item {
 			padding: 1rem;
 			background-color: #f9f9f9;
 			border-radius: 8px;
@@ -25,43 +25,43 @@
 
 	}
 
-	.pattern-manager_editor {
+	.pattern-manager__editor {
 		display: flex;
 		flex-direction: column;
 		height: 100%;
 
-		.pattern-editor_header {
+		.pattern-editor__header {
 			padding: 1rem;
 			font-weight: bold;
 			border-bottom: 1px solid #ddd;
 			display: flex;
 		}
 
-		.pattern-editor_body {
+		.pattern-editor__body {
 			display: flex;
 			flex: 1;
 			overflow: hidden;
 
-			.pattern-editor_list-view {
+			.pattern-editor__list-view {
 				padding: 1rem;
 				overflow-y: auto;
 				width: 300px;
 			}
 
-			.pattern-editor_content {
+			.pattern-editor__content {
 				flex: 3;
 				padding: 1rem;
 				background-color: #eee;
 			}
 
-			.pattern-editor_sidebar {
+			.pattern-editor__sidebar {
 				padding: 1rem 0;
 				overflow-y: auto;
 				width: 370px;
 			}
 		}
 
-		.pattern-manager_pattern-details {
+		.pattern-manager__pattern-details {
 			padding: 1rem;
 			display: flex;
 			flex-direction: column;
@@ -81,13 +81,13 @@
 	}
 }
 
-.pattern-manager_modal {
+.pattern-manager__modal {
 	.components-modal__content {
 		padding-left: 0;
 		padding-right: 0;
 		padding-bottom: 0;
 
-		*:has(> .pattern-manager_container) {
+		*:has(> .pattern-manager__container) {
 			height: 100%;
 		}
 

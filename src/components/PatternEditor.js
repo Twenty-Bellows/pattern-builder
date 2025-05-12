@@ -46,14 +46,14 @@ export const PatternEditor = ({ pattern, onClose }) => {
 
 	if (!editorSettings) {
 		return (
-			<div className="pattern-manager_editor">
+			<div className="pattern-manager__editor">
 				Loading...
 			</div>
 		);
 	}
 
 	return (
-		<div className="pattern-manager_editor">
+		<div className="pattern-manager__editor">
 			<BlockEditorProvider
 				value={blocks}
 				onInput={setBlocks}
