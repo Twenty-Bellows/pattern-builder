@@ -123,20 +123,21 @@ class Twenty_Bellows_Pattern_Manager_API {
      * @return string
      */
     private function build_pattern_file_metadata(Abstract_Pattern $pattern): string {
-        $synced = $pattern->synced ? ' * Synced: yes' : '';
-        $inserter = $pattern->inserter ? '' : ' * Inserter: no';
-        $categories = $pattern->categories ? ' * Categories: ' . implode(', ', $pattern->categories) : '';
-        $keywords = $pattern->keywords ? ' * Keywords: ' . implode(', ', $pattern->keywords) : '';
+		$synced = $pattern->synced ? "\n * Synced: yes" : '';
+		$inserter = $pattern->inserter ? '' : "\n * Inserter: no";
+        $categories = $pattern->categories ? "\n * Categories: " . implode(', ', $pattern->categories) : '';
+        $keywords = $pattern->keywords ? "\n * Keywords: " . implode(', ', $pattern->keywords) : '';
 
-        return <<<METADATA
-            <?php
-            /**
-             * Title: $pattern->title
-             * Slug: $pattern->name
-             * Description: $pattern->description$synced$inserter$categories$keywords
-             */
-            ?>
-        METADATA;
+		return <<<METADATA
+	<?php
+	/**
+	 * Title: $pattern->title
+	 * Slug: $pattern->name
+	 * Description: $pattern->description$synced$inserter$categories$keywords
+	 */
+	?>
+
+	METADATA;
     }
 
     /**
