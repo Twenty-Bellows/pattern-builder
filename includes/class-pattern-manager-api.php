@@ -159,7 +159,7 @@ class Twenty_Bellows_Pattern_Manager_API {
 				'post_status'  => 'publish',
 			];
 
-			$post_id = wp_insert_post($post);
+			wp_insert_post($post);
 
         } else {
 			wp_update_post([
@@ -170,7 +170,12 @@ class Twenty_Bellows_Pattern_Manager_API {
 			]);
 		}
 
-
+		// ensure the 'synced' meta key is set
+		if ($pattern->synced) {
+			delete_post_meta($post->ID, 'wp_pattern_sync_status');
+		} else {
+			update_post_meta($post->ID, 'wp_pattern_sync_status', 'unsynced');
+		}
 
         return $pattern;
     }
