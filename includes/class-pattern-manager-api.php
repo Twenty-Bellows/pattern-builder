@@ -30,6 +30,13 @@ class Twenty_Bellows_Pattern_Manager_API {
             'callback' => [$this, 'save_block_pattern'],
             'permission_callback' => [$this, 'default_permission_callback'],
         ]);
+
+		// register a route expecting a pattern slug
+		register_rest_route(self::$base_route, '/pattern', [
+			'methods'  => 'DELETE',
+			'callback' => [$this, 'delete_block_pattern'],
+			'permission_callback' => [$this, 'default_permission_callback'],
+		]);
     }
 
     /**
@@ -40,6 +47,50 @@ class Twenty_Bellows_Pattern_Manager_API {
     }
 
     // Callback functions //////////
+
+	public function delete_block_pattern(WP_REST_Request $request) {
+		$pattern_data = json_decode($request->get_body(), true);
+
+        if (empty($pattern_data)) {
+            return new WP_Error('no_patterns', 'No pattern to save', ['status' => 400]);
+        }
+
+        $pattern = new Abstract_Pattern($pattern_data);
+
+        if ($pattern->source === 'user') {
+            $response = $this->delete_user_pattern($pattern);
+        } elseif ($pattern->source === 'theme') {
+            $response = $this->delete_theme_pattern($pattern);
+        } else {
+            return new WP_Error('invalid_pattern', 'Pattern source is not valid', ['status' => 400]);
+        }
+
+		return rest_ensure_response($response);
+	}
+
+	private function delete_user_pattern(Abstract_Pattern $pattern) {
+		$post = get_page_by_path($pattern->name, OBJECT, 'wp_block');
+		if (empty($post)) {
+			return new WP_Error('pattern_not_found', 'Pattern not found', ['status' => 404]);
+		}
+		$deleted = wp_delete_post($post->ID, true);
+		if (!$deleted) {
+			return new WP_Error('pattern_delete_failed', 'Failed to delete pattern', ['status' => 500]);
+		}
+		return ['message' => 'Pattern deleted successfully'];
+	}
+
+	private function delete_theme_pattern(Abstract_Pattern $pattern) {
+		$path = $pattern->filePath ?? wp_get_theme()->get_stylesheet_directory() . '/patterns/' . basename($pattern->name) . '.php';
+		if (!file_exists($path)) {
+			return new WP_Error('pattern_not_found', 'Pattern not found', ['status' => 404]);
+		}
+		$deleted = unlink($path);
+		if (!$deleted) {
+			return new WP_Error('pattern_delete_failed', 'Failed to delete pattern', ['status' => 500]);
+		}
+		return ['message' => 'Pattern deleted successfully'];
+	}
 
     /**
      * Saves a block pattern.

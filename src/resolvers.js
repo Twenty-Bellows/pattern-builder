@@ -40,3 +40,15 @@ export async function savePattern(pattern) {
 		return new AbstractPattern( response );
 	});
 }
+
+export async function deletePattern(pattern) {
+	debugger;
+	return apiFetch( {
+		path: `/pattern-manager/v1/pattern`,
+		method: 'DELETE',
+		body: JSON.stringify( pattern ),
+	})
+	.then( ( response ) => {
+		return response;
+	});
+}

@@ -13,7 +13,7 @@ import { parse, serialize } from '@wordpress/blocks';
 import { chevronLeft } from '@wordpress/icons';
 import { ToolbarButton, ToolbarItem } from '@wordpress/components';
 
-import { getEditorSettings, savePattern } from '../resolvers';
+import { getEditorSettings, savePattern, deletePattern } from '../resolvers';
 import { PatternDetails } from '../components/PatternDetails';
 
 
@@ -42,6 +42,20 @@ export const PatternEditor = ({ pattern, onClose }) => {
 		.catch((error) => {
 			alert('Error saving pattern');
 		});
+	}
+
+	const handleDeletePattern = (pattern) => {
+		if (confirm('Are you sure you want to delete this pattern?')) {
+			deletePattern(pattern)
+				.then((response) => {
+					if (onClose) {
+						onClose();
+					}
+				})
+				.catch((error) => {
+					console.error('Error deleting pattern:', error);
+				});
+		}
 	}
 
 	if (!editorSettings) {
@@ -85,7 +99,7 @@ export const PatternEditor = ({ pattern, onClose }) => {
 
 				<div className="pattern-editor__body">
 					<div className="pattern-editor__list-view">
-						<ListView />
+						<ListView isExpanded />
 					</div>
 					<div className="pattern-editor__content">
 						<BlockCanvas height="100%" styles={editorSettings.styles}/>
@@ -122,7 +136,7 @@ export const PatternEditor = ({ pattern, onClose }) => {
 									<>
 										{tab.name === 'pattern' && (
 											<Panel>
-												<PatternDetails pattern={ updatedPattern } onChange={ setUpdatedPattern } />
+												<PatternDetails pattern={ updatedPattern } onChange={ setUpdatedPattern } onDeletePattern={ handleDeletePattern } />
 											</Panel>
 										)}
 										{tab.name === 'block' && (

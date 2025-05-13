@@ -1,7 +1,7 @@
 import { useState, useEffect } from '@wordpress/element';
 import { TextControl, TextareaControl, SelectControl, ToggleControl, Button, FormTokenField } from '@wordpress/components';
 
-export const PatternDetails = ({ pattern, onChange }) => {
+export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
 
     const [editablePattern, setEditablePattern] = useState({ ...pattern });
 
@@ -33,7 +33,6 @@ export const PatternDetails = ({ pattern, onChange }) => {
 	};
 
     const handleChange = (field, value) => {
-		console.log('handleChange', field, value);
         setEditablePattern((prev) => ({ ...prev, [field]: value }));
     };
 
@@ -116,9 +115,7 @@ export const PatternDetails = ({ pattern, onChange }) => {
                     isDestructive
                     variant="secondary"
                     label="Delete Pattern"
-                    onClick={() => {
-                        console.log('Delete pattern:', editablePattern);
-                    }}
+                    onClick={()=>{onDeletePattern(pattern);}}
                     __next40pxDefaultSize
                     __nextHasNoMarginBottom
                 >
