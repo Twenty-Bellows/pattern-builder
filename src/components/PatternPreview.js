@@ -2,6 +2,12 @@ import { BlockPreview } from '@wordpress/block-editor';
 import { parse } from '@wordpress/blocks';
 import { Composite } from '@wordpress/components';
 
+function PatternPreviewPlaceholder() {
+	return (
+		<div className="pattern-manager__preview-grid-item pattern-manager__preview-grid-item-preview" />
+	);
+}
+
 const PatternPreview = ({ pattern, onClick }) => {
 
 	const { title, content } = pattern;
@@ -15,11 +21,18 @@ const PatternPreview = ({ pattern, onClick }) => {
 				}
 			} }
 		>
-			<p>{title}</p>
-			<BlockPreview
-				blocks={ blocks }
-				viewportWidth={ 500 }
-			/>
+			<div className="pattern-manager__preview-grid-item">
+			<BlockPreview.Async
+				placeholder={ <PatternPreviewPlaceholder /> }
+			>
+				<BlockPreview
+					blocks={ blocks }
+					viewportWidth={ 800 }
+				/>
+			</BlockPreview.Async>
+			</div>
+
+			<p className='pattern-manager__preview-grid-item-title'>{title}</p>
 		</Composite>
 	);
 }

@@ -5,12 +5,12 @@ import { registerPlugin } from '@wordpress/plugins';
 import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
 import { Modal, Button } from '@wordpress/components';
 import { __, _x } from '@wordpress/i18n';
-import { tool, code } from '@wordpress/icons';
+import { tool, widget } from '@wordpress/icons';
 import { useState } from '@wordpress/element';
-import { BlockPreview } from '@wordpress/block-editor';
 import { parse } from '@wordpress/block-serialization-default-parser';
 
 import PatternManager from './pattern-manager';
+import PatternSearch from './components/PatternSearch';
 
 const PatternManagerModal = ( { onRequestClose } ) => {
 	return (
@@ -28,39 +28,41 @@ const PatternManagerModal = ( { onRequestClose } ) => {
 export default function PatternManagerEditorTools() {
 
 	const [ isPatternManagerOpen, setIsPatternManagerOpen ] = useState( false );
-	const blocks = parse('<!-- wp:paragraph --><p>Hello from BlockPreview!</p><!-- /wp:paragraph -->');
 
 	return (
 		<>
 			<PluginSidebarMoreMenuItem
 				target="pattern-manager-sidebar"
 				icon={ tool }
-				onClick={ () => setIsPatternManagerOpen( true ) }
 			>
 				{ _x( 'Pattern Manager', 'UI String', 'pattern-manager' ) }
 			</PluginSidebarMoreMenuItem>
 
 			<PluginSidebar
+				className='pattern-manager__editor-sidebar'
 				name="pattern-manager-sidebar"
-				icon={ tool }
+				icon={ widget }
 				title={ _x(
-					'Pattern Manager',
+					'Patterns',
 					'UI String',
 					'pattern-manager'
 				) }
 			>
+
 				<Button
-					icon={code}
+					variant='primary'
+					icon={widget}
 					onClick={() =>
 						setIsPatternManagerOpen(true)
 					}
+					style={{width: '100%'}}
 				>
 					{__(
-						'View Custom Styles',
-						'create-block-theme'
+						'Manage Patterns',
+						'pattern-manager'
 					)}
 				</Button>
-				<BlockPreview blocks={blocks} viewportWidth={300} minHeight={300}/>
+				<PatternSearch />
 			</PluginSidebar>
 
 			{ isPatternManagerOpen && (

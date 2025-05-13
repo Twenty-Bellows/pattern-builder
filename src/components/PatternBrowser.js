@@ -6,6 +6,7 @@ import { getAllPatterns, getEditorSettings } from '../resolvers';
 import PatternPreview from './PatternPreview';
 import { PatternBrowserPanel } from './PatternBrowserPanel';
 import { AbstractPattern } from '../objects/AbstractPattern';
+
 /**
  * PatternGrid Component
  * Displays a grid of pattern previews.
@@ -21,7 +22,7 @@ export const PatternGrid = ({ onPatternClick, patterns, editorSettings }) => {
         >
             <div className="pattern-manager__preview-grid">
                 {patterns.map((pattern, index) => (
-                    <div className="pattern-manager__preview-grid-item" key={index}>
+                    <div key={index}>
                         <PatternPreview onClick={onPatternClick} pattern={pattern} />
                     </div>
                 ))}
@@ -96,16 +97,16 @@ export const PatternBrowser = ({ onPatternClick }) => {
 
             {!isLoading && !error && (
                 <>
-                    <PatternGrid
-                        onPatternClick={onPatternClick}
-                        patterns={filteredPatterns}
-                        editorSettings={editorSettings}
-                    />
                     <PatternBrowserPanel
                         patterns={patterns}
                         editorSettings={editorSettings}
                         onFilterChange={handleFilterChange}
 						onCreatePattern={handleCreatePattern}
+                    />
+					<PatternGrid
+                        onPatternClick={onPatternClick}
+                        patterns={filteredPatterns}
+                        editorSettings={editorSettings}
                     />
                 </>
             )}

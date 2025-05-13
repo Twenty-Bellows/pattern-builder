@@ -41,8 +41,7 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 
     return (
         <div className="pattern-manager__sidebar">
-            <PanelBody title={__('Filters', 'pattern-manager')} initialOpen={true}>
-                {/* Source Filter */}
+
                 <SelectControl
                     label={__('Source', 'pattern-manager')}
                     value={filterOptions.source}
@@ -55,7 +54,6 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
                     onChange={(value) => updateFilterOptions('source', value)}
                 />
 
-                {/* Synced Filter */}
                 <SelectControl
                     label={__('Synced', 'pattern-manager')}
                     value={filterOptions.synced}
@@ -86,10 +84,9 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
                     placeholder={__('Search by keyword...', 'pattern-manager')}
                     onChange={(value) => updateFilterOptions('keyword', value)}
                 />
-            </PanelBody>
 
-            {/* New Pattern Creation Panel */}
-            <PanelBody title={__('Create New Pattern', 'pattern-manager')} initialOpen={true}>
+				<hr />
+
                 <TextControl
                     label={__('Name', 'pattern-manager')}
                     value={newPattern.title}
@@ -100,10 +97,10 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 		    		variant="primary"
                     onClick={handleCreatePattern}
                     disabled={!newPattern.title}
+					style={{ width: '100%' }}
                 >
                     {__('Create Pattern', 'pattern-manager')}
                 </Button>
-            </PanelBody>
         </div>
     );
 };

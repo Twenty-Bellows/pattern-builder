@@ -88,7 +88,7 @@ export const PatternEditor = ({ pattern, onClose }) => {
 						<ListView />
 					</div>
 					<div className="pattern-editor__content">
-						<BlockCanvas height="100%" />
+						<BlockCanvas height="100%" styles={editorSettings.styles}/>
 					</div>
 					<div className="pattern-editor__sidebar">
 						<div className="pattern-sidebar">
