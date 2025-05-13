@@ -123,9 +123,15 @@ class Twenty_Bellows_Pattern_Manager_API {
      * @return string
      */
     private function build_pattern_file_metadata(Abstract_Pattern $pattern): string {
+
+		// map the pattern categories to their slugs
+		$category_slugs = array_map(function($category) {
+			return $category['slug'] ?? sanitize_title($category['name']);
+		}, $pattern->categories);
+
 		$synced = $pattern->synced ? "\n * Synced: yes" : '';
 		$inserter = $pattern->inserter ? '' : "\n * Inserter: no";
-        $categories = $pattern->categories ? "\n * Categories: " . implode(', ', $pattern->categories) : '';
+        $categories = $category_slugs ? "\n * Categories: " . implode(', ', $category_slugs) : '';
         $keywords = $pattern->keywords ? "\n * Keywords: " . implode(', ', $pattern->keywords) : '';
 
 		return <<<METADATA
@@ -178,6 +184,12 @@ class Twenty_Bellows_Pattern_Manager_API {
 			update_post_meta($post->ID, 'wp_pattern_sync_status', 'unsynced');
 		}
 
+		// store categories
+		$category_slugs = array_map(function($category) {
+			return $category['slug'] ?? sanitize_title($category['name']);
+		}, $pattern->categories);
+		wp_set_object_terms($post->ID, $category_slugs, 'wp_pattern_category', false);
+
         return $pattern;
     }
 
@@ -189,7 +201,32 @@ class Twenty_Bellows_Pattern_Manager_API {
     private function get_block_patterns_from_registry(): array {
         $patterns = WP_Block_Patterns_Registry::get_instance()->get_all_registered();
 
-        return array_map([Abstract_Pattern::class, 'from_registry'], $patterns);
+		foreach ($patterns as &$pattern) {
+
+			if (isset($pattern['categories'])) {
+				$category_items = [];
+
+				foreach ($pattern['categories'] as $category) {
+
+					$term = get_term_by('slug', $category, 'wp_pattern_category');
+
+					if ( ! $term) {
+						$term = wp_insert_term($category, 'wp_pattern_category');
+					}
+
+					$category_items[] = array(
+						'id' => $term->term_id,
+						'name' => $term->name,
+						'slug' => $term->slug,
+					);
+
+				}
+				$pattern['categories'] = $category_items;
+			}
+		}
+
+		// Convert to Abstract_Pattern objects
+		return array_map([Abstract_Pattern::class, 'from_registry'], $patterns);
     }
 
     /**
@@ -203,9 +240,55 @@ class Twenty_Bellows_Pattern_Manager_API {
 
         foreach ($query->posts as $post) {
             $metadata = get_post_meta($post->ID);
-            $patterns[] = Abstract_Pattern::from_post($post, $metadata);
+			$categories = wp_get_object_terms($post->ID, 'wp_pattern_category');
+            $patterns[] = Abstract_Pattern::from_post($post, $metadata, $categories);
         }
 
         return $patterns;
     }
+
+	private function get_pattern_categories($pattern_data)
+	{
+		//get the default pattern categories
+		$registered_pattern_categories = WP_Block_Pattern_Categories_Registry::get_instance()->get_all_registered();
+
+		$category_ids = array();
+		$categories = explode(',', $pattern_data['categories']);
+		$terms = get_terms(array(
+			'taxonomy' => 'wp_pattern_category',
+			'hide_empty' => false,
+			'fields' => 'all',
+
+		));
+		foreach ($categories as $category) {
+			$category = sanitize_title($category);
+			$found = false;
+			foreach ($terms as $term) {
+				if (sanitize_title($term->name) === $category || sanitize_title($term->slug) === $category) {
+					$category_ids[] = $term->term_id;
+					$found = true;
+					break;
+				}
+			}
+			if ( ! $found ) {
+				// See if it's in the registered_pattern_categories
+				foreach ($registered_pattern_categories as $registered_category) {
+					if (
+						( isset($registered_category['slug']) && sanitize_title($registered_category['slug']) === $category ) ||
+						( isset($registered_category['name']) && sanitize_title($registered_category['name']) === $category)) {
+						$term = wp_insert_term($registered_category['name'], 'wp_pattern_category', array(
+							'slug' => $registered_category['slug'],
+							'description' => $registered_category['description'] ?? '',
+						));
+						$terms[] = (object) $term;
+						$category_ids[] = $term['term_id'];
+						$found = true;
+						break;
+					}
+				}
+			}
+			// if the term is still not found then I guess we're just out of luck.
+		}
+		return $category_ids;
+	}
 }

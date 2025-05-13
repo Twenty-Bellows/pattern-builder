@@ -31,8 +31,11 @@ const PatternSearch = () => {
 			const lowerCaseSearchTerm = searchTerm.toLowerCase();
 			const filtered = patterns.filter((pattern) => {
 				return (
-					pattern.title.toLowerCase().includes(lowerCaseSearchTerm)
-					//TODO: Include categories and keyword searches
+					// search pattern title
+					pattern.title.toLowerCase().includes(lowerCaseSearchTerm) ||
+
+					// search pattern categories
+					(pattern.categories && pattern.categories.some((category) => category.name.toLowerCase().includes(lowerCaseSearchTerm)))
 				);
 			});
 			setFilteredPatterns(filtered);
@@ -65,6 +68,12 @@ const PatternSearch = () => {
 					<Card key={index}>
 						<CardBody>
 							<PatternPreview pattern={pattern} />
+							<p style={{fontSize:'10px'}}>{pattern.categories.map( (category) => {
+								if (typeof category === 'string') {
+									return category;
+								}
+								return category.name;
+							}).join(', ') }</p>
 						</CardBody>
 					</Card>
 				))}

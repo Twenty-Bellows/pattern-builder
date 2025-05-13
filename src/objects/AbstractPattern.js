@@ -18,6 +18,7 @@ export class AbstractPattern {
 	filePath = null;
 
 	constructor( options ) {
+
 		this.title = options.title || '';
 		this.name = options.name;
 		this.description = options.description || '';
@@ -26,6 +27,8 @@ export class AbstractPattern {
 		this.source = options.source || '';
 		this.synced = options.synced || false;
 		this.inserter = options.inserter || false;
+
+		this.categories = options.categories || [];
 
 		this.filePath = options.filePath || null;
 	}

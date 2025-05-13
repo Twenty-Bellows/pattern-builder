@@ -27,6 +27,8 @@ class Abstract_Pattern
 		$this->synced = $args['synced'] ?? false;
 		$this->inserter = $args['inserter'] ?? true;
 
+		$this->categories = $args['categories'] ?? array();
+
 		$this->filePath = $args['filePath'] ?? null;
 	}
 
@@ -38,6 +40,7 @@ class Abstract_Pattern
 				'title'       => $pattern['title'],
 				'description' => $pattern['description'],
 				'content'     => $pattern['content'],
+				'categories'  => $pattern['categories'],
 				'source'      => 'theme',
 				'synced'      => false,
 				'inserter'    => true,
@@ -46,8 +49,19 @@ class Abstract_Pattern
 		);
 	}
 
-	public static function from_post( $post, $metadata )
+	public static function from_post( $post, $metadata, $categories )
 	{
+		$categories = array_map(
+			function ( $category ) {
+				// return $category->slug;
+				return [
+					'id'   => $category->term_id,
+					'name' => $category->name,
+					'slug' => $category->slug,
+				];
+			},
+			$categories
+		);
 		return new self(
 			array(
 				'name'        => $post->post_name,
@@ -56,6 +70,7 @@ class Abstract_Pattern
 				'content'     => $post->post_content,
 				'source'      => 'user',
 				'synced'      => $metadata['wp_pattern_sync_status'][0] !== 'unsynced' ?? false,
+				'categories'  => $categories,
 				'inserter'    => true,
 			)
 		);

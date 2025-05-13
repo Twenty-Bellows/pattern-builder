@@ -1,5 +1,5 @@
 import { useState, useEffect } from '@wordpress/element';
-import { TextControl, TextareaControl, SelectControl, ToggleControl, Button } from '@wordpress/components';
+import { TextControl, TextareaControl, SelectControl, ToggleControl, Button, FormTokenField } from '@wordpress/components';
 
 export const PatternDetails = ({ pattern, onChange }) => {
 
@@ -12,7 +12,28 @@ export const PatternDetails = ({ pattern, onChange }) => {
         }
     }, [editablePattern, onChange]);
 
+	const handleCategoryChange = (categories) => {
+		const updatedCategories = categories.map((category) => {
+			if (typeof category === 'string') {
+				return {
+					id: null,
+					name: category,
+					value: category,
+					slug: null,
+				};
+			}
+			return {
+				id: category.id,
+				name: category.name,
+				value: category.name,
+				slug: category.slug,
+			};
+		});
+		setEditablePattern((prev) => ({ ...prev, categories: updatedCategories }));
+	};
+
     const handleChange = (field, value) => {
+		console.log('handleChange', field, value);
         setEditablePattern((prev) => ({ ...prev, [field]: value }));
     };
 
@@ -31,6 +52,25 @@ export const PatternDetails = ({ pattern, onChange }) => {
                 onChange={(value) => handleChange('description', value)}
                 __nextHasNoMarginBottom
             />
+			<FormTokenField
+				label="Categories"
+				value={
+					editablePattern.categories.map((category) => {
+						if(typeof category === 'string') {
+							return {
+								value: category,
+								name: category,
+							}
+						}
+						return {
+							id: category.id,
+							value: category.name,
+							name: category.name,
+							slug: category.slug,
+						};
+					}) || []}
+				onChange={handleCategoryChange}
+			/>
             <div className="components-base-control">
                 <label className="components-base-control__label">Synced Pattern</label>
                 <ToggleControl

@@ -74,8 +74,6 @@ export const PatternBrowser = ({ onPatternClick }) => {
 			return pattern.synced === (filters.synced === 'yes'); // Match the synced status
 		});
 
-		console.log('Filtered patterns:', updatedFilteredPatterns);
-
         setFilteredPatterns(updatedFilteredPatterns);
 
     };
