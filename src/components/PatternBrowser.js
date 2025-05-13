@@ -101,11 +101,7 @@ export const PatternBrowser = ({ onPatternClick }) => {
     };
 
 	const handleCreatePattern = (newPattern) => {
-		onPatternClick(new AbstractPattern( {
-			...newPattern,
-			synced: true,
-			source: 'user',
-		}));
+		onPatternClick(new AbstractPattern(newPattern));
 	}
 
     return (

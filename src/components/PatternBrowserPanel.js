@@ -19,10 +19,6 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
         keyword: '',
     });
 
-    const [newPattern, setNewPattern] = useState({
-        title: '',
-    });
-
     const updateFilterOptions = (key, value) => {
         const updatedFilters = { ...filterOptions, [key]: value };
         setFilterOptions(updatedFilters);
@@ -31,17 +27,10 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
         }
     };
 
-    const updateNewPattern = (key, value) => {
-        setNewPattern({ ...newPattern, [key]: value });
-    };
-
-    const handleCreatePattern = () => {
+    const handleCreatePattern = ( newPattern ) => {
         if (onCreatePattern) {
-            onCreatePattern(newPattern);
+            onCreatePattern( newPattern );
         }
-        setNewPattern({
-	    title: '',
-        });
     };
 
 	const patternCategories = Object.values(patterns.reduce((acc, pattern) => {
@@ -94,6 +83,24 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
                     options={patternCategories}
                     onChange={(value) => updateFilterOptions('category', value)}
                 />
+
+				<hr style={{ width: '100%' }} />
+
+				<Button
+					style={{ width: '100%' }}
+					variant='primary'
+					onClick={()=>handleCreatePattern({source: 'user', synced: true})}
+				>
+					{__('Create User Pattern', 'pattern-manager')}
+				</Button>
+
+				<Button
+					style={{ width: '100%' }}
+					variant='primary'
+					onClick={()=>handleCreatePattern({source: 'theme', synced: false})}
+				>
+					{__('Create Theme Pattern', 'pattern-manager')}
+				</Button>
 
         </div>
     );
