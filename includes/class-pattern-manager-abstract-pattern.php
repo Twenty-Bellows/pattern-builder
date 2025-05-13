@@ -28,6 +28,7 @@ class Abstract_Pattern
 		$this->inserter = $args['inserter'] ?? true;
 
 		$this->categories = $args['categories'] ?? array();
+		$this->keywords = $args['keywords'] ?? array();
 
 		$this->filePath = $args['filePath'] ?? null;
 	}
@@ -41,6 +42,7 @@ class Abstract_Pattern
 				'description' => $pattern['description'],
 				'content'     => $pattern['content'],
 				'categories'  => $pattern['categories'],
+				'keywords'    => $pattern['keywords'],
 				'source'      => 'theme',
 				'synced'      => false,
 				'inserter'    => true,

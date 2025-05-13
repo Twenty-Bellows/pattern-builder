@@ -71,6 +71,13 @@ export const PatternDetails = ({ pattern, onChange }) => {
 					}) || []}
 				onChange={handleCategoryChange}
 			/>
+			{editablePattern.source === 'theme' && (
+				<FormTokenField
+					label="Keywords"
+					value={editablePattern.keywords}
+					onChange={(value) => handleChange('keywords', value)}
+				/>
+			)}
             <div className="components-base-control">
                 <label className="components-base-control__label">Synced Pattern</label>
                 <ToggleControl

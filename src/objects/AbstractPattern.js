@@ -29,6 +29,7 @@ export class AbstractPattern {
 		this.inserter = options.inserter || false;
 
 		this.categories = options.categories || [];
+		this.keywords = options.keywords || [];
 
 		this.filePath = options.filePath || null;
 	}
