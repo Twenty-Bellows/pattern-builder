@@ -37,14 +37,33 @@ class Twenty_Bellows_Pattern_Manager_Admin {
      * Enqueues the necessary assets for the admin page.
      */
     private function enqueue_assets(): void {
-        $asset_file = include plugin_dir_path(__DIR__) . '../build/pattern-manager-admin.asset.php';
+
+		$screen = get_current_screen();
+
+		if ( $screen->id !== "appearance_page_pattern-manager" ) {
+			return;
+		}
+
+        $asset_file = include plugin_dir_path(__FILE__) . '../build/pattern-manager-admin.asset.php';
 
         wp_enqueue_script(
             'pattern-manager-app',
-            plugins_url('build/pattern-manager-admin.js', __DIR__),
+            plugins_url('../build/pattern-manager-admin.js', __FILE__),
             $asset_file['dependencies'],
             $asset_file['version']
         );
+
+        wp_enqueue_style(
+            'pattern-manager-editor-style',
+            plugins_url('../build/pattern-manager-admin.css', __FILE__),
+            [],
+            $asset_file['version']
+        );
+
+		// Enqueue core editor styles
+		wp_enqueue_style( 'wp-edit-blocks' ); // Block editor base styles
+		wp_enqueue_style( 'wp-block-library' ); // Front-end block styles
+		wp_enqueue_style( 'wp-block-editor' ); // Editor layout styles
 
         wp_set_script_translations('pattern-manager-app', 'pattern-manager');
     }

@@ -1,7 +1,13 @@
 import { createRoot } from '@wordpress/element';
 import PatternManager from './pattern-manager';
+import { registerCoreBlocks } from '@wordpress/block-library';
 
 export default function PatternManagerAdmin() {
+
+	registerCoreBlocks();
+
+	// TODO: Register custom blocks from plugins?
+
 	return (
 		<PatternManager />
 	);
