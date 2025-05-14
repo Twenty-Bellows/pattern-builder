@@ -48,7 +48,55 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 			}
 		});
 		return acc;
-	}, { 'all': { label: __('All', 'pattern-manager'), value: 'all' } }));
+	}, {
+		'all': { label: __('All', 'pattern-manager'), value: 'all' },
+		'uncategorized': { label: __('Uncategorized', 'pattern-manager'), value: 'uncategorized' }
+	}));
+
+	const patternBlockTypes = Object.values(patterns.reduce((acc, pattern) => {
+		pattern.blockTypes.forEach((blockType) => {
+			if (!acc[blockType]) {
+				acc[blockType] = {
+					label: blockType,
+					value: blockType,
+				};
+			}
+		});
+		return acc;
+	}, {
+		'all': { label: __('All', 'pattern-manager'), value: 'all' },
+		'unassigned': { label: __('Unassigned', 'pattern-manager'), value: 'unassigned' }
+	}));
+
+	const patternTemplateTypes = Object.values(patterns.reduce((acc, pattern) => {
+		pattern.templateTypes.forEach((templateType) => {
+			if (!acc[templateType]) {
+				acc[templateType] = {
+					label: templateType,
+					value: templateType,
+				};
+			}
+		});
+		return acc;
+	}, {
+		'all': { label: __('All', 'pattern-manager'), value: 'all' },
+		'unassigned': { label: __('Unassigned', 'pattern-manager'), value: 'unassigned' }
+	}));
+
+	const patternPostTypes = Object.values(patterns.reduce((acc, pattern) => {
+		pattern.postTypes.forEach((postTypes) => {
+			if (!acc[postTypes]) {
+				acc[postTypes] = {
+					label: postTypes,
+					value: postTypes,
+				};
+			}
+		});
+		return acc;
+	}, {
+		'all': { label: __('All', 'pattern-manager'), value: 'all' },
+		'unassigned': { label: __('Unassigned', 'pattern-manager'), value: 'unassigned' }
+	}));
 
 	return (
 		<div className="pattern-manager__sidebar">
@@ -99,6 +147,34 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 				options={patternCategories}
 				onChange={(value) => updateFilterOptions('category', value)}
 			/>
+
+			{ patternTemplateTypes.length > 2 && (
+
+				<SelectControl
+					label={__('Template Type', 'pattern-manager')}
+					value={filterOptions.templateType || 'all'}
+					options={patternTemplateTypes}
+					onChange={(value) => updateFilterOptions('templateType', value)}
+				/>
+			)}
+
+			{ patternPostTypes.length > 2 && (
+				<SelectControl
+					label={__('Post Type', 'pattern-manager')}
+					value={filterOptions.postType || 'all'}
+					options={patternPostTypes}
+					onChange={(value) => updateFilterOptions('postType', value)}
+				/>
+			)}
+
+			{ patternBlockTypes.length > 2 && (
+				<SelectControl
+					label={__('Block Type', 'pattern-manager')}
+					value={filterOptions.blockType || 'all'}
+					options={patternBlockTypes}
+					onChange={(value) => updateFilterOptions('blockType', value)}
+				/>
+			)}
 
 			<hr style={{ width: '100%' }} />
 

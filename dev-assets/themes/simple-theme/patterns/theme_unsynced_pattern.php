@@ -2,10 +2,11 @@
 /**
  * Title: Theme Unsynced Pattern
  * Slug: synced-patterns-test/theme-unsynced-pattern
- * Categories: text
  * Description: An unsynced pattern provided with the theme to use for testing.
+ * Categories: text
+ * Block Types: group
+ * Post Types: post, page
  */
-
 ?>
 <!-- wp:group {"style":{"color":{"background":"#d6cfff"}},"layout":{"type":"default"}} -->
 <div class="wp-block-group has-background" style="background-color:#d6cfff"><!-- wp:heading {"level":1} -->

@@ -85,7 +85,26 @@ export const PatternBrowser = ({ onPatternClick }) => {
 			.filter((pattern) => {
 				// Filter patterns based on the category
 				if (filters.category === 'all') return true; // Show all patterns
+				if (filters.category === 'uncategorized' && pattern.categories.length === 0) return true; // Show patterns without categories
 				return pattern.categories.some((category) => category.slug === filters.category); // Match the category
+			})
+			.filter((pattern) => {
+				// Filter patterns based on the block type
+				if (!filters.blockType || filters.blockType === 'all') return true; // Show all patterns
+				if (filters.blockType === 'unassigned' && pattern.blockTypes.length === 0) return true; // Show patterns without block types
+				return pattern.blockTypes.includes(filters.blockType); // Match the block type
+			})
+			.filter((pattern) => {
+				// Filter patterns based on the template type
+				if (!filters.templateType || filters.templateType === 'all') return true; // Show all patterns
+				if (filters.templateType === 'unassigned' && pattern.templateTypes.length === 0) return true; // Show patterns without template types
+				return pattern.templateTypes.includes(filters.templateType); // Match the template type
+			})
+			.filter((pattern) => {
+				// Filter patterns based on the post type
+				if (!filters.postType || filters.postType === 'all') return true; // Show all patterns
+				if (filters.postType === 'unassigned' && pattern.postTypes.length === 0) return true; // Show patterns without post types
+				return pattern.postTypes.includes(filters.postType); // Match the post type
 			})
 			.filter((pattern) => {
 				// Filter patterns based on the keyword / title

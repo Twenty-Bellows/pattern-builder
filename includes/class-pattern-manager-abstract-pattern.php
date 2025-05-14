@@ -10,6 +10,10 @@ class Abstract_Pattern
 	public $categories;
 	public $keywords;
 
+	public $blockTypes;
+	public $templateTypes;
+	public $postTypes;
+
 	public $source;
 	public $synced;
 	public $inserter;
@@ -30,6 +34,10 @@ class Abstract_Pattern
 		$this->categories = $args['categories'] ?? array();
 		$this->keywords = $args['keywords'] ?? array();
 
+		$this->blockTypes = $args['blockTypes'] ?? array();
+		$this->templateTypes = $args['templateTypes'] ?? array();
+		$this->postTypes = $args['postTypes'] ?? array();
+
 		$this->filePath = $args['filePath'] ?? null;
 	}
 
@@ -37,16 +45,19 @@ class Abstract_Pattern
 	{
 		return new self(
 			array(
-				'name'        => $pattern['name'],
-				'title'       => $pattern['title'],
-				'description' => $pattern['description'],
-				'content'     => $pattern['content'],
-				'categories'  => $pattern['categories'],
-				'keywords'    => $pattern['keywords'],
-				'source'      => 'theme',
-				'synced'      => false,
-				'inserter'    => $pattern['inserter'],
-				'filePath'    => $pattern['filePath'],
+				'name'          => $pattern['name'],
+				'title'         => $pattern['title'],
+				'description'   => $pattern['description'],
+				'content'       => $pattern['content'],
+				'categories'    => $pattern['categories'],
+				'keywords'      => $pattern['keywords'],
+				'source'        => 'theme',
+				'synced'        => false,
+				'blockTypes'    => $pattern['blockTypes'],
+				'templateTypes' => $pattern['templateTypes'],
+				'postTypes'     => $pattern['postTypes'],
+				'inserter'      => $pattern['inserter'],
+				'filePath'      => $pattern['filePath'],
 			)
 		);
 	}

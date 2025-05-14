@@ -15,6 +15,10 @@ export class AbstractPattern {
 	synced = false;
 	inserter = true;
 
+	blockTypes = [];
+	templateTypes = [];
+	postTypes = [];
+
 	filePath = null;
 
 	constructor( options ) {
@@ -30,6 +34,10 @@ export class AbstractPattern {
 
 		this.categories = options.categories || [];
 		this.keywords = options.keywords || [];
+
+		this.blockTypes = options.blockTypes || [];
+		this.templateTypes = options.templateTypes || [];
+		this.postTypes = options.postTypes || [];
 
 		this.filePath = options.filePath || null;
 	}

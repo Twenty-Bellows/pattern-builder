@@ -184,13 +184,16 @@ class Twenty_Bellows_Pattern_Manager_API {
 		$inserter = $pattern->inserter ? '' : "\n * Inserter: no";
         $categories = $category_slugs ? "\n * Categories: " . implode(', ', $category_slugs) : '';
         $keywords = $pattern->keywords ? "\n * Keywords: " . implode(', ', $pattern->keywords) : '';
+        $blockTypes = $pattern->blockTypes ? "\n * Block Types: " . implode(', ', $pattern->blockTypes) : '';
+        $templateTypes = $pattern->templateTypes ? "\n * Template Types: " . implode(', ', $pattern->templateTypes) : '';
+        $postTypes = $pattern->postTypes ? "\n * Post Types: " . implode(', ', $pattern->postTypes) : '';
 
 		return <<<METADATA
 	<?php
 	/**
 	 * Title: $pattern->title
 	 * Slug: $pattern->name
-	 * Description: $pattern->description$synced$inserter$categories$keywords
+	 * Description: $pattern->description$synced$inserter$categories$keywords$blockTypes$templateTypes$postTypes
 	 */
 	?>
 
@@ -298,48 +301,4 @@ class Twenty_Bellows_Pattern_Manager_API {
         return $patterns;
     }
 
-	private function get_pattern_categories($pattern_data)
-	{
-		//get the default pattern categories
-		$registered_pattern_categories = WP_Block_Pattern_Categories_Registry::get_instance()->get_all_registered();
-
-		$category_ids = array();
-		$categories = explode(',', $pattern_data['categories']);
-		$terms = get_terms(array(
-			'taxonomy' => 'wp_pattern_category',
-			'hide_empty' => false,
-			'fields' => 'all',
-
-		));
-		foreach ($categories as $category) {
-			$category = sanitize_title($category);
-			$found = false;
-			foreach ($terms as $term) {
-				if (sanitize_title($term->name) === $category || sanitize_title($term->slug) === $category) {
-					$category_ids[] = $term->term_id;
-					$found = true;
-					break;
-				}
-			}
-			if ( ! $found ) {
-				// See if it's in the registered_pattern_categories
-				foreach ($registered_pattern_categories as $registered_category) {
-					if (
-						( isset($registered_category['slug']) && sanitize_title($registered_category['slug']) === $category ) ||
-						( isset($registered_category['name']) && sanitize_title($registered_category['name']) === $category)) {
-						$term = wp_insert_term($registered_category['name'], 'wp_pattern_category', array(
-							'slug' => $registered_category['slug'],
-							'description' => $registered_category['description'] ?? '',
-						));
-						$terms[] = (object) $term;
-						$category_ids[] = $term['term_id'];
-						$found = true;
-						break;
-					}
-				}
-			}
-			// if the term is still not found then I guess we're just out of luck.
-		}
-		return $category_ids;
-	}
 }
