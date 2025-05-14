@@ -15,6 +15,7 @@ import { ToolbarButton, ToolbarItem } from '@wordpress/components';
 
 import { getEditorSettings, savePattern, deletePattern } from '../resolvers';
 import { PatternDetails } from '../components/PatternDetails';
+import PatternSearch from '../components/PatternSearch';
 
 
 export const PatternEditor = ({ pattern, onClose }) => {
@@ -119,16 +120,12 @@ export const PatternEditor = ({ pattern, onClose }) => {
 										title: 'Block',
 									},
 									{
-										name: 'add',
-										title: 'Add',
+										name: 'blocks',
+										title: '+Blocks',
 									},
 									{
-										name: 'bindings',
-										title: 'Bindings',
-									},
-									{
-										name: 'history',
-										title: 'History',
+										name: 'patterns',
+										title: '+Patterns',
 									},
 								]}
 							>
@@ -144,9 +141,14 @@ export const PatternEditor = ({ pattern, onClose }) => {
 												<BlockInspector />
 											</Panel>
 										)}
-										{tab.name === 'add' && (
-											<Panel>
+										{tab.name === 'blocks' && (
+											<Panel className="pattern-manager__editor__add-blocks-panel">
 												<InserterLibrary />
+											</Panel>
+										)}
+										{tab.name === 'patterns' && (
+											<Panel>
+												<PatternSearch />
 											</Panel>
 										)}
 									</>

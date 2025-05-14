@@ -33,6 +33,12 @@
 	}
 }
 
+.pattern-manager__editor__add-blocks-panel {
+	.block-editor-tabbed-sidebar__tablist-and-close-button{
+		display: none;
+	}
+}
+
 .pattern-manager__container {
 
 	height: 100%;
