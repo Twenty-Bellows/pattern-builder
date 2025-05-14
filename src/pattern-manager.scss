@@ -113,6 +113,23 @@
 			font-weight: bold;
 			border-bottom: 1px solid #ddd;
 			display: flex;
+			gap: 0.5rem;
+		}
+
+		.pattern-editor__code-editor {
+			height: 100%;
+			.components-base-control__field {
+				height: 100%;
+			}
+			textarea {
+				width: 100%;
+				height: 100%;
+				resize: none;
+				white-space: pre;
+				overflow-x: auto;
+				overflow-y: auto;
+				font-family: monospace;
+			}
 		}
 
 		.pattern-editor__body {

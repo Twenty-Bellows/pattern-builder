@@ -6,16 +6,17 @@ import {
 	__experimentalListView as ListView,
 	__experimentalLibrary as InserterLibrary
 } from '@wordpress/block-editor';
-import { Panel, TabPanel, Button } from '@wordpress/components';
+import { Panel, TabPanel, Button, TextareaControl } from '@wordpress/components';
 import { EditorHistoryRedo, EditorHistoryUndo } from '@wordpress/editor';
 import { useState, useEffect } from '@wordpress/element';
 import { parse, serialize } from '@wordpress/blocks';
 import { chevronLeft } from '@wordpress/icons';
-import { ToolbarButton, ToolbarItem } from '@wordpress/components';
+import { ToolbarItem, ToggleControl } from '@wordpress/components';
 
 import { getEditorSettings, savePattern, deletePattern } from '../resolvers';
 import { PatternDetails } from '../components/PatternDetails';
 import PatternSearch from '../components/PatternSearch';
+import { formatBlockMarkup, validateBlockMarkup } from '../formatters';
 
 
 export const PatternEditor = ({ pattern, onClose }) => {
@@ -24,6 +25,10 @@ export const PatternEditor = ({ pattern, onClose }) => {
 	const [blocks, setBlocks] = useState(parse(pattern.content));
 	const [editorSettings, setEditorSettings] = useState(null);
 
+	const [showCodeEditor, setShowCodeEditor] = useState(false);
+	const [codeMarkupIsValid, setCodeMarkupIsValid] = useState(true);
+	const [codeMarkup, setCodeMarkup] = useState('');
+
 	// TODO: Optimize me
 	useEffect(() => {
 		getEditorSettings()
@@ -31,6 +36,18 @@ export const PatternEditor = ({ pattern, onClose }) => {
 				setEditorSettings(data);
 			});
 	}, []);
+
+	const toggleCodeEditor = () => {
+
+		if (!showCodeEditor) {
+			setCodeMarkup(formatBlockMarkup(serialize(blocks)));
+		}
+		else {
+			setBlocks(parse(codeMarkup));
+		}
+
+		setShowCodeEditor((prev) => !prev);
+	}
 
 	const handleSavePattern = () => {
 		savePattern({
@@ -91,6 +108,13 @@ export const PatternEditor = ({ pattern, onClose }) => {
 						variant={'tertiary'}
 						size="compact"
 					/>
+					<ToggleControl
+						label="Code Editor"
+						disabled={!codeMarkupIsValid}
+						checked={showCodeEditor}
+						onChange={toggleCodeEditor}
+						__nextHasNoMarginBottom
+					/>
 					<div style={{ flexGrow: 1 }} />
 					<Button
 						variant="primary"
@@ -98,12 +122,25 @@ export const PatternEditor = ({ pattern, onClose }) => {
 					>Save</Button>
 				</div>
 
+				{showCodeEditor && (
+					<TextareaControl
+						className="pattern-editor__code-editor"
+						value={codeMarkup}
+						onChange={(value) => {
+							//TODO: validate the block markup
+							setCodeMarkupIsValid(validateBlockMarkup(value));
+							setCodeMarkup(value);
+						}}
+						placeholder="Nothing here yet..."
+					/>
+				)}
+				{!showCodeEditor && (
 				<div className="pattern-editor__body">
 					<div className="pattern-editor__list-view">
 						<ListView isExpanded />
 					</div>
 					<div className="pattern-editor__content">
-						<BlockCanvas height="100%" styles={editorSettings.styles}/>
+							<BlockCanvas height="100%" styles={editorSettings.styles}/>
 					</div>
 					<div className="pattern-editor__sidebar">
 						<div className="pattern-sidebar">
@@ -157,6 +194,7 @@ export const PatternEditor = ({ pattern, onClose }) => {
 						</div>
 					</div>
 				</div>
+				)}
 			</BlockEditorProvider>
 		</div>
 	);
