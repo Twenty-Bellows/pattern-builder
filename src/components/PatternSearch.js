@@ -1,7 +1,9 @@
 import { __ } from '@wordpress/i18n';
 import { TextControl, Card, CardBody } from '@wordpress/components';
+import { __experimentalBlockPatternsList as BlockPatternsList } from '@wordpress/block-editor';
 import { useEffect, useState } from '@wordpress/element';
-
+import { useAsyncList } from '@wordpress/compose';
+import { parse, serialize } from '@wordpress/blocks';
 import PatternPreview from './PatternPreview';
 
 import { getAllPatterns } from '../resolvers';
@@ -41,9 +43,23 @@ const PatternSearch = () => {
 					|| (pattern.keywords && pattern.keywords.some((keyword) => keyword.toLowerCase().includes(lowerCaseSearchTerm)))
 				);
 			});
-			setFilteredPatterns(filtered);
+
+			const mappedFiltered = filtered.map((pattern) => {
+				return {
+					name: pattern.name,
+					blocks: parse(pattern.content),
+					title: pattern.title,
+					id: pattern.name
+				}
+			});
+
+			setFilteredPatterns(mappedFiltered);
 		}
 	}, [searchTerm]);
+
+	const onClickPattern = (pattern) => {
+		console.log('Pattern clicked:', pattern);
+	};
 
 	return (
 		<>
@@ -67,20 +83,14 @@ const PatternSearch = () => {
 			)}
 
 			<div className='pattern-manager__pattern-search-results'>
-				{filteredPatterns.map((pattern, index) => (
-					<Card key={index}>
-						<CardBody>
-							<PatternPreview pattern={pattern} />
-							<p style={{fontSize:'10px', margin:'0'}}>{pattern.categories.map( (category) => {
-								if (typeof category === 'string') {
-									return category;
-								}
-								return category.name;
-							}).join(', ') }</p>
-							<p style={{fontSize:'10px', margin:'0'}}>{pattern.keywords.join(', ') }</p>
-						</CardBody>
-					</Card>
-				))}
+				<BlockPatternsList
+					isDraggable
+					blockPatterns={filteredPatterns}
+					shownPatterns={useAsyncList(filteredPatterns)}
+					onClickPattern={onClickPattern}
+					label={__('Pattern Search Results', 'pattern-manager')}
+					showTitlesAsTooltip={false}
+				/>
 			</div>
 
 
