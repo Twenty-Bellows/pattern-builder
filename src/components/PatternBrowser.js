@@ -47,7 +47,6 @@ export const PatternBrowser = ({ onPatternClick }) => {
         getAllPatterns()
             .then((patterns) => {
                 setPatterns(patterns);
-                setFilteredPatterns(null);
                 setIsLoading(false);
             })
             .catch((err) => {
@@ -62,13 +61,17 @@ export const PatternBrowser = ({ onPatternClick }) => {
 
     const handleFilterChange = (filters) => {
 
-		if (filters.keyword.length < 2 && filters.category === 'all' && filters.source === 'all' && filters.synced === 'all') {
-			setFilteredPatterns(null);
-			return;
-		}
-		// Filter patterns based on the keyword
+		// if (filters.keyword.length < 2 && filters.category === 'all' && filters.source === 'all' && filters.synced === 'all') {
+		// 	setFilteredPatterns(null);
+		// 	return;
+		// }
 
         const updatedFilteredPatterns = patterns
+			.filter((pattern) => {
+				// Filter patterns based on the hidden status
+				if (filters.hidden === 'all') return true;
+				return pattern.inserter === (filters.hidden === 'visible');
+			})
 			.filter((pattern) => {
 	        	// Filter patterns based on the source
 	            if (filters.source === 'all') return true; // Show all patterns

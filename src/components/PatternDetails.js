@@ -1,3 +1,4 @@
+import { __ } from '@wordpress/i18n';
 import { useState, useEffect } from '@wordpress/element';
 import { TextControl, TextareaControl, SelectControl, ToggleControl, Button, FormTokenField } from '@wordpress/components';
 
@@ -78,19 +79,30 @@ export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
 				/>
 			)}
             <div className="components-base-control">
-                <label className="components-base-control__label">Synced Pattern</label>
+                <label className="components-base-control__label">Synced</label>
                 <ToggleControl
                     checked={editablePattern.synced}
                     onChange={(value) => handleChange('synced', value)}
                     __nextHasNoMarginBottom
                 />
             </div>
-
+			{editablePattern.source === 'theme' && (
+				<div className="components-base-control">
+   	             <label className="components-base-control__label">Hidden from User</label>
+   	             <ToggleControl
+   	                 checked={ ! editablePattern.inserter}
+   	                 onChange={(value) => handleChange('inserter', ! value)}
+   	                 __nextHasNoMarginBottom
+   	             />
+   	         </div>
+			)}
             <details>
+
                 <summary>Advanced</summary>
 
-                <h3>Warning</h3>
-                <p>The fields below are dangerous to change. Proceed with caution.</p>
+				<div className="pattern-manager__advanced-details">
+
+				<p className="pattern-manager__advanced-details-warning">{__('The fields below are dangerous to change. Proceed with caution and understand the consequences.', 'pattern-manager')}</p>
 
                 <TextControl
                     label="Slug"
@@ -99,21 +111,29 @@ export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
                     __next40pxDefaultSize
                     __nextHasNoMarginBottom
                 />
-                <SelectControl
-                    label="Source"
-                    value={editablePattern.source || ''}
-                    options={[
-                        { label: 'Core', value: 'core', disabled: true },
-                        { label: 'Theme', value: 'theme' },
-                        { label: 'User', value: 'user' },
-                    ]}
-                    onChange={(value) => handleChange('source', value)}
-                    __nextHasNoMarginBottom
-                    __next40pxDefaultSize
-                />
+				{editablePattern.source === 'theme' && (
+					<Button
+						onClick="handleConvertToUserPattern"
+						variant="primary"
+                    	__next40pxDefaultSize
+                    	__nextHasNoMarginBottom
+					>
+						{__('Convert to User Pattern', 'pattern-manager')}
+					</Button>
+				)}
+				{editablePattern.source === 'user' && (
+					<Button
+						onClick="handleConvertToThemePattern"
+						variant="primary"
+                    	__next40pxDefaultSize
+                    	__nextHasNoMarginBottom
+					>
+						{__('Convert to Theme Pattern', 'pattern-manager')}
+					</Button>
+				)}
                 <Button
                     isDestructive
-                    variant="secondary"
+                    variant="primary"
                     label="Delete Pattern"
                     onClick={()=>{onDeletePattern(pattern);}}
                     __next40pxDefaultSize
@@ -121,6 +141,7 @@ export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
                 >
                     Delete Pattern
                 </Button>
+				</div>
             </details>
         </div>
     );

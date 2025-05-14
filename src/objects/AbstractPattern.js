@@ -13,7 +13,7 @@ export class AbstractPattern {
 
 	source = '';
 	synced = false;
-	inserter = false;
+	inserter = true;
 
 	filePath = null;
 
@@ -26,7 +26,7 @@ export class AbstractPattern {
 
 		this.source = options.source || '';
 		this.synced = options.synced || false;
-		this.inserter = options.inserter || false;
+		this.inserter = options.inserter === false ? false : true;
 
 		this.categories = options.categories || [];
 		this.keywords = options.keywords || [];

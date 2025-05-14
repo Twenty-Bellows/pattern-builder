@@ -45,8 +45,8 @@ class Abstract_Pattern
 				'keywords'    => $pattern['keywords'],
 				'source'      => 'theme',
 				'synced'      => false,
-				'inserter'    => true,
-				'filePath'    => $pattern['filePath'] ?? null,
+				'inserter'    => $pattern['inserter'],
+				'filePath'    => $pattern['filePath'],
 			)
 		);
 	}

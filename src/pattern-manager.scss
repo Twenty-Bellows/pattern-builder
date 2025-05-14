@@ -23,6 +23,16 @@
 	gap: 1rem;
 }
 
+.pattern-manager__advanced-details {
+	display: inline-grid;
+	gap: 1rem;
+	.pattern-manager__advanced-details-warning {
+		color: #d9534f;
+		font-size: 12px;
+		font-weight: bold;
+	}
+}
+
 .pattern-manager__container {
 
 	height: 100%;
