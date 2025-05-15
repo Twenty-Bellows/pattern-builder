@@ -1,3 +1,5 @@
+import { parse } from '@wordpress/blocks';
+
 /**
  * This is a class that unifies the different types of patterns.
  */
@@ -7,6 +9,8 @@ export class AbstractPattern {
 	title = '';
 	description = '';
 	content = '';
+
+	blocks = [];
 
 	categories = [];
 	keywords = [];
@@ -40,6 +44,8 @@ export class AbstractPattern {
 		this.postTypes = options.postTypes || [];
 
 		this.filePath = options.filePath || null;
+
+		this.blocks = parse( this.content );
 	}
 
 }

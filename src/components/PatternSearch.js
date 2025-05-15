@@ -44,16 +44,7 @@ const PatternSearch = () => {
 				);
 			});
 
-			const mappedFiltered = filtered.map((pattern) => {
-				return {
-					name: pattern.name,
-					blocks: parse(pattern.content),
-					title: pattern.title,
-					id: pattern.name
-				}
-			});
-
-			setFilteredPatterns(mappedFiltered);
+			setFilteredPatterns(filtered);
 		}
 	}, [searchTerm]);
 
