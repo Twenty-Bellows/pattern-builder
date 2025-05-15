@@ -102,7 +102,7 @@ export const PatternBrowser = ({ onPatternClick }) => {
 				/>
 				{filteredPatterns?.length > 0 && (
 					<div className="pattern-manager__preview-grid">
-					{patterns.map((pattern, index) => (
+					{filteredPatterns.map((pattern, index) => (
 						<div key={index}>
 							<PatternPreview onClick={onPatternClick} pattern={pattern} />
 						</div>

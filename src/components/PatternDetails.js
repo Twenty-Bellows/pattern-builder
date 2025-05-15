@@ -1,6 +1,7 @@
 import { __ } from '@wordpress/i18n';
 import { useState, useEffect } from '@wordpress/element';
-import { TextControl, TextareaControl, SelectControl, ToggleControl, Button, FormTokenField } from '@wordpress/components';
+import { TextControl, TextareaControl, SelectControl, ToggleControl, Button, FormTokenField, Panel } from '@wordpress/components';
+import { PanelBody } from '@wordpress/components';
 
 export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
 
@@ -38,7 +39,8 @@ export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
 	};
 
 	return (
-		<div className="pattern-manager__pattern-details">
+		<Panel>
+			<PanelBody>
 			<TextControl
 				label="Title"
 				value={editablePattern.title || ''}
@@ -52,6 +54,29 @@ export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
 				onChange={(value) => handleChange('description', value)}
 				__nextHasNoMarginBottom
 			/>
+
+			<div className="components-base-control">
+				<label className="components-base-control__label">Synced</label>
+				<ToggleControl
+					checked={editablePattern.synced}
+					onChange={(value) => handleChange('synced', value)}
+					__nextHasNoMarginBottom
+				/>
+			</div>
+			{editablePattern.source === 'theme' && (
+				<div className="components-base-control">
+					<label className="components-base-control__label">Hidden from User</label>
+					<ToggleControl
+						checked={!editablePattern.inserter}
+						onChange={(value) => handleChange('inserter', !value)}
+						__nextHasNoMarginBottom
+					/>
+				</div>
+			)}
+
+		</PanelBody>
+
+		<PanelBody title={__('Organization', 'pattern-manager')} initialOpen={false} >
 			<FormTokenField
 				label="Categories"
 				value={
@@ -78,31 +103,11 @@ export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
 					onChange={(value) => handleChange('keywords', value)}
 				/>
 			)}
-			<div className="components-base-control">
-				<label className="components-base-control__label">Synced</label>
-				<ToggleControl
-					checked={editablePattern.synced}
-					onChange={(value) => handleChange('synced', value)}
-					__nextHasNoMarginBottom
-				/>
-			</div>
-			{editablePattern.source === 'theme' && (
-				<div className="components-base-control">
-					<label className="components-base-control__label">Hidden from User</label>
-					<ToggleControl
-						checked={!editablePattern.inserter}
-						onChange={(value) => handleChange('inserter', !value)}
-						__nextHasNoMarginBottom
-					/>
-				</div>
-			)}
-			{editablePattern.source === 'theme' && (
-				<details>
-					<summary>Restrictions</summary>
+		</PanelBody>
+		{editablePattern.source === 'theme' && (
+				<PanelBody title={__('Restrictions', 'pattern-manager')} initialOpen={false} >
 
-					<div className="pattern-manager__advanced-details">
-
-					<p>{__('Restrict this pattern to only be used in these items.', 'pattern-manager')}</p>
+					<p>{__('Restrict this pattern to only be used in these contexts. This is only available for Theme Patterns.', 'pattern-manager')}</p>
 
 					<FormTokenField
 						__experimentalShowHowTo={false}
@@ -122,15 +127,12 @@ export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
 						value={editablePattern.postTypes}
 						onChange={(value) => handleChange('postTypes', value)}
 					/>
-					</div>
-				</details>
+				</PanelBody>
+
+
 			)}
 
-			<details>
-
-				<summary>Advanced</summary>
-
-				<div className="pattern-manager__advanced-details">
+			<PanelBody title={__('Advanced', 'pattern-manager')} initialOpen={false} >
 
 					<p className="pattern-manager__advanced-details-warning">{__('The fields below are dangerous to change. Proceed with caution and understand the consequences.', 'pattern-manager')}</p>
 
@@ -171,9 +173,9 @@ export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
 					>
 						Delete Pattern
 					</Button>
-				</div>
-			</details>
-		</div>
+
+			</PanelBody>
+		</Panel>
 	);
 };
 
