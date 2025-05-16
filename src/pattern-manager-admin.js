@@ -4,8 +4,8 @@ import { registerCoreBlocks } from '@wordpress/block-library';
 
 export default function PatternManagerAdmin() {
 
+	// TODO: Is this the right place?  Maybe in the PatternEditor?
 	registerCoreBlocks();
-
 	// TODO: Register custom blocks from plugins?
 
 	return (

@@ -17,6 +17,11 @@ import { getEditorSettings, savePattern, deletePattern } from '../resolvers';
 import { PatternDetails } from '../components/PatternDetails';
 import PatternSearch from '../components/PatternSearch';
 import { formatBlockMarkup, validateBlockMarkup } from '../formatters';
+import BlockBindingsPanel from './BlockBindingsPanel';
+
+import { registerBlockBindingsSource } from '@wordpress/blocks';
+import patternOverrides from '../imports/pattern-overrides';
+
 
 
 export const PatternEditor = ({ pattern, onClose }) => {
@@ -29,8 +34,13 @@ export const PatternEditor = ({ pattern, onClose }) => {
 	const [codeMarkupIsValid, setCodeMarkupIsValid] = useState(true);
 	const [codeMarkup, setCodeMarkup] = useState('');
 
+
 	// TODO: Optimize me
 	useEffect(() => {
+
+		patternOverrides.label = 'Pattern Overrides';
+		registerBlockBindingsSource( patternOverrides );
+
 		getEditorSettings()
 			.then((data) => {
 				setEditorSettings(data);
@@ -164,6 +174,10 @@ export const PatternEditor = ({ pattern, onClose }) => {
 										name: 'patterns',
 										title: '+Patterns',
 									},
+									{
+										name: 'bindings',
+										title: 'Bindings',
+									}
 								]}
 							>
 								{(tab) => (
@@ -186,6 +200,11 @@ export const PatternEditor = ({ pattern, onClose }) => {
 										{tab.name === 'patterns' && (
 											<Panel>
 												<PatternSearch />
+											</Panel>
+										)}
+										{tab.name === 'bindings' && (
+											<Panel>
+												<BlockBindingsPanel />
 											</Panel>
 										)}
 									</>
