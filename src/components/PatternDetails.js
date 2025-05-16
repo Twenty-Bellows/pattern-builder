@@ -34,6 +34,14 @@ export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
 		setEditablePattern((prev) => ({ ...prev, categories: updatedCategories }));
 	};
 
+	const handleConvertToThemePattern = () => {
+
+	}
+
+	const handleConvertToUserPattern = () => {
+
+	}
+
 	const handleChange = (field, value) => {
 		setEditablePattern((prev) => ({ ...prev, [field]: value }));
 	};

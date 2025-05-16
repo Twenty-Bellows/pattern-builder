@@ -2,26 +2,16 @@ import { __ } from '@wordpress/i18n';
 import { TextControl, Card, CardBody } from '@wordpress/components';
 import { __experimentalBlockPatternsList as BlockPatternsList } from '@wordpress/block-editor';
 import { useEffect, useState } from '@wordpress/element';
+import { useSelect } from '@wordpress/data';
 import { useAsyncList } from '@wordpress/compose';
-import { parse, serialize } from '@wordpress/blocks';
 import PatternPreview from './PatternPreview';
-
-import { getAllPatterns } from '../resolvers';
-
-
 
 const PatternSearch = () => {
 
 	const [searchTerm, setSearchTerm] = useState('');
-	const [patterns, setPatterns] = useState([]);
 	const [filteredPatterns, setFilteredPatterns] = useState([]);
 
-	useEffect(() => {
-		getAllPatterns()
-			.then((patterns) => {
-				setPatterns(patterns);
-			});
-	}, []);
+	const patterns = useSelect((select) => select('pattern-manager').getAllPatterns(), []);
 
 	useEffect(() => {
 

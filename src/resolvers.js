@@ -1,7 +1,7 @@
 import apiFetch from '@wordpress/api-fetch';
 import AbstractPattern from './objects/AbstractPattern';
 
-export async function getAllPatterns() {
+export async function fetchAllPatterns() {
 	return apiFetch( {
 		path: '/pattern-manager/v1/patterns',
 		method: 'GET',
@@ -16,7 +16,7 @@ export async function getAllPatterns() {
 	});
 }
 
-export async function getEditorSettings() {
+export async function fetchEditorConfiguration() {
 	return apiFetch({ path: `/pattern-manager/v1/global-styles` })
 		.then((data) => {
 			return data;

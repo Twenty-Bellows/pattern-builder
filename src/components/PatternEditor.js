@@ -12,40 +12,25 @@ import { useState, useEffect } from '@wordpress/element';
 import { parse, serialize } from '@wordpress/blocks';
 import { chevronLeft } from '@wordpress/icons';
 import { ToolbarItem, ToggleControl } from '@wordpress/components';
+import { useSelect } from '@wordpress/data';
 
-import { getEditorSettings, savePattern, deletePattern } from '../resolvers';
+import { savePattern, deletePattern } from '../resolvers';
 import { PatternDetails } from '../components/PatternDetails';
 import PatternSearch from '../components/PatternSearch';
 import { formatBlockMarkup, validateBlockMarkup } from '../formatters';
 import BlockBindingsPanel from './BlockBindingsPanel';
-
-import { registerBlockBindingsSource } from '@wordpress/blocks';
-import patternOverrides from '../imports/pattern-overrides';
-
 
 
 export const PatternEditor = ({ pattern, onClose }) => {
 
 	const [updatedPattern, setUpdatedPattern] = useState(pattern);
 	const [blocks, setBlocks] = useState(parse(pattern.content));
-	const [editorSettings, setEditorSettings] = useState(null);
 
 	const [showCodeEditor, setShowCodeEditor] = useState(false);
 	const [codeMarkupIsValid, setCodeMarkupIsValid] = useState(true);
 	const [codeMarkup, setCodeMarkup] = useState('');
 
-
-	// TODO: Optimize me
-	useEffect(() => {
-
-		patternOverrides.label = 'Pattern Overrides';
-		registerBlockBindingsSource( patternOverrides );
-
-		getEditorSettings()
-			.then((data) => {
-				setEditorSettings(data);
-			});
-	}, []);
+	const editorSettings = useSelect((select) => select('pattern-manager').getEditorConfiguration(), []);
 
 	const toggleCodeEditor = () => {
 
