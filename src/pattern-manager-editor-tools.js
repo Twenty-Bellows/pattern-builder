@@ -7,7 +7,6 @@ import { Modal, Button } from '@wordpress/components';
 import { __, _x } from '@wordpress/i18n';
 import { tool, widget } from '@wordpress/icons';
 import { useState } from '@wordpress/element';
-import { parse } from '@wordpress/block-serialization-default-parser';
 
 import PatternManager from './pattern-manager';
 import PatternSearch from './components/PatternSearch';

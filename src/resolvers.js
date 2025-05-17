@@ -42,7 +42,6 @@ export async function savePattern(pattern) {
 }
 
 export async function deletePattern(pattern) {
-	debugger;
 	return apiFetch( {
 		path: `/pattern-manager/v1/pattern`,
 		method: 'DELETE',

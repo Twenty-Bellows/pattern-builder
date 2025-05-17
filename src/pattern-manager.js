@@ -1,16 +1,20 @@
 import { __, _x } from '@wordpress/i18n';
 import { useEffect } from '@wordpress/element';
-import { dispatch, useSelect } from '@wordpress/data';
+import { dispatch, useSelect, useDispatch } from '@wordpress/data';
 
 import { PatternBrowser } from './components/PatternBrowser';
 import PatternEditor from './components/PatternEditor';
+import { SnackbarList } from '@wordpress/components';
 
 import './store';
 
 import './pattern-manager.scss';
 
 const PatternManager = () => {
-    // Initialize the data store when the component mounts
+
+    const notices = useSelect((select) => select('core/notices').getNotices());
+    const { removeNotice } = useDispatch('core/notices');
+
     useEffect(() => {
         dispatch('pattern-manager').fetchEditorConfiguration();
         dispatch('pattern-manager').fetchAllPatterns();
@@ -34,8 +38,12 @@ const PatternManager = () => {
                         dispatch('pattern-manager').setActivePattern(pattern)
                     }
                 />
-            )}
-        </div>
+			)}
+			<SnackbarList
+				notices={notices}
+				onRemove={removeNotice}
+			/>
+		</div>
     );
 };
 

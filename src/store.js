@@ -45,21 +45,14 @@ const reducer = (state = initialState, action) => {
 // Actions
 const actions = {
     setActivePattern: (value) => ({ type: SET_ACTIVE_PATTERN, value }),
-    deleteActivePattern: () => async ({dispatch, select}) => {
-        try {
-            const activePattern = select('pattern-manager').getActivePattern();
+    deleteActivePattern: (patternToDelete) => async ({dispatch, select}) => {
 
-            if (!activePattern) {
-                console.warn('No active pattern to delete.');
-                return;
+            if (!patternToDelete) {
+				throw new Error('No pattern to delete.');
             }
 
-            await deletePattern(activePattern);
-
-            dispatch({ type: DELETE_ACTIVE_PATTERN });
-        } catch (error) {
-            console.error('Failed to delete the active pattern:', error);
-        }
+            await deletePattern(patternToDelete);
+			dispatch(actions.setActivePattern(null));
     },
     setEditorConfiguration: (value) => ({ type: SET_EDITOR_CONFIGURATION, value }),
     fetchEditorConfiguration: () => async ({dispatch}) => {
@@ -79,7 +72,9 @@ const actions = {
 
             const savedPattern = await savePattern(updatedPattern);
             dispatch(actions.setActivePattern(savedPattern));
-            console.log('Pattern saved successfully.');
+
+			return savedPattern;
+
         } catch (error) {
             console.error('Failed to save the pattern:', error);
         }

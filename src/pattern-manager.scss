@@ -47,6 +47,10 @@
 
 	height: 100%;
 
+	.components-snackbar-list {
+		bottom: 0;
+	}
+
 	.pattern-manager__pattern-browser {
 		height: 100%;
 		overflow-y: auto;

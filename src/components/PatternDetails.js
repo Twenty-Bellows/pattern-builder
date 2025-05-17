@@ -2,10 +2,15 @@ import { __ } from '@wordpress/i18n';
 import { useState, useEffect } from '@wordpress/element';
 import { TextControl, TextareaControl, SelectControl, ToggleControl, Button, FormTokenField, Panel } from '@wordpress/components';
 import { PanelBody } from '@wordpress/components';
+import { dispatch, useDispatch } from '@wordpress/data';
+import { store as noticesStore } from '@wordpress/notices';
 
-export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
+
+export const PatternDetails = ({ pattern, onChange }) => {
 
 	const [editablePattern, setEditablePattern] = useState({ ...pattern });
+	const { createWarningNotice } = useDispatch(noticesStore);
+
 
 	// Use useEffect to call onChange when editablePattern updates
 	useEffect(() => {
@@ -42,6 +47,18 @@ export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
 
 	}
 
+	const handleDeletePattern = () => {
+		if (confirm('Are you sure you want to delete this pattern?')) {
+			dispatch('pattern-manager').deleteActivePattern( pattern )
+				.catch((error) => {
+					console.error('Error deleting pattern:', error);
+					createWarningNotice(__('Error  pattern'), {
+						isDismissible: true,
+					});
+				});
+		}
+	}
+
 	const handleChange = (field, value) => {
 		setEditablePattern((prev) => ({ ...prev, [field]: value }));
 	};
@@ -52,8 +69,7 @@ export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
 			<TextControl
 				label="Title"
 				value={editablePattern.title || ''}
-				onChange={(value) => handleChange('title', value)}
-				__next40pxDefaultSize
+				onChange={(value) => handleChange('title', value)} __next40pxDefaultSize
 				__nextHasNoMarginBottom
 			/>
 			<TextareaControl
@@ -175,7 +191,7 @@ export const PatternDetails = ({ pattern, onChange, onDeletePattern }) => {
 						isDestructive
 						variant="primary"
 						label="Delete Pattern"
-						onClick={() => { onDeletePattern(pattern); }}
+						onClick={handleDeletePattern}
 						__next40pxDefaultSize
 						__nextHasNoMarginBottom
 					>
