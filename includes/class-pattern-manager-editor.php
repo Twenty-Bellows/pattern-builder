@@ -10,11 +10,11 @@ class Twenty_Bellows_Pattern_Manager_Editor {
      * Enqueues assets for the block editor.
      */
     public function enqueue_block_editor_assets(): void {
-        $asset_file = include plugin_dir_path(__FILE__) . '../build/pattern-manager-editor-tools.asset.php';
+        $asset_file = include plugin_dir_path(__FILE__) . '../build/PatternManager_EditorTools.asset.php';
 
         wp_enqueue_script(
             'pattern-manager',
-            plugins_url('../build/pattern-manager-editor-tools.js', __FILE__),
+            plugins_url('../build/PatternManager_EditorTools.js', __FILE__),
             $asset_file['dependencies'],
             $asset_file['version'],
             false
@@ -22,7 +22,7 @@ class Twenty_Bellows_Pattern_Manager_Editor {
 
         wp_enqueue_style(
             'pattern-manager-editor-style',
-            plugins_url('../build/pattern-manager-editor-tools.css', __FILE__),
+            plugins_url('../build/PatternManager_EditorTools.css', __FILE__),
             [],
             $asset_file['version']
         );

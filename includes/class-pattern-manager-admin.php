@@ -44,18 +44,18 @@ class Twenty_Bellows_Pattern_Manager_Admin {
 			return;
 		}
 
-        $asset_file = include plugin_dir_path(__FILE__) . '../build/pattern-manager-admin.asset.php';
+        $asset_file = include plugin_dir_path(__FILE__) . '../build/PatternManager_Admin.asset.php';
 
         wp_enqueue_script(
             'pattern-manager-app',
-            plugins_url('../build/pattern-manager-admin.js', __FILE__),
+            plugins_url('../build/PatternManager_Admin.js', __FILE__),
             $asset_file['dependencies'],
             $asset_file['version']
         );
 
         wp_enqueue_style(
             'pattern-manager-editor-style',
-            plugins_url('../build/pattern-manager-admin.css', __FILE__),
+            plugins_url('../build/PatternManager_Admin.css', __FILE__),
             [],
             $asset_file['version']
         );
