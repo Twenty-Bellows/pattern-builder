@@ -8,16 +8,20 @@ import {
 	__experimentalLibrary as InserterLibrary
 } from '@wordpress/block-editor';
 import { Panel, TabPanel, Button, TextareaControl } from '@wordpress/components';
+import {
+	__experimentalToggleGroupControl as ToggleGroupControl,
+	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
+} from '@wordpress/components';
 import { EditorHistoryRedo, EditorHistoryUndo } from '@wordpress/editor';
 import { useState } from '@wordpress/element';
 import { parse, serialize } from '@wordpress/blocks';
 import { chevronLeft } from '@wordpress/icons';
-import { ToolbarItem, ToggleControl } from '@wordpress/components';
+import { ToolbarItem } from '@wordpress/components';
 import { useSelect, dispatch, useDispatch } from '@wordpress/data';
 import { store as noticesStore } from '@wordpress/notices';
 
-import { PatternDetails } from '../components/PatternDetails';
-import PatternSearch from '../components/PatternSearch';
+import { PatternDetails } from './PatternDetails';
+import PatternSearch from './PatternSearch';
 import { formatBlockMarkup, validateBlockMarkup } from '../utils/formatters';
 import BlockBindingsPanel from './BlockBindingsPanel';
 
@@ -27,23 +31,35 @@ export const PatternEditor = ({ pattern, onClose }) => {
 	const [updatedPattern, setUpdatedPattern] = useState(pattern);
 	const [blocks, setBlocks] = useState(parse(pattern.content));
 
-	const [showCodeEditor, setShowCodeEditor] = useState(false);
 	const [codeMarkupIsValid, setCodeMarkupIsValid] = useState(true);
 	const [codeMarkup, setCodeMarkup] = useState('');
+	const [editorMode, setEditorMode] = useState('visual');
 
 	const editorSettings = useSelect((select) => select('pattern-manager').getEditorConfiguration(), []);
 	const { createSuccessNotice, createWarningNotice } = useDispatch(noticesStore);
 
-	const toggleCodeEditor = () => {
+	const onEditorModeChange = (newMode) => {
 
-		if (!showCodeEditor) {
+		if (newMode === 'markup') {
 			setCodeMarkup(formatBlockMarkup(serialize(blocks)));
 		}
-		else {
+		else if (newMode === 'visual') {
+			setBlocks(parse(codeMarkup));
+		}
+		else if (newMode === 'code') {
+			// Handle code mode
+			// This is where you would implement the logic for the code editor
+			// For now, we will just set the blocks to the current state
+			setBlocks(parse(codeMarkup));
+		}
+		else if (newMode === 'style') {
+			// Handle style mode
+			// This is where you would implement the logic for the style editor
+			// For now, we will just set the blocks to the current state
 			setBlocks(parse(codeMarkup));
 		}
 
-		setShowCodeEditor((prev) => !prev);
+		setEditorMode(newMode);
 	}
 
 	const handleSavePattern = () => {
@@ -96,13 +112,17 @@ export const PatternEditor = ({ pattern, onClose }) => {
 						variant={'tertiary'}
 						size="compact"
 					/>
-					<ToggleControl
-						label="Code Editor"
-						disabled={!codeMarkupIsValid}
-						checked={showCodeEditor}
-						onChange={toggleCodeEditor}
+					<ToggleGroupControl
+						value={editorMode}
+						onChange={onEditorModeChange}
 						__nextHasNoMarginBottom
-					/>
+					>
+						<ToggleGroupControlOption value="visual" label="Visual" disabled={!codeMarkupIsValid}/>
+						<ToggleGroupControlOption value="markup" label="Markup" disabled={!codeMarkupIsValid} />
+						<ToggleGroupControlOption value="code" label="Code" disabled={!codeMarkupIsValid} />
+						<ToggleGroupControlOption value="style" label="Style" disabled={!codeMarkupIsValid} />
+					</ToggleGroupControl>
+
 					<div style={{ flexGrow: 1 }} />
 					<Button
 						variant="primary"
@@ -110,19 +130,8 @@ export const PatternEditor = ({ pattern, onClose }) => {
 					>Save</Button>
 				</div>
 
-				{showCodeEditor && (
-					<TextareaControl
-						className="pattern-editor__code-editor"
-						value={codeMarkup}
-						onChange={(value) => {
-							//TODO: validate the block markup
-							setCodeMarkupIsValid(validateBlockMarkup(value));
-							setCodeMarkup(value);
-						}}
-						placeholder="Nothing here yet..."
-					/>
-				)}
-				{!showCodeEditor && (
+				{/* Render based on editorMode */}
+				{editorMode === 'visual' && (
 					<div className="pattern-editor__body">
 						<div className="pattern-editor__list-view">
 							<ListView isExpanded />
@@ -190,6 +199,33 @@ export const PatternEditor = ({ pattern, onClose }) => {
 								</TabPanel>
 							</div>
 						</div>
+					</div>
+				)}
+
+				{editorMode === 'markup' && (
+					<TextareaControl
+						className="pattern-editor__code-editor"
+						value={codeMarkup}
+						onChange={(value) => {
+							// Validate the block markup
+							setCodeMarkupIsValid(validateBlockMarkup(value));
+							setCodeMarkup(value);
+						}}
+						placeholder="Enter your markup here..."
+					/>
+				)}
+
+				{editorMode === 'code' && (
+					<div className="pattern-editor__code-placeholder">
+						{/* Placeholder for Code mode */}
+						<p>Code editor placeholder</p>
+					</div>
+				)}
+
+				{editorMode === 'style' && (
+					<div className="pattern-editor__style-placeholder">
+						{/* Placeholder for Style mode */}
+						<p>Style editor placeholder</p>
 					</div>
 				)}
 			</BlockEditorProvider>

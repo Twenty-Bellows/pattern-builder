@@ -4,7 +4,6 @@ import { __experimentalBlockPatternsList as BlockPatternsList } from '@wordpress
 import { useEffect, useState } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import { useAsyncList } from '@wordpress/compose';
-import PatternPreview from './PatternPreview';
 
 const PatternSearch = () => {
 
