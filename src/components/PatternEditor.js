@@ -18,7 +18,7 @@ import { store as noticesStore } from '@wordpress/notices';
 
 import { PatternDetails } from '../components/PatternDetails';
 import PatternSearch from '../components/PatternSearch';
-import { formatBlockMarkup, validateBlockMarkup } from '../formatters';
+import { formatBlockMarkup, validateBlockMarkup } from '../utils/formatters';
 import BlockBindingsPanel from './BlockBindingsPanel';
 
 

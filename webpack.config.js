@@ -9,8 +9,8 @@ defaultConfig[ 0 ] = {
 	],
 	...{
 		entry: {
-			'pattern-manager-editor-tools': './src/pattern-manager-editor-tools.js',
-			'pattern-manager-admin': './src/pattern-manager-admin.js',
+			'PatternManager_EditorTools': './src/PatternManager_EditorTools.js',
+			'PatternManager_Admin': './src/PatternManager_Admin.js',
 		},
 	},
 };
