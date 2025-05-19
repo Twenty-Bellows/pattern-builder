@@ -1,10 +1,12 @@
 import { __ } from '@wordpress/i18n';
 import { PanelBody, SelectControl, TextControl, TextareaControl, CheckboxControl, Button } from '@wordpress/components';
-import { useEffect, useState } from '@wordpress/element';
+import { useEffect, useMemo } from '@wordpress/element';
+import { useDispatch, useSelect } from '@wordpress/data';
 import {
 	__experimentalToggleGroupControl as ToggleGroupControl,
 	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
 } from '@wordpress/components';
+import store from '../utils/store'; // Import the Redux store
 
 /**
  * PatternBrowserPanel Component
@@ -12,24 +14,18 @@ import {
  */
 export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, onCreatePattern }) => {
 
-	const [filterOptions, setFilterOptions] = useState({
-		source: 'all',
-		synced: 'all',
-		category: 'all',
-		hidden: 'visible',
-		keyword: '',
-	});
+	const filterOptions = useSelect((select) => select(store).getFilterOptions(), []);
+
+	const { setFilterOptions } = useDispatch(store);
 
 	useEffect(() => {
-		onFilterChange(filterOptions);
-	}, [patterns]);
+		if (onFilterChange) {
+			onFilterChange(filterOptions);
+		}
+	}, [filterOptions]);
 
 	const updateFilterOptions = (key, value) => {
-		const updatedFilters = { ...filterOptions, [key]: value };
-		setFilterOptions(updatedFilters);
-		if (onFilterChange) {
-			onFilterChange(updatedFilters);
-		}
+		setFilterOptions({ [key]: value });
 	};
 
 	const handleCreatePattern = (newPattern) => {
@@ -38,65 +34,73 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 		}
 	};
 
-	const patternCategories = Object.values(patterns.reduce((acc, pattern) => {
-		pattern.categories.forEach((category) => {
-			if (!acc[category.slug]) {
-				acc[category.slug] = {
-					label: category.name,
-					value: category.slug,
-				};
-			}
-		});
-		return acc;
-	}, {
-		'all': { label: __('All', 'pattern-manager'), value: 'all' },
-		'uncategorized': { label: __('Uncategorized', 'pattern-manager'), value: 'uncategorized' }
-	}));
+	const patternCategories = useMemo(() => {
+		return Object.values(patterns.reduce((acc, pattern) => {
+			pattern.categories.forEach((category) => {
+				if (!acc[category.slug]) {
+					acc[category.slug] = {
+						label: category.name,
+						value: category.slug,
+					};
+				}
+			});
+			return acc;
+		}, {
+			'all': { label: __('All', 'pattern-manager'), value: 'all' },
+			'uncategorized': { label: __('Uncategorized', 'pattern-manager'), value: 'uncategorized' }
+		}));
+	}, [patterns]);
 
-	const patternBlockTypes = Object.values(patterns.reduce((acc, pattern) => {
-		pattern.blockTypes.forEach((blockType) => {
-			if (!acc[blockType]) {
-				acc[blockType] = {
-					label: blockType,
-					value: blockType,
-				};
-			}
-		});
-		return acc;
-	}, {
-		'all': { label: __('All', 'pattern-manager'), value: 'all' },
-		'unassigned': { label: __('Unassigned', 'pattern-manager'), value: 'unassigned' }
-	}));
+	const patternBlockTypes = useMemo(() => {
+		return Object.values(patterns.reduce((acc, pattern) => {
+			pattern.blockTypes.forEach((blockType) => {
+				if (!acc[blockType]) {
+					acc[blockType] = {
+						label: blockType,
+						value: blockType,
+					};
+				}
+			});
+			return acc;
+		}, {
+			'all': { label: __('All', 'pattern-manager'), value: 'all' },
+			'unassigned': { label: __('Unassigned', 'pattern-manager'), value: 'unassigned' }
+		}));
+	}, [patterns]);
 
-	const patternTemplateTypes = Object.values(patterns.reduce((acc, pattern) => {
-		pattern.templateTypes.forEach((templateType) => {
-			if (!acc[templateType]) {
-				acc[templateType] = {
-					label: templateType,
-					value: templateType,
-				};
-			}
-		});
-		return acc;
-	}, {
-		'all': { label: __('All', 'pattern-manager'), value: 'all' },
-		'unassigned': { label: __('Unassigned', 'pattern-manager'), value: 'unassigned' }
-	}));
+	const patternTemplateTypes = useMemo(() => {
+		return Object.values(patterns.reduce((acc, pattern) => {
+			pattern.templateTypes.forEach((templateType) => {
+				if (!acc[templateType]) {
+					acc[templateType] = {
+						label: templateType,
+						value: templateType,
+					};
+				}
+			});
+			return acc;
+		}, {
+			'all': { label: __('All', 'pattern-manager'), value: 'all' },
+			'unassigned': { label: __('Unassigned', 'pattern-manager'), value: 'unassigned' }
+		}));
+	}, [patterns]);
 
-	const patternPostTypes = Object.values(patterns.reduce((acc, pattern) => {
-		pattern.postTypes.forEach((postTypes) => {
-			if (!acc[postTypes]) {
-				acc[postTypes] = {
-					label: postTypes,
-					value: postTypes,
-				};
-			}
-		});
-		return acc;
-	}, {
-		'all': { label: __('All', 'pattern-manager'), value: 'all' },
-		'unassigned': { label: __('Unassigned', 'pattern-manager'), value: 'unassigned' }
-	}));
+	const patternPostTypes = useMemo(() => {
+		return Object.values(patterns.reduce((acc, pattern) => {
+			pattern.postTypes.forEach((postTypes) => {
+				if (!acc[postTypes]) {
+					acc[postTypes] = {
+						label: postTypes,
+						value: postTypes,
+					};
+				}
+			});
+			return acc;
+		}, {
+			'all': { label: __('All', 'pattern-manager'), value: 'all' },
+			'unassigned': { label: __('Unassigned', 'pattern-manager'), value: 'unassigned' }
+		}));
+	}, [patterns]);
 
 	return (
 		<div className="pattern-manager__sidebar">

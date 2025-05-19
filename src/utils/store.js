@@ -5,11 +5,19 @@ const SET_ACTIVE_PATTERN = 'SET_ACTIVE_PATTERN';
 const DELETE_ACTIVE_PATTERN = 'DELETE_ACTIVE_PATTERN';
 const SET_EDITOR_CONFIGURATION = 'SET_EDITOR_CONFIGURATION';
 const SET_ALL_PATTERNS = 'SET_ALL_PATTERNS';
+const SET_FILTER_OPTIONS = 'SET_FILTER_OPTIONS';
 
 const initialState = {
     activePattern: null,
     editorConfiguration: {},
     allPatterns: [],
+    filterOptions: {
+        source: 'all',
+        synced: 'all',
+        category: 'all',
+        hidden: 'visible',
+        keyword: '',
+    },
 };
 
 const reducer = (state = initialState, action) => {
@@ -33,6 +41,14 @@ const reducer = (state = initialState, action) => {
             return {
                 ...state,
                 allPatterns: action.value,
+            };
+        case SET_FILTER_OPTIONS:
+            return {
+                ...state,
+                filterOptions: {
+                    ...state.filterOptions,
+                    ...action.value,
+                },
             };
         default:
             return state;
@@ -83,12 +99,14 @@ const actions = {
             console.error('Failed to fetch all patterns:', error);
         }
     },
+    setFilterOptions: (value) => ({ type: SET_FILTER_OPTIONS, value }),
 };
 
 const selectors = {
     getActivePattern: (state) => state.activePattern,
     getEditorConfiguration: (state) => state.editorConfiguration,
     getAllPatterns: (state) => state.allPatterns,
+    getFilterOptions: (state) => state.filterOptions,
 };
 
 const store = createReduxStore('pattern-manager', {
