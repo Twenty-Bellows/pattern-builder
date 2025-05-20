@@ -62,7 +62,9 @@ const BindableBlockControls = ({block}) => {
 		updateBlockAttributes(block.clientId, {
 			metadata: {
 				...block.attributes.metadata,
-				bindings: {},
+				bindings: newValue ? {
+					__default: { source: "core/pattern-overrides" }
+				} : null,
 			},
 		});
 	}

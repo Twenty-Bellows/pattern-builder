@@ -19,11 +19,12 @@ class Abstract_Pattern
 	public $inserter;
 	public $filePath;
 
-	public function __construct( $args = array() )
+	public function __construct($args = array())
 	{
 		$this->title = $args['title'];
 
-		$this->name = $args['name'] ?? sanitize_title( $args['title'] );
+		$this->name = $args['name'] ?? sanitize_title($args['title']);
+
 		$this->description = $args['description'] ?? '';
 		$this->content = $args['content'] ?? '';
 
@@ -41,7 +42,60 @@ class Abstract_Pattern
 		$this->filePath = $args['filePath'] ?? null;
 	}
 
-	public static function from_registry( $pattern )
+	private static function render_pattern($pattern_file)
+	{
+		ob_start();
+		include $pattern_file;
+		return ob_get_clean();
+	}
+
+
+	public static function from_file($pattern_file)
+	{
+		$pattern_data = get_file_data($pattern_file, array(
+			'title'         => 'Title',
+			'slug'          => 'Slug',
+			'description'   => 'Description',
+			'viewportWidth' => 'Viewport Width',
+			'inserter'      => 'Inserter',
+			'categories'    => 'Categories',
+			'keywords'      => 'Keywords',
+			'blockTypes'    => 'Block Types',
+			'postTypes'     => 'Post Types',
+			'templateTypes' => 'Template Types',
+			'synced'	=> 'Synced',
+		));
+
+		$categories = array_map(
+			function ($category_slug) {
+				return [
+					'name' => $category_slug,
+					'slug' => $category_slug,
+				];
+			},
+			explode(',', $pattern_data['categories'])
+		);
+
+		$new = new self([
+			'name' => $pattern_data['slug'],
+			'title' => $pattern_data['title'],
+			'description' => $pattern_data['description'],
+			'content' => self::render_pattern($pattern_file),
+			'filePath' => $pattern_file,
+			'categories' => $categories,
+			'keywords' => explode(',', $pattern_data['keywords']),
+			'blockTypes' => explode(',', $pattern_data['blockTypes']),
+			'postTypes' => explode(',', $pattern_data['postTypes']),
+			'templateTypes' => explode(',', $pattern_data['templateTypes']),
+			'source' => 'theme',
+			'synced' => $pattern_data['synced'] === 'yes' ? true : false,
+			'inserter' => $pattern_data['inserter'] !== 'no' ? true : false,
+		]);
+
+		return $new;
+	}
+
+	public static function from_registry($pattern)
 	{
 		return new self(
 			array(
@@ -62,11 +116,12 @@ class Abstract_Pattern
 		);
 	}
 
-	public static function from_post( $post, $metadata, $categories )
+	public static function from_post($post)
 	{
+		$metadata = get_post_meta($post->ID);
+		$categories = wp_get_object_terms($post->ID, 'wp_pattern_category');
 		$categories = array_map(
-			function ( $category ) {
-				// return $category->slug;
+			function ($category) {
 				return [
 					'id'   => $category->term_id,
 					'name' => $category->name,
@@ -82,11 +137,14 @@ class Abstract_Pattern
 				'description' => $post->post_excerpt,
 				'content'     => $post->post_content,
 				'source'      => 'user',
-				'synced'      => $metadata['wp_pattern_sync_status'][0] !== 'unsynced' ?? false,
+				'synced'      => ($metadata['wp_pattern_sync_status'][0] ?? 'synced') !== 'unsynced',
+				'blockTypes'  => explode(',', $metadata['wp_pattern_block_types'][0] ?? ''),
+				'templateTypes' => explode(',', $metadata['wp_pattern_template_types'][0] ?? ''),
+				'postTypes'   => explode(',', $metadata['wp_pattern_post_types'][0] ?? ''),
+				'keywords'   => explode(',', $metadata['wp_pattern_keywords'][0] ?? ''),
 				'categories'  => $categories,
 				'inserter'    => true,
 			)
 		);
 	}
-
 }

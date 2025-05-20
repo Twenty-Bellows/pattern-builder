@@ -3,6 +3,7 @@
 require_once __DIR__ . '/class-pattern-manager-api.php';
 require_once __DIR__ . '/class-pattern-manager-admin.php';
 require_once __DIR__ . '/class-pattern-manager-editor.php';
+require_once __DIR__ . '/class-pattern-manager-post-type.php';
 
 /**
  * Main class for managing the Pattern Manager plugin.
@@ -19,6 +20,7 @@ class Twenty_Bellows_Pattern_Manager
         new Twenty_Bellows_Pattern_Manager_API();
         new Twenty_Bellows_Pattern_Manager_Admin();
         new Twenty_Bellows_Pattern_Manager_Editor();
+		new Pattern_Manager_Post_Type();
     }
 
     /**
