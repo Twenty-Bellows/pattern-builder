@@ -4,8 +4,6 @@
  * Slug: synced-patterns-test/theme-unsynced-pattern
  * Description: An unsynced pattern provided with the theme to use for testing.
  * Categories: text
- * Block Types: group
- * Post Types: post, page
  */
 ?>
 <!-- wp:group {"style":{"color":{"background":"#d6cfff"}},"layout":{"type":"default"}} -->
