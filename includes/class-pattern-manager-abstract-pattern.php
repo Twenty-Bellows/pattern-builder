@@ -136,7 +136,7 @@ class Abstract_Pattern
 				'title'       => $post->post_title,
 				'description' => $post->post_excerpt,
 				'content'     => $post->post_content,
-				'source'      => 'user',
+				'source'      => ($post->post_type === 'pb_block') ? 'theme' : 'user',
 				'synced'      => ($metadata['wp_pattern_sync_status'][0] ?? 'synced') !== 'unsynced',
 				'blockTypes'  => explode(',', $metadata['wp_pattern_block_types'][0] ?? ''),
 				'templateTypes' => explode(',', $metadata['wp_pattern_template_types'][0] ?? ''),

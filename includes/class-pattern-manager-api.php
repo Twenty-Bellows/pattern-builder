@@ -15,7 +15,11 @@ class Twenty_Bellows_Pattern_Manager_API
 		add_action('plugins_loaded', array($this, 'register_patterns'));
 
 		add_filter('render_block', [$this, 'render_pb_blocks'] , 10, 2);
+
+		add_filter('rest_request_before_callbacks', [$this, 'handle_hijack_block_update'], 10, 3);
+
 	}
+
 
 	/**
 	 * Registers REST API routes for the pattern manager.
@@ -622,5 +626,22 @@ class Twenty_Bellows_Pattern_Manager_API
 			return $content;
 		}
 		return $block_content;
+	}
+
+	function handle_hijack_block_update($response, $handler, $request)
+	{
+		$route = $request->get_route();
+		if (preg_match('#^/wp/v2/blocks/(\d+)$#', $route, $matches) && $request->get_method() === 'PUT') {
+			$id = intval($matches[1]);
+			$post = get_post($id);
+			if ($post && $post->post_type === 'pb_block') {
+				$updated_pattern = json_decode($request->get_body(), true);
+				$pattern = Abstract_Pattern::from_post($post);
+				$pattern->content = $updated_pattern['content'];
+				$response = $this->update_theme_pattern($pattern);
+				return new WP_REST_Response($response, 200);
+			}
+		}
+		return $response;
 	}
 }
