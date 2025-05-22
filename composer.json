@@ -1,0 +1,24 @@
+{
+    "name": "twentybellows/pattern-manager",
+    "require": {
+        "phpunit/phpunit": "^9.3",
+        "wp-phpunit/wp-phpunit": "^6.6",
+        "yoast/phpunit-polyfills": "^1.1",
+		"spatie/phpunit-watcher": "^1.23"
+    },
+	"scripts": {
+		"format": "phpcbf --standard=phpcs.xml.dist --report-summary --report-source",
+		"lint": "phpcs --standard=phpcs.xml.dist",
+		"test": "phpunit",
+		"test:watch": [
+			"Composer\\Config::disableProcessTimeout",
+			"phpunit-watcher watch < /dev/tty"
+		]
+	},
+    "authors": [
+        {
+            "name": "Jason Crist",
+            "email": "jcrist@pbking.com"
+        }
+    ]
+}

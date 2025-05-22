@@ -1,0 +1,8 @@
+watch:
+  directories:
+    - includes/
+    - tests/php/
+
+notifications:
+  passingTests: false
+  failingTests: false

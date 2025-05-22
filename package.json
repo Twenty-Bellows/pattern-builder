@@ -20,7 +20,9 @@
 		"stop": "wp-env stop",
 		"clean": "wp-env clean all",
 		"test:unit": "wp-scripts test-unit-js",
-		"test:unit:watch": "wp-scripts test-unit-js --watch"
+		"test:unit:watch": "wp-scripts test-unit-js --watch",
+		"test:php": "wp-env run --env-cwd='wp-content/plugins/pattern-manager' tests-cli composer run-script test",
+		"test:php:watch": "wp-env run --env-cwd='wp-content/plugins/pattern-manager' tests-cli composer run-script test:watch"
 	},
 	"devDependencies": {
 		"@jest/globals": "^29.7.0",
