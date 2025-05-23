@@ -6,14 +6,14 @@ require_once __DIR__ . '/class-pattern-manager-editor.php';
 require_once __DIR__ . '/class-pattern-manager-post-type.php';
 
 /**
- * Main class for managing the Pattern Manager plugin.
+ * Main class for managing the Pattern Builder plugin.
  */
 class Twenty_Bellows_Pattern_Manager
 {
     private static ?Twenty_Bellows_Pattern_Manager $instance = null;
 
     /**
-     * Constructor to initialize the Pattern Manager components.
+     * Constructor to initialize the Pattern Builder components.
      */
     private function __construct()
     {

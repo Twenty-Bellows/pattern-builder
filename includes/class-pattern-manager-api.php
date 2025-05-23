@@ -20,7 +20,7 @@ class Twenty_Bellows_Pattern_Manager_API
 
 
 	/**
-	 * Registers REST API routes for the pattern manager.
+	 * Registers REST API routes for the Pattern Builder.
 	 */
 	public function register_routes(): void
 	{

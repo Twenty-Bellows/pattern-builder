@@ -14,7 +14,7 @@ import PatternSearch from './components/PatternSearch';
 const PatternManagerModal = ( { onRequestClose } ) => {
 	return (
 		<Modal
-			title={ _x( 'Pattern Manager', 'UI String', 'pattern-manager' ) }
+			title={ _x( 'Pattern Builder', 'UI String', 'pattern-manager' ) }
 			className="pattern-manager__modal"
 			onRequestClose={ onRequestClose }
 			isFullScreen
@@ -34,7 +34,7 @@ export default function PatternManagerEditorTools() {
 				target="pattern-manager-sidebar"
 				icon={ tool }
 			>
-				{ _x( 'Pattern Manager', 'UI String', 'pattern-manager' ) }
+				{ _x( 'Pattern Builder', 'UI String', 'pattern-manager' ) }
 			</PluginSidebarMoreMenuItem>
 
 			<PluginSidebar

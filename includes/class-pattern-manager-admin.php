@@ -3,7 +3,7 @@
 class Twenty_Bellows_Pattern_Manager_Admin {
 
     private const PAGE_SLUG = 'pattern-manager';
-    private const PAGE_TITLE = 'Pattern Manager';
+    private const PAGE_TITLE = 'Pattern Builder';
 
     /**
      * Constructor to initialize admin hooks.
@@ -13,7 +13,7 @@ class Twenty_Bellows_Pattern_Manager_Admin {
     }
 
     /**
-     * Creates the admin menu for the Pattern Manager.
+     * Creates the admin menu for the Pattern Builder.
      */
     public function create_admin_menu(): void {
         add_theme_page(
