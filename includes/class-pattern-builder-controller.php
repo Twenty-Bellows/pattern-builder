@@ -99,6 +99,9 @@ class Pattern_Builder_Controller
 		// store categories
 		wp_set_object_terms($post->ID, $pattern->categories, 'wp_pattern_category', false);
 
+		// update the pattern file
+		$this->update_theme_pattern_file($pattern);
+
 		return $pattern;
 	}
 
@@ -237,7 +240,7 @@ class Pattern_Builder_Controller
 		$path = $this->get_pattern_filepath($pattern);
 
 		if (!$path) {
-			return new WP_Error('pattern_not_found', 'Pattern not found', ['status' => 404]);
+			$path = get_stylesheet_directory() . '/patterns/' . basename($pattern->name) . '.php';
 		}
 
 		$file_content = $this->build_pattern_file_metadata($pattern) . $pattern->content . "\n";
