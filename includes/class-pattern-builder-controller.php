@@ -262,14 +262,9 @@ class Pattern_Builder_Controller
 	private function build_pattern_file_metadata(Abstract_Pattern $pattern): string
 	{
 
-		// map the pattern categories to their slugs
-		$category_slugs = array_map(function ($category) {
-			return $category['slug'] ?? sanitize_title($category['name']);
-		}, $pattern->categories);
-
 		$synced = $pattern->synced ? "\n * Synced: yes" : '';
 		$inserter = $pattern->inserter ? '' : "\n * Inserter: no";
-		$categories = $category_slugs ? "\n * Categories: " . implode(', ', $category_slugs) : '';
+		$categories = $pattern->categories ? "\n * Categories: " . implode(', ', $pattern->categories) : '';
 		$keywords = $pattern->keywords ? "\n * Keywords: " . implode(', ', $pattern->keywords) : '';
 		$blockTypes = $pattern->blockTypes ? "\n * Block Types: " . implode(', ', $pattern->blockTypes) : '';
 		$templateTypes = $pattern->templateTypes ? "\n * Template Types: " . implode(', ', $pattern->templateTypes) : '';
