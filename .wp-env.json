@@ -13,6 +13,9 @@
 		"WP_UPLOAD_MAX_FILESIZE": "128M",
 		"WP_MEMORY_LIMIT": "256M",
 		"WP_ENVIRONMENT_TYPE": "development",
-		"WP_DEVELOPMENT_MODE": "all"
+		"WP_DEVELOPMENT_MODE": "all",
+		"WP_FS__DEV_MODE": true,
+		"WP_FS__SKIP_EMAIL_ACTIVATION": true,
+		"WP_FS__pattern-builder_SECRET_KEY": "sk_aB<:G1k!;L7nC79rfAO+vW2cpEh.0"
 	}
 }

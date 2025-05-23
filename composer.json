@@ -4,7 +4,8 @@
         "phpunit/phpunit": "^9.3",
         "wp-phpunit/wp-phpunit": "^6.6",
         "yoast/phpunit-polyfills": "^1.1",
-		"spatie/phpunit-watcher": "^1.23"
+		"spatie/phpunit-watcher": "^1.23",
+        "freemius/wordpress-sdk": "^2.12"
     },
 	"scripts": {
 		"format": "phpcbf --standard=phpcs.xml.dist --report-summary --report-source",
