@@ -1,0 +1,286 @@
+<?php
+
+require_once __DIR__ . '/class-pattern-manager-abstract-pattern.php';
+
+class Twenty_Bellows_Pattern_Manager_Controller
+{
+	public function get_pb_block_post_for_pattern($pattern)
+	{
+
+		$pattern_post = get_page_by_path(sanitize_title($pattern->name), OBJECT, 'pb_block');
+
+		if ($pattern_post) {
+			return $pattern_post;
+		}
+
+		return $this->create_pb_block_post_for_pattern($pattern);
+	}
+
+	public function create_pb_block_post_for_pattern($pattern)
+	{
+		$meta = [];
+
+		if ( ! $pattern->synced ) {
+			$meta['wp_pattern_sync_status'] = "unsynced";
+		}
+		if ( $pattern->blockTypes ) {
+			$meta['wp_pattern_block_types'] = implode(',', $pattern->blockTypes);
+		}
+		if ( $pattern->templateTypes ) {
+			$meta['wp_pattern_template_types'] = implode(',', $pattern->templateTypes);
+		}
+		if ( $pattern->postTypes ) {
+			$meta['wp_pattern_post_types'] = implode(',', $pattern->postTypes);
+		}
+		if ( $pattern->keywords ) {
+			$meta['wp_pattern_keywords'] = implode(',', $pattern->keywords);
+		}
+
+		$post_id = wp_insert_post(array(
+			'post_title' => $pattern->title,
+			'post_name' => $pattern->name,
+			'post_content' => $pattern->content,
+			'post_excerpt' => $pattern->description,
+			'post_type' => 'pb_block',
+			'post_status' => 'publish',
+			'ping_status' => 'closed',
+			'comment_status' => 'closed',
+			'meta_input' => $meta,
+		));
+
+		// store categories
+		wp_set_object_terms($post_id, $pattern->categories, 'wp_pattern_category', false);
+
+		//return the post by post id
+		return get_post($post_id);
+	}
+
+	public function update_theme_pattern(Abstract_Pattern $pattern)
+	{
+		$post = $this->get_pb_block_post_for_pattern($pattern);
+
+		wp_update_post([
+			'ID'           => $post->ID,
+			'post_title'   => $pattern->title,
+			'post_content' => $pattern->content,
+			'post_excerpt' => $pattern->description,
+		]);
+
+		if ($pattern->synced) {
+			delete_post_meta($post->ID, 'wp_pattern_sync_status');
+		} else {
+			update_post_meta($post->ID, 'wp_pattern_sync_status', 'unsynced');
+		}
+
+		if ($pattern->keywords) {
+			update_post_meta($post->ID, 'wp_pattern_keywords', implode(',', $pattern->keywords));
+		} else {
+			delete_post_meta($post->ID, 'wp_pattern_keywords');
+		}
+
+		if ($pattern->blockTypes) {
+			update_post_meta($post->ID, 'wp_pattern_block_types', implode(',', $pattern->blockTypes));
+		} else {
+			delete_post_meta($post->ID, 'wp_pattern_block_types');
+		}
+
+		if ($pattern->templateTypes) {
+			update_post_meta($post->ID, 'wp_pattern_template_types', implode(',', $pattern->templateTypes));
+		} else {
+			delete_post_meta($post->ID, 'wp_pattern_template_types');
+		}
+
+		if ($pattern->postTypes) {
+			update_post_meta($post->ID, 'wp_pattern_post_types', implode(',', $pattern->postTypes));
+		} else {
+			delete_post_meta($post->ID, 'wp_pattern_post_types');
+		}
+
+		// store categories
+		wp_set_object_terms($post->ID, $pattern->categories, 'wp_pattern_category', false);
+
+		return $pattern;
+	}
+
+	/**
+	 * Updates a user pattern.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern to update.
+	 * @return Abstract_Pattern|WP_Error
+	 */
+	public function update_user_pattern(Abstract_Pattern $pattern)
+	{
+		$post = get_page_by_path($pattern->name, OBJECT, 'wp_block');
+
+		if (empty($post)) {
+			$post_id = wp_insert_post([
+				'post_title'   => $pattern->title,
+				'post_name'    => $pattern->name,
+				'post_content' => $pattern->content,
+				'post_excerpt' => $pattern->description,
+				'post_type'    => 'wp_block',
+				'post_status'  => 'publish',
+			]);
+		} else {
+			$post_id = $post->ID;
+			wp_update_post([
+				'ID'           => $post->ID,
+				'post_title'   => $pattern->title,
+				'post_name'    => $pattern->name,
+				'post_content' => $pattern->content,
+				'post_excerpt' => $pattern->description,
+			]);
+		}
+
+		// ensure the 'synced' meta key is set
+		if ($pattern->synced) {
+			delete_post_meta($post_id, 'wp_pattern_sync_status');
+		} else {
+			update_post_meta($post_id, 'wp_pattern_sync_status', 'unsynced');
+		}
+
+
+		// store categories
+		wp_set_object_terms($post_id, $pattern->categories, 'wp_pattern_category', false);
+
+		return $pattern;
+	}
+
+	public function get_block_patterns_from_theme_files()
+	{
+		$pattern_files = glob(get_stylesheet_directory() . '/patterns/*.php');
+		$patterns = [];
+
+		foreach ($pattern_files as $pattern_file) {
+			$pattern = Abstract_Pattern::from_file($pattern_file);
+			$patterns[] = $pattern;
+		}
+
+		return $patterns;
+	}
+
+	public function get_block_patterns_from_database(): array
+	{
+		$query = new WP_Query(['post_type' => 'wp_block']);
+		$patterns = [];
+
+		foreach ($query->posts as $post) {
+			$patterns[] = Abstract_Pattern::from_post($post);
+		}
+
+		return $patterns;
+	}
+
+	public function delete_user_pattern(Abstract_Pattern $pattern)
+	{
+		$post = get_page_by_path($pattern->name, OBJECT, 'wp_block');
+
+		if (empty($post)) {
+			return new WP_Error('pattern_not_found', 'Pattern not found', ['status' => 404]);
+		}
+
+		$deleted = wp_delete_post($post->ID, true);
+
+		if (!$deleted) {
+			return new WP_Error('pattern_delete_failed', 'Failed to delete pattern', ['status' => 500]);
+		}
+
+		return ['message' => 'Pattern deleted successfully'];
+	}
+
+	private function get_pattern_filepath($pattern)
+	{
+		$path = $pattern->filePath ?? get_stylesheet_directory() . '/patterns/' . basename($pattern->name) . '.php';
+
+		if (file_exists($path)) {
+			return $path;
+		}
+
+		$patterns = $this->get_block_patterns_from_theme_files();
+		$pattern = array_find( $patterns, function ($p) use ($pattern) {
+			return $p->name === $pattern->name;
+		});
+
+		if ( $pattern && file_exists($pattern->filePath) ) {
+			return $pattern->filePath;
+		}
+
+		return null;
+	}
+
+	public function delete_theme_pattern(Abstract_Pattern $pattern)
+	{
+		$path = $this->get_pattern_filepath($pattern);
+
+		if (!$path) {
+			return new WP_Error('pattern_not_found', 'Pattern not found', ['status' => 404]);
+		}
+
+		$deleted = unlink($path);
+
+		if (!$deleted) {
+			return new WP_Error('pattern_delete_failed', 'Failed to delete pattern', ['status' => 500]);
+		}
+
+		$pb_block_post = $this->get_pb_block_post_for_pattern($pattern);
+		$deleted = wp_delete_post($pb_block_post->ID, true);
+
+		if (!$deleted) {
+			return new WP_Error('pattern_delete_failed', 'Failed to delete pattern', ['status' => 500]);
+		}
+
+		return ['message' => 'Pattern deleted successfully'];
+	}
+
+	public function update_theme_pattern_file(Abstract_Pattern $pattern)
+	{
+		$path = $this->get_pattern_filepath($pattern);
+
+		if (!$path) {
+			return new WP_Error('pattern_not_found', 'Pattern not found', ['status' => 404]);
+		}
+
+		$file_content = $this->build_pattern_file_metadata($pattern) . $pattern->content . "\n";
+		$response = file_put_contents($path, $file_content);
+
+		if (!$response) {
+			return new WP_Error('file_creation_failed', 'Failed to create pattern file', ['status' => 500]);
+		}
+
+		return $pattern;
+	}
+
+	/**
+	 * Builds metadata for a pattern file.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern object.
+	 * @return string
+	 */
+	private function build_pattern_file_metadata(Abstract_Pattern $pattern): string
+	{
+
+		// map the pattern categories to their slugs
+		$category_slugs = array_map(function ($category) {
+			return $category['slug'] ?? sanitize_title($category['name']);
+		}, $pattern->categories);
+
+		$synced = $pattern->synced ? "\n * Synced: yes" : '';
+		$inserter = $pattern->inserter ? '' : "\n * Inserter: no";
+		$categories = $category_slugs ? "\n * Categories: " . implode(', ', $category_slugs) : '';
+		$keywords = $pattern->keywords ? "\n * Keywords: " . implode(', ', $pattern->keywords) : '';
+		$blockTypes = $pattern->blockTypes ? "\n * Block Types: " . implode(', ', $pattern->blockTypes) : '';
+		$templateTypes = $pattern->templateTypes ? "\n * Template Types: " . implode(', ', $pattern->templateTypes) : '';
+		$postTypes = $pattern->postTypes ? "\n * Post Types: " . implode(', ', $pattern->postTypes) : '';
+
+		return <<<METADATA
+	<?php
+	/**
+	 * Title: $pattern->title
+	 * Slug: $pattern->name
+	 * Description: $pattern->description$synced$inserter$categories$keywords$blockTypes$templateTypes$postTypes
+	 */
+	?>
+
+	METADATA;
+	}
+}

@@ -66,27 +66,17 @@ class Abstract_Pattern
 			'synced'	=> 'Synced',
 		));
 
-		$categories = array_map(
-			function ($category_slug) {
-				return [
-					'name' => $category_slug,
-					'slug' => $category_slug,
-				];
-			},
-			explode(',', $pattern_data['categories'])
-		);
-
 		$new = new self([
 			'name' => $pattern_data['slug'],
 			'title' => $pattern_data['title'],
 			'description' => $pattern_data['description'],
 			'content' => self::render_pattern($pattern_file),
 			'filePath' => $pattern_file,
-			'categories' => $categories,
-			'keywords' => explode(',', $pattern_data['keywords']),
-			'blockTypes' => explode(',', $pattern_data['blockTypes']),
-			'postTypes' => explode(',', $pattern_data['postTypes']),
-			'templateTypes' => explode(',', $pattern_data['templateTypes']),
+			'categories' => $pattern_data['categories'] === '' ? array() : explode(',', $pattern_data['categories']),
+			'keywords' => $pattern_data['keywords'] === '' ? array() : explode(',', $pattern_data['keywords']),
+			'blockTypes' => $pattern_data['blockTypes'] === '' ? array() : explode(',', $pattern_data['blockTypes']),
+			'postTypes' => $pattern_data['postTypes'] === '' ? array() : explode(',', $pattern_data['postTypes']),
+			'templateTypes' => $pattern_data['templateTypes'] === '' ? array() : explode(',', $pattern_data['templateTypes']),
 			'source' => 'theme',
 			'synced' => $pattern_data['synced'] === 'yes' ? true : false,
 			'inserter' => $pattern_data['inserter'] !== 'no' ? true : false,
@@ -122,14 +112,11 @@ class Abstract_Pattern
 		$categories = wp_get_object_terms($post->ID, 'wp_pattern_category');
 		$categories = array_map(
 			function ($category) {
-				return [
-					'id'   => $category->term_id,
-					'name' => $category->name,
-					'slug' => $category->slug,
-				];
+				return $category->slug;
 			},
 			$categories
 		);
+
 		return new self(
 			array(
 				'name'        => $post->post_name,
@@ -138,10 +125,12 @@ class Abstract_Pattern
 				'content'     => $post->post_content,
 				'source'      => ($post->post_type === 'pb_block') ? 'theme' : 'user',
 				'synced'      => ($metadata['wp_pattern_sync_status'][0] ?? 'synced') !== 'unsynced',
-				'blockTypes'  => explode(',', $metadata['wp_pattern_block_types'][0] ?? ''),
-				'templateTypes' => explode(',', $metadata['wp_pattern_template_types'][0] ?? ''),
-				'postTypes'   => explode(',', $metadata['wp_pattern_post_types'][0] ?? ''),
-				'keywords'   => explode(',', $metadata['wp_pattern_keywords'][0] ?? ''),
+
+				'blockTypes' => isset($metadata['wp_pattern_block_types'][0]) ? explode(',', $metadata['wp_pattern_block_types'][0]) : [],
+				'templateTypes' => isset($metadata['wp_pattern_template_types'][0]) ? explode(',', $metadata['wp_pattern_template_types'][0]) : [],
+				'postTypes'   => isset($metadata['wp_pattern_post_types'][0]) ? explode(',', $metadata['wp_pattern_post_types'][0]) : [],
+
+				'keywords' => isset($metadata['wp_pattern_keywords'][0]) ? explode(',', $metadata['wp_pattern_keywords'][0]) : [],
 				'categories'  => $categories,
 				'inserter'    => true,
 			)
