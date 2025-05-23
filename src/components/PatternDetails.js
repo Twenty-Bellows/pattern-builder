@@ -90,6 +90,7 @@ export const PatternDetails = ({ pattern, onChange }) => {
 				<FormTokenField
 					label="Keywords"
 					value={editablePattern.keywords}
+					tokenizeOnBlur
 					onChange={(value) => handleChange('keywords', value)}
 				/>
 			)}
@@ -103,18 +104,21 @@ export const PatternDetails = ({ pattern, onChange }) => {
 						__experimentalShowHowTo={false}
 						label="Block Types"
 						value={editablePattern.blockTypes}
+						tokenizeOnBlur
 						onChange={(value) => handleChange('blockTypes', value)}
 					/>
 					<FormTokenField
 						__experimentalShowHowTo={false}
 						label="Template Types"
 						value={editablePattern.templateTypes}
+						tokenizeOnBlur
 						onChange={(value) => handleChange('templateTypes', value)}
 					/>
 					<FormTokenField
 						__experimentalShowHowTo={false}
 						label="Post Types"
 						value={editablePattern.postTypes}
+						tokenizeOnBlur
 						onChange={(value) => handleChange('postTypes', value)}
 					/>
 				</PanelBody>

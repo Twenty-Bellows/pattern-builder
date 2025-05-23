@@ -65,6 +65,7 @@ const actions = {
 
             await deletePattern(patternToDelete);
 			dispatch(actions.setActivePattern(null));
+			dispatch(actions.fetchAllPatterns());
     },
     setEditorConfiguration: (value) => ({ type: SET_EDITOR_CONFIGURATION, value }),
     fetchEditorConfiguration: () => async ({dispatch}) => {
@@ -84,6 +85,7 @@ const actions = {
 
             const savedPattern = await savePattern(updatedPattern);
             dispatch(actions.setActivePattern(savedPattern));
+			dispatch(actions.fetchAllPatterns());
 
 			return savedPattern;
 
