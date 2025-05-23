@@ -19,26 +19,6 @@ export const PatternDetails = ({ pattern, onChange }) => {
 		}
 	}, [editablePattern, onChange]);
 
-	const handleCategoryChange = (categories) => {
-		const updatedCategories = categories.map((category) => {
-			if (typeof category === 'string') {
-				return {
-					id: null,
-					name: category,
-					value: category,
-					slug: null,
-				};
-			}
-			return {
-				id: category.id,
-				name: category.name,
-				value: category.name,
-				slug: category.slug,
-			};
-		});
-		setEditablePattern((prev) => ({ ...prev, categories: updatedCategories }));
-	};
-
 	const handleConvertToThemePattern = () => {
 
 	}
@@ -103,22 +83,8 @@ export const PatternDetails = ({ pattern, onChange }) => {
 		<PanelBody title={__('Organization', 'pattern-manager')} initialOpen={false} >
 			<FormTokenField
 				label="Categories"
-				value={
-					editablePattern.categories.map((category) => {
-						if (typeof category === 'string') {
-							return {
-								value: category,
-								name: category,
-							}
-						}
-						return {
-							id: category.id,
-							value: category.name,
-							name: category.name,
-							slug: category.slug,
-						};
-					}) || []}
-				onChange={handleCategoryChange}
+				value={editablePattern.categories}
+				onChange={(value) => handleChange('categories', value)}
 			/>
 			{editablePattern.source === 'theme' && (
 				<FormTokenField
