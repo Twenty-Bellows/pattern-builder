@@ -22,7 +22,7 @@ require_once "{$_tests_dir}/includes/functions.php";
  * Manually load the plugin being tested.
  */
 function _manually_load_plugin() {
-	require dirname( dirname( __FILE__ ) ) . '/pattern-manager/pattern-manager.php';
+	require dirname( dirname( __FILE__ ) ) . '/pattern-builder/pattern-builder.php';
 }
 
 tests_add_filter( 'muplugins_loaded', '_manually_load_plugin' );

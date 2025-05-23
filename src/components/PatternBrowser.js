@@ -18,8 +18,8 @@ export const PatternBrowser = ({ onPatternClick }) => {
 
     const { patterns, editorSettings } = useSelect((select) => {
         return {
-            patterns: select('pattern-manager').getAllPatterns(),
-            editorSettings: select('pattern-manager').getEditorConfiguration(),
+            patterns: select('pattern-builder').getAllPatterns(),
+            editorSettings: select('pattern-builder').getEditorConfiguration(),
         };
     }, []);
 
@@ -77,7 +77,7 @@ export const PatternBrowser = ({ onPatternClick }) => {
     };
 
     return (
-        <div className="pattern-manager__pattern-browser">
+        <div className="pattern-builder__pattern-browser">
             <BlockEditorProvider settings={editorSettings}>
                 <PatternBrowserPanel
                     patterns={patterns}
@@ -86,7 +86,7 @@ export const PatternBrowser = ({ onPatternClick }) => {
                     onCreatePattern={handleCreatePattern}
                 />
                 {filteredPatterns?.length > 0 && (
-                    <div className="pattern-manager__preview-grid">
+                    <div className="pattern-builder__preview-grid">
                         {filteredPatterns.map((pattern, index) => (
                             <div key={index}>
                                 <PatternPreview onClick={onPatternClick} pattern={pattern} />
@@ -96,7 +96,7 @@ export const PatternBrowser = ({ onPatternClick }) => {
                 )}
                 {filteredPatterns?.length === 0 && (
                     <div>
-                        <p>{__('No patterns found', 'pattern-manager')}</p>
+                        <p>{__('No patterns found', 'pattern-builder')}</p>
                     </div>
                 )}
             </BlockEditorProvider>

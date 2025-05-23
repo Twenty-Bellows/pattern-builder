@@ -1,25 +1,25 @@
 import { createRoot } from '@wordpress/element';
 import { registerCoreBlocks } from '@wordpress/block-library';
 
-import PatternManager from './PatternManager';
+import PatternBuilder from './PatternBuilder';
 
-export default function PatternManagerAdmin() {
+export default function PatternBuilderAdmin() {
 
 	// TODO: Is this the right place?  Maybe in the PatternEditor?
 	registerCoreBlocks();
 	// TODO: Register custom blocks from plugins?
 
 	return (
-		<PatternManager />
+		<PatternBuilder />
 	);
 }
 
 window.addEventListener(
 	'load',
 	function () {
-		const domNode = document.getElementById( 'pattern-manager-app' );
+		const domNode = document.getElementById( 'pattern-builder-app' );
 		const root = createRoot( domNode );
-		root.render( <PatternManagerAdmin /> );
+		root.render( <PatternBuilderAdmin /> );
 	},
 	false
 );

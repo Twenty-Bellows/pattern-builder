@@ -4,7 +4,7 @@ import { Composite } from '@wordpress/components';
 
 function PatternPreviewPlaceholder() {
 	return (
-		<div className="pattern-manager__preview-grid-item pattern-manager__preview-grid-item-preview" />
+		<div className="pattern-builder__preview-grid-item pattern-builder__preview-grid-item-preview" />
 	);
 }
 
@@ -21,7 +21,7 @@ const PatternPreview = ({ pattern, onClick }) => {
 				}
 			} }
 		>
-			<div className="pattern-manager__preview-grid-item">
+			<div className="pattern-builder__preview-grid-item">
 			<BlockPreview.Async
 				placeholder={ <PatternPreviewPlaceholder /> }
 			>
@@ -32,7 +32,7 @@ const PatternPreview = ({ pattern, onClick }) => {
 			</BlockPreview.Async>
 			</div>
 
-			<p className='pattern-manager__preview-grid-item-title'>{title}</p>
+			<p className='pattern-builder__preview-grid-item-title'>{title}</p>
 		</Composite>
 	);
 }

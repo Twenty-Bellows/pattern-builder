@@ -1,5 +1,5 @@
 {
-	"name": "pattern-manager",
+	"name": "pattern-builder",
 	"version": "1.0.0",
 	"description": "Manage patterns in WordPress",
 	"author": "twentybellows",
@@ -13,16 +13,17 @@
 		"lint:js": "wp-scripts lint-js",
 		"packages-update": "wp-scripts packages-update",
 		"plugin-zip": "wp-scripts plugin-zip",
-		"plugin-unpack": "rm -rf ./release && mkdir -p ./release && unzip -o ./pattern-manager.zip -d ./release/pattern-manager",
-		"plugin-test-env": "wp-now start --blueprint=plugin-test-blueprint.json --path=./release/pattern-manager",
+		"plugin-unpack": "rm -rf ./release && mkdir -p ./release && unzip -o ./pattern-builder.zip -d ./release/pattern-builder",
+		"plugin-test-env": "wp-now start --blueprint=plugin-test-blueprint.json --path=./release/pattern-builder",
 		"plugin-test": "npm run build && npm run plugin-zip && npm run plugin-unpack && npm run plugin-test-env",
 		"start": "wp-env start --xdebug",
 		"stop": "wp-env stop",
 		"clean": "wp-env clean all",
+		"wp-env": "wp-env",
 		"test:unit": "wp-scripts test-unit-js",
 		"test:unit:watch": "wp-scripts test-unit-js --watch",
-		"test:php": "wp-env run --env-cwd='wp-content/plugins/pattern-manager' tests-cli composer run-script test",
-		"test:php:watch": "wp-env run --env-cwd='wp-content/plugins/pattern-manager' tests-cli composer run-script test:watch"
+		"test:php": "wp-env run --env-cwd='wp-content/plugins/pattern-builder' tests-cli composer run-script test",
+		"test:php:watch": "wp-env run --env-cwd='wp-content/plugins/pattern-builder' tests-cli composer run-script test:watch"
 	},
 	"devDependencies": {
 		"@jest/globals": "^29.7.0",

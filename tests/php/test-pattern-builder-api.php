@@ -1,6 +1,6 @@
 <?php
 
-class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
+class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 	private $test_dir;
 
@@ -14,7 +14,7 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 		wp_set_current_user($admin_id);
 
 		// Create a temporary directory for the test patterns
-		$this->test_dir = sys_get_temp_dir() . '/pattern-manager-test';
+		$this->test_dir = sys_get_temp_dir() . '/pattern-builder-test';
 		$this->remove_test_directory($this->test_dir);
 		mkdir($this->test_dir);
 		mkdir($this->test_dir . '/patterns');
@@ -56,7 +56,7 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 	// TESTS ////////////////////////////////////////////////////
 
 	public function no_test_get_global_styles_endpoint() {
-		$request = new WP_REST_Request('GET', '/pattern-manager/v1/global-styles');
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/global-styles');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
 
@@ -66,11 +66,11 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test the pattern-manager/v1/patterns GET endpoint returns a valid empty array
+	 * Test the pattern-builder/v1/patterns GET endpoint returns a valid empty array
 	 */
 	public function test_get_patterns_endpoint_returns_response() {
 
-		$request = new WP_REST_Request('GET', '/pattern-manager/v1/patterns');
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
 
@@ -81,13 +81,13 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test the pattern-manager/v1/patterns GET endpoint returns a valid unsynced theme pattern
+	 * Test the pattern-builder/v1/patterns GET endpoint returns a valid unsynced theme pattern
 	 */
 	public function test_get_patterns_endpoint_returns_response_with_patterns() {
 
 		$this->copy_test_pattern('theme_unsynced_pattern.php');
 
-		$request = new WP_REST_Request('GET', '/pattern-manager/v1/patterns');
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
 
@@ -113,13 +113,13 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test the pattern-manager/v1/patterns GET endpoint returns a valid synced theme pattern
+	 * Test the pattern-builder/v1/patterns GET endpoint returns a valid synced theme pattern
 	 */
 	public function test_get_patterns_endpoint_returns_response_with_synced_patterns() {
 
 		$this->copy_test_pattern('theme_synced_pattern.php');
 
-		$request = new WP_REST_Request('GET', '/pattern-manager/v1/patterns');
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
 
@@ -265,7 +265,7 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 
 		do_action('init');
 
-		$request = new WP_REST_Request('GET', '/pattern-manager/v1/patterns');
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
 
@@ -285,7 +285,7 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 		$pattern->postTypes = array('post');
 
 		// update the pattern
-		$request = new WP_REST_Request('PUT', '/pattern-manager/v1/pattern');
+		$request = new WP_REST_Request('PUT', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$data = $response->get_data();
@@ -293,7 +293,7 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals(200, $response->get_status());
 
 		// fetch the pattern again to ensure it was updated
-		$request = new WP_REST_Request('GET', '/pattern-manager/v1/patterns');
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
 		$pattern = $data[0];
@@ -338,7 +338,7 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 		]);
 
 		// Save the pattern
-		$request = new WP_REST_Request('POST', '/pattern-manager/v1/pattern');
+		$request = new WP_REST_Request('POST', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$data = $response->get_data();
@@ -358,7 +358,7 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals('user', $pattern->source);
 
 		// fetch the pattern again to ensure it was created as expected
-		$request = new WP_REST_Request('GET', '/pattern-manager/v1/patterns');
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
 		$pattern = $data[0];
@@ -402,7 +402,7 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 		]);
 
 		// Save the pattern
-		$request = new WP_REST_Request('POST', '/pattern-manager/v1/pattern');
+		$request = new WP_REST_Request('POST', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$data = $response->get_data();
@@ -417,13 +417,13 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 		$pattern->categories = array('text', 'design');
 		$pattern->synced = true;
 
-		$request = new WP_REST_Request('PUT', '/pattern-manager/v1/pattern');
+		$request = new WP_REST_Request('PUT', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$this->assertEquals(200, $response->get_status());
 
 		// fetch the pattern again to ensure it was updated
-		$request = new WP_REST_Request('GET', '/pattern-manager/v1/patterns');
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
 		$pattern = $data[0];
@@ -466,7 +466,7 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 		]);
 
 		// Save the pattern
-		$request = new WP_REST_Request('POST', '/pattern-manager/v1/pattern');
+		$request = new WP_REST_Request('POST', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$data = $response->get_data();
@@ -475,13 +475,13 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals(200, $response->get_status());
 
 		// delete the pattern
-		$request = new WP_REST_Request('DELETE', '/pattern-manager/v1/pattern');
+		$request = new WP_REST_Request('DELETE', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$this->assertEquals(200, $response->get_status());
 
 		// fetch the pattern again to ensure it was deleted
-		$request = new WP_REST_Request('GET', '/pattern-manager/v1/patterns');
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
 		$this->assertEquals(200, $response->get_status());
@@ -494,7 +494,7 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 	public function test_delete_theme_unsynced_pattern() {
 		$this->copy_test_pattern('theme_unsynced_pattern.php');
 
-		$request = new WP_REST_Request('GET', '/pattern-manager/v1/patterns');
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
 
@@ -504,13 +504,13 @@ class Pattern_Manager_API_Integration_Test extends WP_UnitTestCase {
 		$pattern = $data[0];
 
 		// delete the pattern
-		$request = new WP_REST_Request('DELETE', '/pattern-manager/v1/pattern');
+		$request = new WP_REST_Request('DELETE', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$this->assertEquals(200, $response->get_status());
 
 		// fetch the pattern again to ensure it was deleted
-		$request = new WP_REST_Request('GET', '/pattern-manager/v1/patterns');
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
 		$this->assertEquals(200, $response->get_status());

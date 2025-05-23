@@ -1,6 +1,6 @@
 <?php
 
-class Pattern_Manager_Post_Type
+class Pattern_Builder_Post_Type
 {
 	public function __construct()
 	{
@@ -14,8 +14,8 @@ class Pattern_Manager_Post_Type
 	public function register_pb_block_post_type()
 	{
 		$labels = [
-			'name'               => __('PB Blocks', 'pattern-manager'),
-			'singular_name'      => __('PB Block', 'pattern-manager'),
+			'name'               => __('PB Blocks', 'pattern-builder'),
+			'singular_name'      => __('PB Block', 'pattern-builder'),
 		];
 
 		$args = [

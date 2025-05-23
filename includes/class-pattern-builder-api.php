@@ -1,16 +1,16 @@
 <?php
 
-require_once __DIR__ . '/class-pattern-manager-abstract-pattern.php';
-require_once __DIR__ . '/class-pattern-manager-controller.php';
+require_once __DIR__ . '/class-pattern-builder-abstract-pattern.php';
+require_once __DIR__ . '/class-pattern-builder-controller.php';
 
-class Twenty_Bellows_Pattern_Manager_API
+class Pattern_Builder_API
 {
-	private static $base_route = 'pattern-manager/v1';
+	private static $base_route = 'pattern-builder/v1';
 	private $controller;
 
 	public function __construct()
 	{
-		$this->controller = new Twenty_Bellows_Pattern_Manager_Controller();
+		$this->controller = new Pattern_Builder_Controller();
 
 		add_action('rest_api_init', [$this, 'register_routes']);
 		add_action('init', array($this, 'register_patterns'));

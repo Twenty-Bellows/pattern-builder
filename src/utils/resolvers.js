@@ -3,7 +3,7 @@ import AbstractPattern from '../objects/AbstractPattern';
 
 export async function fetchAllPatterns() {
 	return apiFetch( {
-		path: '/pattern-manager/v1/patterns',
+		path: '/pattern-builder/v1/patterns',
 		method: 'GET',
 		headers: {
 			'Content-Type': 'application/json',
@@ -17,7 +17,7 @@ export async function fetchAllPatterns() {
 }
 
 export async function fetchEditorConfiguration() {
-	return apiFetch({ path: `/pattern-manager/v1/global-styles` })
+	return apiFetch({ path: `/pattern-builder/v1/global-styles` })
 		.then((data) => {
 			return data;
 		})
@@ -28,7 +28,7 @@ export async function fetchEditorConfiguration() {
 
 export async function savePattern(pattern) {
 	return apiFetch( {
-		path: '/pattern-manager/v1/pattern',
+		path: '/pattern-builder/v1/pattern',
 		method: 'PUT',
 		body: JSON.stringify( pattern ),
 		headers: {
@@ -43,7 +43,7 @@ export async function savePattern(pattern) {
 
 export async function deletePattern(pattern) {
 	return apiFetch( {
-		path: `/pattern-manager/v1/pattern`,
+		path: `/pattern-builder/v1/pattern`,
 		method: 'DELETE',
 		body: JSON.stringify( pattern ),
 	})

@@ -29,7 +29,7 @@ export const PatternDetails = ({ pattern, onChange }) => {
 
 	const handleDeletePattern = () => {
 		if (confirm('Are you sure you want to delete this pattern?')) {
-			dispatch('pattern-manager').deleteActivePattern( pattern )
+			dispatch('pattern-builder').deleteActivePattern( pattern )
 				.catch((error) => {
 					console.error('Error deleting pattern:', error);
 					createWarningNotice(__('Error  pattern'), {
@@ -80,7 +80,7 @@ export const PatternDetails = ({ pattern, onChange }) => {
 
 		</PanelBody>
 
-		<PanelBody title={__('Organization', 'pattern-manager')} initialOpen={false} >
+		<PanelBody title={__('Organization', 'pattern-builder')} initialOpen={false} >
 			<FormTokenField
 				label="Categories"
 				value={editablePattern.categories}
@@ -96,9 +96,9 @@ export const PatternDetails = ({ pattern, onChange }) => {
 			)}
 		</PanelBody>
 		{editablePattern.source === 'theme' && (
-				<PanelBody title={__('Restrictions', 'pattern-manager')} initialOpen={false} >
+				<PanelBody title={__('Restrictions', 'pattern-builder')} initialOpen={false} >
 
-					<p>{__('Restrict this pattern to only be used in these contexts. This is only available for Theme Patterns.', 'pattern-manager')}</p>
+					<p>{__('Restrict this pattern to only be used in these contexts. This is only available for Theme Patterns.', 'pattern-builder')}</p>
 
 					<FormTokenField
 						__experimentalShowHowTo={false}
@@ -126,9 +126,9 @@ export const PatternDetails = ({ pattern, onChange }) => {
 
 			)}
 
-			<PanelBody title={__('Advanced', 'pattern-manager')} initialOpen={false} >
+			<PanelBody title={__('Advanced', 'pattern-builder')} initialOpen={false} >
 
-					<p className="pattern-manager__advanced-details-warning">{__('The fields below are dangerous to change. Proceed with caution and understand the consequences.', 'pattern-manager')}</p>
+					<p className="pattern-builder__advanced-details-warning">{__('The fields below are dangerous to change. Proceed with caution and understand the consequences.', 'pattern-builder')}</p>
 
 					<TextControl
 						label="Slug"
@@ -144,7 +144,7 @@ export const PatternDetails = ({ pattern, onChange }) => {
 							__next40pxDefaultSize
 							__nextHasNoMarginBottom
 						>
-							{__('Convert to User Pattern', 'pattern-manager')}
+							{__('Convert to User Pattern', 'pattern-builder')}
 						</Button>
 					)}
 					{editablePattern.source === 'user' && (
@@ -154,7 +154,7 @@ export const PatternDetails = ({ pattern, onChange }) => {
 							__next40pxDefaultSize
 							__nextHasNoMarginBottom
 						>
-							{__('Convert to Theme Pattern', 'pattern-manager')}
+							{__('Convert to Theme Pattern', 'pattern-builder')}
 						</Button>
 					)}
 					<Button

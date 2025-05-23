@@ -8,34 +8,34 @@ import { SnackbarList } from '@wordpress/components';
 
 import './utils/store';
 
-import './PatternManager.scss';
+import './PatternBuilder.scss';
 
-const PatternManager = () => {
+const PatternBuilder = () => {
 
     const notices = useSelect((select) => select('core/notices').getNotices());
     const { removeNotice } = useDispatch('core/notices');
 
     useEffect(() => {
-        dispatch('pattern-manager').fetchEditorConfiguration();
-        dispatch('pattern-manager').fetchAllPatterns();
+        dispatch('pattern-builder').fetchEditorConfiguration();
+        dispatch('pattern-builder').fetchAllPatterns();
     }, []);
 
     // Get the active pattern from the store
 	const selectedPattern = useSelect((select) =>
-		select('pattern-manager').getActivePattern()
+		select('pattern-builder').getActivePattern()
 	);
 
     return (
-        <div className="pattern-manager__container">
+        <div className="pattern-builder__container">
             {selectedPattern ? (
                 <PatternEditor
                     pattern={selectedPattern}
-                    onClose={() => dispatch('pattern-manager').setActivePattern(null)}
+                    onClose={() => dispatch('pattern-builder').setActivePattern(null)}
                 />
             ) : (
                 <PatternBrowser
                     onPatternClick={(pattern) =>
-                        dispatch('pattern-manager').setActivePattern(pattern)
+                        dispatch('pattern-builder').setActivePattern(pattern)
                     }
                 />
 			)}
@@ -47,4 +47,4 @@ const PatternManager = () => {
     );
 };
 
-export default PatternManager;
+export default PatternBuilder;

@@ -46,8 +46,8 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 			});
 			return acc;
 		}, {
-			'all': { label: __('All', 'pattern-manager'), value: 'all' },
-			'uncategorized': { label: __('Uncategorized', 'pattern-manager'), value: 'uncategorized' }
+			'all': { label: __('All', 'pattern-builder'), value: 'all' },
+			'uncategorized': { label: __('Uncategorized', 'pattern-builder'), value: 'uncategorized' }
 		}));
 	}, [patterns]);
 
@@ -63,8 +63,8 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 			});
 			return acc;
 		}, {
-			'all': { label: __('All', 'pattern-manager'), value: 'all' },
-			'unassigned': { label: __('Unassigned', 'pattern-manager'), value: 'unassigned' }
+			'all': { label: __('All', 'pattern-builder'), value: 'all' },
+			'unassigned': { label: __('Unassigned', 'pattern-builder'), value: 'unassigned' }
 		}));
 	}, [patterns]);
 
@@ -80,8 +80,8 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 			});
 			return acc;
 		}, {
-			'all': { label: __('All', 'pattern-manager'), value: 'all' },
-			'unassigned': { label: __('Unassigned', 'pattern-manager'), value: 'unassigned' }
+			'all': { label: __('All', 'pattern-builder'), value: 'all' },
+			'unassigned': { label: __('Unassigned', 'pattern-builder'), value: 'unassigned' }
 		}));
 	}, [patterns]);
 
@@ -97,56 +97,56 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 			});
 			return acc;
 		}, {
-			'all': { label: __('All', 'pattern-manager'), value: 'all' },
-			'unassigned': { label: __('Unassigned', 'pattern-manager'), value: 'unassigned' }
+			'all': { label: __('All', 'pattern-builder'), value: 'all' },
+			'unassigned': { label: __('Unassigned', 'pattern-builder'), value: 'unassigned' }
 		}));
 	}, [patterns]);
 
 	return (
-		<div className="pattern-manager__sidebar">
+		<div className="pattern-builder__sidebar">
 
 			<TextControl
-				label={__('Keyword / Title', 'pattern-manager')}
+				label={__('Keyword / Title', 'pattern-builder')}
 				value={filterOptions.keyword}
-				placeholder={__('Search...', 'pattern-manager')}
+				placeholder={__('Search...', 'pattern-builder')}
 				onChange={(value) => updateFilterOptions('keyword', value)}
 			/>
 
 			<ToggleGroupControl
 				isBlock
-				label={__('Source', 'pattern-manager')}
+				label={__('Source', 'pattern-builder')}
 				value={filterOptions.source}
 				onChange={(value) => updateFilterOptions('source', value)}
 			>
-				<ToggleGroupControlOption label={__('All', 'pattern-manager')} value="all" />
-				<ToggleGroupControlOption label={__('User', 'pattern-manager')} value="user" />
-				<ToggleGroupControlOption label={__('Theme', 'pattern-manager')} value="theme" />
+				<ToggleGroupControlOption label={__('All', 'pattern-builder')} value="all" />
+				<ToggleGroupControlOption label={__('User', 'pattern-builder')} value="user" />
+				<ToggleGroupControlOption label={__('Theme', 'pattern-builder')} value="theme" />
 			</ToggleGroupControl>
 
 			<ToggleGroupControl
 				isBlock
-				label={__('Synced', 'pattern-manager')}
+				label={__('Synced', 'pattern-builder')}
 				value={filterOptions.synced}
 				onChange={(value) => updateFilterOptions('synced', value)}
 			>
-				<ToggleGroupControlOption label={__('All', 'pattern-manager')} value="all" />
-				<ToggleGroupControlOption label={__('Synced', 'pattern-manager')} value="yes" />
-				<ToggleGroupControlOption label={__('Unsynced', 'pattern-manager')} value="no" />
+				<ToggleGroupControlOption label={__('All', 'pattern-builder')} value="all" />
+				<ToggleGroupControlOption label={__('Synced', 'pattern-builder')} value="yes" />
+				<ToggleGroupControlOption label={__('Unsynced', 'pattern-builder')} value="no" />
 			</ToggleGroupControl>
 
 			<ToggleGroupControl
 				isBlock
-				label={__('Visiblity', 'pattern-manager')}
+				label={__('Visiblity', 'pattern-builder')}
 				value={filterOptions.hidden}
 				onChange={(value) => updateFilterOptions('hidden', value)}
 			>
-				<ToggleGroupControlOption label={__('All', 'pattern-manager')} value="all" />
-				<ToggleGroupControlOption label={__('Visible', 'pattern-manager')} value="visible" />
-				<ToggleGroupControlOption label={__('Hidden', 'pattern-manager')} value="hidden" />
+				<ToggleGroupControlOption label={__('All', 'pattern-builder')} value="all" />
+				<ToggleGroupControlOption label={__('Visible', 'pattern-builder')} value="visible" />
+				<ToggleGroupControlOption label={__('Hidden', 'pattern-builder')} value="hidden" />
 			</ToggleGroupControl>
 
 			<SelectControl
-				label={__('Category', 'pattern-manager')}
+				label={__('Category', 'pattern-builder')}
 				value={filterOptions.category}
 				options={patternCategories}
 				onChange={(value) => updateFilterOptions('category', value)}
@@ -155,7 +155,7 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 			{ patternTemplateTypes.length > 2 && (
 
 				<SelectControl
-					label={__('Template Type', 'pattern-manager')}
+					label={__('Template Type', 'pattern-builder')}
 					value={filterOptions.templateType || 'all'}
 					options={patternTemplateTypes}
 					onChange={(value) => updateFilterOptions('templateType', value)}
@@ -164,7 +164,7 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 
 			{ patternPostTypes.length > 2 && (
 				<SelectControl
-					label={__('Post Type', 'pattern-manager')}
+					label={__('Post Type', 'pattern-builder')}
 					value={filterOptions.postType || 'all'}
 					options={patternPostTypes}
 					onChange={(value) => updateFilterOptions('postType', value)}
@@ -173,7 +173,7 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 
 			{ patternBlockTypes.length > 2 && (
 				<SelectControl
-					label={__('Block Type', 'pattern-manager')}
+					label={__('Block Type', 'pattern-builder')}
 					value={filterOptions.blockType || 'all'}
 					options={patternBlockTypes}
 					onChange={(value) => updateFilterOptions('blockType', value)}
@@ -187,7 +187,7 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 				variant='primary'
 				onClick={() => handleCreatePattern({ source: 'user', synced: true })}
 			>
-				{__('Create User Pattern', 'pattern-manager')}
+				{__('Create User Pattern', 'pattern-builder')}
 			</Button>
 
 			<Button
@@ -195,7 +195,7 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 				variant='primary'
 				onClick={() => handleCreatePattern({ source: 'theme', synced: false })}
 			>
-				{__('Create Theme Pattern', 'pattern-manager')}
+				{__('Create Theme Pattern', 'pattern-builder')}
 			</Button>
 
 		</div>

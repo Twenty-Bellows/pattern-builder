@@ -1,8 +1,8 @@
 <?php
 
-require_once __DIR__ . '/class-pattern-manager-abstract-pattern.php';
+require_once __DIR__ . '/class-pattern-builder-abstract-pattern.php';
 
-class Twenty_Bellows_Pattern_Manager_Controller
+class Pattern_Builder_Controller
 {
 	public function get_pb_block_post_for_pattern($pattern)
 	{

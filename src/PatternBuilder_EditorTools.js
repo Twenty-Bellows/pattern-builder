@@ -8,43 +8,43 @@ import { __, _x } from '@wordpress/i18n';
 import { tool, widget } from '@wordpress/icons';
 import { useState } from '@wordpress/element';
 
-import PatternManager from './PatternManager';
+import PatternBuilder from './PatternBuilder';
 import PatternSearch from './components/PatternSearch';
 
-const PatternManagerModal = ( { onRequestClose } ) => {
+const PatternBuilderModal = ( { onRequestClose } ) => {
 	return (
 		<Modal
-			title={ _x( 'Pattern Builder', 'UI String', 'pattern-manager' ) }
-			className="pattern-manager__modal"
+			title={ _x( 'Pattern Builder', 'UI String', 'pattern-builder' ) }
+			className="pattern-builder__modal"
 			onRequestClose={ onRequestClose }
 			isFullScreen
 		>
-			<PatternManager />
+			<PatternBuilder />
 		</Modal>
 	);
 };
 
-export default function PatternManagerEditorTools() {
+export default function PatternBuilderEditorTools() {
 
-	const [ isPatternManagerOpen, setIsPatternManagerOpen ] = useState( false );
+	const [ isPatternBuilderOpen, setIsPatternBuilderOpen ] = useState( false );
 
 	return (
 		<>
 			<PluginSidebarMoreMenuItem
-				target="pattern-manager-sidebar"
+				target="pattern-builder-sidebar"
 				icon={ tool }
 			>
-				{ _x( 'Pattern Builder', 'UI String', 'pattern-manager' ) }
+				{ _x( 'Pattern Builder', 'UI String', 'pattern-builder' ) }
 			</PluginSidebarMoreMenuItem>
 
 			<PluginSidebar
-				className='pattern-manager__editor-sidebar'
-				name="pattern-manager-sidebar"
+				className='pattern-builder__editor-sidebar'
+				name="pattern-builder-sidebar"
 				icon={ widget }
 				title={ _x(
 					'Patterns',
 					'UI String',
-					'pattern-manager'
+					'pattern-builder'
 				) }
 			>
 
@@ -52,21 +52,21 @@ export default function PatternManagerEditorTools() {
 					variant='primary'
 					icon={widget}
 					onClick={() =>
-						setIsPatternManagerOpen(true)
+						setIsPatternBuilderOpen(true)
 					}
 					style={{width: '100%'}}
 				>
 					{__(
 						'Manage Patterns',
-						'pattern-manager'
+						'pattern-builder'
 					)}
 				</Button>
 				<PatternSearch />
 			</PluginSidebar>
 
-			{ isPatternManagerOpen && (
-				<PatternManagerModal
-					onRequestClose={ () => setIsPatternManagerOpen( false ) }
+			{ isPatternBuilderOpen && (
+				<PatternBuilderModal
+					onRequestClose={ () => setIsPatternBuilderOpen( false ) }
 				/>
 			) }
 
@@ -74,6 +74,6 @@ export default function PatternManagerEditorTools() {
 	);
 }
 
-registerPlugin( 'pattern-manager', {
-	render: PatternManagerEditorTools,
+registerPlugin( 'pattern-builder', {
+	render: PatternBuilderEditorTools,
 } );

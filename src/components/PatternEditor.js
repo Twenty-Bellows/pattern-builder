@@ -35,7 +35,7 @@ export const PatternEditor = ({ pattern, onClose }) => {
 	const [codeMarkup, setCodeMarkup] = useState('');
 	const [editorMode, setEditorMode] = useState('visual');
 
-	const editorSettings = useSelect((select) => select('pattern-manager').getEditorConfiguration(), []);
+	const editorSettings = useSelect((select) => select('pattern-builder').getEditorConfiguration(), []);
 	const { createSuccessNotice, createWarningNotice } = useDispatch(noticesStore);
 
 	const onEditorModeChange = (newMode) => {
@@ -64,7 +64,7 @@ export const PatternEditor = ({ pattern, onClose }) => {
 
 	const handleSavePattern = () => {
 
-		dispatch('pattern-manager').saveActivePattern({
+		dispatch('pattern-builder').saveActivePattern({
 			...updatedPattern,
 			content: serialize(blocks),
 		})
@@ -82,14 +82,14 @@ export const PatternEditor = ({ pattern, onClose }) => {
 
 	if (!editorSettings) {
 		return (
-			<div className="pattern-manager__editor">
+			<div className="pattern-builder__editor">
 				Loading...
 			</div>
 		);
 	}
 
 	return (
-		<div className="pattern-manager__editor">
+		<div className="pattern-builder__editor">
 			<BlockEditorProvider
 				value={blocks}
 				onInput={setBlocks}
@@ -180,7 +180,7 @@ export const PatternEditor = ({ pattern, onClose }) => {
 												</Panel>
 											)}
 											{tab.name === 'blocks' && (
-												<Panel className="pattern-manager__editor__add-blocks-panel">
+												<Panel className="pattern-builder__editor__add-blocks-panel">
 													<InserterLibrary />
 												</Panel>
 											)}

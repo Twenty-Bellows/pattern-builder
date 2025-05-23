@@ -10,7 +10,7 @@
 			"request": "launch",
 			"port": 9003,
 			"pathMappings": {
-				"/var/www/html/wp-content/plugins/pattern-manager/": "${workspaceFolder}/"
+				"/var/www/html/wp-content/plugins/pattern-builder/": "${workspaceFolder}/"
 			}
 		}
 	]

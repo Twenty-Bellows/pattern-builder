@@ -111,7 +111,7 @@ const selectors = {
     getFilterOptions: (state) => state.filterOptions,
 };
 
-const store = createReduxStore('pattern-manager', {
+const store = createReduxStore('pattern-builder', {
     reducer,
     actions,
     selectors,

@@ -1,5 +1,5 @@
 {
-    "name": "twentybellows/pattern-manager",
+    "name": "twentybellows/pattern-builder",
     "require": {
         "phpunit/phpunit": "^9.3",
         "wp-phpunit/wp-phpunit": "^6.6",

@@ -10,7 +10,7 @@ const PatternSearch = () => {
 	const [searchTerm, setSearchTerm] = useState('');
 	const [filteredPatterns, setFilteredPatterns] = useState([]);
 
-	const patterns = useSelect((select) => select('pattern-manager').getAllPatterns(), []);
+	const patterns = useSelect((select) => select('pattern-builder').getAllPatterns(), []);
 
 	useEffect(() => {
 
@@ -51,24 +51,24 @@ const PatternSearch = () => {
 			/>
 
 			{filteredPatterns.length === 0 && searchTerm && (
-				<div className="pattern-manager__no-results">
-					<p>{__('No patterns found.', 'pattern-manager')}</p>
+				<div className="pattern-builder__no-results">
+					<p>{__('No patterns found.', 'pattern-builder')}</p>
 				</div>
 			)}
 
 			{filteredPatterns.length === 0 && !searchTerm && (
-				<div className="pattern-manager__no-results">
-					<p>{__('Start typing to search for patterns with matching categories, keywords or titles.', 'pattern-manager')}</p>
+				<div className="pattern-builder__no-results">
+					<p>{__('Start typing to search for patterns with matching categories, keywords or titles.', 'pattern-builder')}</p>
 				</div>
 			)}
 
-			<div className='pattern-manager__pattern-search-results'>
+			<div className='pattern-builder__pattern-search-results'>
 				<BlockPatternsList
 					isDraggable
 					blockPatterns={filteredPatterns}
 					shownPatterns={useAsyncList(filteredPatterns)}
 					onClickPattern={onClickPattern}
-					label={__('Pattern Search Results', 'pattern-manager')}
+					label={__('Pattern Search Results', 'pattern-builder')}
 					showTitlesAsTooltip={false}
 				/>
 			</div>

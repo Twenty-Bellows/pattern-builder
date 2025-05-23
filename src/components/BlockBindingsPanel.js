@@ -129,7 +129,7 @@ const BlockBindingsPanel = () => {
 	);
 
 	return (
-		<Panel header={__('Block Binding Overrides', 'pattern-manager')}>
+		<Panel header={__('Block Binding Overrides', 'pattern-builder')}>
 			<PanelBody>
 
 			{bindableBlocks.length > 0 ? (

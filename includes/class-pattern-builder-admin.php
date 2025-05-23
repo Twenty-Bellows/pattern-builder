@@ -1,8 +1,8 @@
 <?php
 
-class Twenty_Bellows_Pattern_Manager_Admin {
+class Pattern_Builder_Admin {
 
-    private const PAGE_SLUG = 'pattern-manager';
+    private const PAGE_SLUG = 'pattern-builder';
     private const PAGE_TITLE = 'Pattern Builder';
 
     /**
@@ -17,8 +17,8 @@ class Twenty_Bellows_Pattern_Manager_Admin {
      */
     public function create_admin_menu(): void {
         add_theme_page(
-            _x(self::PAGE_TITLE, 'UI String', 'pattern-manager'),
-            _x(self::PAGE_TITLE, 'UI String', 'pattern-manager'),
+            _x(self::PAGE_TITLE, 'UI String', 'pattern-builder'),
+            _x(self::PAGE_TITLE, 'UI String', 'pattern-builder'),
             'edit_theme_options',
             self::PAGE_SLUG,
             [$this, 'render_admin_menu_page']
@@ -30,7 +30,7 @@ class Twenty_Bellows_Pattern_Manager_Admin {
      */
     public function render_admin_menu_page(): void {
         $this->enqueue_assets();
-        echo '<div id="pattern-manager-app"></div>';
+        echo '<div id="pattern-builder-app"></div>';
     }
 
     /**
@@ -40,22 +40,22 @@ class Twenty_Bellows_Pattern_Manager_Admin {
 
 		$screen = get_current_screen();
 
-		if ( $screen->id !== "appearance_page_pattern-manager" ) {
+		if ( $screen->id !== "appearance_page_pattern-builder" ) {
 			return;
 		}
 
-        $asset_file = include plugin_dir_path(__FILE__) . '../build/PatternManager_Admin.asset.php';
+        $asset_file = include plugin_dir_path(__FILE__) . '../build/PatternBuilder_Admin.asset.php';
 
         wp_enqueue_script(
-            'pattern-manager-app',
-            plugins_url('../build/PatternManager_Admin.js', __FILE__),
+            'pattern-builder-app',
+            plugins_url('../build/PatternBuilder_Admin.js', __FILE__),
             $asset_file['dependencies'],
             $asset_file['version']
         );
 
         wp_enqueue_style(
-            'pattern-manager-editor-style',
-            plugins_url('../build/PatternManager_Admin.css', __FILE__),
+            'pattern-builder-editor-style',
+            plugins_url('../build/PatternBuilder_Admin.css', __FILE__),
             [],
             $asset_file['version']
         );
@@ -65,7 +65,7 @@ class Twenty_Bellows_Pattern_Manager_Admin {
 		wp_enqueue_style( 'wp-block-library' ); // Front-end block styles
 		wp_enqueue_style( 'wp-block-editor' ); // Editor layout styles
 
-        wp_set_script_translations('pattern-manager-app', 'pattern-manager');
+        wp_set_script_translations('pattern-builder-app', 'pattern-builder');
     }
 }
 
