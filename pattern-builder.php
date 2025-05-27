@@ -18,7 +18,7 @@ if (! defined('ABSPATH')) {
 
 require_once __DIR__ . '/vendor/autoload.php';
 
-if ( ! function_exists( 'pb_fs' ) ) {
+if ( ! function_exists( 'pb_fs' ) && function_exists( 'fs_dynamic_init' ) ) {
 
     function pb_fs() {
 
