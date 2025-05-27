@@ -12,7 +12,7 @@
 		"lint:css": "wp-scripts lint-style",
 		"lint:js": "wp-scripts lint-js",
 		"packages-update": "wp-scripts packages-update",
-		"plugin-zip": "wp-scripts plugin-zip",
+		"plugin-zip": "composer install --no-dev && wp-scripts plugin-zip  --output-path=./dist",
 		"plugin-unpack": "rm -rf ./release && mkdir -p ./release && unzip -o ./pattern-builder.zip -d ./release/pattern-builder",
 		"plugin-test-env": "wp-now start --blueprint=plugin-test-blueprint.json --path=./release/pattern-builder",
 		"plugin-test": "npm run build && npm run plugin-zip && npm run plugin-unpack && npm run plugin-test-env",
@@ -41,5 +41,13 @@
 		"@wp-now/wp-now": "^0.1.74",
 		"clean-webpack-plugin": "^4.0.0",
 		"prettier": "npm:wp-prettier@^3.0.3"
-	}
+	},
+	"files": [
+		"build",
+		"includes",
+		"vendor",
+		"index.php",
+		"pattern-builder.php",
+		"readme.md"
+	]
 }
