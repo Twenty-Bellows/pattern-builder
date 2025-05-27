@@ -63,12 +63,33 @@ class Pattern_Builder_API
 	/**
 	 * Permission callback for write operations (PUT, POST, DELETE).
 	 * Restricts access to administrators and editors only.
+	 * Also verifies the REST API nonce for additional security.
 	 *
-	 * @return bool True if the user can modify patterns, false otherwise.
+	 * @param WP_REST_Request $request The REST request object.
+	 * @return bool|WP_Error True if the user can modify patterns, WP_Error otherwise.
 	 */
-	public function write_permission_callback()
+	public function write_permission_callback($request)
 	{
-		return current_user_can('edit_others_posts');
+		// First check if user has the required capability
+		if (!current_user_can('edit_others_posts')) {
+			return new WP_Error(
+				'rest_forbidden',
+				__('You do not have permission to modify patterns.', 'pattern-builder'),
+				['status' => 403]
+			);
+		}
+
+		// Verify the REST API nonce
+		$nonce = $request->get_header('X-WP-Nonce');
+		if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
+			return new WP_Error(
+				'rest_cookie_invalid_nonce',
+				__('Cookie nonce is invalid', 'pattern-builder'),
+				['status' => 403]
+			);
+		}
+
+		return true;
 	}
 
 	// Callback functions //////////
@@ -292,8 +313,23 @@ class Pattern_Builder_API
 			if ($post && $post->post_type === 'pb_block') {
 				// Check write permissions before allowing update
 				if (!current_user_can('edit_others_posts')) {
-					return new WP_Error('rest_forbidden', 'You do not have permission to edit patterns.', ['status' => 403]);
+					return new WP_Error(
+						'rest_forbidden',
+						__('You do not have permission to edit patterns.', 'pattern-builder'),
+						['status' => 403]
+					);
 				}
+
+				// Verify the REST API nonce
+				$nonce = $request->get_header('X-WP-Nonce');
+				if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
+					return new WP_Error(
+						'rest_cookie_invalid_nonce',
+						__('Cookie nonce is invalid', 'pattern-builder'),
+						['status' => 403]
+					);
+				}
+
 				$updated_pattern = json_decode($request->get_body(), true);
 				$pattern = Abstract_Pattern::from_post($post);
 				$pattern->content = $updated_pattern['content'];
