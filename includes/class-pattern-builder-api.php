@@ -27,31 +27,48 @@ class Pattern_Builder_API
 		register_rest_route(self::$base_route, '/global-styles', [
 			'methods'  => 'GET',
 			'callback' => [$this, 'get_global_styles'],
-			'permission_callback' => [$this, 'default_permission_callback'],
+			'permission_callback' => [$this, 'read_permission_callback'],
 		]);
 
 		register_rest_route(self::$base_route, '/patterns', [
 			'methods'  => 'GET',
 			'callback' => [$this, 'get_patterns'],
-			'permission_callback' => [$this, 'default_permission_callback'],
+			'permission_callback' => [$this, 'read_permission_callback'],
 		]);
 
 		register_rest_route(self::$base_route, '/pattern', [
 			'methods'  => ['PUT', 'POST'],
 			'callback' => [$this, 'save_block_pattern'],
-			'permission_callback' => [$this, 'default_permission_callback'],
+			'permission_callback' => [$this, 'write_permission_callback'],
 		]);
 
 		register_rest_route(self::$base_route, '/pattern', [
 			'methods'  => 'DELETE',
 			'callback' => [$this, 'delete_block_pattern'],
-			'permission_callback' => [$this, 'default_permission_callback'],
+			'permission_callback' => [$this, 'write_permission_callback'],
 		]);
 	}
 
-	public function default_permission_callback()
+	/**
+	 * Permission callback for read operations.
+	 * Allows access to all logged-in users who can edit posts.
+	 *
+	 * @return bool True if the user can read patterns, false otherwise.
+	 */
+	public function read_permission_callback()
 	{
-		return true;
+		return current_user_can('edit_posts');
+	}
+
+	/**
+	 * Permission callback for write operations (PUT, POST, DELETE).
+	 * Restricts access to administrators and editors only.
+	 *
+	 * @return bool True if the user can modify patterns, false otherwise.
+	 */
+	public function write_permission_callback()
+	{
+		return current_user_can('edit_others_posts');
 	}
 
 	// Callback functions //////////
@@ -273,6 +290,10 @@ class Pattern_Builder_API
 			$id = intval($matches[1]);
 			$post = get_post($id);
 			if ($post && $post->post_type === 'pb_block') {
+				// Check write permissions before allowing update
+				if (!current_user_can('edit_others_posts')) {
+					return new WP_Error('rest_forbidden', 'You do not have permission to edit patterns.', ['status' => 403]);
+				}
 				$updated_pattern = json_decode($request->get_body(), true);
 				$pattern = Abstract_Pattern::from_post($post);
 				$pattern->content = $updated_pattern['content'];
