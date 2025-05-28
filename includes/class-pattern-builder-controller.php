@@ -338,13 +338,24 @@ class Pattern_Builder_Controller
 					// if the post is a pb_block post, we can convert it to a wp:pattern block
 					if ( $pattern_post && $pattern_post->post_type === 'pb_block' ) {
 
-						$pattern_slug = sanitize_title($pattern_post->post_name);
+						$pattern_slug = $pattern_post->post_name;
 
-						$attributes = [
-							'slug' => $pattern_slug,
-						];
+						// TODO: Optimize this
+						// NOTE: Because the name of the post is the slug, but the slug has /'s removed, we have to find the ACTUALY slug from the file.
+						$all_patterns = $this->get_block_patterns_from_theme_files();
+						$pattern = array_find( $all_patterns, function ($p) use ($pattern_slug) {
+							return sanitize_title($p->name) === sanitize_title($pattern_slug);
+						});
 
-						return 'wp:pattern ' . json_encode($attributes) . ' /-->';
+						if ( $pattern ) {
+
+							$attributes = [
+								'slug' => $pattern->name,
+							];
+
+							return 'wp:pattern ' . json_encode($attributes, JSON_UNESCAPED_SLASHES) . ' /-->';
+						}
+
 
 					}
 				}

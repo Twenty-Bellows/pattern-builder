@@ -651,4 +651,133 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals('Theme Unsynced Pattern', $data[0]['title']['raw']);
 	}
 
+	/**
+	 * Test that patterns with wp:block references to theme patterns are remapped to wp:pattern
+	 */
+	public function test_remap_wp_block_to_wp_pattern_for_theme_patterns() {
+		// First, create a synced theme pattern
+		$this->copy_test_pattern('theme_synced_pattern.php');
+
+		// Get the theme pattern to find its post ID
+		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertEquals(200, $response->get_status());
+		$this->assertCount(1, $data);
+
+		$theme_pattern_post_id = $data[0]['id'];
+
+		// Create a user pattern that references the theme pattern using wp:block
+		$pattern_with_ref = new Abstract_Pattern([
+			'name' => 'pattern-with-reference',
+			'title' => 'Pattern with Theme Pattern Reference',
+			'description' => 'A pattern that references a theme pattern',
+			'content' => '<!-- wp:paragraph --><p>Before pattern</p><!-- /wp:paragraph --><!-- wp:block {"ref":' . $theme_pattern_post_id . '} /--><!-- wp:paragraph --><p>After pattern</p><!-- /wp:paragraph -->',
+			'source' => 'user',
+			'synced' => false,
+			'inserter' => true,
+			'categories' => ['text'],
+		]);
+
+		// Save the pattern
+		$request = $this->create_rest_request('POST', '/pattern-builder/v1/pattern');
+		$request->set_body(json_encode($pattern_with_ref));
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertEquals(200, $response->get_status());
+
+		// Verify the content was remapped from wp:block to wp:pattern
+		$expected_content = '<!-- wp:paragraph --><p>Before pattern</p><!-- /wp:paragraph --><!-- wp:pattern {"slug":"synced-patterns-test/theme-synced-pattern"} /--><!-- wp:paragraph --><p>After pattern</p><!-- /wp:paragraph -->';
+		$this->assertEquals($expected_content, $data->content);
+
+		// Verify the pattern slug is correct
+		$this->assertStringContainsString('wp:pattern', $data->content);
+		$this->assertStringContainsString('"slug":"synced-patterns-test/theme-synced-pattern"', $data->content);
+		$this->assertStringNotContainsString('wp:block', $data->content);
+		$this->assertStringNotContainsString('"ref":' . $theme_pattern_post_id, $data->content);
+	}
+
+	/**
+	 * Test that multiple wp:block references are all remapped correctly
+	 */
+	public function test_remap_multiple_wp_block_references() {
+		// Copy two theme patterns
+		$this->copy_test_pattern('theme_synced_pattern.php');
+		$this->copy_test_pattern('theme_unsynced_pattern.php');
+
+		// Create the unsynced pattern as synced for this test
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
+		$response = rest_do_request($request);
+		$patterns = $response->get_data();
+
+		// Find and update the unsynced pattern to be synced
+		$unsynced_pattern = null;
+		foreach ($patterns as $p) {
+			if ($p->name === 'synced-patterns-test/theme-unsynced-pattern') {
+				$unsynced_pattern = $p;
+				break;
+			}
+		}
+
+		$unsynced_pattern->synced = true;
+		$request = $this->create_rest_request('PUT', '/pattern-builder/v1/pattern');
+		$request->set_body(json_encode($unsynced_pattern));
+		$response = rest_do_request($request);
+
+		// Get both patterns from the blocks API to get their IDs
+		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
+		$response = rest_do_request($request);
+		$blocks = $response->get_data();
+
+		$this->assertCount(2, $blocks);
+
+		$pattern1_id = null;
+		$pattern2_id = null;
+		foreach ($blocks as $block) {
+			if (strpos($block['slug'], 'theme-synced-pattern') !== false) {
+				$pattern1_id = $block['id'];
+			} elseif (strpos($block['slug'], 'theme-unsynced-pattern') !== false) {
+				$pattern2_id = $block['id'];
+			}
+		}
+
+		$this->assertNotNull($pattern1_id);
+		$this->assertNotNull($pattern2_id);
+
+		// Create a pattern with multiple references
+		$pattern_with_refs = new Abstract_Pattern([
+			'name' => 'pattern-with-multiple-refs',
+			'title' => 'Pattern with Multiple References',
+			'description' => 'A pattern that references multiple theme patterns',
+			'content' => '<!-- wp:heading --><h2>Multiple Patterns</h2><!-- /wp:heading --><!-- wp:block {"ref":' . $pattern1_id . '} /--><!-- wp:separator --><!-- /wp:separator --><!-- wp:block {"ref":' . $pattern2_id . '} /--><!-- wp:paragraph --><p>End</p><!-- /wp:paragraph -->',
+			'source' => 'user',
+			'synced' => true,
+			'inserter' => true,
+			'categories' => ['text'],
+		]);
+
+		// Save the pattern
+		$request = $this->create_rest_request('POST', '/pattern-builder/v1/pattern');
+		$request->set_body(json_encode($pattern_with_refs));
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertEquals(200, $response->get_status());
+
+		// Verify both references were remapped
+		$this->assertStringContainsString('<!-- wp:pattern {"slug":"synced-patterns-test/theme-synced-pattern"} /-->', $data->content);
+		$this->assertStringContainsString('<!-- wp:pattern {"slug":"synced-patterns-test/theme-unsynced-pattern"} /-->', $data->content);
+
+		// Verify no wp:block references remain
+		$this->assertStringNotContainsString('wp:block', $data->content);
+		$this->assertStringNotContainsString('"ref":', $data->content);
+
+		// Verify the structure is maintained
+		$this->assertStringContainsString('<!-- wp:heading --><h2>Multiple Patterns</h2><!-- /wp:heading -->', $data->content);
+		$this->assertStringContainsString('<!-- wp:separator --><!-- /wp:separator -->', $data->content);
+		$this->assertStringContainsString('<!-- wp:paragraph --><p>End</p><!-- /wp:paragraph -->', $data->content);
+	}
+
 }
