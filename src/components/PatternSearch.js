@@ -23,10 +23,10 @@ const PatternSearch = () => {
 			const filtered = patterns.filter((pattern) => {
 				return (
 					// search pattern title
-					pattern.title.toLowerCase().includes(lowerCaseSearchTerm)
+					pattern.title?.toLowerCase().includes(lowerCaseSearchTerm)
 
 					// search pattern categories
-					|| (pattern.categories && pattern.categories.some((category) => category.name.toLowerCase().includes(lowerCaseSearchTerm)))
+					|| (pattern.categories && pattern.categories.some((category) => category.toLowerCase().includes(lowerCaseSearchTerm)))
 
 					// search pattern keywords
 					|| (pattern.keywords && pattern.keywords.some((keyword) => keyword.toLowerCase().includes(lowerCaseSearchTerm)))
