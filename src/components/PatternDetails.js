@@ -20,11 +20,11 @@ export const PatternDetails = ({ pattern, onChange }) => {
 	}, [editablePattern, onChange]);
 
 	const handleConvertToThemePattern = () => {
-
+		setEditablePattern((prev) => ({ ...prev, ['source']: 'theme' }));
 	}
 
 	const handleConvertToUserPattern = () => {
-
+		setEditablePattern((prev) => ({ ...prev, ['source']: 'user' }));
 	}
 
 	const handleDeletePattern = () => {
@@ -139,7 +139,7 @@ export const PatternDetails = ({ pattern, onChange }) => {
 					/>
 					{editablePattern.source === 'theme' && (
 						<Button
-							onClick="handleConvertToUserPattern"
+							onClick={handleConvertToUserPattern}
 							variant="primary"
 							__next40pxDefaultSize
 							__nextHasNoMarginBottom
@@ -149,7 +149,7 @@ export const PatternDetails = ({ pattern, onChange }) => {
 					)}
 					{editablePattern.source === 'user' && (
 						<Button
-							onClick="handleConvertToThemePattern"
+							onClick={handleConvertToThemePattern}
 							variant="primary"
 							__next40pxDefaultSize
 							__nextHasNoMarginBottom

@@ -3,6 +3,7 @@
 class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 	private $test_dir;
+	private $rest_nonce;
 
 	/**
 	 * Set up the environment for each test
@@ -51,6 +52,18 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 	private function copy_test_pattern($pattern_file) {
 		// Copy the pattern file to the test directory
 		copy(__DIR__ . '/../../dev-assets/themes/simple-theme/patterns/' . $pattern_file, $this->test_dir . '/patterns/' . $pattern_file);
+	}
+
+	/**
+	 * Helper method to create authenticated REST requests
+	 */
+	private function create_rest_request($method, $route) {
+		$rest_nonce = wp_create_nonce('wp_rest');
+		$request = new WP_REST_Request($method, $route);
+		if (in_array($method, ['PUT', 'POST', 'DELETE'])) {
+			$request->set_header('X-WP-Nonce', $rest_nonce);
+		}
+		return $request;
 	}
 
 	// TESTS ////////////////////////////////////////////////////
@@ -285,7 +298,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$pattern->postTypes = array('post');
 
 		// update the pattern
-		$request = new WP_REST_Request('PUT', '/pattern-builder/v1/pattern');
+		$request = $this->create_rest_request('PUT', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$data = $response->get_data();
@@ -338,7 +351,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		]);
 
 		// Save the pattern
-		$request = new WP_REST_Request('POST', '/pattern-builder/v1/pattern');
+		$request = $this->create_rest_request('POST', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$data = $response->get_data();
@@ -402,7 +415,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		]);
 
 		// Save the pattern
-		$request = new WP_REST_Request('POST', '/pattern-builder/v1/pattern');
+		$request = $this->create_rest_request('POST', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$data = $response->get_data();
@@ -417,7 +430,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$pattern->categories = array('text', 'design');
 		$pattern->synced = true;
 
-		$request = new WP_REST_Request('PUT', '/pattern-builder/v1/pattern');
+		$request = $this->create_rest_request('PUT', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$this->assertEquals(200, $response->get_status());
@@ -466,7 +479,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		]);
 
 		// Save the pattern
-		$request = new WP_REST_Request('POST', '/pattern-builder/v1/pattern');
+		$request = $this->create_rest_request('POST', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$data = $response->get_data();
@@ -475,7 +488,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals(200, $response->get_status());
 
 		// delete the pattern
-		$request = new WP_REST_Request('DELETE', '/pattern-builder/v1/pattern');
+		$request = $this->create_rest_request('DELETE', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$this->assertEquals(200, $response->get_status());
@@ -504,7 +517,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$pattern = $data[0];
 
 		// delete the pattern
-		$request = new WP_REST_Request('DELETE', '/pattern-builder/v1/pattern');
+		$request = $this->create_rest_request('DELETE', '/pattern-builder/v1/pattern');
 		$request->set_body(json_encode($pattern));
 		$response = rest_do_request($request);
 		$this->assertEquals(200, $response->get_status());
@@ -515,6 +528,71 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$data = $response->get_data();
 		$this->assertEquals(200, $response->get_status());
 		$this->assertCount(0, $data);
+	}
+
+	/**
+	 * Test converting a user pattern to a theme pattern via the API
+	 */
+	public function test_convert_user_pattern_to_theme_pattern() {
+
+		// First, create a user pattern
+		$pattern = new Abstract_Pattern([
+			'name' => 'test-user-pattern',
+			'title' => 'Test User Pattern',
+			'description' => 'A user pattern to be converted to theme pattern',
+			'content' => '<!-- wp:paragraph -->User pattern content<!-- /wp:paragraph -->',
+			'source' => 'user',
+			'synced' => true,
+			'inserter' => true,
+			'categories' => ['text'],
+		]);
+
+		// Save the user pattern
+		$request = $this->create_rest_request('POST', '/pattern-builder/v1/pattern');
+		$request->set_body(json_encode($pattern));
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+		$saved_pattern = $data;
+
+		$this->assertEquals(200, $response->get_status());
+		$this->assertEquals('user', $saved_pattern->source);
+
+		$saved_pattern->source = 'theme';
+
+		// Convert the pattern to a theme pattern
+		$request = $this->create_rest_request('POST', '/pattern-builder/v1/pattern');
+		$request->set_body(json_encode($saved_pattern));
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertEquals(200, $response->get_status());
+		$this->assertEquals('theme', $data->source);
+		$this->assertEquals($saved_pattern->name, $data->name);
+		$this->assertEquals($saved_pattern->title, $data->title);
+		$this->assertEquals($saved_pattern->content, $data->content);
+
+		// Verify the theme pattern file was created
+		$theme_pattern_file = $this->test_dir . '/patterns/test-user-pattern.php';
+		$this->assertFileExists($theme_pattern_file);
+
+		// Verify the file contents
+		$file_contents = file_get_contents($theme_pattern_file);
+		$this->assertStringContainsString('Title: Test User Pattern', $file_contents);
+		$this->assertStringContainsString('Slug: test-user-pattern', $file_contents);
+		$this->assertStringContainsString('Description: A user pattern to be converted to theme pattern', $file_contents);
+		$this->assertStringContainsString('Categories: text', $file_contents);
+		$this->assertStringContainsString('<!-- wp:paragraph -->User pattern content<!-- /wp:paragraph -->', $file_contents);
+
+		// Assert that the pattern is now available in the patterns endpoint
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+		$this->assertEquals(200, $response->get_status());
+		$this->assertCount(1, $data);
+		$pattern = $data[0];
+		$this->assertEquals('Test User Pattern', $pattern->title);
+		$this->assertEquals('test-user-pattern', $pattern->name);
+		$this->assertEquals('theme', $pattern->source);
 	}
 
 }

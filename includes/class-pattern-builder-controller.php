@@ -57,13 +57,28 @@ class Pattern_Builder_Controller
 
 	public function update_theme_pattern(Abstract_Pattern $pattern)
 	{
-		$post = $this->get_pb_block_post_for_pattern($pattern);
+		// get the pb_block post if it already exists
+		$post = get_page_by_path(sanitize_title($pattern->name), OBJECT, 'pb_block');
+
+		if (empty($post)) {
+			// if it doesn't exist, check if a wp_block post exists
+			// this is for any user patterns that are being converted to theme patterns
+			// It will be converted to a pb_block post when it is updated
+			$post = get_page_by_path(sanitize_title($pattern->name), OBJECT, 'wp_block');
+		}
+
+		if (empty($post)){
+			// create a new post if it doesn't exist
+			$post = $this->create_pb_block_post_for_pattern($pattern);
+		}
+
 
 		wp_update_post([
 			'ID'           => $post->ID,
 			'post_title'   => $pattern->title,
 			'post_content' => $pattern->content,
 			'post_excerpt' => $pattern->description,
+			'post_type'    => 'pb_block',
 		]);
 
 		if ($pattern->synced) {
@@ -114,6 +129,15 @@ class Pattern_Builder_Controller
 	public function update_user_pattern(Abstract_Pattern $pattern)
 	{
 		$post = get_page_by_path($pattern->name, OBJECT, 'wp_block');
+		$convert_from_theme_pattern = false;
+
+		if (empty($post)) {
+			// check if the pattern exists in the database as a pb_block post
+			// this is for any user patterns that are being converted to theme patterns
+			// It will be converted to a wp_block post when it is updated
+			$post = get_page_by_path($pattern->name, OBJECT, 'pb_block');
+			$convert_from_theme_pattern = true;
+		}
 
 		if (empty($post)) {
 			$post_id = wp_insert_post([
@@ -132,6 +156,7 @@ class Pattern_Builder_Controller
 				'post_name'    => $pattern->name,
 				'post_content' => $pattern->content,
 				'post_excerpt' => $pattern->description,
+				'post_type'    => 'wp_block',
 			]);
 		}
 
@@ -142,9 +167,16 @@ class Pattern_Builder_Controller
 			update_post_meta($post_id, 'wp_pattern_sync_status', 'unsynced');
 		}
 
-
 		// store categories
 		wp_set_object_terms($post_id, $pattern->categories, 'wp_pattern_category', false);
+
+		// if we are converting a theme pattern to a user pattern delete the theme pattern file
+		if ( $convert_from_theme_pattern ) {
+			$path = $this->get_pattern_filepath($pattern);
+			if ($path) {
+				$deleted = unlink($path);
+			}
+		}
 
 		return $pattern;
 	}
