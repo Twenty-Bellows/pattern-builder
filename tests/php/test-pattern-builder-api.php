@@ -595,4 +595,60 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals('theme', $pattern->source);
 	}
 
+	/**
+	 * Test converting a theme pattern to a user pattern via the API
+	 */
+	public function test_convert_theme_pattern_to_user_pattern() {
+		// First, copy a theme pattern
+		$this->copy_test_pattern('theme_unsynced_pattern.php');
+
+		// Get the theme pattern
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertEquals(200, $response->get_status());
+		$this->assertCount(1, $data);
+
+		$theme_pattern = $data[0];
+		$this->assertEquals('theme', $theme_pattern->source);
+		$this->assertEquals('synced-patterns-test/theme-unsynced-pattern', $theme_pattern->name);
+
+		// Convert the pattern to a user pattern
+		$theme_pattern->source = 'user';
+		$request = $this->create_rest_request('POST', '/pattern-builder/v1/pattern');
+		$request->set_body(json_encode( $theme_pattern ));
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertEquals(200, $response->get_status());
+		$this->assertEquals('user', $data->source);
+		$this->assertEquals($theme_pattern->name, $data->name);
+		$this->assertEquals($theme_pattern->title, $data->title);
+		$this->assertEquals($theme_pattern->content, $data->content);
+		$this->assertEquals($theme_pattern->categories, $data->categories);
+		$this->assertEquals($theme_pattern->synced, $data->synced);
+
+		// Verify the theme pattern file was removed
+		$theme_pattern_file = $this->test_dir . '/patterns/theme_unsynced_pattern.php';
+		$this->assertFileDoesNotExist($theme_pattern_file);
+
+		// Verify the pattern is now in the database as a user pattern
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertCount(1, $data);
+		$this->assertEquals('user', $data[0]->source);
+		$this->assertEquals('Theme Unsynced Pattern', $data[0]->title);
+
+		// Verify it's also available through the core blocks API
+		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertCount(1, $data);
+		$this->assertEquals('Theme Unsynced Pattern', $data[0]['title']['raw']);
+	}
+
 }
