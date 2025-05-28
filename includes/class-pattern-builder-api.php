@@ -271,6 +271,8 @@ class Pattern_Builder_API
 
 		$pattern = new Abstract_Pattern($pattern_data);
 
+		$pattern = $this->controller->remap_patterns($pattern);
+
 		if ($pattern->source === 'user') {
 			$response = $this->controller->update_user_pattern($pattern);
 		} elseif ($pattern->source === 'theme') {
@@ -333,6 +335,7 @@ class Pattern_Builder_API
 				$updated_pattern = json_decode($request->get_body(), true);
 				$pattern = Abstract_Pattern::from_post($post);
 				$pattern->content = $updated_pattern['content'];
+				$pattern = $this->controller->remap_patterns($pattern);
 				$response = $this->controller->update_theme_pattern($pattern);
 				return new WP_REST_Response($response, 200);
 			}

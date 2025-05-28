@@ -313,4 +313,48 @@ class Pattern_Builder_Controller
 
 	METADATA;
 	}
+
+	/**
+	 * Remaps wp:block blocks that reference theme patterns to wp:pattern blocks.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern to remap.
+	 * @return Abstract_Pattern
+	 */
+	public function remap_patterns( Abstract_Pattern $pattern ) {
+		// if this pattern's content contains wp:block blocks and they reference
+		// theme patterns, remap them to wp:pattern blocks.
+
+		$pattern->content = preg_replace_callback(
+			'/wp:block\s+({.*})\s*\/?-->/sU',
+			function ($matches) use ($pattern) {
+
+				$attributes = json_decode($matches[1], true);
+
+				if (isset($attributes['ref'])) {
+
+					// get the post of the pattern
+					$pattern_post = get_post( $attributes['ref'], OBJECT );
+
+					// if the post is a pb_block post, we can convert it to a wp:pattern block
+					if ( $pattern_post && $pattern_post->post_type === 'pb_block' ) {
+
+						$pattern_slug = sanitize_title($pattern_post->post_name);
+
+						$attributes = [
+							'slug' => $pattern_slug,
+						];
+
+						return 'wp:pattern ' . json_encode($attributes) . ' /-->';
+
+					}
+				}
+
+				return 'wp:block ' . $matches[1] . ' /-->';
+			},
+
+			$pattern->content
+		);
+
+		return $pattern;
+	}
 }
