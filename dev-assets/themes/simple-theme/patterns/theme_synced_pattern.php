@@ -12,7 +12,3 @@
 <h1 class="wp-block-heading">This is a Theme SYNCED Pattern</h1>
 <!-- /wp:heading --></div>
 <!-- /wp:group -->
-
-<!-- wp:paragraph -->
-<p>with changes asdf asdf asdf aasd fasd fas dfas dfasdf asd fas df</p>
-<!-- /wp:paragraph -->
