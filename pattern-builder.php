@@ -6,7 +6,7 @@
  * Description:       Manage Patterns in the block editor.
  * Requires at least: 6.6
  * Requires PHP:      7.2
- * Version:           0.1.0
+ * Version:           0.1.1
  * Author:            Twenty Bellows
  * Author URI:        https://twentybellows.com
  * Text Domain:       pattern-builder

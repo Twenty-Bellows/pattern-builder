@@ -1,9 +1,8 @@
 {
 	"name": "pattern-builder",
-	"version": "1.0.0",
+	"version": "0.1.1",
 	"description": "Manage patterns in WordPress",
 	"author": "twentybellows",
-	"license": "GPL-2.0-or-later",
 	"main": "build/index.js",
 	"scripts": {
 		"build": "wp-scripts build --webpack-copy-php --experimental-modules",
