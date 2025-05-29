@@ -10,7 +10,7 @@ import './utils/store';
 
 import './PatternBuilder.scss';
 
-const PatternBuilder = () => {
+const PatternBuilder = ( { editingPatternId } ) => {
 
     const notices = useSelect((select) => select('core/notices').getNotices());
     const { removeNotice } = useDispatch('core/notices');
@@ -19,6 +19,24 @@ const PatternBuilder = () => {
         dispatch('pattern-builder').fetchEditorConfiguration();
         dispatch('pattern-builder').fetchAllPatterns();
     }, []);
+
+	const allPatterns = useSelect((select) =>
+	    select('pattern-builder').getAllPatterns()
+	);
+
+    // If editingPatternId is provided, set it as active pattern once patterns are loaded
+    useEffect(() => {
+        if (editingPatternId) {
+			if (allPatterns && allPatterns.length > 0) {
+
+             		const pattern = allPatterns.find(p => p.id === editingPatternId);
+
+                    if (pattern) {
+                        dispatch('pattern-builder').setActivePattern(pattern);
+                    }
+			}
+        }
+    }, [editingPatternId, allPatterns]);
 
     // Get the active pattern from the store
 	const selectedPattern = useSelect((select) =>

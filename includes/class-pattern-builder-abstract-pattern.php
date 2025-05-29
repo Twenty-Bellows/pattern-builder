@@ -2,6 +2,8 @@
 
 class Abstract_Pattern
 {
+	public $id;
+
 	public $name;
 	public $title;
 	public $description;
@@ -21,6 +23,8 @@ class Abstract_Pattern
 
 	public function __construct($args = array())
 	{
+		$this->id = $args['id'] ?? null;
+
 		$this->title = $args['title'];
 
 		$this->name = $args['name'] ?? sanitize_title($args['title']);
@@ -119,6 +123,7 @@ class Abstract_Pattern
 
 		return new self(
 			array(
+				'id'          => $post->ID,
 				'name'        => $post->post_name,
 				'title'       => $post->post_title,
 				'description' => $post->post_excerpt,

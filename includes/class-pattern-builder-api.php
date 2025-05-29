@@ -165,42 +165,29 @@ class Pattern_Builder_API
 
 	public function format_pb_block_response($post)
 	{
-		$categories = wp_get_object_terms($post->ID, 'wp_pattern_category');
+		// Use WordPress core's REST controller for proper formatting
+		$controller = new WP_REST_Blocks_Controller('wp_block');
 
-		return [
-			'id' => $post->ID,
-			'date' => get_post_time('c', false, $post),
-			'date_gmt' => get_post_time('c', true, $post),
-			'guid' => [
-				'rendered' => get_the_guid($post),
-				'raw' => get_the_guid($post),
-			],
-			'modified' => get_post_modified_time('c', false, $post),
-			'modified_gmt' => get_post_modified_time('c', true, $post),
-			'password' => $post->post_password,
-			'slug' => $post->post_name,
-			'status' => $post->post_status,
-			// 'type' => $post->post_type,
-			'type' => 'wp_block',
-			'link' => get_permalink($post),
-			'title' => [
-				'raw' => $post->post_title,
-			],
-			'content' => [
-				'raw' => $post->post_content,
-				'protected' => false,
-				'block_version' => 1,
-			],
-			'excerpt' => [
-				'raw' => $post->post_excerpt,
-				'rendered' => $post->post_excerpt,
-				'protected' => false,
-			],
-			'meta' => [],
-			'wp_pattern_category' => $categories,
-			'wp_pattern_sync_status' => get_post_meta($post->ID, 'wp_pattern_sync_status', true),
-			// '_links' => $response->get_links(), // Preserve existing links
-		];
+		// Create a mock request to pass to the controller
+		$request = new WP_REST_Request('GET', '/wp/v2/blocks/' . $post->ID);
+		$request->set_param('context', 'edit');
+
+		// Change the post type to wp_block for proper formatting
+		$post->post_type = 'wp_block';
+
+		// Use the controller's prepare_item_for_response method
+		$response = $controller->prepare_item_for_response($post, $request);
+		$data = $response->get_data();
+
+		// Add pattern-specific fields
+		$categories = wp_get_object_terms($post->ID, 'wp_pattern_category', array('fields' => 'ids'));
+		$data['wp_pattern_category'] = $categories;
+		$data['wp_pattern_sync_status'] = get_post_meta($post->ID, 'wp_pattern_sync_status', true);
+
+		// Include the _links from the response
+		$data['_links'] = $response->get_links();
+
+		return $data;
 	}
 
 	/**

@@ -5,6 +5,7 @@ import { parse } from '@wordpress/blocks';
  */
 export class AbstractPattern {
 
+	id = null;
 	name = '';
 	title = '';
 	description = '';
@@ -26,6 +27,8 @@ export class AbstractPattern {
 	filePath = null;
 
 	constructor( options ) {
+
+		this.id = options.id || null;
 
 		this.title = options.title || '';
 		this.name = options.name;
