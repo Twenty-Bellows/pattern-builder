@@ -28,12 +28,12 @@ const PatternBuilder = ( { editingPatternId } ) => {
     useEffect(() => {
         if (editingPatternId) {
 			if (allPatterns && allPatterns.length > 0) {
-
-             		const pattern = allPatterns.find(p => p.id === editingPatternId);
-
+                    const pattern = allPatterns.find(p => p.id === editingPatternId);
                     if (pattern) {
-                        dispatch('pattern-builder').setActivePattern(pattern);
-                    }
+                		setTimeout(() => {
+                 	       dispatch('pattern-builder').setActivePattern(pattern);
+                		}, 1);
+                 }
 			}
         }
     }, [editingPatternId, allPatterns]);
