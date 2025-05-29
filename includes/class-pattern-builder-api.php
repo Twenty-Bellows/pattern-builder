@@ -208,6 +208,14 @@ class Pattern_Builder_API
 
 			$post = $this->controller->get_pb_block_post_for_pattern($pattern);
 
+			// if the post content is out of date we need to update it
+			// TODO: When users are able to edit these patterns and ONLY effect the database content we will have to enact some conflict resolution.
+			// TODO: More than just the content may change, so we should check for other changes as well.
+			if ($post->post_content !== $pattern->content) {
+				$post->post_content = $pattern->content;
+				wp_update_post($post);
+			}
+
 			if ($pattern_registry->is_registered($pattern->name)) {
 				$pattern_registry->unregister($pattern->name);
 			}
