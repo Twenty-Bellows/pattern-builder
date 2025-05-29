@@ -87,6 +87,15 @@ const actions = {
             dispatch(actions.setActivePattern(savedPattern));
 			dispatch(actions.fetchAllPatterns());
 
+			// Invalidate the WordPress core cache for this pattern
+			// This forces the site editor to refetch the updated pattern
+			if (savedPattern.id) {
+				wp.data.dispatch('core').invalidateResolution('getEntityRecord', ['postType', 'pb_block', savedPattern.id]);
+				wp.data.dispatch('core').invalidateResolution('getEntityRecord', ['postType', 'wp_block', savedPattern.id]);
+				wp.data.dispatch('core').invalidateResolution('getEntityRecords', ['postType', 'pb_block']);
+				wp.data.dispatch('core').invalidateResolution('getEntityRecords', ['postType', 'wp_block']);
+			}
+
 			return savedPattern;
 
         } catch (error) {
