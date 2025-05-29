@@ -1,21 +1,30 @@
 import { __ } from '@wordpress/i18n';
-import { TextControl, Card, CardBody } from '@wordpress/components';
-import { __experimentalBlockPatternsList as BlockPatternsList } from '@wordpress/block-editor';
+import { TextControl } from '@wordpress/components';
 import { useEffect, useState } from '@wordpress/element';
-import { useSelect } from '@wordpress/data';
-import { useAsyncList } from '@wordpress/compose';
+import { useSelect, useDispatch, dispatch } from '@wordpress/data';
+import { createBlock, parse } from '@wordpress/blocks';
+import PatternList from './PatternList';
 
 const PatternSearch = () => {
 
-	const [searchTerm, setSearchTerm] = useState('');
-	const [filteredPatterns, setFilteredPatterns] = useState([]);
-
 	const patterns = useSelect((select) => select('pattern-builder').getAllPatterns(), []);
+
+	const [searchTerm, setSearchTerm] = useState('');
+	const [filteredPatterns, setFilteredPatterns] = useState(patterns);
+
+	const { insertBlocks } = useDispatch('core/block-editor');
+
+	// dispatch fetch all patterns if not loaded
+	useEffect(() => {
+		if (!patterns || patterns.length === 0) {
+			dispatch('pattern-builder').fetchAllPatterns();
+		}
+	}, [patterns]);
 
 	useEffect(() => {
 
 		if (!searchTerm) {
-			setFilteredPatterns([]);
+			setFilteredPatterns(patterns);
 		}
 
 		else {
@@ -31,14 +40,28 @@ const PatternSearch = () => {
 					// search pattern keywords
 					|| (pattern.keywords && pattern.keywords.some((keyword) => keyword.toLowerCase().includes(lowerCaseSearchTerm)))
 				);
-			});
+			})
 
 			setFilteredPatterns(filtered);
 		}
-	}, [searchTerm]);
+	}, [searchTerm, patterns]);
 
 	const onClickPattern = (pattern) => {
-		console.log('Pattern clicked:', pattern);
+		// Handle synced patterns by creating a core/block reference
+		if (pattern.synced && pattern.id) {
+			const blockReference = createBlock('core/block', {
+				ref: pattern.id
+			});
+			insertBlocks(blockReference);
+		} else {
+			const blocks = parse(pattern.content);
+			// give the first block the metadata name
+			blocks[0].attributes.metadata = {
+				name: pattern.title,
+			};
+
+			insertBlocks(blocks);
+		}
 	};
 
 	return (
@@ -63,13 +86,8 @@ const PatternSearch = () => {
 			)}
 
 			<div className='pattern-builder__pattern-search-results'>
-				<BlockPatternsList
-					isDraggable
-					blockPatterns={filteredPatterns}
-					shownPatterns={useAsyncList(filteredPatterns)}
-					onClickPattern={onClickPattern}
-					label={__('Pattern Search Results', 'pattern-builder')}
-					showTitlesAsTooltip={false}
+				<PatternList
+					patterns={filteredPatterns}
 				/>
 			</div>
 

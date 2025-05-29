@@ -42,6 +42,67 @@
 		display: none;
 	}
 }
+// Custom Pattern List styles
+.pattern-list {
+	display: grid;
+	gap: 8px;
+
+	&__item {
+		border: 1px solid #e0e0e0;
+		border-radius: 2px;
+		transition: all 0.2s ease;
+		cursor: move;
+
+		&:hover {
+			border-color: var(--wp-admin-theme-color);
+			box-shadow: 0 0 0 1px var(--wp-admin-theme-color);
+		}
+		
+		&[draggable="true"] {
+			cursor: grab;
+			
+			&:active {
+				cursor: grabbing;
+			}
+		}
+
+		&-button {
+			width: 100%;
+			height: auto;
+			padding: 12px;
+			text-align: left;
+			justify-content: flex-start;
+
+			&:hover {
+				background-color: transparent;
+			}
+		}
+
+		&-preview {
+			width: 100%;
+		}
+
+		&-title {
+			font-weight: 600;
+			margin-bottom: 4px;
+		}
+
+		&-description {
+			font-size: 12px;
+			color: #757575;
+			margin-bottom: 4px;
+		}
+
+		&-badge {
+			display: inline-block;
+			font-size: 11px;
+			padding: 2px 6px;
+			background-color: #f0f0f0;
+			border-radius: 2px;
+			margin-top: 4px;
+		}
+	}
+}
 
 .pattern-builder__container {
 
