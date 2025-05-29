@@ -1,5 +1,6 @@
 <?php
 
+require_once __DIR__ . '/licensing.php';
 require_once __DIR__ . '/class-pattern-builder-api.php';
 require_once __DIR__ . '/class-pattern-builder-admin.php';
 require_once __DIR__ . '/class-pattern-builder-editor.php';
