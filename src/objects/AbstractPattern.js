@@ -31,7 +31,7 @@ export class AbstractPattern {
 		this.id = options.id || null;
 
 		this.title = options.title || '';
-		this.name = options.name;
+		this.name = options.name || '';
 		this.description = options.description || '';
 		this.content = options.content || '';
 

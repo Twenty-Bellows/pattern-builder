@@ -1,6 +1,17 @@
 import { createReduxStore, register } from '@wordpress/data';
 import { deletePattern, fetchEditorConfiguration, savePattern, fetchAllPatterns } from './resolvers';
 
+// Helper function to format patterns for WordPress editor settings
+function formatPatternsForEditor(patterns) {
+	return patterns.map(pattern => {
+		return {
+			...pattern,
+			syncStatus: pattern.synced ? 'fully' : 'unsynced',
+			content: pattern.synced ? `<!-- wp:block {"ref":${pattern.id}} /-->` : pattern.content || '',
+		}
+	});
+}
+
 const SET_ACTIVE_PATTERN = 'SET_ACTIVE_PATTERN';
 const DELETE_ACTIVE_PATTERN = 'DELETE_ACTIVE_PATTERN';
 const SET_EDITOR_CONFIGURATION = 'SET_EDITOR_CONFIGURATION';
@@ -35,12 +46,19 @@ const reducer = (state = initialState, action) => {
         case SET_EDITOR_CONFIGURATION:
             return {
                 ...state,
-                editorConfiguration: action.value,
+                editorConfiguration: {
+					...action.value,
+					__experimentalBlockPatterns: state.editorConfiguration.__experimentalBlockPatterns || [],
+				}
             };
         case SET_ALL_PATTERNS:
             return {
                 ...state,
                 allPatterns: action.value,
+				editorConfiguration: {
+					...state.editorConfiguration,
+					__experimentalBlockPatterns: formatPatternsForEditor(action.value),
+				}
             };
         case SET_FILTER_OPTIONS:
             return {
@@ -85,7 +103,9 @@ const actions = {
 
             const savedPattern = await savePattern(updatedPattern);
             dispatch(actions.setActivePattern(savedPattern));
-			dispatch(actions.fetchAllPatterns());
+
+			// Fetch all patterns to refresh the editor settings
+			await dispatch(actions.fetchAllPatterns());
 
 			// Invalidate the WordPress core cache for this pattern
 			// This forces the site editor to refetch the updated pattern
