@@ -69,12 +69,12 @@ export const PatternEditor = ({ pattern, onClose }) => {
 			content: serialize(blocks),
 		})
 			.then(() => {
-				createSuccessNotice(__('Pattern was saved sucessfully'), {
+				createSuccessNotice(__('Pattern was saved successfully'), {
 					isDismissible: true,
 				})
 			})
 			.catch((err) => {
-				createWarningNotice(__('Error saving pattern'), {
+				createWarningNotice(err.message, {
 					isDismissible: true,
 				});
 			});

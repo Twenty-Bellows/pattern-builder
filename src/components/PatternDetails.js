@@ -30,9 +30,8 @@ export const PatternDetails = ({ pattern, onChange }) => {
 	const handleDeletePattern = () => {
 		if (confirm('Are you sure you want to delete this pattern?')) {
 			dispatch('pattern-builder').deleteActivePattern( pattern )
-				.catch((error) => {
-					console.error('Error deleting pattern:', error);
-					createWarningNotice(__('Error  pattern'), {
+				.catch((err) => {
+					createWarningNotice(err.message, {
 						isDismissible: true,
 					});
 				});

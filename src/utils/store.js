@@ -95,32 +95,28 @@ const actions = {
         }
     },
     saveActivePattern: (updatedPattern) => async ({dispatch}) => {
-        try {
-            if (!updatedPattern) {
-                console.warn('No pattern provided to save.');
-                return;
-            }
-
-            const savedPattern = await savePattern(updatedPattern);
-            dispatch(actions.setActivePattern(savedPattern));
-
-			// Fetch all patterns to refresh the editor settings
-			await dispatch(actions.fetchAllPatterns());
-
-			// Invalidate the WordPress core cache for this pattern
-			// This forces the site editor to refetch the updated pattern
-			if (savedPattern.id) {
-				wp.data.dispatch('core').invalidateResolution('getEntityRecord', ['postType', 'pb_block', savedPattern.id]);
-				wp.data.dispatch('core').invalidateResolution('getEntityRecord', ['postType', 'wp_block', savedPattern.id]);
-				wp.data.dispatch('core').invalidateResolution('getEntityRecords', ['postType', 'pb_block']);
-				wp.data.dispatch('core').invalidateResolution('getEntityRecords', ['postType', 'wp_block']);
-			}
-
-			return savedPattern;
-
-        } catch (error) {
-            console.error('Failed to save the pattern:', error);
+        if (!updatedPattern) {
+            console.warn('No pattern provided to save.');
+            return;
         }
+
+        const savedPattern = await savePattern(updatedPattern);
+        dispatch(actions.setActivePattern(savedPattern));
+
+		// Fetch all patterns to refresh the editor settings
+		await dispatch(actions.fetchAllPatterns());
+
+		// Invalidate the WordPress core cache for this pattern
+		// This forces the site editor to refetch the updated pattern
+		if (savedPattern.id) {
+			wp.data.dispatch('core').invalidateResolution('getEntityRecord', ['postType', 'pb_block', savedPattern.id]);
+			wp.data.dispatch('core').invalidateResolution('getEntityRecord', ['postType', 'wp_block', savedPattern.id]);
+			wp.data.dispatch('core').invalidateResolution('getEntityRecords', ['postType', 'pb_block']);
+			wp.data.dispatch('core').invalidateResolution('getEntityRecords', ['postType', 'wp_block']);
+		}
+
+		return savedPattern;
+
     },
     fetchAllPatterns: () => async ({dispatch}) => {
         try {

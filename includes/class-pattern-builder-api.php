@@ -14,8 +14,14 @@ class Pattern_Builder_API
 
 		add_action('rest_api_init', [$this, 'register_routes']);
 		add_action('init', array($this, 'register_patterns'));
+
+		// TODO: This is shared code with the Synced Patterns for Themes plugin.
+		// It should be moved to a common location and make sure there are no conflicts.
 		add_filter('rest_request_after_callbacks', [$this, 'inject_theme_synced_patterns'], 10, 3);
-		add_filter('rest_request_before_callbacks', [$this, 'handle_hijack_block_update'], 10, 3);
+
+		if (pb_fs()->can_use_premium_code__premium_only()) {
+			add_filter('rest_request_before_callbacks', [$this, 'handle_hijack_block_update'], 10, 3);
+		}
 	}
 
 
@@ -303,36 +309,43 @@ class Pattern_Builder_API
 
 	function handle_hijack_block_update($response, $handler, $request)
 	{
-		$route = $request->get_route();
-		if (preg_match('#^/wp/v2/blocks/(\d+)$#', $route, $matches) && $request->get_method() === 'PUT') {
-			$id = intval($matches[1]);
-			$post = get_post($id);
-			if ($post && $post->post_type === 'pb_block') {
-				// Check write permissions before allowing update
-				if (!current_user_can('edit_others_posts')) {
-					return new WP_Error(
-						'rest_forbidden',
-						__('You do not have permission to edit patterns.', 'pattern-builder'),
-						['status' => 403]
-					);
-				}
+		if (pb_fs()->can_use_premium_code__premium_only()) {
 
-				// Verify the REST API nonce
-				$nonce = $request->get_header('X-WP-Nonce');
-				if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
-					return new WP_Error(
-						'rest_cookie_invalid_nonce',
-						__('Cookie nonce is invalid', 'pattern-builder'),
-						['status' => 403]
-					);
-				}
+			$route = $request->get_route();
 
-				$updated_pattern = json_decode($request->get_body(), true);
-				$pattern = Abstract_Pattern::from_post($post);
-				$pattern->content = $updated_pattern['content'];
-				$pattern = $this->controller->remap_patterns($pattern);
-				$response = $this->controller->update_theme_pattern($pattern);
-				return new WP_REST_Response($response, 200);
+			if (preg_match('#^/wp/v2/blocks/(\d+)$#', $route, $matches) && $request->get_method() === 'PUT') {
+
+				$id = intval($matches[1]);
+				$post = get_post($id);
+
+				if ($post && $post->post_type === 'pb_block') {
+
+					// Check write permissions before allowing update
+					if (!current_user_can('edit_others_posts')) {
+						return new WP_Error(
+							'rest_forbidden',
+							__('You do not have permission to edit patterns.', 'pattern-builder'),
+							['status' => 403]
+						);
+					}
+
+					// Verify the REST API nonce
+					$nonce = $request->get_header('X-WP-Nonce');
+					if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
+						return new WP_Error(
+							'rest_cookie_invalid_nonce',
+							__('Cookie nonce is invalid', 'pattern-builder'),
+							['status' => 403]
+						);
+					}
+
+					$updated_pattern = json_decode($request->get_body(), true);
+					$pattern = Abstract_Pattern::from_post($post);
+					$pattern->content = $updated_pattern['content'];
+					$pattern = $this->controller->remap_patterns($pattern);
+					$response = $this->controller->update_theme_pattern($pattern);
+					return new WP_REST_Response($response, 200);
+				}
 			}
 		}
 		return $response;
