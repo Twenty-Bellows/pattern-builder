@@ -60,6 +60,8 @@ class Pattern_Builder_Controller
 	{
 		if (pb_fs()->can_use_premium_code__premium_only()) {
 
+			$pattern = $this->import_pattern_image_assets($pattern);
+
 			// get the pb_block post if it already exists
 			$post = get_page_by_path(sanitize_title($pattern->name), OBJECT, 'pb_block');
 
@@ -124,6 +126,56 @@ class Pattern_Builder_Controller
 		}
 
 		return new WP_Error('premium_required', 'Saving Theme Patterns requires the premium version of Pattern Builder.', ['status' => 403]);
+	}
+
+	private function import_pattern_image_assets( $pattern ) {
+
+		$home_url = home_url();
+
+		// get all of the instances of URLs in the pattern that begin with the home URL
+		$pattern->content = preg_replace_callback(
+			'/(src|href)="(' . preg_quote($home_url, '/') . '[^"]+)"/',
+
+			function ($matches) use ($home_url) {
+				// continue if the asset isn't an image
+				if (!preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $matches[2])) {
+					return $matches[0]; // return the original match if it's not an image
+				}
+
+				//download the file and save it to the theme's assets directory
+				$url = $matches[2];
+
+				$download_file = download_url($url);
+
+				if (is_wp_error($download_file)) {
+					//we're going to try again with a new URL
+					//we might be running this in a docker container
+					//and if that's the case let's try again on port 80
+					$parsed_url = parse_url($url);
+					if ('localhost' === $parsed_url['host'] && '80' !== $parsed_url['port']) {
+						$download_file = download_url(str_replace('localhost:' . $parsed_url['port'], 'localhost:80', $url));
+					}
+				}
+
+				if (is_wp_error($download_file)) {
+					return $matches[0]; // return the original match if the download fails
+				}
+
+				$filename = basename($url);
+				$attribute_type = $matches[1];
+				$asset_dir = get_stylesheet_directory() . '/assets/images/';
+				if (!is_dir($asset_dir)) {
+					wp_mkdir_p($asset_dir);
+				}
+
+				rename($download_file, $asset_dir . $filename);
+
+				return $attribute_type . '="<?php echo get_stylesheet_directory_uri() . \'/assets/images/' . $filename . '\'; ?>"';
+			},
+			$pattern->content
+		);
+
+		return $pattern;
 	}
 
 	/**
