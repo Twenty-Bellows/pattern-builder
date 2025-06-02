@@ -1,5 +1,6 @@
 import apiFetch from '@wordpress/api-fetch';
 import AbstractPattern from '../objects/AbstractPattern';
+import { formatBlockMarkup } from './formatters';
 
 export async function fetchAllPatterns() {
 	return apiFetch( {
@@ -27,6 +28,7 @@ export async function fetchEditorConfiguration() {
 }
 
 export async function savePattern(pattern) {
+	pattern.content = formatBlockMarkup( pattern.content );
 	return apiFetch( {
 		path: '/pattern-builder/v1/pattern',
 		method: 'PUT',
