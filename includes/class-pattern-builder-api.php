@@ -5,6 +5,7 @@ require_once __DIR__ . '/class-pattern-builder-controller.php';
 
 class Pattern_Builder_API
 {
+	private static $synced_theme_patterns = [];
 	private static $base_route = 'pattern-builder/v1';
 	private $controller;
 
@@ -22,6 +23,10 @@ class Pattern_Builder_API
 		if (pb_fs()->can_use_premium_code__premium_only()) {
 			add_filter('rest_request_before_callbacks', [$this, 'handle_hijack_block_update'], 10, 3);
 		}
+
+		// Add filter for wp:pattern block pre-rendering to modify block data
+		add_filter('pre_render_block', [$this, 'filter_pattern_block_attributes'], 10, 2);
+
 	}
 
 
@@ -227,6 +232,9 @@ class Pattern_Builder_API
 			}
 
 			if ($pattern->synced) {
+
+				self::$synced_theme_patterns[$pattern->name] = $post->ID;
+
 				$pattern_registry->register(
 					$pattern->name,
 					array(
@@ -350,4 +358,50 @@ class Pattern_Builder_API
 		}
 		return $response;
 	}
+
+	/**
+	 * Filters pattern block data to apply attributes to nested wp:block.
+	 *
+	 * @param array $parsed_block The parsed block data.
+	 * @param array $source_block The original block data.
+	 * @return array Modified block data.
+	 */
+	public function filter_pattern_block_attributes($pre_render, $parsed_block)
+	{
+		// Only process wp:pattern blocks
+		if ($parsed_block['blockName'] !== 'core/pattern') {
+			return $pre_render;
+		}
+
+		// Extract attributes from the pattern block
+		$pattern_attrs = isset($parsed_block['attrs']) ? $parsed_block['attrs'] : [];
+
+		$slug = $pattern_attrs['slug'] ?? '';
+
+		// Remove attributes we don't want to pass down
+		unset($pattern_attrs['slug']);
+
+		// If no attributes to apply, return as-is
+		if (empty($pattern_attrs)) {
+			return $pre_render;
+		}
+
+		$synced_pattern_id = self::$synced_theme_patterns[$slug];
+
+		// if there is a synced_pattern_id then contruct the block with a reference to the synced pattern that also has the rest of the pattern's attributes and render it.
+		if ($synced_pattern_id) {
+			$block_attributes = array_merge(
+				['ref' => $synced_pattern_id],
+				$pattern_attrs
+			);
+			$block_attributes = wp_json_encode($block_attributes);
+			$block_string = "<!-- wp:block $block_attributes /-->";
+			return do_blocks($block_string);
+		}
+
+		return $pre_render;
+	}
+
+
+
 }

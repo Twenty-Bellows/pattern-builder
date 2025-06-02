@@ -364,9 +364,8 @@ class Pattern_Builder_Controller
 
 						if ( $pattern ) {
 
-							$attributes = [
-								'slug' => $pattern->name,
-							];
+							unset($attributes['ref']);
+							$attributes['slug'] = $pattern->name;
 
 							return 'wp:pattern ' . json_encode($attributes, JSON_UNESCAPED_SLASHES) . ' /-->';
 						}
