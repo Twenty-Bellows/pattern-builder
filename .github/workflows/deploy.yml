@@ -11,7 +11,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Verify confirmation
         run: |
@@ -67,11 +67,13 @@ jobs:
           retention-days: 30
 
       - name: Create and push tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git tag ${{ steps.get-version.outputs.tag }}
-          git push origin ${{ steps.get-version.outputs.tag }}
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} ${{ steps.get-version.outputs.tag }}
 
       - name: Create Release
         id: create-release
