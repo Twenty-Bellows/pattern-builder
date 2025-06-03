@@ -11,7 +11,7 @@
 		"lint:css": "wp-scripts lint-style",
 		"lint:js": "wp-scripts lint-js",
 		"packages-update": "wp-scripts packages-update",
-		"plugin-zip": "composer install --no-dev && wp-scripts plugin-zip  --output-path=./dist",
+		"plugin-zip": "composer install --no-dev && wp-scripts plugin-zip",
 		"plugin-unpack": "rm -rf ./release && mkdir -p ./release && unzip -o ./pattern-builder.zip -d ./release/pattern-builder",
 		"plugin-test-env": "wp-now start --blueprint=plugin-test-blueprint.json --path=./release/pattern-builder",
 		"plugin-test": "npm run build && npm run plugin-zip && npm run plugin-unpack && npm run plugin-test-env",
