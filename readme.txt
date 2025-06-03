@@ -2,7 +2,7 @@
 Contributors:      twentybellows, pbking
 Tags:              block
 Tested up to:      6.8
-Stable tag:        0.1.1
+Stable tag: 0.1.2
 
 Manage Patterns in the WordPress Edito
 

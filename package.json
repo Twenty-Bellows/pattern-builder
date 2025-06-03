@@ -1,6 +1,6 @@
 {
 	"name": "pattern-builder",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "Manage patterns in WordPress",
 	"author": "twentybellows",
 	"main": "build/index.js",
@@ -22,7 +22,8 @@
 		"test:unit": "wp-scripts test-unit-js",
 		"test:unit:watch": "wp-scripts test-unit-js --watch",
 		"test:php": "wp-env run --env-cwd='wp-content/plugins/pattern-builder' tests-cli composer run-script test",
-		"test:php:watch": "wp-env run --env-cwd='wp-content/plugins/pattern-builder' tests-cli composer run-script test:watch"
+		"test:php:watch": "wp-env run --env-cwd='wp-content/plugins/pattern-builder' tests-cli composer run-script test:watch",
+		"version-bump": "node scripts/version-bump.js"
 	},
 	"devDependencies": {
 		"@jest/globals": "^29.7.0",
