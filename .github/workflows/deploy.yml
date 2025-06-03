@@ -1,0 +1,95 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type RELEASE to confirm deployment'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Verify confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirmation }}" != "RELEASE" ]; then
+            echo "Error: You must type RELEASE to confirm deployment"
+            exit 1
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from package.json
+        id: get-version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if tag exists
+        run: |
+          if git ls-remote --tags origin | grep -q "refs/tags/${{ steps.get-version.outputs.tag }}"; then
+            echo "Error: Tag ${{ steps.get-version.outputs.tag }} already exists!"
+            exit 1
+          fi
+          echo "Tag ${{ steps.get-version.outputs.tag }} does not exist, proceeding with deployment"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Create plugin ZIP
+        run: npm run plugin-zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pattern-builder-${{ steps.get-version.outputs.version }}
+          path: pattern-builder.zip
+          retention-days: 30
+
+      - name: Create and push tag
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag ${{ steps.get-version.outputs.tag }}
+          git push origin ${{ steps.get-version.outputs.tag }}
+
+      - name: Create Release
+        id: create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get-version.outputs.tag }}
+          release_name: Release ${{ steps.get-version.outputs.tag }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: pattern-builder.zip
+          asset_name: pattern-builder-${{ steps.get-version.outputs.version }}.zip
+          asset_content_type: application/zip
