@@ -73,7 +73,7 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git tag ${{ steps.get-version.outputs.tag }}
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} ${{ steps.get-version.outputs.tag }}
+          git push origin ${{ steps.get-version.outputs.tag }}
 
       - name: Create Release
         id: create-release
