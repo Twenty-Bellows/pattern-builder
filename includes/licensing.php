@@ -1,6 +1,6 @@
 <?php
 
-if ( ! function_exists( 'pb_fs' ) && function_exists( 'fs_dynamic_init' ) ) {
+if ( ! function_exists( 'pb_fs' ) ) {
 
     function pb_fs() {
 
