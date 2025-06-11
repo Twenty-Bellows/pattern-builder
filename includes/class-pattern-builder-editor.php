@@ -26,5 +26,39 @@ class Pattern_Builder_Editor {
             [],
             $asset_file['version']
         );
+
+        // Pass synced patterns data to JavaScript
+		$synced_patterns =
+        $synced_patterns = $this->get_synced_patterns_map();
+        wp_localize_script(
+            'pattern-builder',
+            'patternBuilderData',
+            [
+                'syncedPatterns' => $synced_patterns
+            ]
+        );
+    }
+
+    /**
+     * Get a map of pattern slugs to their synced post IDs.
+     *
+     * @return array Map of pattern slug => post ID
+     */
+    private function get_synced_patterns_map(): array {
+        $synced_patterns = [];
+
+        // Query for all pb_block posts that have a _pattern_sync_source meta
+        $args = [
+            'post_type' => 'pb_block',
+            'posts_per_page' => -1,
+        ];
+
+        $posts = get_posts($args);
+
+        foreach ($posts as $post) {
+            $synced_patterns[$post->post_name] = $post->ID;
+        }
+
+        return $synced_patterns;
     }
 }
