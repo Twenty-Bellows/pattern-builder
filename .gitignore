@@ -15,6 +15,7 @@ vendor/
 .env
 .phpunit.result.cache
 .wp-env.override.json
+.vscode/settings.json
 
 *.tgz
 *.zip
