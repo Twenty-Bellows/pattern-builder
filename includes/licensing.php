@@ -27,11 +27,19 @@ if ( ! function_exists( 'pb_fs' ) ) {
             ) );
         }
 
-        return $pb_fs;
+		return $pb_fs;
     }
 
-    // Init Freemius.
     pb_fs();
-    // Signal that SDK was initiated.
     do_action( 'pb_fs_loaded' );
+}
+
+if ( ! function_exists( 'pb_fs_testing' ) ) {
+    function pb_fs_testing() {
+		if ( ! defined( 'WP_FS__pattern-builder_SECRET_KEY' ) ) {
+			return false;
+		}
+		$expected_value = "793c8c98fa1abc0e90d6bb664e29887a0a7fdd66bdef92e3bd013e92880ddc67";
+		return $expected_value === hash('sha256', constant('WP_FS__pattern-builder_SECRET_KEY'));
+	}
 }
