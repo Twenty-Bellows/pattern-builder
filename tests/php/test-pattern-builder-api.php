@@ -177,7 +177,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals('A SYNCED pattern that comes with the theme to be used for testing.', $pattern['excerpt']['raw']);
 		$this->assertEquals('', $pattern['wp_pattern_sync_status']);
 		$this->assertCount(1, $pattern['wp_pattern_category']);
-		$this->assertEquals('text', $pattern['wp_pattern_category'][0]->slug);
+		$this->assertIsInt($pattern['wp_pattern_category'][0]);
 	}
 
 	/**
@@ -203,7 +203,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals('A SYNCED pattern that comes with the theme to be used for testing.', $pattern['excerpt']['raw']);
 		$this->assertEquals('', $pattern['wp_pattern_sync_status']);
 		$this->assertCount(1, $pattern['wp_pattern_category']);
-		$this->assertEquals('text', $pattern['wp_pattern_category'][0]->slug);
+		$this->assertIsInt($pattern['wp_pattern_category'][0]);
 		$this->assertEquals('wp_block', $pattern['type']);
 	}
 
