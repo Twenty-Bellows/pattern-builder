@@ -115,6 +115,8 @@ class Pattern_Builder_API
 	{
 		$editor_context = new WP_Block_Editor_Context(['name' => 'core/edit-site']);
 		$settings = get_block_editor_settings([], $editor_context);
+		$settings['mediaUpload'] = true;
+		$settings['mediaLibrary'] = true;
 
 		return rest_ensure_response($settings);
 	}

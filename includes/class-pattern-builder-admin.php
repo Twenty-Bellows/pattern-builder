@@ -65,6 +65,9 @@ class Pattern_Builder_Admin {
 		wp_enqueue_style( 'wp-block-library' ); // Front-end block styles
 		wp_enqueue_style( 'wp-block-editor' ); // Editor layout styles
 
+		// Enqueue media library assets
+		wp_enqueue_media();
+
         wp_set_script_translations('pattern-builder-app', 'pattern-builder');
     }
 }
