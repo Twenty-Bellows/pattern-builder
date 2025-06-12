@@ -30,6 +30,8 @@ const PatternBuilderModal = ( { onRequestClose, editingPatternId } ) => {
 			className="pattern-builder__modal"
 			onRequestClose={ onRequestClose }
 			isFullScreen
+			shouldCloseOnClickOutside={ false }
+			shouldCloseOnEsc={ false }
 		>
 			<PatternBuilder editingPatternId={ editingPatternId } />
 		</Modal>

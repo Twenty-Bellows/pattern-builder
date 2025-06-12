@@ -46,18 +46,6 @@ export const PatternEditor = ({ pattern, onClose }) => {
 		else if (newMode === 'visual') {
 			setBlocks(parse(codeMarkup));
 		}
-		else if (newMode === 'code') {
-			// Handle code mode
-			// This is where you would implement the logic for the code editor
-			// For now, we will just set the blocks to the current state
-			setBlocks(parse(codeMarkup));
-		}
-		else if (newMode === 'style') {
-			// Handle style mode
-			// This is where you would implement the logic for the style editor
-			// For now, we will just set the blocks to the current state
-			setBlocks(parse(codeMarkup));
-		}
 
 		setEditorMode(newMode);
 	}
@@ -119,8 +107,6 @@ export const PatternEditor = ({ pattern, onClose }) => {
 					>
 						<ToggleGroupControlOption value="visual" label="Visual" disabled={!codeMarkupIsValid}/>
 						<ToggleGroupControlOption value="markup" label="Markup" disabled={!codeMarkupIsValid} />
-						<ToggleGroupControlOption value="code" label="Code" disabled={!codeMarkupIsValid} />
-						<ToggleGroupControlOption value="style" label="Style" disabled={!codeMarkupIsValid} />
 					</ToggleGroupControl>
 
 					<div style={{ flexGrow: 1 }} />
@@ -154,17 +140,13 @@ export const PatternEditor = ({ pattern, onClose }) => {
 											title: 'Block',
 										},
 										{
-											name: 'blocks',
-											title: '+Blocks',
-										},
-										{
-											name: 'patterns',
-											title: '+Patterns',
-										},
-										{
 											name: 'bindings',
 											title: 'Bindings',
-										}
+										},
+										{
+											name: 'blocks',
+											title: '+ Add',
+										},
 									]}
 								>
 									{(tab) => (
