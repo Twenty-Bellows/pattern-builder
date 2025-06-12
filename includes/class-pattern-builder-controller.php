@@ -164,7 +164,7 @@ class Pattern_Builder_Controller
 
 			rename($download_file, $asset_dir . $filename);
 
-			return get_stylesheet_directory_uri() . '/assets/images/' . $filename;
+			return '/assets/images/' . $filename;
 		};
 
 		// First, handle HTML attributes (src and href)
@@ -173,7 +173,7 @@ class Pattern_Builder_Controller
 			function ($matches) use ($download_and_save_image) {
 				$new_url = $download_and_save_image($matches[2]);
 				if ($new_url) {
-					return $matches[1] . '="<?php echo \'' . $new_url . '\'; ?>"';
+					return $matches[1] . '="<?php echo get_stylesheet_directory_uri() . \'' . $new_url . '\'; ?>"';
 				}
 				return $matches[0];
 			},
@@ -186,7 +186,7 @@ class Pattern_Builder_Controller
 			function ($matches) use ($download_and_save_image) {
 				$new_url = $download_and_save_image($matches[1]);
 				if ($new_url) {
-					return '"url":"<?php echo \'' . $new_url . '\'; ?>"';
+					return '"url":"<?php echo get_stylesheet_directory_uri() . \'' . $new_url . '\'; ?>"';
 				}
 				return $matches[0];
 			},
