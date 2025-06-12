@@ -37,10 +37,10 @@ export const PatternBrowserPanel = ({ editorSettings, patterns, onFilterChange, 
 	const patternCategories = useMemo(() => {
 		return Object.values(patterns.reduce((acc, pattern) => {
 			pattern.categories.forEach((category) => {
-				if (!acc[category.slug]) {
-					acc[category.slug] = {
-						label: category.name,
-						value: category.slug,
+				if (!acc[category]) {
+					acc[category] = {
+						label: category,
+						value: category,
 					};
 				}
 			});

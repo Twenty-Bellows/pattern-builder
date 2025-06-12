@@ -40,7 +40,7 @@ export const PatternBrowser = ({ onPatternClick }) => {
             .filter((pattern) => {
                 if (filters.category === 'all') return true;
                 if (filters.category === 'uncategorized' && pattern.categories.length === 0) return true;
-                return pattern.categories.some((category) => category.slug === filters.category);
+                return pattern.categories.some((category) => category === filters.category);
             })
             .filter((pattern) => {
                 if (!filters.blockType || filters.blockType === 'all') return true;
