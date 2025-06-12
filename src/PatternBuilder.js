@@ -1,13 +1,13 @@
 import { __, _x } from '@wordpress/i18n';
 import { useEffect } from '@wordpress/element';
 import { dispatch, useSelect, useDispatch } from '@wordpress/data';
+import { SnackbarList } from '@wordpress/components';
 
 import { PatternBrowser } from './components/PatternBrowser';
 import PatternEditor from './components/PatternEditor';
-import { SnackbarList } from '@wordpress/components';
 
+import './blocks/pattern';
 import './utils/store';
-
 import './PatternBuilder.scss';
 
 const PatternBuilder = ( { editingPatternId } ) => {

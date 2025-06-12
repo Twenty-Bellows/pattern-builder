@@ -26,5 +26,6 @@ class Pattern_Builder_Editor {
             [],
             $asset_file['version']
         );
+
     }
 }

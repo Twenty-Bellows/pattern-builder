@@ -3,6 +3,7 @@
 require_once __DIR__ . '/class-pattern-builder-abstract-pattern.php';
 
 global $pb_fs;
+
 class Pattern_Builder_Controller
 {
 	public function get_pb_block_post_for_pattern($pattern)
@@ -58,7 +59,7 @@ class Pattern_Builder_Controller
 
 	public function update_theme_pattern(Abstract_Pattern $pattern)
 	{
-		if (pb_fs()->can_use_premium_code__premium_only()) {
+		if (pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing()) {
 
 			$pattern = $this->import_pattern_image_assets($pattern);
 
@@ -197,7 +198,7 @@ class Pattern_Builder_Controller
 			$convert_from_theme_pattern = true;
 		}
 
-		if ( $convert_from_theme_pattern && !pb_fs()->can_use_premium_code() ) {
+		if ( $convert_from_theme_pattern && !pb_fs()->can_use_premium_code() && !pb_fs_testing() ) {
 			return new WP_Error('premium_required', 'Converting Theme Patterns to User Patterns requires the premium version of Pattern Builder.', ['status' => 403]);
 		}
 
@@ -307,7 +308,7 @@ class Pattern_Builder_Controller
 
 	public function delete_theme_pattern(Abstract_Pattern $pattern)
 	{
-		if (pb_fs()->can_use_premium_code__premium_only()) {
+		if (pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing()) {
 
 			$path = $this->get_pattern_filepath($pattern);
 

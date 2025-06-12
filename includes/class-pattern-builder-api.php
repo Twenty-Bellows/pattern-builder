@@ -20,7 +20,7 @@ class Pattern_Builder_API
 		// It should be moved to a common location and make sure there are no conflicts.
 		add_filter('rest_request_after_callbacks', [$this, 'inject_theme_synced_patterns'], 10, 3);
 
-		if (pb_fs()->can_use_premium_code__premium_only()) {
+		if (pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing()) {
 			add_filter('rest_request_before_callbacks', [$this, 'handle_hijack_block_update'], 10, 3);
 		}
 
@@ -317,7 +317,7 @@ class Pattern_Builder_API
 
 	function handle_hijack_block_update($response, $handler, $request)
 	{
-		if (pb_fs()->can_use_premium_code__premium_only()) {
+		if (pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing()) {
 
 			$route = $request->get_route();
 

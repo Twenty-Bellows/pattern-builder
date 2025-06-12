@@ -6,6 +6,17 @@ class Pattern_Builder_Post_Type
 	{
 		add_action('init', [$this, 'register_pb_block_post_type']);
 		add_filter('render_block', [$this, 'render_pb_blocks'] , 10, 2);
+		add_filter('register_block_type_args', function ($args, $block_type) {
+			if ($block_type === 'core/pattern') {
+				$extra_attributes = array(
+					"content" => array(
+						"type" => "object",
+					)
+				);
+				$args['attributes'] = array_merge($args['attributes'], $extra_attributes);
+			}
+			return $args;
+		}, 10, 2);
 	}
 
 	/**
