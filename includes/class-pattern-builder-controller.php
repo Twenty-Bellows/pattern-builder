@@ -139,7 +139,7 @@ class Pattern_Builder_Controller
 
 			function ($matches) use ($home_url) {
 				// continue if the asset isn't an image
-				if (!preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $matches[2])) {
+				if (!preg_match('/\.(jpg|jpeg|png|gif|webp|svg)$/i', $matches[2])) {
 					return $matches[0]; // return the original match if it's not an image
 				}
 
