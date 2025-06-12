@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/class-pattern-builder-abstract-pattern.php';
+require_once ABSPATH . 'wp-admin/includes/file.php';
 
 global $pb_fs;
 
