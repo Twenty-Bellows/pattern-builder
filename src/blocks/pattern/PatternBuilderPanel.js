@@ -14,7 +14,6 @@ export const PatternBuilderPanelPlugin = () => {
 
 	const { postType, post } = useSelect(
 		( select ) => {
-			console.log('select again');
 			const postType = select( 'core/editor' ).getCurrentPostType();
 			const postId = select( 'core/editor' ).getCurrentPostId();
 			const post = select( 'core' ).getEntityRecord( 'postType', postType, postId );
@@ -35,37 +34,35 @@ export const PatternBuilderPanel = ({ patternPost }) => {
 		return null;
 	}
 
-	// const [pattern, setPattern] = useState( new PBPattern( patternPost ) );
-
-	// useEffect( () => {
-	// 	setPattern( new PBPattern( patternPost ) );
-	// }, [ patternPost ] );
-
+	console.log('PatternBuilderPanel', patternPost);
 
 	const changeSyncedStatus = ( value ) => {
-		// setPattern((prev) => ({ ...prev, synced: value }));
 		dispatch( 'core' ).editEntityRecord( 'postType', 'wp_block', patternPost.id, { wp_pattern_sync_status: value ? '' : 'unsynced' } );
 	}
 
+	const changeSourceStatus = ( value ) => {
+		dispatch( 'core' ).editEntityRecord( 'postType', 'wp_block', patternPost.id, { source: value } );
+	}
 
 	return (<PluginDocumentSettingPanel
 		name={'pattern-edit-panel'}
 		title={'Pattern Builder'}
 	>
 
-		{/* <div className="components-base-control">
+		<div className="components-base-control">
 			<label className="components-base-control__label">{'Pattern Source'}</label>
 			<ToggleGroupControl
-				value={pattern.source}
+				value={patternPost.source || 'user'}
 				onChange={(value) => {
-					setPattern((prev) => ({ ...prev, source: value }));
+					changeSourceStatus( value );
 				}}
 				__nextHasNoMarginBottom
 			>
 				<ToggleGroupControlOption value="theme" label="Theme" />
 				<ToggleGroupControlOption value="user" label="User" />
 			</ToggleGroupControl>
-		</div> */}
+		</div>
+
 		<div className="components-base-control">
 			<label className="components-base-control__label">{'Synced Status'}</label>
 			<ToggleGroupControl

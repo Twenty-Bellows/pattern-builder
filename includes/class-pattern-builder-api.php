@@ -332,8 +332,20 @@ class Pattern_Builder_API
 
 				$id = intval($matches[1]);
 				$post = get_post($id);
+				$updated_pattern = json_decode($request->get_body(), true);
 
-				if ($post && $post->post_type === 'pb_block') {
+				$convert_user_pattern_to_theme_pattern = false;
+
+				if ($post && $post->post_type === 'wp_block') {
+
+					if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'theme' ) {
+						// we are attempting to convert a USER pattern to a THEME pattern.
+						$convert_user_pattern_to_theme_pattern = true;
+					}
+
+				}
+
+				if ($post && $post->post_type === 'pb_block' || $convert_user_pattern_to_theme_pattern ) {
 
 					// Check write permissions before allowing update
 					if (!current_user_can('edit_others_posts')) {
@@ -354,7 +366,6 @@ class Pattern_Builder_API
 						);
 					}
 
-					$updated_pattern = json_decode($request->get_body(), true);
 					$pattern = Abstract_Pattern::from_post($post);
 
 					$pattern->content = $updated_pattern['content'];
@@ -376,12 +387,21 @@ class Pattern_Builder_API
 					}
 
 					$pattern = $this->controller->remap_patterns($pattern);
-					$response = $this->controller->update_theme_pattern($pattern);
 
-					$post = $this->controller->get_pb_block_post_for_pattern($pattern);
+					if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'user' ) {
+						// we are attempting to convert a THEME pattern to a USER pattern.
+						$response = $this->controller->update_user_pattern($pattern);
+						$post = get_post($pattern->id);
+					}
+					else {
+						$response = $this->controller->update_theme_pattern($pattern);
+						$post = $this->controller->get_pb_block_post_for_pattern($pattern);
+
+					}
+
 					$formatted_response = $this->format_pb_block_response($post, $request);
-
 					return new WP_REST_Response($formatted_response, 200);
+
 				}
 			}
 		}
