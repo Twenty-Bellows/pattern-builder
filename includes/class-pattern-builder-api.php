@@ -22,6 +22,8 @@ class Pattern_Builder_API
 
 		add_filter('rest_request_before_callbacks', [$this, 'handle_hijack_block_update'], 10, 3);
 
+		add_filter('rest_request_before_callbacks', [$this, 'handle_block_to_pattern_conversion'], 10, 3);
+
 		// Add filter for wp:pattern block pre-rendering to modify block data
 		add_filter('pre_render_block', [$this, 'filter_pattern_block_attributes'], 10, 2);
 
@@ -371,7 +373,11 @@ class Pattern_Builder_API
 					$pattern->content = $updated_pattern['content'];
 
 					if ( isset($updated_pattern['content']) ) {
-						$pattern->content = $updated_pattern['content'];
+						// remap pb_blocks to patterns
+						$blocks = parse_blocks($updated_pattern['content']);
+						$blocks = $this->convert_blocks_to_patterns($blocks);
+						$pattern->content = serialize_blocks($blocks);
+						//TODO: Format the content to be easy on the eyes.
 					}
 
 					if( isset($updated_pattern['title']) ) {
@@ -385,8 +391,6 @@ class Pattern_Builder_API
 					if( isset($updated_pattern['wp_pattern_sync_status']) ) {
 						$pattern->synced = $updated_pattern['wp_pattern_sync_status'] !== 'unsynced';
 					}
-
-					$pattern = $this->controller->remap_patterns($pattern);
 
 					if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'user' ) {
 						// we are attempting to convert a THEME pattern to a USER pattern.
@@ -406,6 +410,44 @@ class Pattern_Builder_API
 			}
 		}
 		return $response;
+	}
+
+	public function handle_block_to_pattern_conversion( $response, $handler, $request ) {
+		if ($request->get_method() === 'PUT' || $request->get_method() === 'POST') {
+			$body = json_decode($request->get_body(), true);
+			if (isset($body['content'])) {
+				// parse the content string into blocks
+				$blocks = parse_blocks($body['content']);
+				$blocks = $this->convert_blocks_to_patterns($blocks);
+				// convert the blocks back to a string
+				$body['content'] = serialize_blocks($blocks);
+				$request->set_body(wp_json_encode($body));
+			}
+		}
+		return $response;
+	}
+
+	private function convert_blocks_to_patterns( $blocks ) {
+		foreach ($blocks as &$block) {
+			if ( isset($block['blockName']) && $block['blockName'] === 'core/block') {
+				$post = get_post($block['attrs']['ref']);
+				if ( $post->post_type === 'pb_block') {
+					$slug = Pattern_Builder_Controller::format_pattern_slug_from_post($post->post_name);
+					$block['blockName'] = 'core/pattern';
+					$block['attrs'] = [
+						'slug' => $slug,
+					];
+					if ( !empty($post->post_title) ) {
+						$block['attrs']['title'] = $post->post_title;
+					}
+					unset($block['attrs']['ref']);
+				}
+			}
+			elseif (isset($block['innerBlocks']) && is_array($block['innerBlocks'])) {
+				$block['innerBlocks'] = $this->convert_blocks_to_patterns($block['innerBlocks']);
+			}
+		}
+		return $blocks;
 	}
 
 	/**
