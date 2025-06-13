@@ -1,6 +1,7 @@
+import './blocks/pattern';
+
 /**
  * WordPress dependencies
- */
 import { registerPlugin } from '@wordpress/plugins';
 import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
 import { Modal, Button } from '@wordpress/components';
@@ -163,3 +164,5 @@ addFilter(
 	'pattern-builder/edit-original-control',
 	withEditOriginalControl
 );
+
+ */

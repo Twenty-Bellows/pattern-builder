@@ -13,7 +13,7 @@ class Pattern_Builder_API
 	{
 		$this->controller = new Pattern_Builder_Controller();
 
-		add_action('rest_api_init', [$this, 'register_routes']);
+		// add_action('rest_api_init', [$this, 'register_routes']);
 		add_action('init', array($this, 'register_patterns'));
 
 		// TODO: This is shared code with the Synced Patterns for Themes plugin.
@@ -153,7 +153,7 @@ class Pattern_Builder_API
 			$block_id = intval($matches['id']);
 			$pb_block = get_post($block_id);
 			if ($pb_block && $pb_block->post_type === 'pb_block') {
-				$data = $this->format_pb_block_response($pb_block);
+				$data = $this->format_pb_block_response($pb_block, $request);
 				$response = new WP_REST_Response($data);
 			}
 		}
@@ -165,9 +165,12 @@ class Pattern_Builder_API
 			$patterns = $this->controller->get_block_patterns_from_theme_files();
 
 			foreach ($patterns as $pattern) {
-				if (! $pattern->synced) continue;
+				// if (! $pattern->synced) continue;
+				if($pattern->name === 'oss-product-image-left') {
+					$true = true;
+				}
 				$post = $this->controller->get_pb_block_post_for_pattern($pattern);
-				$data[] = $this->format_pb_block_response($post);
+				$data[] = $this->format_pb_block_response($post, $request);
 			}
 
 			$response->set_data($data);
@@ -176,31 +179,18 @@ class Pattern_Builder_API
 		return $response;
 	}
 
-	public function format_pb_block_response($post)
+	public function format_pb_block_response($post, $request)
 	{
-		// Use WordPress core's REST controller for proper formatting
-		$controller = new WP_REST_Blocks_Controller('wp_block');
-
-		// Create a mock request to pass to the controller
-		$request = new WP_REST_Request('GET', '/wp/v2/blocks/' . $post->ID);
-		$request->set_param('context', 'edit');
-
-		// Change the post type to wp_block for proper formatting
 		$post->post_type = 'wp_block';
 
-		// Use the controller's prepare_item_for_response method
+		$controller = new WP_REST_Blocks_Controller('wp_block');
 		$response = $controller->prepare_item_for_response($post, $request);
-		$data = $response->get_data();
 
-		// Add pattern-specific fields
-		$categories = wp_get_object_terms($post->ID, 'wp_pattern_category', array('fields' => 'ids'));
-		$data['wp_pattern_category'] = $categories;
-		$data['wp_pattern_sync_status'] = get_post_meta($post->ID, 'wp_pattern_sync_status', true);
-
-		// Include the _links from the response
-		$data['_links'] = $response->get_links();
+		$data = $controller->prepare_response_for_collection($response);
 
 		return $data;
+
+		// return $response->get_data();
 	}
 
 	/**
@@ -223,10 +213,20 @@ class Pattern_Builder_API
 
 			// if the post content is out of date we need to update it
 			// TODO: When users are able to edit these patterns and ONLY effect the database content we will have to enact some conflict resolution.
-			// TODO: More than just the content may change, so we should check for other changes as well.
 			if ($post->post_content !== $pattern->content) {
 				$post->post_content = $pattern->content;
 				wp_update_post($post);
+			}
+
+			if ($post->post_title !== $pattern->title) {
+				$post->post_title = $pattern->title;
+				wp_update_post($post);
+			}
+
+			if ($pattern->synced) {
+				delete_post_meta($post->ID, 'wp_pattern_sync_status');
+			} else {
+				update_post_meta($post->ID, 'wp_pattern_sync_status', 'unsynced');
 			}
 
 			if ($pattern_registry->is_registered($pattern->name)) {
@@ -250,15 +250,7 @@ class Pattern_Builder_API
 					$pattern->name,
 					array(
 						'title'   => $pattern->title,
-						'description' => $pattern->description,
-						'slug'   => $pattern->name,
-						'inserter' => $pattern->inserter,
-						'categories' => $pattern->categories,
-						'keywords' => $pattern->keywords,
-						'blockTypes' => $pattern->blockTypes,
-						// TODO: Why does this make the pattern not show up in the inserter?
-						// 'postTypes' => $pattern->postTypes,
-						'templateTypes' => $pattern->templateTypes,
+						'inserter' => false,
 						'content' => $pattern->content,
 					)
 				);
