@@ -370,8 +370,6 @@ class Pattern_Builder_API
 
 					$pattern = Abstract_Pattern::from_post($post);
 
-					$pattern->content = $updated_pattern['content'];
-
 					if ( isset($updated_pattern['content']) ) {
 						// remap pb_blocks to patterns
 						$blocks = parse_blocks($updated_pattern['content']);
