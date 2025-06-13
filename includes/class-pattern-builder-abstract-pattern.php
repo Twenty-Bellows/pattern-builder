@@ -121,10 +121,12 @@ class Abstract_Pattern
 			$categories
 		);
 
+		$slug = Pattern_Builder_Controller::format_pattern_slug_from_post($post->post_name);
+
 		return new self(
 			array(
 				'id'          => $post->ID,
-				'name'        => $post->post_name,
+				'name'        => $slug,
 				'title'       => $post->post_title,
 				'description' => $post->post_excerpt,
 				'content'     => $post->post_content,

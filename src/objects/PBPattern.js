@@ -1,32 +1,32 @@
-import { parse } from '@wordpress/blocks';
+export class PBPattern {
 
-/**
- * This is a class that unifies the different types of patterns.
- */
-export class AbstractPattern {
+	// id = null;
+	// name = '';
+	// title = '';
+	// description = '';
+	// content = '';
 
-	id = null;
-	name = '';
-	title = '';
-	description = '';
-	content = '';
+	// blocks = [];
 
-	blocks = [];
-
-	categories = [];
-	keywords = [];
+	// categories = [];
+	// keywords = [];
 
 	source = '';
-	synced = false;
-	inserter = true;
+	synced = true;
+	// inserter = true;
 
-	blockTypes = [];
-	templateTypes = [];
-	postTypes = [];
+	// blockTypes = [];
+	// templateTypes = [];
+	// postTypes = [];
 
-	filePath = null;
+	// filePath = null;
 
-	constructor( options ) {
+	constructor( patternPost ) {
+
+		console.log('PBPattern', patternPost);
+
+		this.source = patternPost.source || 'user';
+		this.synced = patternPost.wp_pattern_sync_status === 'unsynced' ? false : true;
 
 		// this.id = options.id || null;
 
@@ -52,5 +52,3 @@ export class AbstractPattern {
 	}
 
 }
-
-export default AbstractPattern;

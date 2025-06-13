@@ -20,9 +20,7 @@ class Pattern_Builder_API
 		// It should be moved to a common location and make sure there are no conflicts.
 		add_filter('rest_request_after_callbacks', [$this, 'inject_theme_synced_patterns'], 10, 3);
 
-		if (pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing()) {
-			add_filter('rest_request_before_callbacks', [$this, 'handle_hijack_block_update'], 10, 3);
-		}
+		add_filter('rest_request_before_callbacks', [$this, 'handle_hijack_block_update'], 10, 3);
 
 		// Add filter for wp:pattern block pre-rendering to modify block data
 		add_filter('pre_render_block', [$this, 'filter_pattern_block_attributes'], 10, 2);
@@ -153,6 +151,15 @@ class Pattern_Builder_API
 			$block_id = intval($matches['id']);
 			$pb_block = get_post($block_id);
 			if ($pb_block && $pb_block->post_type === 'pb_block') {
+
+				// TODO: Optimize this
+				// NOTE: Because the name of the post is the slug, but the slug has /'s removed, we have to find the ACTUALY slug from the file.
+				$all_patterns = $this->controller->get_block_patterns_from_theme_files();
+				$pattern_slug = $pb_block->post_name;
+				$pattern = array_find( $all_patterns, function ($p) use ($pattern_slug) {
+					return sanitize_title($p->name) === sanitize_title($pattern_slug);
+				});
+
 				$data = $this->format_pb_block_response($pb_block, $request);
 				$response = new WP_REST_Response($data);
 			}
@@ -165,10 +172,6 @@ class Pattern_Builder_API
 			$patterns = $this->controller->get_block_patterns_from_theme_files();
 
 			foreach ($patterns as $pattern) {
-				// if (! $pattern->synced) continue;
-				if($pattern->name === 'oss-product-image-left') {
-					$true = true;
-				}
 				$post = $this->controller->get_pb_block_post_for_pattern($pattern);
 				$data[] = $this->format_pb_block_response($post, $request);
 			}
@@ -183,14 +186,19 @@ class Pattern_Builder_API
 	{
 		$post->post_type = 'wp_block';
 
+		// Create a mock request to pass to the controller
+		$mock_request = new WP_REST_Request('GET', '/wp/v2/blocks/' . $post->ID);
+		$mock_request->set_param('context', 'edit');
+
 		$controller = new WP_REST_Blocks_Controller('wp_block');
-		$response = $controller->prepare_item_for_response($post, $request);
+		$response = $controller->prepare_item_for_response($post, $mock_request);
 
 		$data = $controller->prepare_response_for_collection($response);
 
+		$data['source'] = 'theme';
+
 		return $data;
 
-		// return $response->get_data();
 	}
 
 	/**
@@ -220,6 +228,11 @@ class Pattern_Builder_API
 
 			if ($post->post_title !== $pattern->title) {
 				$post->post_title = $pattern->title;
+				wp_update_post($post);
+			}
+
+			if ($post->post_excerpt !== $pattern->description) {
+				$post->post_excerpt = $pattern->description;
 				wp_update_post($post);
 			}
 
@@ -343,10 +356,32 @@ class Pattern_Builder_API
 
 					$updated_pattern = json_decode($request->get_body(), true);
 					$pattern = Abstract_Pattern::from_post($post);
+
 					$pattern->content = $updated_pattern['content'];
+
+					if ( isset($updated_pattern['content']) ) {
+						$pattern->content = $updated_pattern['content'];
+					}
+
+					if( isset($updated_pattern['title']) ) {
+						$pattern->title = $updated_pattern['title'];
+					}
+
+					if( isset($updated_pattern['excerpt']) ) {
+						$pattern->description = $updated_pattern['excerpt'];
+					}
+
+					if( isset($updated_pattern['wp_pattern_sync_status']) ) {
+						$pattern->synced = $updated_pattern['wp_pattern_sync_status'] !== 'unsynced';
+					}
+
 					$pattern = $this->controller->remap_patterns($pattern);
 					$response = $this->controller->update_theme_pattern($pattern);
-					return new WP_REST_Response($response, 200);
+
+					$post = $this->controller->get_pb_block_post_for_pattern($pattern);
+					$formatted_response = $this->format_pb_block_response($post, $request);
+
+					return new WP_REST_Response($formatted_response, 200);
 				}
 			}
 		}

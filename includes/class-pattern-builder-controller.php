@@ -7,10 +7,28 @@ global $pb_fs;
 
 class Pattern_Builder_Controller
 {
+	public function format_pattern_slug_for_post($slug) {
+		$new_slug = str_replace('/', '-x-x-', $slug);
+		return $new_slug;
+	}
+
+	public static function format_pattern_slug_from_post($slug) {
+		$new_slug = str_replace('-x-x-', '/', $slug);
+		return $new_slug;
+	}
+
 	public function get_pb_block_post_for_pattern($pattern)
 	{
 
-		$pattern_post = get_page_by_path(sanitize_title($pattern->name), OBJECT, 'pb_block');
+		// $pattern_post = get_page_by_path(sanitize_title($pattern->name), OBJECT, 'pb_block');
+		$path = $this->format_pattern_slug_for_post($pattern->name);
+		// $pattern_post = get_page_by_path($path, OBJECT, 'pb_block');
+
+		$posts = get_posts( array(
+  			'name' => $path,
+  			'post_type' => 'pb_block'
+		) );
+		$pattern_post = $posts ? $posts[0] : null;
 
 		if ($pattern_post) {
 			return $pattern_post;
@@ -41,7 +59,7 @@ class Pattern_Builder_Controller
 
 		$post_id = wp_insert_post(array(
 			'post_title' => $pattern->title,
-			'post_name' => $pattern->name,
+			'post_name' =>$this->format_pattern_slug_for_post($pattern->name),
 			'post_content' => $pattern->content,
 			'post_excerpt' => $pattern->description,
 			'post_type' => 'pb_block',
@@ -65,7 +83,7 @@ class Pattern_Builder_Controller
 			$pattern = $this->import_pattern_image_assets($pattern);
 
 			// get the pb_block post if it already exists
-			$post = get_page_by_path(sanitize_title($pattern->name), OBJECT, 'pb_block');
+			$post = get_page_by_path($this->format_pattern_slug_for_post($pattern->name), OBJECT, 'pb_block');
 
 			if (empty($post)) {
 				// if it doesn't exist, check if a wp_block post exists
@@ -83,8 +101,8 @@ class Pattern_Builder_Controller
 			wp_update_post([
 				'ID'           => $post->ID,
 				'post_title'   => $pattern->title,
-				'post_content' => $pattern->content,
 				'post_excerpt' => $pattern->description,
+				'post_content' => $pattern->content,
 				'post_type'    => 'pb_block',
 			]);
 

@@ -1,17 +1,25 @@
 import { PluginDocumentSettingPanel } from '@wordpress/editor';
-import { useSelect } from '@wordpress/data';
+import { useSelect, select } from '@wordpress/data';
 import PatternDetails from '../../components/PatternDetails';
+import {
+	__experimentalToggleGroupControl as ToggleGroupControl,
+	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
+	ToggleControl
+} from '@wordpress/components';
+import { PBPattern } from '../../objects/PBPattern';
+import { useState, useEffect } from '@wordpress/element';
+import { dispatch } from '@wordpress/data';
 
 export const PatternBuilderPanelPlugin = () => {
 
 	const { postType, post } = useSelect(
 		( select ) => {
+			console.log('select again');
 			const postType = select( 'core/editor' ).getCurrentPostType();
 			const postId = select( 'core/editor' ).getCurrentPostId();
 			const post = select( 'core' ).getEntityRecord( 'postType', postType, postId );
 			return { postType, post };
-		},
-		[]
+		}
 	);
 
 	if ( postType !== 'wp_block') {
@@ -23,12 +31,53 @@ export const PatternBuilderPanelPlugin = () => {
 
 export const PatternBuilderPanel = ({ patternPost }) => {
 
-	console.log('PatternBuilderPanel', patternPost);
+	if ( ! patternPost ) {
+		return null;
+	}
+
+	// const [pattern, setPattern] = useState( new PBPattern( patternPost ) );
+
+	// useEffect( () => {
+	// 	setPattern( new PBPattern( patternPost ) );
+	// }, [ patternPost ] );
+
+
+	const changeSyncedStatus = ( value ) => {
+		// setPattern((prev) => ({ ...prev, synced: value }));
+		dispatch( 'core' ).editEntityRecord( 'postType', 'wp_block', patternPost.id, { wp_pattern_sync_status: value ? '' : 'unsynced' } );
+	}
+
 
 	return (<PluginDocumentSettingPanel
 		name={'pattern-edit-panel'}
 		title={'Pattern Builder'}
 	>
-		<PatternDetails />
+
+		{/* <div className="components-base-control">
+			<label className="components-base-control__label">{'Pattern Source'}</label>
+			<ToggleGroupControl
+				value={pattern.source}
+				onChange={(value) => {
+					setPattern((prev) => ({ ...prev, source: value }));
+				}}
+				__nextHasNoMarginBottom
+			>
+				<ToggleGroupControlOption value="theme" label="Theme" />
+				<ToggleGroupControlOption value="user" label="User" />
+			</ToggleGroupControl>
+		</div> */}
+		<div className="components-base-control">
+			<label className="components-base-control__label">{'Synced Status'}</label>
+			<ToggleGroupControl
+				value={patternPost.wp_pattern_sync_status === 'unsynced' ? 'false' : 'true'}
+				onChange={(value) => {
+					changeSyncedStatus(value === 'true');
+				}}
+				__nextHasNoMarginBottom
+			>
+				<ToggleGroupControlOption value="true" label="Synced" />
+				<ToggleGroupControlOption value="false" label="Not synced" />
+			</ToggleGroupControl>
+		</div>
 	</PluginDocumentSettingPanel>);
 };
