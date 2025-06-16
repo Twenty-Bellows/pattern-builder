@@ -21,6 +21,7 @@ class Pattern_Builder_API
 		add_filter('rest_request_after_callbacks', [$this, 'inject_theme_synced_patterns'], 10, 3);
 
 		add_filter('rest_request_before_callbacks', [$this, 'handle_hijack_block_update'], 10, 3);
+		add_filter('rest_request_after_callbacks', [$this, 'handle_hijack_block_delete'], 10, 3);
 
 		add_filter('rest_request_before_callbacks', [$this, 'handle_block_to_pattern_conversion'], 10, 3);
 
@@ -316,86 +317,127 @@ class Pattern_Builder_API
 		return rest_ensure_response($response);
 	}
 
+	function handle_hijack_block_delete($response, $server, $request ) {
+
+		$route = $request->get_route();
+
+		if (preg_match('#^/wp/v2/blocks/(\d+)$#', $route, $matches)) {
+
+			$id = intval($matches[1]);
+			$post = get_post($id);
+
+			if ($post && $post->post_type === 'pb_block' && $request->get_method() === 'DELETE' ) {
+
+				$deleted = wp_delete_post($id, true);
+
+				if (!$deleted) {
+					return new WP_Error('pattern_delete_failed', 'Failed to delete pattern', ['status' => 500]);
+				}
+
+				$abstract_pattern = Abstract_Pattern::from_post($post);
+
+				$path = $this->controller->get_pattern_filepath($abstract_pattern);
+
+				if (!$path) {
+					return new WP_Error('pattern_not_found', 'Pattern not found', ['status' => 404]);
+				}
+
+				$deleted = unlink($path);
+
+				if (!$deleted) {
+					return new WP_Error('pattern_delete_failed', 'Failed to delete pattern', ['status' => 500]);
+				}
+
+				return new WP_REST_Response(['message' => 'Pattern deleted successfully'], 200);
+
+			}
+
+		}
+
+
+		return $response;
+	}
+
 	function handle_hijack_block_update($response, $handler, $request)
 	{
 		if (pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing()) {
 
 			$route = $request->get_route();
 
-			if (preg_match('#^/wp/v2/blocks/(\d+)$#', $route, $matches) && $request->get_method() === 'PUT') {
+			if (preg_match('#^/wp/v2/blocks/(\d+)$#', $route, $matches)) {
 
 				$id = intval($matches[1]);
 				$post = get_post($id);
-				$updated_pattern = json_decode($request->get_body(), true);
 
-				$convert_user_pattern_to_theme_pattern = false;
+				if ($post && $request->get_method() === 'PUT') {
 
-				if ($post && $post->post_type === 'wp_block') {
+					$updated_pattern = json_decode($request->get_body(), true);
 
-					if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'theme' ) {
-						// we are attempting to convert a USER pattern to a THEME pattern.
-						$convert_user_pattern_to_theme_pattern = true;
+					$convert_user_pattern_to_theme_pattern = false;
+
+					if ($post->post_type === 'wp_block') {
+
+						if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'theme') {
+							// we are attempting to convert a USER pattern to a THEME pattern.
+							$convert_user_pattern_to_theme_pattern = true;
+						}
 					}
 
-				}
+					if ($post->post_type === 'pb_block' || $convert_user_pattern_to_theme_pattern) {
 
-				if ($post && $post->post_type === 'pb_block' || $convert_user_pattern_to_theme_pattern ) {
+						// Check write permissions before allowing update
+						if (!current_user_can('edit_others_posts')) {
+							return new WP_Error(
+								'rest_forbidden',
+								__('You do not have permission to edit patterns.', 'pattern-builder'),
+								['status' => 403]
+							);
+						}
 
-					// Check write permissions before allowing update
-					if (!current_user_can('edit_others_posts')) {
-						return new WP_Error(
-							'rest_forbidden',
-							__('You do not have permission to edit patterns.', 'pattern-builder'),
-							['status' => 403]
-						);
+						// Verify the REST API nonce
+						$nonce = $request->get_header('X-WP-Nonce');
+						if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
+							return new WP_Error(
+								'rest_cookie_invalid_nonce',
+								__('Cookie nonce is invalid', 'pattern-builder'),
+								['status' => 403]
+							);
+						}
+
+						$pattern = Abstract_Pattern::from_post($post);
+
+						if (isset($updated_pattern['content'])) {
+							// remap pb_blocks to patterns
+							$blocks = parse_blocks($updated_pattern['content']);
+							$blocks = $this->convert_blocks_to_patterns($blocks);
+							$pattern->content = serialize_blocks($blocks);
+							//TODO: Format the content to be easy on the eyes.
+						}
+
+						if (isset($updated_pattern['title'])) {
+							$pattern->title = $updated_pattern['title'];
+						}
+
+						if (isset($updated_pattern['excerpt'])) {
+							$pattern->description = $updated_pattern['excerpt'];
+						}
+
+						if (isset($updated_pattern['wp_pattern_sync_status'])) {
+							$pattern->synced = $updated_pattern['wp_pattern_sync_status'] !== 'unsynced';
+						}
+
+						if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'user') {
+							// we are attempting to convert a THEME pattern to a USER pattern.
+							$response = $this->controller->update_user_pattern($pattern);
+							$post = get_post($pattern->id);
+						} else {
+							$response = $this->controller->update_theme_pattern($pattern);
+							$post = $this->controller->get_pb_block_post_for_pattern($pattern);
+						}
+
+						$formatted_response = $this->format_pb_block_response($post, $request);
+						return new WP_REST_Response($formatted_response, 200);
 					}
-
-					// Verify the REST API nonce
-					$nonce = $request->get_header('X-WP-Nonce');
-					if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
-						return new WP_Error(
-							'rest_cookie_invalid_nonce',
-							__('Cookie nonce is invalid', 'pattern-builder'),
-							['status' => 403]
-						);
-					}
-
-					$pattern = Abstract_Pattern::from_post($post);
-
-					if ( isset($updated_pattern['content']) ) {
-						// remap pb_blocks to patterns
-						$blocks = parse_blocks($updated_pattern['content']);
-						$blocks = $this->convert_blocks_to_patterns($blocks);
-						$pattern->content = serialize_blocks($blocks);
-						//TODO: Format the content to be easy on the eyes.
-					}
-
-					if( isset($updated_pattern['title']) ) {
-						$pattern->title = $updated_pattern['title'];
-					}
-
-					if( isset($updated_pattern['excerpt']) ) {
-						$pattern->description = $updated_pattern['excerpt'];
-					}
-
-					if( isset($updated_pattern['wp_pattern_sync_status']) ) {
-						$pattern->synced = $updated_pattern['wp_pattern_sync_status'] !== 'unsynced';
-					}
-
-					if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'user' ) {
-						// we are attempting to convert a THEME pattern to a USER pattern.
-						$response = $this->controller->update_user_pattern($pattern);
-						$post = get_post($pattern->id);
-					}
-					else {
-						$response = $this->controller->update_theme_pattern($pattern);
-						$post = $this->controller->get_pb_block_post_for_pattern($pattern);
-
-					}
-
-					$formatted_response = $this->format_pb_block_response($post, $request);
-					return new WP_REST_Response($formatted_response, 200);
-
 				}
 			}
 		}

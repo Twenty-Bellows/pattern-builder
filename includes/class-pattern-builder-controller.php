@@ -326,7 +326,7 @@ class Pattern_Builder_Controller
 		return ['message' => 'Pattern deleted successfully'];
 	}
 
-	private function get_pattern_filepath($pattern)
+	public function get_pattern_filepath($pattern)
 	{
 		$path = $pattern->filePath ?? get_stylesheet_directory() . '/patterns/' . basename($pattern->name) . '.php';
 
