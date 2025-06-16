@@ -31,6 +31,7 @@ class Pattern_Builder_Controller
 		$pattern_post = $posts ? $posts[0] : null;
 
 		if ($pattern_post) {
+			$pattern_post->post_name = $pattern->name;
 			return $pattern_post;
 		}
 
@@ -73,7 +74,10 @@ class Pattern_Builder_Controller
 		wp_set_object_terms($post_id, $pattern->categories, 'wp_pattern_category', false);
 
 		//return the post by post id
-		return get_post($post_id);
+		$post = get_post($post_id);
+		$post->post_name = $pattern->name;
+
+		return $post;
 	}
 
 	public function update_theme_pattern(Abstract_Pattern $pattern)
@@ -230,7 +234,7 @@ class Pattern_Builder_Controller
 			// check if the pattern exists in the database as a pb_block post
 			// this is for any user patterns that are being converted from theme patterns
 			// It will be converted to a wp_block post when it is updated
-			$post = get_page_by_path($pattern->name, OBJECT, 'pb_block');
+			$post = get_page_by_path($this->format_pattern_slug_for_post($pattern->name), OBJECT, 'pb_block');
 			$convert_from_theme_pattern = true;
 		}
 
@@ -376,7 +380,8 @@ class Pattern_Builder_Controller
 		$path = $this->get_pattern_filepath($pattern);
 
 		if (!$path) {
-			$path = get_stylesheet_directory() . '/patterns/' . basename($pattern->name) . '.php';
+			$filename = str_replace('-', '_', basename($pattern->name));
+			$path = get_stylesheet_directory() . '/patterns/' . $filename . '.php';
 		}
 
 		$file_content = $this->build_pattern_file_metadata($pattern) . $pattern->content . "\n";

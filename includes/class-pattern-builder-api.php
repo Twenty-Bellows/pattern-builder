@@ -153,22 +153,14 @@ class Pattern_Builder_API
 			$block_id = intval($matches['id']);
 			$pb_block = get_post($block_id);
 			if ($pb_block && $pb_block->post_type === 'pb_block') {
-
-				// TODO: Optimize this
-				// NOTE: Because the name of the post is the slug, but the slug has /'s removed, we have to find the ACTUALY slug from the file.
-				$all_patterns = $this->controller->get_block_patterns_from_theme_files();
-				$pattern_slug = $pb_block->post_name;
-				$pattern = array_find( $all_patterns, function ($p) use ($pattern_slug) {
-					return sanitize_title($p->name) === sanitize_title($pattern_slug);
-				});
-
+				$pb_block->post_name = $this->controller->format_pattern_slug_from_post($pb_block->post_name);
 				$data = $this->format_pb_block_response($pb_block, $request);
 				$response = new WP_REST_Response($data);
 			}
 		}
 
 		// Requesting all patterns.  Inject all of the synced theme patterns.
-		else if ($request->get_route() === '/wp/v2/blocks') {
+		else if ($request->get_route() === '/wp/v2/blocks' && $request->get_method() === 'GET') {
 
 			$data = $response->get_data();
 			$patterns = $this->controller->get_block_patterns_from_theme_files();

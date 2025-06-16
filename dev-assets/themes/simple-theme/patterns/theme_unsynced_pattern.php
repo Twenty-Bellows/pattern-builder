@@ -2,7 +2,7 @@
 /**
  * Title: Theme Unsynced Pattern
  * Slug: synced-patterns-test/theme-unsynced-pattern
- * Description: An unsynced pattern provided with the theme to use for testing.
+ * Description: An UNSYNCED pattern that comes with the theme to be used for testing.
  * Categories: text
  */
 ?>
