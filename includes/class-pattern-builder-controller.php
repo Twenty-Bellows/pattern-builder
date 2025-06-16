@@ -19,10 +19,7 @@ class Pattern_Builder_Controller
 
 	public function get_pb_block_post_for_pattern($pattern)
 	{
-
-		// $pattern_post = get_page_by_path(sanitize_title($pattern->name), OBJECT, 'pb_block');
 		$path = $this->format_pattern_slug_for_post($pattern->name);
-		// $pattern_post = get_page_by_path($path, OBJECT, 'pb_block');
 
 		$posts = get_posts( array(
   			'name' => $path,
@@ -94,6 +91,11 @@ class Pattern_Builder_Controller
 				// this is for any user patterns that are being converted to theme patterns
 				// It will be converted to a pb_block post when it is updated
 				$post = get_page_by_path(sanitize_title($pattern->name), OBJECT, 'wp_block');
+
+				// if we found it then we will want to change the slug of the post to include the theme's namespace
+				if ($post) {
+					$pattern->name = get_stylesheet() . '/' . $pattern->name;
+				}
 			}
 
 			if (empty($post)){
@@ -234,7 +236,8 @@ class Pattern_Builder_Controller
 			// check if the pattern exists in the database as a pb_block post
 			// this is for any user patterns that are being converted from theme patterns
 			// It will be converted to a wp_block post when it is updated
-			$post = get_page_by_path($this->format_pattern_slug_for_post($pattern->name), OBJECT, 'pb_block');
+			$slug = $this->format_pattern_slug_for_post($pattern->name);
+			$post = get_page_by_path($slug, OBJECT, 'pb_block');
 			$convert_from_theme_pattern = true;
 		}
 
@@ -245,7 +248,7 @@ class Pattern_Builder_Controller
 		if (empty($post)) {
 			$post_id = wp_insert_post([
 				'post_title'   => $pattern->title,
-				'post_name'    => $pattern->name,
+				'post_name'    => basename($pattern->name),
 				'post_content' => $pattern->content,
 				'post_excerpt' => $pattern->description,
 				'post_type'    => 'wp_block',
@@ -256,7 +259,7 @@ class Pattern_Builder_Controller
 			wp_update_post([
 				'ID'           => $post->ID,
 				'post_title'   => $pattern->title,
-				'post_name'    => $pattern->name,
+				'post_name'    => basename($pattern->name),
 				'post_content' => $pattern->content,
 				'post_excerpt' => $pattern->description,
 				'post_type'    => 'wp_block',

@@ -21,6 +21,11 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		add_filter('stylesheet_directory', [$this, 'get_test_directory']);
 		add_filter( 'should_load_remote_block_patterns', '__return_false' );
+
+		// add a filter to override the stylesheet value to simulate our test theme
+		add_filter('stylesheet', function() {
+			return 'synced-patterns-test';
+		});
 	}
 
 	/**
@@ -299,6 +304,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$pattern = $data[0];
 
 		$this->assertArrayNotHasKey('source', $pattern);
+		$this->assertEquals('theme-synced-pattern', $pattern['slug']);
 
 		//Ensure there is not a pb_block post for this pattern
 		// get app 'pb_block' posts
@@ -352,6 +358,79 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		// Make sure the pattern file has been created
 		$pattern_file = $this->test_dir . '/patterns/test_user_pattern.php';
+		$this->assertFileExists($pattern_file);
+	}
+
+	/**
+	 * Test converting a theme pattern to a user pattern and back via the API
+	 */
+	public function test_convert_theme_pattern_to_user_pattern_and_back() {
+
+		$this->copy_test_pattern('theme_synced_pattern.php');
+
+		do_action('init');
+
+		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+		$pattern = $data[0];
+
+		// update the pattern
+		$pattern_updates = [
+			'source' => 'user',
+		];
+
+		$request = $this->create_rest_request('PUT', '/wp/v2/blocks/' . $pattern['id']);
+		$request->set_body(json_encode($pattern_updates));
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertEquals(200, $response->get_status());
+
+		// fetch the pattern again to ensure it was updated
+		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+		$pattern = $data[0];
+
+		$this->assertArrayNotHasKey('source', $pattern);
+
+		//Ensure there is not a pb_block post for this pattern
+		// get app 'pb_block' posts
+		$all_pb_block_posts = get_posts([
+			'post_type' => 'pb_block',
+			'numberposts' => -1,
+			'post_status' => 'any',
+		]);
+		$this->assertEmpty($all_pb_block_posts, 'There should be no pb_block posts after converting the theme pattern to a user pattern.');
+
+		// Make sure the pattern file has been removed
+		$pattern_file = $this->test_dir . '/patterns/theme_synced_pattern.php';
+		$this->assertFileDoesNotExist($pattern_file);
+
+		// update the pattern
+		$pattern_updates = [
+			'source' => 'theme',
+		];
+
+		$request = $this->create_rest_request('PUT', '/wp/v2/blocks/' . $pattern['id']);
+		$request->set_body(json_encode($pattern_updates));
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertEquals(200, $response->get_status());
+
+		// fetch the pattern again to ensure it was updated
+		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+		$pattern = $data[0];
+
+		$this->assertEquals('theme', $pattern['source']);
+		$this->assertEquals('synced-patterns-test/theme-synced-pattern', $pattern['slug']);
+
+		// Make sure the pattern file has been created
+		$pattern_file = $this->test_dir . '/patterns/theme_synced_pattern.php';
 		$this->assertFileExists($pattern_file);
 	}
 
