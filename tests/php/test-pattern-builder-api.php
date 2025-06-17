@@ -24,7 +24,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		// add a filter to override the stylesheet value to simulate our test theme
 		add_filter('stylesheet', function() {
-			return 'synced-patterns-test';
+			return 'simple-theme';
 		});
 	}
 
@@ -93,7 +93,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		// This is in the format of the core API wp_block response
 		$this->assertIsInt($pattern['id']);
 		$this->assertEquals('Theme Synced Pattern', $pattern['title']['raw']);
-		$this->assertEquals('synced-patterns-test/theme-synced-pattern', $pattern['slug']);
+		$this->assertEquals('simple-theme/theme-synced-pattern', $pattern['slug']);
 		$this->assertEquals('A SYNCED pattern that comes with the theme to be used for testing.', $pattern['excerpt']['raw']);
 		$this->assertEquals('', $pattern['wp_pattern_sync_status']);
 		$this->assertCount(1, $pattern['wp_pattern_category']);
@@ -120,7 +120,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals(200, $response->get_status());
 		$this->assertEquals('theme', $pattern['source']);
 		$this->assertEquals('Theme Synced Pattern', $pattern['title']['raw']);
-		$this->assertEquals('synced-patterns-test/theme-synced-pattern', $pattern['slug']);
+		$this->assertEquals('simple-theme/theme-synced-pattern', $pattern['slug']);
 		$this->assertEquals('A SYNCED pattern that comes with the theme to be used for testing.', $pattern['excerpt']['raw']);
 		$this->assertEquals('', $pattern['wp_pattern_sync_status']);
 		$this->assertCount(1, $pattern['wp_pattern_category']);
@@ -147,10 +147,10 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		// one of the items in the $data array should be the pattern.
 		$pattern = array_find($data, function ($pattern) {
-			return $pattern['name'] === 'synced-patterns-test/theme-synced-pattern';
+			return $pattern['name'] === 'simple-theme/theme-synced-pattern';
 		});
 
-		$this->assertEquals('synced-patterns-test/theme-synced-pattern', $pattern['name']);
+		$this->assertEquals('simple-theme/theme-synced-pattern', $pattern['name']);
 		$this->assertEquals('Theme Synced Pattern', $pattern['title']);
 		$this->assertEquals(false, $pattern['inserter']);
 		$this->stringContains('<!-- wp:block {"ref":', $pattern['content']);
@@ -176,7 +176,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		$this->assertEquals(200, $response->get_status());
 		$this->assertEquals('Theme Unsynced Pattern', $pattern['title']['raw']);
-		$this->assertEquals('synced-patterns-test/theme-unsynced-pattern', $pattern['slug']);
+		$this->assertEquals('simple-theme/theme-unsynced-pattern', $pattern['slug']);
 		$this->assertEquals('An UNSYNCED pattern that comes with the theme to be used for testing.', $pattern['excerpt']['raw']);
 		$this->assertEquals('', $pattern['wp_pattern_sync_status']);
 		$this->assertCount(1, $pattern['wp_pattern_category']);
@@ -203,10 +203,10 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		// one of the items in the $data array should be the pattern.
 		$pattern = array_find($data, function ($pattern) {
-			return $pattern['name'] === 'synced-patterns-test/theme-unsynced-pattern';
+			return $pattern['name'] === 'simple-theme/theme-unsynced-pattern';
 		});
 
-		$this->assertEquals('synced-patterns-test/theme-unsynced-pattern', $pattern['name']);
+		$this->assertEquals('simple-theme/theme-unsynced-pattern', $pattern['name']);
 		$this->assertEquals('Theme Unsynced Pattern', $pattern['title']);
 		$this->assertEquals(false, $pattern['inserter']);
 		$this->stringContains('This is a Theme UNSYNCED Pattern', $pattern['content']);
@@ -355,6 +355,15 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$pattern = $data[0];
 
 		$this->assertEquals('theme', $pattern['source']);
+		$this->assertCount(1, $data);
+
+		//fetch all of the pb_block posts
+		$all_pb_block_posts = get_posts([
+			'post_type' => 'pb_block',
+			'numberposts' => -1,
+			'post_status' => 'any',
+		]);
+		$this->assertCount(1, $all_pb_block_posts, 'There should be one pb_block post after converting the user pattern to a theme pattern.');
 
 		// Make sure the pattern file has been created
 		$pattern_file = $this->test_dir . '/patterns/test_user_pattern.php';
@@ -394,6 +403,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$pattern = $data[0];
 
 		$this->assertArrayNotHasKey('source', $pattern);
+		$this->assertCount(1, $data);
 
 		//Ensure there is not a pb_block post for this pattern
 		// get app 'pb_block' posts
@@ -427,7 +437,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$pattern = $data[0];
 
 		$this->assertEquals('theme', $pattern['source']);
-		$this->assertEquals('synced-patterns-test/theme-synced-pattern', $pattern['slug']);
+		$this->assertEquals('simple-theme/theme-synced-pattern', $pattern['slug']);
 
 		// Make sure the pattern file has been created
 		$pattern_file = $this->test_dir . '/patterns/theme_synced_pattern.php';

@@ -81,69 +81,57 @@ class Pattern_Builder_Controller
 	{
 		if (pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing()) {
 
+			// get the pb_block post if it already exists
+			$post = get_page_by_path($this->format_pattern_slug_for_post($pattern->name), OBJECT, ['pb_block', 'wp_block']);
+
+			if ( $post && $post->post_type === 'wp_block' ) {
+				// this is being converted to theme patterns, change the slug to include the theme domain
+				$pattern->name = get_stylesheet() . '/' . $pattern->name;
+			}
+
 			$pattern = $this->import_pattern_image_assets($pattern);
 
-			// get the pb_block post if it already exists
-			$post = get_page_by_path($this->format_pattern_slug_for_post($pattern->name), OBJECT, 'pb_block');
-
-			if (empty($post)) {
-				// if it doesn't exist, check if a wp_block post exists
-				// this is for any user patterns that are being converted to theme patterns
-				// It will be converted to a pb_block post when it is updated
-				$post = get_page_by_path(sanitize_title($pattern->name), OBJECT, 'wp_block');
-
-				// if we found it then we will want to change the slug of the post to include the theme's namespace
-				if ($post) {
-					$pattern->name = get_stylesheet() . '/' . $pattern->name;
-				}
-			}
-
-			if (empty($post)){
-				// create a new post if it doesn't exist
-				$post = $this->create_pb_block_post_for_pattern($pattern);
-			}
-
-
-			wp_update_post([
-				'ID'           => $post->ID,
+			$post_id = wp_update_post([
+				'ID'           => $post ? $post->ID : null,
 				'post_title'   => $pattern->title,
+				'post_name'    => $this->format_pattern_slug_for_post($pattern->name),
 				'post_excerpt' => $pattern->description,
 				'post_content' => $pattern->content,
 				'post_type'    => 'pb_block',
 			]);
 
 			if ($pattern->synced) {
-				delete_post_meta($post->ID, 'wp_pattern_sync_status');
+				delete_post_meta($post_id, 'wp_pattern_sync_status');
 			} else {
-				update_post_meta($post->ID, 'wp_pattern_sync_status', 'unsynced');
+				update_post_meta($post_id, 'wp_pattern_sync_status', 'unsynced');
 			}
 
 			if ($pattern->keywords) {
-				update_post_meta($post->ID, 'wp_pattern_keywords', implode(',', $pattern->keywords));
+				update_post_meta($post_id, 'wp_pattern_keywords', implode(',', $pattern->keywords));
 			} else {
-				delete_post_meta($post->ID, 'wp_pattern_keywords');
+				delete_post_meta($post_id, 'wp_pattern_keywords');
 			}
 
 			if ($pattern->blockTypes) {
-				update_post_meta($post->ID, 'wp_pattern_block_types', implode(',', $pattern->blockTypes));
+				update_post_meta($post_id, 'wp_pattern_block_types', implode(',', $pattern->blockTypes));
 			} else {
-				delete_post_meta($post->ID, 'wp_pattern_block_types');
+				delete_post_meta($post_id, 'wp_pattern_block_types');
 			}
 
 			if ($pattern->templateTypes) {
-				update_post_meta($post->ID, 'wp_pattern_template_types', implode(',', $pattern->templateTypes));
+				update_post_meta($post_id, 'wp_pattern_template_types', implode(',', $pattern->templateTypes));
 			} else {
-				delete_post_meta($post->ID, 'wp_pattern_template_types');
+				delete_post_meta($post_id, 'wp_pattern_template_types');
 			}
 
 			if ($pattern->postTypes) {
-				update_post_meta($post->ID, 'wp_pattern_post_types', implode(',', $pattern->postTypes));
+				update_post_meta($post_id, 'wp_pattern_post_types', implode(',', $pattern->postTypes));
 			} else {
-				delete_post_meta($post->ID, 'wp_pattern_post_types');
+				delete_post_meta($post_id, 'wp_pattern_post_types');
 			}
 
 			// store categories
-			wp_set_object_terms($post->ID, $pattern->categories, 'wp_pattern_category', false);
+			wp_set_object_terms($post_id, $pattern->categories, 'wp_pattern_category', false);
 
 			// update the pattern file
 			$this->update_theme_pattern_file($pattern);

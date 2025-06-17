@@ -212,29 +212,44 @@ class Pattern_Builder_API
 
 		foreach ($patterns as $pattern) {
 
-			$post = $this->controller->get_pb_block_post_for_pattern($pattern);
+			$post = get_page_by_path($this->controller->format_pattern_slug_for_post($pattern->name), OBJECT, ['pb_block']);
 
-			// if the post content is out of date we need to update it
-			// TODO: When users are able to edit these patterns and ONLY effect the database content we will have to enact some conflict resolution.
-			if ($post->post_content !== $pattern->content) {
-				$post->post_content = $pattern->content;
-				wp_update_post($post);
+			if (!$post) {
+				// If the post doesn't exist, create it.
+				$post = $this->controller->create_pb_block_post_for_pattern($pattern);
 			}
+			else {
 
-			if ($post->post_title !== $pattern->title) {
-				$post->post_title = $pattern->title;
-				wp_update_post($post);
-			}
+				// if the post content is out of date we need to update it
 
-			if ($post->post_excerpt !== $pattern->description) {
-				$post->post_excerpt = $pattern->description;
-				wp_update_post($post);
-			}
+				// TODO: When users are able to edit these patterns and ONLY effect the database content we will have to enact some conflict resolution.
 
-			if ($pattern->synced) {
-				delete_post_meta($post->ID, 'wp_pattern_sync_status');
-			} else {
-				update_post_meta($post->ID, 'wp_pattern_sync_status', 'unsynced');
+				$post_changed = false;
+
+				if ($post->post_content !== $pattern->content) {
+					$post->post_content = $pattern->content;
+					$post_changed = true;
+				}
+
+				if ($post->post_title !== $pattern->title) {
+					$post->post_title = $pattern->title;
+					$post_changed = true;
+				}
+
+				if ($post->post_excerpt !== $pattern->description) {
+					$post->post_excerpt = $pattern->description;
+					$post_changed = true;
+				}
+
+				if ($post_changed) {
+					wp_update_post($post);
+				}
+
+				if ($pattern->synced) {
+					delete_post_meta($post->ID, 'wp_pattern_sync_status');
+				} else {
+					update_post_meta($post->ID, 'wp_pattern_sync_status', 'unsynced');
+				}
 			}
 
 			if ($pattern_registry->is_registered($pattern->name)) {
@@ -428,15 +443,14 @@ class Pattern_Builder_API
 
 						if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'user') {
 							// we are attempting to convert a THEME pattern to a USER pattern.
-							$response = $this->controller->update_user_pattern($pattern);
-							$post = get_post($pattern->id);
+							$this->controller->update_user_pattern($pattern);
 						} else {
-							$response = $this->controller->update_theme_pattern($pattern);
-							$post = $this->controller->get_pb_block_post_for_pattern($pattern);
+							$this->controller->update_theme_pattern($pattern);
 						}
 
+						$post = get_post($pattern->id);
 						$formatted_response = $this->format_pb_block_response($post, $request);
-						return new WP_REST_Response($formatted_response, 200);
+						$response = new WP_REST_Response($formatted_response, 200);
 					}
 				}
 			}
