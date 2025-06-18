@@ -160,12 +160,6 @@ export const EditorSidePanel = () => {
 							</HStack>
 							<VStack>
 								<Divider />
-								<Text>
-									{ __(
-										'Would you like to create a new User Pattern or a Theme Pattern? (You may change the type later.)',
-										'pattern-builder'
-									) }
-								</Text>
 								<Navigator.Button
 									icon={tool}
 									path="/create/type"

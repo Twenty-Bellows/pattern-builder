@@ -154,6 +154,11 @@ class Pattern_Builder_API
 			$block_id = intval($matches['id']);
 			$pb_block = get_post($block_id);
 			if ($pb_block && $pb_block->post_type === 'pb_block') {
+				// make sure the pattern has a pattern file
+				$pattern_file_path = $this->controller->get_pattern_filepath(Abstract_Pattern::from_post($pb_block));
+				if (!$pattern_file_path) {
+					return $response; // No pattern file found, return the original response
+				}
 				$pb_block->post_name = $this->controller->format_pattern_slug_from_post($pb_block->post_name);
 				$data = $this->format_pb_block_response($pb_block, $request);
 				$response = new WP_REST_Response($data);
