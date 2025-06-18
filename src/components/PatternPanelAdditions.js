@@ -5,72 +5,54 @@ import {
 	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
 } from '@wordpress/components';
 import { dispatch } from '@wordpress/data';
+import { PatternSourcePanel } from './PatternSourcePanel';
+import { PatternSyncedStatusPanel } from './PatternSyncedStatusPanel';
+import { BlockBindingsPanel } from './BlockBindingsPanel';
 
 export const PatternPanelAdditionsPlugin = () => {
 
 	const { postType, post } = useSelect(
-		( select ) => {
-			const postType = select( 'core/editor' ).getCurrentPostType();
-			const postId = select( 'core/editor' ).getCurrentPostId();
-			const post = select( 'core' ).getEntityRecord( 'postType', postType, postId );
+		(select) => {
+			const postType = select('core/editor').getCurrentPostType();
+			const postId = select('core/editor').getCurrentPostId();
+			const post = select('core').getEntityRecord('postType', postType, postId);
 			return { postType, post };
 		}
 	);
 
-	if ( postType !== 'wp_block') {
+	if (postType !== 'wp_block') {
 		return null;
 	}
 
-	return <PatternBuilderPanel patternPost={ post } />;
+	return <PatternBuilderPanel patternPost={post} />;
 }
 
 export const PatternBuilderPanel = ({ patternPost }) => {
 
-	if ( ! patternPost ) {
+	if (!patternPost) {
 		return null;
 	}
 
-	console.log('PatternBuilderPanel', patternPost);
+	return (<>
+		<PluginDocumentSettingPanel
+			name={'pattern-panel-additions-source'}
+			title={'Pattern Source'}
+		>
+			<PatternSourcePanel patternPost={patternPost} />
+		</PluginDocumentSettingPanel>
 
-	const changeSyncedStatus = ( value ) => {
-		dispatch( 'core' ).editEntityRecord( 'postType', 'wp_block', patternPost.id, { wp_pattern_sync_status: value ? '' : 'unsynced' } );
-	}
+		<PluginDocumentSettingPanel
+			name={'pattern-panel-additions-synced-status'}
+			title={'Pattern Synced Status'}
+		>
+			<PatternSyncedStatusPanel patternPost={patternPost} />
+		</PluginDocumentSettingPanel>
 
-	const changeSourceStatus = ( value ) => {
-		dispatch( 'core' ).editEntityRecord( 'postType', 'wp_block', patternPost.id, { source: value } );
-	}
-
-	return (<PluginDocumentSettingPanel
-		name={'pattern-edit-panel'}
-		title={'Pattern Builder'}
-	>
-
-		<div className="components-base-control">
-			<label className="components-base-control__label">{'Pattern Source'}</label>
-			<ToggleGroupControl
-				value={patternPost.source || 'user'}
-				onChange={(value) => {
-					changeSourceStatus( value );
-				}}
-				__nextHasNoMarginBottom
-			>
-				<ToggleGroupControlOption value="theme" label="Theme" />
-				<ToggleGroupControlOption value="user" label="User" />
-			</ToggleGroupControl>
-		</div>
-
-		<div className="components-base-control">
-			<label className="components-base-control__label">{'Synced Status'}</label>
-			<ToggleGroupControl
-				value={patternPost.wp_pattern_sync_status === 'unsynced' ? 'false' : 'true'}
-				onChange={(value) => {
-					changeSyncedStatus(value === 'true');
-				}}
-				__nextHasNoMarginBottom
-			>
-				<ToggleGroupControlOption value="true" label="Synced" />
-				<ToggleGroupControlOption value="false" label="Not synced" />
-			</ToggleGroupControl>
-		</div>
-	</PluginDocumentSettingPanel>);
+		{/* <PluginDocumentSettingPanel
+			name={'pattern-panel-additions-bindings'}
+			title={'Pattern Bindings'}
+		>
+			<BlockBindingsPanel />
+		</PluginDocumentSettingPanel> */}
+	</>);
 };
