@@ -1,16 +1,12 @@
 import { PluginDocumentSettingPanel } from '@wordpress/editor';
-import { useSelect, select } from '@wordpress/data';
-import PatternDetails from '../../components/PatternDetails';
+import { useSelect } from '@wordpress/data';
 import {
 	__experimentalToggleGroupControl as ToggleGroupControl,
 	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
-	ToggleControl
 } from '@wordpress/components';
-import { PBPattern } from '../../objects/PBPattern';
-import { useState, useEffect } from '@wordpress/element';
 import { dispatch } from '@wordpress/data';
 
-export const PatternBuilderPanelPlugin = () => {
+export const PatternPanelAdditionsPlugin = () => {
 
 	const { postType, post } = useSelect(
 		( select ) => {

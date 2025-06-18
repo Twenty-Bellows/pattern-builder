@@ -6,7 +6,7 @@ import { SnackbarList } from '@wordpress/components';
 import { PatternBrowser } from './components/PatternBrowser';
 import PatternEditor from './components/PatternEditor';
 
-import './blocks/pattern';
+// import './blocks/pattern';
 import './utils/store';
 import './PatternBuilder.scss';
 

@@ -7,32 +7,6 @@ import {
 } from '@wordpress/block-editor';
 
 /**
- *
- * SyncedPatternFilter
- *
- * This filter checks if the block being edited is a core/pattern block with a slug and content.
- * If so, it renders the SyncedPatternRenderer component instead of the default BlockEdit.
- */
-export const SyncedPatternFilter = (BlockEdit) => (props) => {
-	const { name, attributes } = props;
-	if (name === 'core/pattern' && attributes.slug && attributes.content) {
-		const selectedPattern = useSelect(
-			(select) =>
-				select(blockEditorStore).__experimentalGetParsedPattern(
-					attributes.slug
-				),
-			[props.attributes.slug]
-		);
-		if (selectedPattern?.blocks?.length === 1 && selectedPattern.blocks[0].name === 'core/block') {
-			return <SyncedPatternRenderer {
-				...props
-			} />;
-		}
-	}
-	return <BlockEdit {...props} />;
-};
-
-/**
  * SyncedPatternRenderer component
  *
  * Renders a Theme Synced Pattern block, passing the content on to the referenced Core Pattern block.
