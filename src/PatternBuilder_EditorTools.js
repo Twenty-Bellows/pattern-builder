@@ -229,13 +229,6 @@ const PatternBuilderEditorTools = () => {
 							</HStack>
 							<VStack>
 								<Divider />
-								<Text>
-									{ __(
-										'Would you like the new pattern to be SYNCED or UNSYNCED?',
-										'pattern-builder'
-									) }
-								</Text>
-								<Divider />
 								<Navigator.Button
 									icon={tool}
 									path="/create/details"
