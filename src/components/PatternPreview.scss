@@ -1,0 +1,23 @@
+.pattern-builder__pattern-preview {
+	transition: background-color 0.2s ease-in-out;
+	.pattern-builder__pattern-preview__header {
+		button {
+			position: absolute;
+			height: unset;
+			opacity: 0;
+			right: 0px;
+			transition: right 0.2s ease-in-out, opacity 0.2s ease-in-out;
+		}
+	}
+}
+
+.pattern-builder__pattern-preview:hover {
+	background-color: #EEEEEE;
+	cursor: pointer;
+	.pattern-builder__pattern-preview__header {
+		button {
+			right: 24px;
+			opacity: 1;
+		}
+	}
+}

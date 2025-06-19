@@ -8,6 +8,7 @@ import { useSelect } from '@wordpress/data';
 import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
 import { TextControl, TextareaControl, SelectControl, ToggleControl, Button, FormTokenField, Panel, PanelBody } from '@wordpress/components';
 import { Navigator } from '@wordpress/components';
+import { useNavigator } from '@wordpress/components';
 import {
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalVStack as VStack,
@@ -43,11 +44,50 @@ import {
 } from '@wordpress/icons';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 
+import { fetchAllPatterns } from '../utils/resolvers';
 import { PatternCreatePanel } from './PatternCreatePanel';
+import { useEffect } from 'react';
+import { useMemo } from 'react';
+import { PatternBrowserPanel } from './PatternBrowserPanel';
 
 export const EditorSidePanel = () => {
 
+	const [	allPatterns, setAllPatterns ] = useState([]);
 
+	useEffect(() => {
+		fetchAllPatterns()
+			.then((patterns) => {
+				setAllPatterns(patterns);
+			})
+			.catch((error) => {
+				console.error('Error fetching patterns:', error);
+			});
+	}, []);
+
+	const patternCategories = useMemo(() => {
+		const categories = Object.values(allPatterns.reduce((acc, pattern) => {
+			pattern.categories.forEach((category) => {
+				if (!acc[category]) {
+					acc[category] = {
+						label: category.charAt(0).toUpperCase() + category.slice(1),
+						value: category,
+					};
+				}
+			});
+			return acc;
+		}, {
+			'all': { label: __('All Patterns', 'pattern-builder'), value: 'all' },
+		}));
+		categories.push({
+			label: __('Uncategorized', 'pattern-builder'),
+			value: 'uncategorized',
+		});
+		categories.push({
+			label: __('Hidden', 'pattern-builder'),
+			value: 'hidden',
+		});
+		return categories;
+	}, [allPatterns]);
 
 	return (
 		<>
@@ -72,15 +112,6 @@ export const EditorSidePanel = () => {
 					<Navigator.Screen path="/">
 						<PanelBody>
 							<VStack spacing={0}>
-								<Button
-									icon={widget}
-									onClick={() => openPatternBrowser()}
-								>
-									{__(
-										'Browse All Patterns',
-										'pattern-builder'
-									)}
-								</Button>
 								<Navigator.Button
 									icon={tool}
 									path="/create"
@@ -88,6 +119,17 @@ export const EditorSidePanel = () => {
 										{__('Create Pattern', 'pattern-builder')}
 										<Icon icon={chevronRight} />
 								</Navigator.Button>
+								<Divider />
+								{patternCategories.map((category) => (
+									<Navigator.Button
+										key={category.value}
+										icon={widget}
+										path={`/browse/${category.value}`}
+									>
+										{category.label}
+										<Icon icon={chevronRight} />
+									</Navigator.Button>
+								))}
 							</VStack>
 						</PanelBody>
 					</Navigator.Screen>
@@ -107,6 +149,26 @@ export const EditorSidePanel = () => {
 								</Heading>
 							</HStack>
 							<PatternCreatePanel/>
+						</PanelBody>
+					</Navigator.Screen>
+					<Navigator.Screen path="/browse/:category">
+						<PanelBody>
+							<VStack spacing={4}>
+							<HStack spacing={2} alignment="left">
+								<Navigator.BackButton
+									icon={chevronLeft}
+									label={__('Back', 'pattern-builder')}
+								/>
+								<Heading
+									level={2}
+									size={13}
+									style={ { margin: 0 } }
+								>
+									{__('Browse', 'pattern-builder')}
+								</Heading>
+							</HStack>
+								<PatternBrowserPanel allPatterns={allPatterns}/>
+							</VStack>
 						</PanelBody>
 					</Navigator.Screen>
 				</Navigator>

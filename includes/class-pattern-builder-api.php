@@ -13,7 +13,7 @@ class Pattern_Builder_API
 	{
 		$this->controller = new Pattern_Builder_Controller();
 
-		// add_action('rest_api_init', [$this, 'register_routes']);
+		add_action('rest_api_init', [$this, 'register_routes']);
 		add_action('init', array($this, 'register_patterns'));
 
 		// TODO: This is shared code with the Synced Patterns for Themes plugin.
@@ -36,11 +36,11 @@ class Pattern_Builder_API
 	 */
 	public function register_routes(): void
 	{
-		register_rest_route(self::$base_route, '/global-styles', [
-			'methods'  => 'GET',
-			'callback' => [$this, 'get_global_styles'],
-			'permission_callback' => [$this, 'read_permission_callback'],
-		]);
+		// register_rest_route(self::$base_route, '/global-styles', [
+		// 	'methods'  => 'GET',
+		// 	'callback' => [$this, 'get_global_styles'],
+		// 	'permission_callback' => [$this, 'read_permission_callback'],
+		// ]);
 
 		register_rest_route(self::$base_route, '/patterns', [
 			'methods'  => 'GET',
@@ -48,17 +48,17 @@ class Pattern_Builder_API
 			'permission_callback' => [$this, 'read_permission_callback'],
 		]);
 
-		register_rest_route(self::$base_route, '/pattern', [
-			'methods'  => ['PUT', 'POST'],
-			'callback' => [$this, 'save_block_pattern'],
-			'permission_callback' => [$this, 'write_permission_callback'],
-		]);
+		// register_rest_route(self::$base_route, '/pattern', [
+		// 	'methods'  => ['PUT', 'POST'],
+		// 	'callback' => [$this, 'save_block_pattern'],
+		// 	'permission_callback' => [$this, 'write_permission_callback'],
+		// ]);
 
-		register_rest_route(self::$base_route, '/pattern', [
-			'methods'  => 'DELETE',
-			'callback' => [$this, 'delete_block_pattern'],
-			'permission_callback' => [$this, 'write_permission_callback'],
-		]);
+		// register_rest_route(self::$base_route, '/pattern', [
+		// 	'methods'  => 'DELETE',
+		// 	'callback' => [$this, 'delete_block_pattern'],
+		// 	'permission_callback' => [$this, 'write_permission_callback'],
+		// ]);
 	}
 
 	/**
@@ -141,6 +141,9 @@ class Pattern_Builder_API
 		}, $theme_patterns);
 
 		$user_patterns = $this->controller->get_block_patterns_from_database();
+
+		// TODO: We also need to get patterns from other potential sources such as plugins and core.
+		// However, these are not editable.
 
 		$all_patterns = array_merge($theme_patterns, $user_patterns);
 
@@ -528,7 +531,7 @@ class Pattern_Builder_API
 			return $pre_render;
 		}
 
-		$synced_pattern_id = self::$synced_theme_patterns[$slug];
+		$synced_pattern_id = self::$synced_theme_patterns[$slug] ?? null;
 
 		// if there is a synced_pattern_id then contruct the block with a reference to the synced pattern that also has the rest of the pattern's attributes and render it.
 		if ($synced_pattern_id) {

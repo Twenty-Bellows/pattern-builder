@@ -59,7 +59,6 @@ export const PatternCreatePanel = () => {
 	const createPattern = () => {
 		createPatternCall(newPatternOptions)
 			.then((pattern) => {
-				console.log('Pattern created successfully:', pattern);
 				onNavigateToEntityRecord({
 					postId: pattern.id,
 					postType: 'wp_block'

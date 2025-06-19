@@ -28,27 +28,27 @@ export class AbstractPattern {
 
 	constructor( options ) {
 
-		// this.id = options.id || null;
+		this.id = options.id || null;
 
-		// this.title = options.title || '';
-		// this.name = options.name || '';
-		// this.description = options.description || '';
-		// this.content = options.content || '';
+		this.title = options.title || '';
+		this.name = options.name || '';
+		this.description = options.description || '';
+		this.content = options.content || '';
 
-		// this.source = options.source || '';
-		// this.synced = options.synced || false;
-		// this.inserter = options.inserter === false ? false : true;
+		this.source = options.source || '';
+		this.synced = options.synced || false;
+		this.inserter = options.inserter === false ? false : true;
 
-		// this.categories = options.categories || [];
-		// this.keywords = options.keywords || [];
+		this.categories = options.categories || [];
+		this.keywords = options.keywords || [];
 
-		// this.blockTypes = options.blockTypes || [];
-		// this.templateTypes = options.templateTypes || [];
-		// this.postTypes = options.postTypes || [];
+		this.blockTypes = options.blockTypes || [];
+		this.templateTypes = options.templateTypes || [];
+		this.postTypes = options.postTypes || [];
 
-		// this.filePath = options.filePath || null;
+		this.filePath = options.filePath || null;
 
-		// this.blocks = parse( this.content );
+		this.blocks = parse( this.content );
 	}
 
 }

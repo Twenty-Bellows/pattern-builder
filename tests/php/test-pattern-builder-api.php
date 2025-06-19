@@ -485,4 +485,79 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEmpty($data, 'There should be no blocks returned from the API after deleting the theme pattern.');
 	}
 
+	/**
+	 * Test the pattern-builder/v1/patterns GET endpoint returns a valid empty array
+	 */
+	public function test_get_patterns_endpoint_returns_response() {
+
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertInstanceOf(WP_REST_Response::class, $response);
+		$this->assertEquals(200, $response->get_status());
+		$this->assertIsArray($data);
+		$this->assertEmpty($data);
+	}
+
+	/**
+	 * Test the pattern-builder/v1/patterns GET endpoint returns a valid unsynced theme pattern
+	 */
+	public function test_get_patterns_endpoint_returns_response_with_patterns() {
+
+		$this->copy_test_pattern('theme_unsynced_pattern.php');
+
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertInstanceOf(WP_REST_Response::class, $response);
+		$this->assertEquals(200, $response->get_status());
+		$this->assertIsArray($data);
+		$this->assertNotEmpty($data);
+		$this->assertCount(1, $data);
+
+		$pattern = $data[0];
+
+		$this->assertEquals('Theme Unsynced Pattern', $pattern->title);
+		$this->assertEquals('simple-theme/theme-unsynced-pattern', $pattern->name);
+		$this->assertEquals('An UNSYNCED pattern that comes with the theme to be used for testing.', $pattern->description);
+		$this->assertEquals('theme', $pattern->source);
+		$this->assertEquals(false, $pattern->synced);
+		$this->assertEquals(true, $pattern->inserter);
+		$this->assertEquals(array('text'), $pattern->categories);
+		$this->assertEquals(array(), $pattern->keywords);
+		$this->assertEquals(array(), $pattern->blockTypes);
+		$this->assertEquals(array(), $pattern->templateTypes);
+		$this->assertEquals(array(), $pattern->postTypes);
+	}
+
+	/**
+	 * Test the pattern-builder/v1/patterns GET endpoint returns a valid synced theme pattern
+	 */
+	public function test_get_patterns_endpoint_returns_response_with_synced_patterns() {
+
+		$this->copy_test_pattern('theme_synced_pattern.php');
+
+		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertEquals(200, $response->get_status());
+		$this->assertCount(1, $data);
+
+		$pattern = $data[0];
+
+		$this->assertEquals('Theme Synced Pattern', $pattern->title);
+		$this->assertEquals('simple-theme/theme-synced-pattern', $pattern->name);
+		$this->assertEquals('A SYNCED pattern that comes with the theme to be used for testing.', $pattern->description);
+		$this->assertEquals('theme', $pattern->source);
+		$this->assertEquals(true, $pattern->synced);
+		$this->assertEquals(true, $pattern->inserter);
+		$this->assertEquals(array('text'), $pattern->categories);
+		$this->assertEquals(array(), $pattern->keywords);
+		$this->assertEquals(array(), $pattern->blockTypes);
+		$this->assertEquals(array(), $pattern->templateTypes);
+		$this->assertEquals(array(), $pattern->postTypes);
+	}
 }
