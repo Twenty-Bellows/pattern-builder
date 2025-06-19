@@ -139,7 +139,7 @@ class Abstract_Pattern
 
 				'keywords' => isset($metadata['wp_pattern_keywords'][0]) ? explode(',', $metadata['wp_pattern_keywords'][0]) : [],
 				'categories'  => $categories,
-				'inserter'    => $metadata['wp_pattern_inserter'][0] === 'no' ? false : true,
+				'inserter' => isset($metadata['wp_pattern_inserter'][0]) ? ($metadata['wp_pattern_inserter'][0] === 'no' ? false : true) : true,
 			)
 		);
 	}
