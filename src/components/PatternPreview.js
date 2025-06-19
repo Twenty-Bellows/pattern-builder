@@ -13,6 +13,7 @@ import {
 	__experimentalVStack as VStack,
 } from '@wordpress/components';
 import './PatternPreview.scss';
+import { useMemo } from 'react';
 
 function PatternPreviewPlaceholder() {
 	return (
@@ -22,8 +23,8 @@ function PatternPreviewPlaceholder() {
 
 const PatternPreview = ({ pattern, onClick, onEditClick }) => {
 
-	const { title, content, description } = pattern;
-	const blocks = parse(content);
+	const { title, description } = pattern;
+	const blocks = pattern.getBlocks();
 
 	return (
 

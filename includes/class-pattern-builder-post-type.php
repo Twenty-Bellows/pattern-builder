@@ -63,6 +63,12 @@ class Pattern_Builder_Post_Type
 			'single'       => true,
 		]);
 
+		register_post_meta('pb_block', 'wp_pattern_inserter', [
+			'show_in_rest' => true,
+			'type'         => 'string',
+			'single'       => true,
+		]);
+
 		register_post_meta('pb_block', 'wp_pattern_post_types', [
 			'show_in_rest' => true,
 			'type'         => 'string',

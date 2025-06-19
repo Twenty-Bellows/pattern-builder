@@ -23,33 +23,6 @@ export const PatternList = ({ patterns }) => {
 		[]
 	);
 
-	// Create draggable data for each pattern
-	const patternsWithDragData = useMemo(() => {
-		return patterns.map(pattern => {
-			let blocks;
-
-			if (pattern.synced && pattern.id) {
-				// For synced patterns, create a core/block reference
-				blocks = [createBlock('core/block', { ref: pattern.id })];
-			} else {
-				// For unsynced patterns, parse the content
-				blocks = parse(pattern.content || '');
-			}
-
-			const dragData = {
-				type: 'block',
-				blocks: blocks,
-				srcClientIds: []
-			};
-
-			return {
-				...pattern,
-				blocks,
-				dragData: JSON.stringify(dragData)
-			};
-		});
-	}, [patterns]);
-
 	const handlePatternClick = (pattern) => {
 		if (pattern.synced && pattern.id) {
 			const blockReference = createBlock('core/block', {
@@ -105,7 +78,7 @@ export const PatternList = ({ patterns }) => {
 
 	return (
 		<VStack spacing={4}>
-			{patternsWithDragData.map(pattern => renderPattern(pattern))}
+			{patterns.map(pattern => renderPattern(pattern))}
 		</VStack>
 	);
 };

@@ -258,6 +258,12 @@ class Pattern_Builder_API
 				} else {
 					update_post_meta($post->ID, 'wp_pattern_sync_status', 'unsynced');
 				}
+
+				if ($pattern->inserter) {
+					delete_post_meta($post->ID, 'wp_pattern_inserter');
+				} else {
+					update_post_meta($post->ID, 'wp_pattern_inserter', 'no');
+				}
 			}
 
 			if ($pattern_registry->is_registered($pattern->name)) {

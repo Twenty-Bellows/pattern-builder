@@ -66,6 +66,9 @@ export const EditorSidePanel = () => {
 
 	const patternCategories = useMemo(() => {
 		const categories = Object.values(allPatterns.reduce((acc, pattern) => {
+			if (pattern.inserter === false) {
+				return acc; // Skip patterns that are not in the inserter
+			}
 			pattern.categories.forEach((category) => {
 				if (!acc[category]) {
 					acc[category] = {
@@ -75,9 +78,7 @@ export const EditorSidePanel = () => {
 				}
 			});
 			return acc;
-		}, {
-			'all': { label: __('All Patterns', 'pattern-builder'), value: 'all' },
-		}));
+		}, {}));
 		categories.push({
 			label: __('Uncategorized', 'pattern-builder'),
 			value: 'uncategorized',
@@ -120,6 +121,7 @@ export const EditorSidePanel = () => {
 										<Icon icon={chevronRight} />
 								</Navigator.Button>
 								<Divider />
+								<Text style={{marginBottom: '10px'}}>{__('Pattern Categories', 'pattern-builder')}</Text>
 								{patternCategories.map((category) => (
 									<Navigator.Button
 										key={category.value}

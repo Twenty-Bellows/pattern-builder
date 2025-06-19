@@ -11,10 +11,10 @@ export const PatternBrowserPanel = ( { allPatterns } ) => {
 			return true;
 		}
 		if ( category === 'uncategorized' ) {
-			return !pattern.categories.length;
+			return !pattern.categories.length && pattern.inserter;
 		}
 		if ( category === 'hidden' ) {
-			return pattern.hidden;
+			return pattern.inserter === false;
 		}
 		return pattern.categories.includes( category );
 	} );
