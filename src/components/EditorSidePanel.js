@@ -112,12 +112,12 @@ export const EditorSidePanel = () => {
 				<Navigator initialPath="/">
 					<Navigator.Screen path="/">
 						<PanelBody>
-							<VStack spacing={0}>
+							<VStack spacing={1}>
 								<Navigator.Button
 									icon={tool}
 									path="/create"
 								>
-										{__('Create Pattern', 'pattern-builder')}
+										<Text style={{flex:1, textAlign:'left'}}>{__('Create Pattern', 'pattern-builder')}</Text>
 										<Icon icon={chevronRight} />
 								</Navigator.Button>
 								<Divider />
@@ -128,7 +128,7 @@ export const EditorSidePanel = () => {
 										icon={widget}
 										path={`/browse/${category.value}`}
 									>
-										{category.label}
+										<Text style={{flex:1, textAlign:'left', whiteSpace:'nowrap', overflow:'hidden'}}>{category.label}</Text>
 										<Icon icon={chevronRight} />
 									</Navigator.Button>
 								))}
