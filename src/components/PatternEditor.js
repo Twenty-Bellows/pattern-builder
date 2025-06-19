@@ -21,7 +21,6 @@ import { useSelect, dispatch, useDispatch } from '@wordpress/data';
 import { store as noticesStore } from '@wordpress/notices';
 
 import { PatternDetails } from './PatternDetails';
-import PatternSearch from './PatternSearch';
 import { formatBlockMarkup, validateBlockMarkup } from '../utils/formatters';
 import BlockBindingsPanel from './BlockBindingsPanel';
 
@@ -166,11 +165,7 @@ export const PatternEditor = ({ pattern, onClose }) => {
 													<InserterLibrary />
 												</Panel>
 											)}
-											{tab.name === 'patterns' && (
-												<Panel>
-													<PatternSearch />
-												</Panel>
-											)}
+
 											{tab.name === 'bindings' && (
 												<Panel>
 													<BlockBindingsPanel />
@@ -197,19 +192,7 @@ export const PatternEditor = ({ pattern, onClose }) => {
 					/>
 				)}
 
-				{editorMode === 'code' && (
-					<div className="pattern-editor__code-placeholder">
-						{/* Placeholder for Code mode */}
-						<p>Code editor placeholder</p>
-					</div>
-				)}
 
-				{editorMode === 'style' && (
-					<div className="pattern-editor__style-placeholder">
-						{/* Placeholder for Style mode */}
-						<p>Style editor placeholder</p>
-					</div>
-				)}
 			</BlockEditorProvider>
 		</div>
 	);
