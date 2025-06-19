@@ -1,0 +1,45 @@
+.pattern-builder__admin-landing-page {
+	color: #1C1C1D;
+	margin-left: -20px;
+
+	a {
+		color: #1C1C1D;
+		text-underline-offset: 0px;
+		text-decoration-thickness: 0px;
+		transition: text-underline-offset 0.1s ease-in;
+		&:hover {
+			text-decoration-thickness: 2px;
+			text-underline-offset: 3px;
+		}
+	}
+
+	.pattern-builder__admin-landing-page__header {
+		margin: 0;
+		color: #FFF;
+		background-color: #627F84;
+		padding: 150px 20px 40px 40px;
+		h1 {
+			color: #EDE6D7;
+			font-weight: 200;
+			font-size: 6rem;
+			line-height: 1;
+			margin: 0;
+		}
+	}
+	.pattern-builder__admin-landing-page__body {
+		padding: 40px;
+		max-width: 600px;
+	}
+
+	ul{
+		padding-left: 20px;
+		li {
+			list-style-type: disc;
+		}
+	}
+
+	.pattern-builder__admin-landing-page__body__muted-text {
+		color: #5d5d5d;
+		font-size: .75rem;
+	}
+}
