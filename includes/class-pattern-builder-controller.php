@@ -142,6 +142,100 @@ class Pattern_Builder_Controller
 		return new WP_Error('premium_required', 'Saving Theme Patterns requires the premium version of Pattern Builder.', ['status' => 403]);
 	}
 
+	private function export_pattern_image_assets( $pattern ) {
+
+		$home_url = home_url();
+
+		// Helper function to download and save image
+		$upload_image = function($url) use ($home_url) {
+			// continue if the asset isn't an image
+			if (!preg_match('/\.(jpg|jpeg|png|gif|webp|svg)$/i', $url)) {
+				return false;
+			}
+
+			$download_file = download_url($url);
+
+			if (is_wp_error($download_file)) {
+				//we're going to try again with a new URL
+				//we might be running this in a docker container
+				//and if that's the case let's try again on port 80
+				$parsed_url = parse_url($url);
+				if ('localhost' === $parsed_url['host'] && '80' !== $parsed_url['port']) {
+					$download_file = download_url(str_replace('localhost:' . $parsed_url['port'], 'localhost:80', $url));
+				}
+			}
+
+			if (is_wp_error($download_file)) {
+				return false;
+			}
+
+			// upload to the media library
+			$upload_dir = wp_upload_dir();
+			if (!is_dir($upload_dir['path'])) {
+				wp_mkdir_p($upload_dir['path']);
+			}
+
+			// Move the downloaded file to the uploads directory
+			$upload_file = $upload_dir['path'] . '/' . basename($url);
+			if (!rename($download_file, $upload_file)) {
+				return false;
+			}
+
+			// Get the file type and create an attachment
+			$filetype = wp_check_filetype(basename($upload_file), null);
+			$attachment = [
+				'guid'           => $upload_dir['url'] . '/' . basename($upload_file),
+				'post_mime_type' => $filetype['type'],
+				'post_title'     => preg_replace('/\.[^.]+$/', '', basename($upload_file)),
+				'post_content'   => '',
+				'post_status'    => 'inherit',
+			];
+
+			// Insert the attachment into the media library
+			$attachment_id = wp_insert_attachment($attachment, $upload_file);
+			if (is_wp_error($attachment_id)) {
+				return false;
+			}
+
+			// Generate attachment metadata and update the attachment
+			require_once ABSPATH . 'wp-admin/includes/image.php';
+			$metadata = wp_generate_attachment_metadata($attachment_id, $upload_file);
+			wp_update_attachment_metadata($attachment_id, $metadata);
+
+			$url = wp_get_attachment_url($attachment_id);
+
+			return $url;
+		};
+
+		// First, handle HTML attributes (src and href)
+		$pattern->content = preg_replace_callback(
+			'/(src|href)="(' . preg_quote($home_url, '/') . '[^"]+)"/',
+			function ($matches) use ($upload_image) {
+				$new_url = $upload_image($matches[2]);
+				if ($new_url) {
+					return $matches[1] . '="' . $new_url . '"';
+				}
+				return $matches[0];
+			},
+			$pattern->content
+		);
+
+		// Second, handle JSON-encoded URLs
+		$pattern->content = preg_replace_callback(
+			'/"url"\s*:\s*"(' . preg_quote($home_url, '/') . '[^"]+)"/',
+			function ($matches) use ($upload_image) {
+				$new_url = $upload_image($matches[2]);
+				if ($new_url) {
+					return '"url":"' . $new_url . '"';
+				}
+				return $matches[0];
+			},
+			$pattern->content
+		);
+
+		return $pattern;
+	}
+
 	private function import_pattern_image_assets( $pattern ) {
 
 		$home_url = home_url();
@@ -232,6 +326,9 @@ class Pattern_Builder_Controller
 		if ( $convert_from_theme_pattern && !pb_fs()->can_use_premium_code() && !pb_fs_testing() ) {
 			return new WP_Error('premium_required', 'Converting Theme Patterns to User Patterns requires the premium version of Pattern Builder.', ['status' => 403]);
 		}
+
+		// upload any assets from the theme
+		$pattern = $this->export_pattern_image_assets($pattern);
 
 		if (empty($post)) {
 			$post_id = wp_insert_post([
