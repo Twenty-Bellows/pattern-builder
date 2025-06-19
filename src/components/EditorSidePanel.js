@@ -2,14 +2,12 @@
  * WordPress dependencies
  */
 import { __, _x } from '@wordpress/i18n';
-import apiFetch from '@wordpress/api-fetch';
-import { useState } from '@wordpress/element';
+import { useState, useEffect, useMemo } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
-import { TextControl, TextareaControl, SelectControl, ToggleControl, Button, FormTokenField, Panel, PanelBody } from '@wordpress/components';
-import { Navigator } from '@wordpress/components';
-import { useNavigator } from '@wordpress/components';
 import {
+	Navigator,
+	PanelBody,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalVStack as VStack,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
@@ -20,34 +18,18 @@ import {
 	__experimentalDivider as Divider,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	Icon,
-	FlexItem,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalHeading as Heading,
-	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
-	__experimentalSpacer as Spacer,
-	__experimentalToggleGroupControl as ToggleGroupControl,
-	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
 } from '@wordpress/components';
 import {
 	widget,
 	tool,
-	copy,
-	download,
-	edit,
-	code,
 	chevronLeft,
 	chevronRight,
-	addCard,
-	blockMeta,
-	help,
-	trash,
 } from '@wordpress/icons';
-import { store as blockEditorStore } from '@wordpress/block-editor';
 
 import { fetchAllPatterns } from '../utils/resolvers';
 import { PatternCreatePanel } from './PatternCreatePanel';
-import { useEffect } from 'react';
-import { useMemo } from 'react';
 import { PatternBrowserPanel } from './PatternBrowserPanel';
 
 export const EditorSidePanel = () => {

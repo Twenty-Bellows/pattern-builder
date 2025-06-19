@@ -1,18 +1,19 @@
 import { __ } from '@wordpress/i18n';
-import {
-	store as blockEditorStore,
-} from '@wordpress/block-editor';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { getBlockType } from '@wordpress/blocks';
-import { Card, CardBody, Panel, PanelBody } from '@wordpress/components';
-import { BlockIcon } from '@wordpress/block-editor';
+import { useState } from '@wordpress/element';
 import {
+	store as blockEditorStore,
+	BlockIcon,
+} from '@wordpress/block-editor';
+import {
+	Card,
+	CardBody,
 	ToggleControl,
 	TextControl,
-	__experimentalHStack as HStack,
+	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalText as Text
 } from '@wordpress/components';
-import { useState } from '@wordpress/element';
 
 // NOTE: this was retrieved from the packages/patterns/src/constants.js file in Gutenberg.
 // They are correct.  This should not be hardcoded.  Nor should it be inacessible...

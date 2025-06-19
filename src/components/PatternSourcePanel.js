@@ -1,11 +1,12 @@
-import { __, _x } from '@wordpress/i18n';
+import { __ } from '@wordpress/i18n';
+import { dispatch } from '@wordpress/data';
+import { useState, useEffect } from '@wordpress/element';
 import {
 	__experimentalToggleGroupControl as ToggleGroupControl,
 	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
+	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalText as Text,
 } from '@wordpress/components';
-import { dispatch } from '@wordpress/data';
-import { useState, useEffect } from 'react';
 
 export const PatternSourcePanel = ({ patternPost }) => {
 

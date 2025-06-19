@@ -1,13 +1,7 @@
 import { PluginDocumentSettingPanel } from '@wordpress/editor';
 import { useSelect } from '@wordpress/data';
-import {
-	__experimentalToggleGroupControl as ToggleGroupControl,
-	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
-} from '@wordpress/components';
-import { dispatch } from '@wordpress/data';
 import { PatternSourcePanel } from './PatternSourcePanel';
 import { PatternSyncedStatusPanel } from './PatternSyncedStatusPanel';
-import { BlockBindingsPanel } from './BlockBindingsPanel';
 
 export const PatternPanelAdditionsPlugin = () => {
 

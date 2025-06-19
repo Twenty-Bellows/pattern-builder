@@ -1,11 +1,9 @@
-import { __ } from '@wordpress/i18n';
-import { useSelect } from '@wordpress/data';
-import { Button,
+import { useSelect, useDispatch } from '@wordpress/data';
+import {
+	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalVStack as VStack,
- } from '@wordpress/components';
-import { useMemo } from '@wordpress/element';
+} from '@wordpress/components';
 import { parse, createBlock, serialize } from '@wordpress/blocks';
-import { useDispatch } from '@wordpress/data';
 import PatternPreview from './PatternPreview';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 
