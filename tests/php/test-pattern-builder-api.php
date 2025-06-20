@@ -445,6 +445,70 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Test converting a theme pattern with an image to a user pattern
+	 * verifies that the image is copied to the WordPress upload directory
+	 * and the pattern content references the uploaded image without PHP
+	 */
+	public function test_convert_theme_image_pattern_to_user_pattern() {
+
+		$this->copy_test_pattern('theme_image_test.php');
+
+		// Copy the logo image to the test theme assets directory
+		$assets_dir = $this->test_dir . '/assets/images';
+		mkdir($assets_dir, 0777, true);
+		copy(__DIR__ . '/../../dev-assets/themes/simple-theme/assets/images/twenty_bellows_logo.png', $assets_dir . '/twenty_bellows_logo.png');
+
+		do_action('init');
+
+		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+		$pattern = $data[0];
+
+		// Convert the pattern to user pattern
+		$pattern_updates = [
+			'source' => 'user',
+		];
+
+		$request = $this->create_rest_request('PUT', '/wp/v2/blocks/' . $pattern['id']);
+		$request->set_body(json_encode($pattern_updates));
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+
+		$this->assertEquals(200, $response->get_status());
+
+		// Fetch the pattern again to check the conversion
+		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+		$pattern = $data[0];
+
+		$this->assertArrayNotHasKey('source', $pattern);
+		$this->assertEquals('theme-image-test', $pattern['slug']);
+
+		// Get the converted content
+		$converted_content = $pattern['content']['raw'];
+
+		// Verify PHP has been removed from the content
+		$this->assertStringNotContainsString('<?php', $converted_content);
+		$this->assertStringNotContainsString('get_stylesheet_directory_uri()', $converted_content);
+
+		// Verify the image URL now points to the uploads directory
+		$upload_dir = wp_upload_dir();
+		$this->assertStringContainsString($upload_dir['baseurl'], $converted_content);
+
+		// Extract the image URL from the content to verify the file exists
+		preg_match('/"url":"([^"]+)"/', $converted_content, $matches);
+		$this->assertNotEmpty($matches, 'Should find the image URL in the pattern content');
+
+		$image_url = stripslashes($matches[1]);
+		$image_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $image_url);
+
+		// Verify the image file was actually copied to the uploads directory
+		$this->assertFileExists($image_path, 'The image should be copied to the WordPress uploads directory');
+	}
+
+	/**
 	 * Test that a theme pattern can be delete via the API
 	 */
 	public function test_delete_theme_pattern() {
