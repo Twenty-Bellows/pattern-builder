@@ -2,7 +2,7 @@
 /**
  * Title: Theme Image Test
  * Slug: simple-theme/theme-image-test
- * Description:
+ * Description: 
  * Synced: yes
  * Categories: media
  */

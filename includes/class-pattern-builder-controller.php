@@ -91,6 +91,12 @@ class Pattern_Builder_Controller
 
 			$pattern = $this->import_pattern_image_assets($pattern);
 
+			// update the pattern file
+			$this->update_theme_pattern_file($pattern);
+
+			// rebuild the pattern from the file (so that the content has no PHP tags)
+			$pattern = Abstract_Pattern::from_file($this->get_pattern_filepath($pattern));
+
 			$post_id = wp_update_post([
 				'ID'           => $post ? $post->ID : null,
 				'post_title'   => $pattern->title,
@@ -132,9 +138,6 @@ class Pattern_Builder_Controller
 
 			// store categories
 			wp_set_object_terms($post_id, $pattern->categories, 'wp_pattern_category', false);
-
-			// update the pattern file
-			$this->update_theme_pattern_file($pattern);
 
 			return $pattern;
 		}
@@ -495,7 +498,7 @@ class Pattern_Builder_Controller
 			$path = get_stylesheet_directory() . '/patterns/' . $filename . '.php';
 		}
 
-		$file_content = $this->build_pattern_file_metadata($pattern) . $pattern->content . "\n";
+		$file_content = $this->build_pattern_file_metadata($pattern) . $pattern->content;
 		$response = file_put_contents($path, $file_content);
 
 		if (!$response) {
