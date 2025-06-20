@@ -67,7 +67,20 @@ export const EditorSidePanel = () => {
 	const patternCategories = useMemo(() => {
 		const categories = Object.values(allPatterns.reduce((acc, pattern) => {
 			if (pattern.inserter === false) {
-				return acc; // Skip patterns that are not in the inserter
+				if (!acc['hidden']) {
+					acc['hidden'] = {
+						label: __('Hidden', 'pattern-builder'),
+						value: 'hidden',
+					};
+				}
+			}
+			if (!pattern.categories || pattern.categories.length === 0) {
+				if (!acc['uncategorized']) {
+					acc['uncategorized'] = {
+						label: __('Uncategorized', 'pattern-builder'),
+						value: 'uncategorized',
+					};
+				}
 			}
 			pattern.categories.forEach((category) => {
 				if (!acc[category]) {
@@ -79,14 +92,7 @@ export const EditorSidePanel = () => {
 			});
 			return acc;
 		}, {}));
-		categories.push({
-			label: __('Uncategorized', 'pattern-builder'),
-			value: 'uncategorized',
-		});
-		categories.push({
-			label: __('Hidden', 'pattern-builder'),
-			value: 'hidden',
-		});
+
 		return categories;
 	}, [allPatterns]);
 
