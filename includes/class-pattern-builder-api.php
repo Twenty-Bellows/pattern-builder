@@ -20,8 +20,8 @@ class Pattern_Builder_API
 		// It should be moved to a common location and make sure there are no conflicts.
 		add_filter('rest_request_after_callbacks', [$this, 'inject_theme_synced_patterns'], 10, 3);
 
-		add_filter('rest_request_before_callbacks', [$this, 'handle_hijack_block_update'], 10, 3);
-		add_filter('rest_request_after_callbacks', [$this, 'handle_hijack_block_delete'], 10, 3);
+		add_filter('rest_pre_dispatch', [$this, 'handle_hijack_block_update'], 10, 3);
+		add_filter('rest_pre_dispatch', [$this, 'handle_hijack_block_delete'], 10, 3);
 
 		add_filter('rest_request_before_callbacks', [$this, 'handle_block_to_pattern_conversion'], 10, 3);
 

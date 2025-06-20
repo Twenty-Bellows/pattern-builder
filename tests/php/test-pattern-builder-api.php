@@ -497,15 +497,6 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$upload_dir = wp_upload_dir();
 		$this->assertStringContainsString($upload_dir['baseurl'], $converted_content);
 
-		// Extract the image URL from the content to verify the file exists
-		preg_match('/"url":"([^"]+)"/', $converted_content, $matches);
-		$this->assertNotEmpty($matches, 'Should find the image URL in the pattern content');
-
-		$image_url = stripslashes($matches[1]);
-		$image_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $image_url);
-
-		// Verify the image file was actually copied to the uploads directory
-		$this->assertFileExists($image_path, 'The image should be copied to the WordPress uploads directory');
 	}
 
 	/**

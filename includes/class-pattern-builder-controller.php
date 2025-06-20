@@ -148,12 +148,29 @@ class Pattern_Builder_Controller
 
 		// Helper function to download and save image
 		$upload_image = function($url) use ($home_url) {
-			// continue if the asset isn't an image
+
+			// skip if the asset isn't an image
 			if (!preg_match('/\.(jpg|jpeg|png|gif|webp|svg)$/i', $url)) {
 				return false;
 			}
 
-			$download_file = download_url($url);
+			$download_file = false;
+
+			// convert the URL to a local file path
+			$file_path = str_replace($home_url, ABSPATH, $url);
+			if (file_exists($file_path)) {
+
+				$temp_file = wp_tempnam(basename($file_path));
+
+				// copy the image to a temporary location
+				if (copy($file_path, $temp_file)) {
+					$download_file = $temp_file;
+				}
+			}
+
+			if (!$download_file) {
+				$download_file = download_url($url);
+			}
 
 			if (is_wp_error($download_file)) {
 				//we're going to try again with a new URL
@@ -175,8 +192,15 @@ class Pattern_Builder_Controller
 				wp_mkdir_p($upload_dir['path']);
 			}
 
-			// Move the downloaded file to the uploads directory
 			$upload_file = $upload_dir['path'] . '/' . basename($url);
+
+			// check to see if the file is already in the uploads directory
+			if (file_exists($upload_file)) {
+				$uploaded_file_url = $upload_dir['url'] . '/' . basename($upload_file);
+				return $uploaded_file_url;
+			}
+
+			// Move the downloaded file to the uploads directory
 			if (!rename($download_file, $upload_file)) {
 				return false;
 			}
@@ -340,8 +364,7 @@ class Pattern_Builder_Controller
 				'post_status'  => 'publish',
 			]);
 		} else {
-			$post_id = $post->ID;
-			wp_update_post([
+			$post_id = wp_update_post([
 				'ID'           => $post->ID,
 				'post_title'   => $pattern->title,
 				'post_name'    => basename($pattern->name),
