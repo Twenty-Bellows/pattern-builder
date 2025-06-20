@@ -251,7 +251,8 @@ class Pattern_Builder_Controller
 		$pattern->content = preg_replace_callback(
 			'/"url"\s*:\s*"(' . preg_quote($home_url, '/') . '[^"]+)"/',
 			function ($matches) use ($upload_image) {
-				$new_url = $upload_image($matches[2]);
+				$url = $matches[1];
+				$new_url = $upload_image($url);
 				if ($new_url) {
 					return '"url":"' . $new_url . '"';
 				}
