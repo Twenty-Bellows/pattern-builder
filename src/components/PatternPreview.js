@@ -1,6 +1,19 @@
+import { __ } from '@wordpress/i18n';
 import { BlockPreview } from '@wordpress/block-editor';
 import { parse } from '@wordpress/blocks';
 import { Composite } from '@wordpress/components';
+import {
+	Button,
+	Card,
+	CardHeader,
+	CardBody,
+	CardFooter,
+	__experimentalText as Text,
+	__experimentalHeading as Heading,
+	__experimentalVStack as VStack,
+} from '@wordpress/components';
+import './PatternPreview.scss';
+import { useMemo } from 'react';
 
 function PatternPreviewPlaceholder() {
 	return (
@@ -8,32 +21,42 @@ function PatternPreviewPlaceholder() {
 	);
 }
 
-const PatternPreview = ({ pattern, onClick }) => {
+const PatternPreview = ({ pattern, onClick, onEditClick }) => {
 
-	const { title, content } = pattern;
-	const blocks = parse(content);
+	const { title, description } = pattern;
+	const blocks = pattern.getBlocks();
 
 	return (
-		<Composite
-			onClick={ () => {
-				if ( onClick ) {
-					onClick( pattern );
-				}
-			} }
-		>
-			<div className="pattern-builder__preview-grid-item">
-			<BlockPreview.Async
-				placeholder={ <PatternPreviewPlaceholder /> }
-			>
-				<BlockPreview
-					blocks={ blocks }
-					viewportWidth={ 800 }
-				/>
-			</BlockPreview.Async>
-			</div>
 
-			<p className='pattern-builder__preview-grid-item-title'>{title}</p>
-		</Composite>
+		<Card className="pattern-builder__pattern-preview" onClick={() => {
+				if (onClick) {
+					onClick(pattern);
+				}
+			}}
+		>
+			<CardHeader className="pattern-builder__pattern-preview__header">
+				<Text>{title}</Text>
+				<Button variant='primary' onClick={(event)=>{
+					event.stopPropagation(); // Prevent the card click event
+					if (onEditClick) {
+						onEditClick(pattern);
+					}
+				}}>{__('Edit', 'pattern-builder')}</Button>
+			</CardHeader>
+			<CardBody>
+				<VStack>
+					<BlockPreview.Async
+						placeholder={<PatternPreviewPlaceholder />}
+					>
+						<BlockPreview
+							blocks={blocks}
+							viewportWidth={800}
+						/>
+					</BlockPreview.Async>
+					<Text variant="muted" size="11px">{description}</Text>
+				</VStack>
+			</CardBody>
+		</Card>
 	);
 }
 export default PatternPreview;

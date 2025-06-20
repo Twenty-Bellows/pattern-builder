@@ -11,7 +11,7 @@ export class AbstractPattern {
 	description = '';
 	content = '';
 
-	blocks = [];
+	_blocks = [];
 
 	categories = [];
 	keywords = [];
@@ -48,7 +48,14 @@ export class AbstractPattern {
 
 		this.filePath = options.filePath || null;
 
-		this.blocks = parse( this.content );
+	}
+
+	getBlocks() {
+		if ( this._blocks.length > 0 ) {
+			return this._blocks;
+		}
+		this._blocks = parse( this.content );
+		return this._blocks;
 	}
 
 }

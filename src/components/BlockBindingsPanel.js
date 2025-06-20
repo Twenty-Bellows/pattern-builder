@@ -97,7 +97,7 @@ const BindableBlockControls = ({block}) => {
 	);
 }
 
-const BlockBindingsPanel = () => {
+export const BlockBindingsPanel = () => {
 
 	function getBindableBlocks(blocks) {
 		return blocks.reduce((acc, block) => {
@@ -128,26 +128,21 @@ const BlockBindingsPanel = () => {
 		[]
 	);
 
-	return (
-		<Panel header={__('Block Binding Overrides', 'pattern-builder')}>
-			<PanelBody>
+	return (<>
+		{bindableBlocks.length > 0 ? (
+			<div className="block-bindings-list">
 
-			{bindableBlocks.length > 0 ? (
-				<div className="block-bindings-list">
+				<p style={{ marginTop: 0 }}>The following blocks can allow user changes throughout instances of this pattern. This is only available to 'synced' patterns.</p>
+				<p>Name the block to allow binding. This is the name a user will see when they use the pattern.</p>
 
-					<p style={{marginTop:0}}>The following blocks can allow user changes throughout instances of this pattern. This is only available to 'synced' patterns.</p>
-					<p>Name the block to allow binding. This is the name a user will see when they use the pattern.</p>
-
-					{bindableBlocks.map((block) => (
-						<BindableBlockControls key={block.clientId} block={block} />
-					))}
-				</div>
-			) : (
-				<p>No bindable blocks found.</p>
-			)}
-			</PanelBody>
-		</Panel>
-	);
+				{bindableBlocks.map((block) => (
+					<BindableBlockControls key={block.clientId} block={block} />
+				))}
+			</div>
+		) : (
+			<p>No bindable blocks found.</p>
+		)}
+	</>);
 }
 
 export default BlockBindingsPanel;

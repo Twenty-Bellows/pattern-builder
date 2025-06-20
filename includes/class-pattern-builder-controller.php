@@ -7,12 +7,28 @@ global $pb_fs;
 
 class Pattern_Builder_Controller
 {
+	public function format_pattern_slug_for_post($slug) {
+		$new_slug = str_replace('/', '-x-x-', $slug);
+		return $new_slug;
+	}
+
+	public static function format_pattern_slug_from_post($slug) {
+		$new_slug = str_replace('-x-x-', '/', $slug);
+		return $new_slug;
+	}
+
 	public function get_pb_block_post_for_pattern($pattern)
 	{
+		$path = $this->format_pattern_slug_for_post($pattern->name);
 
-		$pattern_post = get_page_by_path(sanitize_title($pattern->name), OBJECT, 'pb_block');
+		$posts = get_posts( array(
+  			'name' => $path,
+  			'post_type' => 'pb_block'
+		) );
+		$pattern_post = $posts ? $posts[0] : null;
 
 		if ($pattern_post) {
+			$pattern_post->post_name = $pattern->name;
 			return $pattern_post;
 		}
 
@@ -41,7 +57,7 @@ class Pattern_Builder_Controller
 
 		$post_id = wp_insert_post(array(
 			'post_title' => $pattern->title,
-			'post_name' => $pattern->name,
+			'post_name' =>$this->format_pattern_slug_for_post($pattern->name),
 			'post_content' => $pattern->content,
 			'post_excerpt' => $pattern->description,
 			'post_type' => 'pb_block',
@@ -55,79 +71,197 @@ class Pattern_Builder_Controller
 		wp_set_object_terms($post_id, $pattern->categories, 'wp_pattern_category', false);
 
 		//return the post by post id
-		return get_post($post_id);
+		$post = get_post($post_id);
+		$post->post_name = $pattern->name;
+
+		return $post;
 	}
 
 	public function update_theme_pattern(Abstract_Pattern $pattern)
 	{
 		if (pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing()) {
 
+			// get the pb_block post if it already exists
+			$post = get_page_by_path($this->format_pattern_slug_for_post($pattern->name), OBJECT, ['pb_block', 'wp_block']);
+
+			if ( $post && $post->post_type === 'wp_block' ) {
+				// this is being converted to theme patterns, change the slug to include the theme domain
+				$pattern->name = get_stylesheet() . '/' . $pattern->name;
+			}
+
 			$pattern = $this->import_pattern_image_assets($pattern);
 
-			// get the pb_block post if it already exists
-			$post = get_page_by_path(sanitize_title($pattern->name), OBJECT, 'pb_block');
+			// update the pattern file
+			$this->update_theme_pattern_file($pattern);
 
-			if (empty($post)) {
-				// if it doesn't exist, check if a wp_block post exists
-				// this is for any user patterns that are being converted to theme patterns
-				// It will be converted to a pb_block post when it is updated
-				$post = get_page_by_path(sanitize_title($pattern->name), OBJECT, 'wp_block');
-			}
+			// rebuild the pattern from the file (so that the content has no PHP tags)
+			$pattern = Abstract_Pattern::from_file($this->get_pattern_filepath($pattern));
 
-			if (empty($post)){
-				// create a new post if it doesn't exist
-				$post = $this->create_pb_block_post_for_pattern($pattern);
-			}
-
-
-			wp_update_post([
-				'ID'           => $post->ID,
+			$post_id = wp_update_post([
+				'ID'           => $post ? $post->ID : null,
 				'post_title'   => $pattern->title,
-				'post_content' => $pattern->content,
+				'post_name'    => $this->format_pattern_slug_for_post($pattern->name),
 				'post_excerpt' => $pattern->description,
+				'post_content' => $pattern->content,
 				'post_type'    => 'pb_block',
 			]);
 
 			if ($pattern->synced) {
-				delete_post_meta($post->ID, 'wp_pattern_sync_status');
+				delete_post_meta($post_id, 'wp_pattern_sync_status');
 			} else {
-				update_post_meta($post->ID, 'wp_pattern_sync_status', 'unsynced');
+				update_post_meta($post_id, 'wp_pattern_sync_status', 'unsynced');
 			}
 
 			if ($pattern->keywords) {
-				update_post_meta($post->ID, 'wp_pattern_keywords', implode(',', $pattern->keywords));
+				update_post_meta($post_id, 'wp_pattern_keywords', implode(',', $pattern->keywords));
 			} else {
-				delete_post_meta($post->ID, 'wp_pattern_keywords');
+				delete_post_meta($post_id, 'wp_pattern_keywords');
 			}
 
 			if ($pattern->blockTypes) {
-				update_post_meta($post->ID, 'wp_pattern_block_types', implode(',', $pattern->blockTypes));
+				update_post_meta($post_id, 'wp_pattern_block_types', implode(',', $pattern->blockTypes));
 			} else {
-				delete_post_meta($post->ID, 'wp_pattern_block_types');
+				delete_post_meta($post_id, 'wp_pattern_block_types');
 			}
 
 			if ($pattern->templateTypes) {
-				update_post_meta($post->ID, 'wp_pattern_template_types', implode(',', $pattern->templateTypes));
+				update_post_meta($post_id, 'wp_pattern_template_types', implode(',', $pattern->templateTypes));
 			} else {
-				delete_post_meta($post->ID, 'wp_pattern_template_types');
+				delete_post_meta($post_id, 'wp_pattern_template_types');
 			}
 
 			if ($pattern->postTypes) {
-				update_post_meta($post->ID, 'wp_pattern_post_types', implode(',', $pattern->postTypes));
+				update_post_meta($post_id, 'wp_pattern_post_types', implode(',', $pattern->postTypes));
 			} else {
-				delete_post_meta($post->ID, 'wp_pattern_post_types');
+				delete_post_meta($post_id, 'wp_pattern_post_types');
 			}
 
 			// store categories
-			wp_set_object_terms($post->ID, $pattern->categories, 'wp_pattern_category', false);
-
-			// update the pattern file
-			$this->update_theme_pattern_file($pattern);
+			wp_set_object_terms($post_id, $pattern->categories, 'wp_pattern_category', false);
 
 			return $pattern;
 		}
 
 		return new WP_Error('premium_required', 'Saving Theme Patterns requires the premium version of Pattern Builder.', ['status' => 403]);
+	}
+
+	private function export_pattern_image_assets( $pattern ) {
+
+		$home_url = home_url();
+
+		// Helper function to download and save image
+		$upload_image = function($url) use ($home_url) {
+
+			// skip if the asset isn't an image
+			if (!preg_match('/\.(jpg|jpeg|png|gif|webp|svg)$/i', $url)) {
+				return false;
+			}
+
+			$download_file = false;
+
+			// convert the URL to a local file path
+			$file_path = str_replace($home_url, ABSPATH, $url);
+			if (file_exists($file_path)) {
+
+				$temp_file = wp_tempnam(basename($file_path));
+
+				// copy the image to a temporary location
+				if (copy($file_path, $temp_file)) {
+					$download_file = $temp_file;
+				}
+			}
+
+			if (!$download_file) {
+				$download_file = download_url($url);
+			}
+
+			if (is_wp_error($download_file)) {
+				//we're going to try again with a new URL
+				//we might be running this in a docker container
+				//and if that's the case let's try again on port 80
+				$parsed_url = parse_url($url);
+				if ('localhost' === $parsed_url['host'] && '80' !== $parsed_url['port']) {
+					$download_file = download_url(str_replace('localhost:' . $parsed_url['port'], 'localhost:80', $url));
+				}
+			}
+
+			if (is_wp_error($download_file)) {
+				return false;
+			}
+
+			// upload to the media library
+			$upload_dir = wp_upload_dir();
+			if (!is_dir($upload_dir['path'])) {
+				wp_mkdir_p($upload_dir['path']);
+			}
+
+			$upload_file = $upload_dir['path'] . '/' . basename($url);
+
+			// check to see if the file is already in the uploads directory
+			if (file_exists($upload_file)) {
+				$uploaded_file_url = $upload_dir['url'] . '/' . basename($upload_file);
+				return $uploaded_file_url;
+			}
+
+			// Move the downloaded file to the uploads directory
+			if (!rename($download_file, $upload_file)) {
+				return false;
+			}
+
+			// Get the file type and create an attachment
+			$filetype = wp_check_filetype(basename($upload_file), null);
+			$attachment = [
+				'guid'           => $upload_dir['url'] . '/' . basename($upload_file),
+				'post_mime_type' => $filetype['type'],
+				'post_title'     => preg_replace('/\.[^.]+$/', '', basename($upload_file)),
+				'post_content'   => '',
+				'post_status'    => 'inherit',
+			];
+
+			// Insert the attachment into the media library
+			$attachment_id = wp_insert_attachment($attachment, $upload_file);
+			if (is_wp_error($attachment_id)) {
+				return false;
+			}
+
+			// Generate attachment metadata and update the attachment
+			require_once ABSPATH . 'wp-admin/includes/image.php';
+			$metadata = wp_generate_attachment_metadata($attachment_id, $upload_file);
+			wp_update_attachment_metadata($attachment_id, $metadata);
+
+			$url = wp_get_attachment_url($attachment_id);
+
+			return $url;
+		};
+
+		// First, handle HTML attributes (src and href)
+		$pattern->content = preg_replace_callback(
+			'/(src|href)="(' . preg_quote($home_url, '/') . '[^"]+)"/',
+			function ($matches) use ($upload_image) {
+				$new_url = $upload_image($matches[2]);
+				if ($new_url) {
+					return $matches[1] . '="' . $new_url . '"';
+				}
+				return $matches[0];
+			},
+			$pattern->content
+		);
+
+		// Second, handle JSON-encoded URLs
+		$pattern->content = preg_replace_callback(
+			'/"url"\s*:\s*"(' . preg_quote($home_url, '/') . '[^"]+)"/',
+			function ($matches) use ($upload_image) {
+				$url = $matches[1];
+				$new_url = $upload_image($url);
+				if ($new_url) {
+					return '"url":"' . $new_url . '"';
+				}
+				return $matches[0];
+			},
+			$pattern->content
+		);
+
+		return $pattern;
 	}
 
 	private function import_pattern_image_assets( $pattern ) {
@@ -212,7 +346,8 @@ class Pattern_Builder_Controller
 			// check if the pattern exists in the database as a pb_block post
 			// this is for any user patterns that are being converted from theme patterns
 			// It will be converted to a wp_block post when it is updated
-			$post = get_page_by_path($pattern->name, OBJECT, 'pb_block');
+			$slug = $this->format_pattern_slug_for_post($pattern->name);
+			$post = get_page_by_path($slug, OBJECT, 'pb_block');
 			$convert_from_theme_pattern = true;
 		}
 
@@ -220,21 +355,23 @@ class Pattern_Builder_Controller
 			return new WP_Error('premium_required', 'Converting Theme Patterns to User Patterns requires the premium version of Pattern Builder.', ['status' => 403]);
 		}
 
+		// upload any assets from the theme
+		$pattern = $this->export_pattern_image_assets($pattern);
+
 		if (empty($post)) {
 			$post_id = wp_insert_post([
 				'post_title'   => $pattern->title,
-				'post_name'    => $pattern->name,
+				'post_name'    => basename($pattern->name),
 				'post_content' => $pattern->content,
 				'post_excerpt' => $pattern->description,
 				'post_type'    => 'wp_block',
 				'post_status'  => 'publish',
 			]);
 		} else {
-			$post_id = $post->ID;
-			wp_update_post([
+			$post_id = wp_update_post([
 				'ID'           => $post->ID,
 				'post_title'   => $pattern->title,
-				'post_name'    => $pattern->name,
+				'post_name'    => basename($pattern->name),
 				'post_content' => $pattern->content,
 				'post_excerpt' => $pattern->description,
 				'post_type'    => 'wp_block',
@@ -304,7 +441,7 @@ class Pattern_Builder_Controller
 		return ['message' => 'Pattern deleted successfully'];
 	}
 
-	private function get_pattern_filepath($pattern)
+	public function get_pattern_filepath($pattern)
 	{
 		$path = $pattern->filePath ?? get_stylesheet_directory() . '/patterns/' . basename($pattern->name) . '.php';
 
@@ -358,10 +495,11 @@ class Pattern_Builder_Controller
 		$path = $this->get_pattern_filepath($pattern);
 
 		if (!$path) {
-			$path = get_stylesheet_directory() . '/patterns/' . basename($pattern->name) . '.php';
+			$filename = str_replace('-', '_', basename($pattern->name));
+			$path = get_stylesheet_directory() . '/patterns/' . $filename . '.php';
 		}
 
-		$file_content = $this->build_pattern_file_metadata($pattern) . $pattern->content . "\n";
+		$file_content = $this->build_pattern_file_metadata($pattern) . $pattern->content;
 		$response = file_put_contents($path, $file_content);
 
 		if (!$response) {

@@ -1,38 +1,27 @@
 import { __ } from '@wordpress/i18n';
-import { Button } from '@wordpress/components';
+import { useSelect } from '@wordpress/data';
+import { Button,
+	__experimentalVStack as VStack,
+ } from '@wordpress/components';
 import { useMemo } from '@wordpress/element';
 import { parse, createBlock, serialize } from '@wordpress/blocks';
 import { useDispatch } from '@wordpress/data';
+import PatternPreview from './PatternPreview';
+import { store as blockEditorStore } from '@wordpress/block-editor';
 
-const PatternList = ({ patterns }) => {
+
+export const PatternList = ({ patterns }) => {
 	const { insertBlocks } = useDispatch('core/block-editor');
 
-	// Create draggable data for each pattern
-	const patternsWithDragData = useMemo(() => {
-		return patterns.map(pattern => {
-			let blocks;
-
-			if (pattern.synced && pattern.id) {
-				// For synced patterns, create a core/block reference
-				blocks = [createBlock('core/block', { ref: pattern.id })];
-			} else {
-				// For unsynced patterns, parse the content
-				blocks = parse(pattern.content || '');
-			}
-
-			const dragData = {
-				type: 'block',
-				blocks: blocks,
-				srcClientIds: []
-			};
-
+	const { onNavigateToEntityRecord } = useSelect(
+		(select) => {
+			const { getSettings } = select(blockEditorStore);
 			return {
-				...pattern,
-				blocks,
-				dragData: JSON.stringify(dragData)
+				onNavigateToEntityRecord: getSettings().onNavigateToEntityRecord,
 			};
-		});
-	}, [patterns]);
+		},
+		[]
+	);
 
 	const handlePatternClick = (pattern) => {
 		if (pattern.synced && pattern.id) {
@@ -51,6 +40,13 @@ const PatternList = ({ patterns }) => {
 			insertBlocks(blocks);
 		}
 	};
+
+	const handlePatternEditClick = (pattern) => {
+		onNavigateToEntityRecord({
+			postId: pattern.id,
+			postType: 'wp_block'
+		});
+	}
 
 	const handleDragStart = (event, pattern) => {
 		// Set the drag data in the format WordPress expects
@@ -71,39 +67,18 @@ const PatternList = ({ patterns }) => {
 		return (
 			<div
 				key={pattern.id || pattern.name}
-				className="pattern-list__item"
 				draggable={true}
 				onDragStart={(e) => handleDragStart(e, pattern)}
 			>
-				<Button
-					className="pattern-list__item-button"
-					onClick={() => handlePatternClick(pattern)}
-				>
-					<div className="pattern-list__item-preview">
-						<div className="pattern-list__item-title">
-							{pattern.title}
-						</div>
-						{pattern.description && (
-							<div className="pattern-list__item-description">
-								{pattern.description}
-							</div>
-						)}
-						{pattern.synced && (
-							<div className="pattern-list__item-badge">
-								{__('Synced', 'pattern-builder')}
-							</div>
-						)}
-					</div>
-				</Button>
+					<PatternPreview pattern={pattern} onClick={handlePatternClick} onEditClick={handlePatternEditClick} />
+
 			</div>
 		);
 	};
 
 	return (
-		<div className="pattern-list">
-			{patternsWithDragData.map(pattern => renderPattern(pattern))}
-		</div>
+		<VStack spacing={4}>
+			{patterns.map(pattern => renderPattern(pattern))}
+		</VStack>
 	);
 };
-
-export default PatternList;

@@ -1,7 +1,7 @@
 <?php
 /**
  * Title: Theme Synced Pattern
- * Slug: synced-patterns-test/theme-synced-pattern
+ * Slug: simple-theme/theme-synced-pattern
  * Description: A SYNCED pattern that comes with the theme to be used for testing.
  * Synced: yes
  * Categories: text

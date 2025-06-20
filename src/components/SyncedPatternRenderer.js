@@ -1,4 +1,3 @@
-import { addFilter } from '@wordpress/hooks';
 import { useSelect, useDispatch, useRegistry } from '@wordpress/data';
 import { cloneBlock } from '@wordpress/blocks';
 import { useState, useEffect } from '@wordpress/element';
@@ -7,7 +6,12 @@ import {
 	useBlockProps,
 } from '@wordpress/block-editor';
 
-const SyncedPattern = ( { attributes, clientId } ) =>{
+/**
+ * SyncedPatternRenderer component
+ *
+ * Renders a Theme Synced Pattern block, passing the content on to the referenced Core Pattern block.
+ */
+export const SyncedPatternRenderer = ( { attributes, clientId } ) =>{
 
 	const registry = useRegistry();
 
@@ -66,27 +70,3 @@ const SyncedPattern = ( { attributes, clientId } ) =>{
 
 	return <div { ...props } />;
 }
-
-
-addFilter(
-	'editor.BlockEdit',
-	'pattern-builder/pattern-edit',
-	( BlockEdit ) => ( props ) => {
-		const { name, attributes } = props;
-		if ( name === 'core/pattern' && attributes.slug && attributes.content ) {
-			const selectedPattern = useSelect(
-				( select ) =>
-					select( blockEditorStore ).__experimentalGetParsedPattern(
-						attributes.slug
-					),
-				[ props.attributes.slug ]
-			);
-			if(selectedPattern?.blocks?.length === 1 && selectedPattern.blocks[0].name === 'core/block' ) {
-				return <SyncedPattern {
-					...props
-				} />;
-			}
-		}
-		return <BlockEdit { ...props } />;
-	}
-);

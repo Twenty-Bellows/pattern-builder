@@ -20,9 +20,10 @@ class Pattern_Builder_API
 		// It should be moved to a common location and make sure there are no conflicts.
 		add_filter('rest_request_after_callbacks', [$this, 'inject_theme_synced_patterns'], 10, 3);
 
-		if (pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing()) {
-			add_filter('rest_request_before_callbacks', [$this, 'handle_hijack_block_update'], 10, 3);
-		}
+		add_filter('rest_pre_dispatch', [$this, 'handle_hijack_block_update'], 10, 3);
+		add_filter('rest_pre_dispatch', [$this, 'handle_hijack_block_delete'], 10, 3);
+
+		add_filter('rest_request_before_callbacks', [$this, 'handle_block_to_pattern_conversion'], 10, 3);
 
 		// Add filter for wp:pattern block pre-rendering to modify block data
 		add_filter('pre_render_block', [$this, 'filter_pattern_block_attributes'], 10, 2);
@@ -35,11 +36,11 @@ class Pattern_Builder_API
 	 */
 	public function register_routes(): void
 	{
-		register_rest_route(self::$base_route, '/global-styles', [
-			'methods'  => 'GET',
-			'callback' => [$this, 'get_global_styles'],
-			'permission_callback' => [$this, 'read_permission_callback'],
-		]);
+		// register_rest_route(self::$base_route, '/global-styles', [
+		// 	'methods'  => 'GET',
+		// 	'callback' => [$this, 'get_global_styles'],
+		// 	'permission_callback' => [$this, 'read_permission_callback'],
+		// ]);
 
 		register_rest_route(self::$base_route, '/patterns', [
 			'methods'  => 'GET',
@@ -47,17 +48,17 @@ class Pattern_Builder_API
 			'permission_callback' => [$this, 'read_permission_callback'],
 		]);
 
-		register_rest_route(self::$base_route, '/pattern', [
-			'methods'  => ['PUT', 'POST'],
-			'callback' => [$this, 'save_block_pattern'],
-			'permission_callback' => [$this, 'write_permission_callback'],
-		]);
+		// register_rest_route(self::$base_route, '/pattern', [
+		// 	'methods'  => ['PUT', 'POST'],
+		// 	'callback' => [$this, 'save_block_pattern'],
+		// 	'permission_callback' => [$this, 'write_permission_callback'],
+		// ]);
 
-		register_rest_route(self::$base_route, '/pattern', [
-			'methods'  => 'DELETE',
-			'callback' => [$this, 'delete_block_pattern'],
-			'permission_callback' => [$this, 'write_permission_callback'],
-		]);
+		// register_rest_route(self::$base_route, '/pattern', [
+		// 	'methods'  => 'DELETE',
+		// 	'callback' => [$this, 'delete_block_pattern'],
+		// 	'permission_callback' => [$this, 'write_permission_callback'],
+		// ]);
 	}
 
 	/**
@@ -141,6 +142,9 @@ class Pattern_Builder_API
 
 		$user_patterns = $this->controller->get_block_patterns_from_database();
 
+		// TODO: We also need to get patterns from other potential sources such as plugins and core.
+		// However, these are not editable.
+
 		$all_patterns = array_merge($theme_patterns, $user_patterns);
 
 		return rest_ensure_response($all_patterns);
@@ -153,21 +157,26 @@ class Pattern_Builder_API
 			$block_id = intval($matches['id']);
 			$pb_block = get_post($block_id);
 			if ($pb_block && $pb_block->post_type === 'pb_block') {
-				$data = $this->format_pb_block_response($pb_block);
+				// make sure the pattern has a pattern file
+				$pattern_file_path = $this->controller->get_pattern_filepath(Abstract_Pattern::from_post($pb_block));
+				if (!$pattern_file_path) {
+					return $response; // No pattern file found, return the original response
+				}
+				$pb_block->post_name = $this->controller->format_pattern_slug_from_post($pb_block->post_name);
+				$data = $this->format_pb_block_response($pb_block, $request);
 				$response = new WP_REST_Response($data);
 			}
 		}
 
 		// Requesting all patterns.  Inject all of the synced theme patterns.
-		else if ($request->get_route() === '/wp/v2/blocks') {
+		else if ($request->get_route() === '/wp/v2/blocks' && $request->get_method() === 'GET') {
 
 			$data = $response->get_data();
 			$patterns = $this->controller->get_block_patterns_from_theme_files();
 
 			foreach ($patterns as $pattern) {
-				if (! $pattern->synced) continue;
 				$post = $this->controller->get_pb_block_post_for_pattern($pattern);
-				$data[] = $this->format_pb_block_response($post);
+				$data[] = $this->format_pb_block_response($post, $request);
 			}
 
 			$response->set_data($data);
@@ -176,31 +185,23 @@ class Pattern_Builder_API
 		return $response;
 	}
 
-	public function format_pb_block_response($post)
+	public function format_pb_block_response($post, $request)
 	{
-		// Use WordPress core's REST controller for proper formatting
-		$controller = new WP_REST_Blocks_Controller('wp_block');
-
-		// Create a mock request to pass to the controller
-		$request = new WP_REST_Request('GET', '/wp/v2/blocks/' . $post->ID);
-		$request->set_param('context', 'edit');
-
-		// Change the post type to wp_block for proper formatting
 		$post->post_type = 'wp_block';
 
-		// Use the controller's prepare_item_for_response method
-		$response = $controller->prepare_item_for_response($post, $request);
-		$data = $response->get_data();
+		// Create a mock request to pass to the controller
+		$mock_request = new WP_REST_Request('GET', '/wp/v2/blocks/' . $post->ID);
+		$mock_request->set_param('context', 'edit');
 
-		// Add pattern-specific fields
-		$categories = wp_get_object_terms($post->ID, 'wp_pattern_category', array('fields' => 'ids'));
-		$data['wp_pattern_category'] = $categories;
-		$data['wp_pattern_sync_status'] = get_post_meta($post->ID, 'wp_pattern_sync_status', true);
+		$controller = new WP_REST_Blocks_Controller('wp_block');
+		$response = $controller->prepare_item_for_response($post, $mock_request);
 
-		// Include the _links from the response
-		$data['_links'] = $response->get_links();
+		$data = $controller->prepare_response_for_collection($response);
+
+		$data['source'] = 'theme';
 
 		return $data;
+
 	}
 
 	/**
@@ -219,14 +220,50 @@ class Pattern_Builder_API
 
 		foreach ($patterns as $pattern) {
 
-			$post = $this->controller->get_pb_block_post_for_pattern($pattern);
+			$post = get_page_by_path($this->controller->format_pattern_slug_for_post($pattern->name), OBJECT, ['pb_block']);
 
-			// if the post content is out of date we need to update it
-			// TODO: When users are able to edit these patterns and ONLY effect the database content we will have to enact some conflict resolution.
-			// TODO: More than just the content may change, so we should check for other changes as well.
-			if ($post->post_content !== $pattern->content) {
-				$post->post_content = $pattern->content;
-				wp_update_post($post);
+			if (!$post) {
+				// If the post doesn't exist, create it.
+				$post = $this->controller->create_pb_block_post_for_pattern($pattern);
+			}
+			else {
+
+				// if the post content is out of date we need to update it
+
+				// TODO: When users are able to edit these patterns and ONLY effect the database content we will have to enact some conflict resolution.
+
+				$post_changed = false;
+
+				if ($post->post_content !== $pattern->content) {
+					$post->post_content = $pattern->content;
+					$post_changed = true;
+				}
+
+				if ($post->post_title !== $pattern->title) {
+					$post->post_title = $pattern->title;
+					$post_changed = true;
+				}
+
+				if ($post->post_excerpt !== $pattern->description) {
+					$post->post_excerpt = $pattern->description;
+					$post_changed = true;
+				}
+
+				if ($post_changed) {
+					wp_update_post($post);
+				}
+
+				if ($pattern->synced) {
+					delete_post_meta($post->ID, 'wp_pattern_sync_status');
+				} else {
+					update_post_meta($post->ID, 'wp_pattern_sync_status', 'unsynced');
+				}
+
+				if ($pattern->inserter) {
+					delete_post_meta($post->ID, 'wp_pattern_inserter');
+				} else {
+					update_post_meta($post->ID, 'wp_pattern_inserter', 'no');
+				}
 			}
 
 			if ($pattern_registry->is_registered($pattern->name)) {
@@ -250,15 +287,7 @@ class Pattern_Builder_API
 					$pattern->name,
 					array(
 						'title'   => $pattern->title,
-						'description' => $pattern->description,
-						'slug'   => $pattern->name,
-						'inserter' => $pattern->inserter,
-						'categories' => $pattern->categories,
-						'keywords' => $pattern->keywords,
-						'blockTypes' => $pattern->blockTypes,
-						// TODO: Why does this make the pattern not show up in the inserter?
-						// 'postTypes' => $pattern->postTypes,
-						'templateTypes' => $pattern->templateTypes,
+						'inserter' => false,
 						'content' => $pattern->content,
 					)
 				);
@@ -317,48 +346,168 @@ class Pattern_Builder_API
 		return rest_ensure_response($response);
 	}
 
+	function handle_hijack_block_delete($response, $server, $request ) {
+
+		$route = $request->get_route();
+
+		if (preg_match('#^/wp/v2/blocks/(\d+)$#', $route, $matches)) {
+
+			$id = intval($matches[1]);
+			$post = get_post($id);
+
+			if ($post && $post->post_type === 'pb_block' && $request->get_method() === 'DELETE' ) {
+
+				$deleted = wp_delete_post($id, true);
+
+				if (!$deleted) {
+					return new WP_Error('pattern_delete_failed', 'Failed to delete pattern', ['status' => 500]);
+				}
+
+				$abstract_pattern = Abstract_Pattern::from_post($post);
+
+				$path = $this->controller->get_pattern_filepath($abstract_pattern);
+
+				if (!$path) {
+					return new WP_Error('pattern_not_found', 'Pattern not found', ['status' => 404]);
+				}
+
+				$deleted = unlink($path);
+
+				if (!$deleted) {
+					return new WP_Error('pattern_delete_failed', 'Failed to delete pattern', ['status' => 500]);
+				}
+
+				return new WP_REST_Response(['message' => 'Pattern deleted successfully'], 200);
+
+			}
+
+		}
+
+
+		return $response;
+	}
+
 	function handle_hijack_block_update($response, $handler, $request)
 	{
 		if (pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing()) {
 
 			$route = $request->get_route();
 
-			if (preg_match('#^/wp/v2/blocks/(\d+)$#', $route, $matches) && $request->get_method() === 'PUT') {
+			if (preg_match('#^/wp/v2/blocks/(\d+)$#', $route, $matches)) {
 
 				$id = intval($matches[1]);
 				$post = get_post($id);
 
-				if ($post && $post->post_type === 'pb_block') {
-
-					// Check write permissions before allowing update
-					if (!current_user_can('edit_others_posts')) {
-						return new WP_Error(
-							'rest_forbidden',
-							__('You do not have permission to edit patterns.', 'pattern-builder'),
-							['status' => 403]
-						);
-					}
-
-					// Verify the REST API nonce
-					$nonce = $request->get_header('X-WP-Nonce');
-					if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
-						return new WP_Error(
-							'rest_cookie_invalid_nonce',
-							__('Cookie nonce is invalid', 'pattern-builder'),
-							['status' => 403]
-						);
-					}
+				if ($post && $request->get_method() === 'PUT') {
 
 					$updated_pattern = json_decode($request->get_body(), true);
-					$pattern = Abstract_Pattern::from_post($post);
-					$pattern->content = $updated_pattern['content'];
-					$pattern = $this->controller->remap_patterns($pattern);
-					$response = $this->controller->update_theme_pattern($pattern);
-					return new WP_REST_Response($response, 200);
+
+					$convert_user_pattern_to_theme_pattern = false;
+
+					if ($post->post_type === 'wp_block') {
+
+						if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'theme') {
+							// we are attempting to convert a USER pattern to a THEME pattern.
+							$convert_user_pattern_to_theme_pattern = true;
+						}
+					}
+
+					if ($post->post_type === 'pb_block' || $convert_user_pattern_to_theme_pattern) {
+
+						// Check write permissions before allowing update
+						if (!current_user_can('edit_others_posts')) {
+							return new WP_Error(
+								'rest_forbidden',
+								__('You do not have permission to edit patterns.', 'pattern-builder'),
+								['status' => 403]
+							);
+						}
+
+						// Verify the REST API nonce
+						$nonce = $request->get_header('X-WP-Nonce');
+						if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
+							return new WP_Error(
+								'rest_cookie_invalid_nonce',
+								__('Cookie nonce is invalid', 'pattern-builder'),
+								['status' => 403]
+							);
+						}
+
+						$pattern = Abstract_Pattern::from_post($post);
+
+						if (isset($updated_pattern['content'])) {
+							// remap pb_blocks to patterns
+							$blocks = parse_blocks($updated_pattern['content']);
+							$blocks = $this->convert_blocks_to_patterns($blocks);
+							$pattern->content = serialize_blocks($blocks);
+							//TODO: Format the content to be easy on the eyes.
+						}
+
+						if (isset($updated_pattern['title'])) {
+							$pattern->title = $updated_pattern['title'];
+						}
+
+						if (isset($updated_pattern['excerpt'])) {
+							$pattern->description = $updated_pattern['excerpt'];
+						}
+
+						if (isset($updated_pattern['wp_pattern_sync_status'])) {
+							$pattern->synced = $updated_pattern['wp_pattern_sync_status'] !== 'unsynced';
+						}
+
+						if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'user') {
+							// we are attempting to convert a THEME pattern to a USER pattern.
+							$this->controller->update_user_pattern($pattern);
+						} else {
+							$this->controller->update_theme_pattern($pattern);
+						}
+
+						$post = get_post($pattern->id);
+						$formatted_response = $this->format_pb_block_response($post, $request);
+						$response = new WP_REST_Response($formatted_response, 200);
+					}
 				}
 			}
 		}
 		return $response;
+	}
+
+	public function handle_block_to_pattern_conversion( $response, $handler, $request ) {
+		if ($request->get_method() === 'PUT' || $request->get_method() === 'POST') {
+			$body = json_decode($request->get_body(), true);
+			if (isset($body['content'])) {
+				// parse the content string into blocks
+				$blocks = parse_blocks($body['content']);
+				$blocks = $this->convert_blocks_to_patterns($blocks);
+				// convert the blocks back to a string
+				$body['content'] = serialize_blocks($blocks);
+				$request->set_body(wp_json_encode($body));
+			}
+		}
+		return $response;
+	}
+
+	private function convert_blocks_to_patterns( $blocks ) {
+		foreach ($blocks as &$block) {
+			if ( isset($block['blockName']) && $block['blockName'] === 'core/block') {
+				$post = get_post($block['attrs']['ref']);
+				if ( $post->post_type === 'pb_block') {
+					$slug = Pattern_Builder_Controller::format_pattern_slug_from_post($post->post_name);
+					$block['blockName'] = 'core/pattern';
+					$block['attrs'] = [
+						'slug' => $slug,
+					];
+					if ( !empty($post->post_title) ) {
+						$block['attrs']['title'] = $post->post_title;
+					}
+					unset($block['attrs']['ref']);
+				}
+			}
+			elseif (isset($block['innerBlocks']) && is_array($block['innerBlocks'])) {
+				$block['innerBlocks'] = $this->convert_blocks_to_patterns($block['innerBlocks']);
+			}
+		}
+		return $blocks;
 	}
 
 	/**
@@ -388,7 +537,7 @@ class Pattern_Builder_API
 			return $pre_render;
 		}
 
-		$synced_pattern_id = self::$synced_theme_patterns[$slug];
+		$synced_pattern_id = self::$synced_theme_patterns[$slug] ?? null;
 
 		// if there is a synced_pattern_id then contruct the block with a reference to the synced pattern that also has the rest of the pattern's attributes and render it.
 		if ($synced_pattern_id) {
