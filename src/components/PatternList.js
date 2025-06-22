@@ -1,14 +1,14 @@
 import { __ } from '@wordpress/i18n';
 import { useSelect } from '@wordpress/data';
-import { Button,
+import { store as blockEditorStore } from '@wordpress/block-editor';
+import {
+	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalVStack as VStack,
  } from '@wordpress/components';
-import { useMemo } from '@wordpress/element';
 import { parse, createBlock, serialize } from '@wordpress/blocks';
 import { useDispatch } from '@wordpress/data';
-import PatternPreview from './PatternPreview';
-import { store as blockEditorStore } from '@wordpress/block-editor';
 
+import { PatternPreview } from './PatternPreview';
 
 export const PatternList = ({ patterns }) => {
 	const { insertBlocks } = useDispatch('core/block-editor');

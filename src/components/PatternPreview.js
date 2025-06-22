@@ -1,19 +1,17 @@
 import { __ } from '@wordpress/i18n';
 import { BlockPreview } from '@wordpress/block-editor';
-import { parse } from '@wordpress/blocks';
-import { Composite } from '@wordpress/components';
 import {
 	Button,
 	Card,
 	CardHeader,
 	CardBody,
-	CardFooter,
+	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalText as Text,
-	__experimentalHeading as Heading,
+	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalVStack as VStack,
 } from '@wordpress/components';
+
 import './PatternPreview.scss';
-import { useMemo } from 'react';
 
 function PatternPreviewPlaceholder() {
 	return (
@@ -21,7 +19,7 @@ function PatternPreviewPlaceholder() {
 	);
 }
 
-const PatternPreview = ({ pattern, onClick, onEditClick }) => {
+export const PatternPreview = ({ pattern, onClick, onEditClick }) => {
 
 	const { title, description } = pattern;
 	const blocks = pattern.getBlocks();
@@ -59,4 +57,3 @@ const PatternPreview = ({ pattern, onClick, onEditClick }) => {
 		</Card>
 	);
 }
-export default PatternPreview;

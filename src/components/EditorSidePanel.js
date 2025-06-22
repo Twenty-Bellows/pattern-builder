@@ -31,7 +31,8 @@ import {
 import {
 	widget,
 	tool,
-	copy,
+	addTemplate,
+	category as categoryIcon,
 	download,
 	edit,
 	code,
@@ -49,6 +50,7 @@ import { PatternCreatePanel } from './PatternCreatePanel';
 import { useEffect } from 'react';
 import { useMemo } from 'react';
 import { PatternBrowserPanel } from './PatternBrowserPanel';
+import { patternBuilderAppIcon } from '../assets/icons';
 
 export const EditorSidePanel = () => {
 
@@ -100,7 +102,6 @@ export const EditorSidePanel = () => {
 		<>
 			<PluginSidebarMoreMenuItem
 				target="pattern-builder-sidebar"
-				icon={tool}
 			>
 				{_x('Pattern Builder', 'UI String', 'pattern-builder')}
 			</PluginSidebarMoreMenuItem>
@@ -108,7 +109,7 @@ export const EditorSidePanel = () => {
 			<PluginSidebar
 				className='pattern-builder__editor-sidebar'
 				name="pattern-builder-sidebar"
-				icon={widget}
+				icon={patternBuilderAppIcon}
 				title={_x(
 					'Pattern Builder',
 					'UI String',
@@ -120,7 +121,7 @@ export const EditorSidePanel = () => {
 						<PanelBody>
 							<VStack spacing={1}>
 								<Navigator.Button
-									icon={tool}
+									icon={addTemplate}
 									path="/create"
 								>
 										<Text style={{flex:1, textAlign:'left'}}>{__('Create Pattern', 'pattern-builder')}</Text>
@@ -131,7 +132,7 @@ export const EditorSidePanel = () => {
 								{patternCategories.map((category) => (
 									<Navigator.Button
 										key={category.value}
-										icon={widget}
+										icon={categoryIcon}
 										path={`/browse/${category.value}`}
 									>
 										<Text style={{flex:1, textAlign:'left', whiteSpace:'nowrap', overflow:'hidden'}}>{category.label}</Text>
