@@ -78,7 +78,7 @@ class Abstract_Pattern
 			'filePath' => $pattern_file,
 			'categories' => $pattern_data['categories'] === '' ? array() : explode(',', $pattern_data['categories']),
 			'keywords' => $pattern_data['keywords'] === '' ? array() : explode(',', $pattern_data['keywords']),
-			'blockTypes' => $pattern_data['blockTypes'] === '' ? array() : explode(',', $pattern_data['blockTypes']),
+			'blockTypes' => $pattern_data['blockTypes'] === '' ? array() : array_map('trim', explode(',', $pattern_data['blockTypes'])),
 			'postTypes' => $pattern_data['postTypes'] === '' ? array() : explode(',', $pattern_data['postTypes']),
 			'templateTypes' => $pattern_data['templateTypes'] === '' ? array() : explode(',', $pattern_data['templateTypes']),
 			'source' => 'theme',

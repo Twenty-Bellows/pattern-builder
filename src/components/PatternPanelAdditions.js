@@ -1,13 +1,9 @@
 import { PluginDocumentSettingPanel } from '@wordpress/editor';
 import { useSelect } from '@wordpress/data';
-import {
-	__experimentalToggleGroupControl as ToggleGroupControl,
-	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
-} from '@wordpress/components';
-import { dispatch } from '@wordpress/data';
+
 import { PatternSourcePanel } from './PatternSourcePanel';
 import { PatternSyncedStatusPanel } from './PatternSyncedStatusPanel';
-import { BlockBindingsPanel } from './BlockBindingsPanel';
+import { PatternRestrictionsPanel } from './PatternRestrictionsPanel';
 
 export const PatternPanelAdditionsPlugin = () => {
 
@@ -46,6 +42,13 @@ export const PatternBuilderPanel = ({ patternPost }) => {
 			title={'Pattern Synced Status'}
 		>
 			<PatternSyncedStatusPanel patternPost={patternPost} />
+		</PluginDocumentSettingPanel>
+
+		<PluginDocumentSettingPanel
+			name={'pattern-panel-additions-restrictions'}
+			title={'Pattern Restrictions'}
+		>
+			<PatternRestrictionsPanel patternPost={patternPost} />
 		</PluginDocumentSettingPanel>
 
 		{/* <PluginDocumentSettingPanel

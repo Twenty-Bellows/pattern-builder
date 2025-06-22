@@ -615,4 +615,54 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals(array(), $pattern->templateTypes);
 		$this->assertEquals(array(), $pattern->postTypes);
 	}
+
+	/**
+	 * Test a pattern that has restrictions
+	 */
+	function test_theme_pattern_with_restrictions() {
+
+		$this->copy_test_pattern('theme_restrictions_test.php');
+
+		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+		$pattern = $data[0];
+
+		$this->assertEquals(200, $response->get_status());
+
+		$this->assertEquals(array('core/heading', 'core/group'), $pattern['wp_pattern_block_types']);
+
+	}
+
+	/**
+	 * Test updating a pattern that has restrictions
+	 */
+	function test_updating_a_theme_pattern_with_restrictions() {
+
+		$this->copy_test_pattern('theme_restrictions_test.php');
+
+		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+		$pattern = $data[0];
+
+		$this->assertEquals(200, $response->get_status());
+
+		$pattern_updates = [
+			'wp_pattern_block_types' => ['core/paragraph'],
+		];
+
+		$request = $this->create_rest_request('PUT', '/wp/v2/blocks/' . $pattern['id']);
+		$request->set_body(json_encode($pattern_updates));
+		$response = rest_do_request($request);
+		$data = $response->get_data();
+		$this->assertEquals(200, $response->get_status());
+		$pattern = $data;
+
+		$this->assertEquals(array('core/paragraph'), $pattern['wp_pattern_block_types']);
+
+
+	}
+
+
 }

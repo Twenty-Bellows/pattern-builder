@@ -198,6 +198,14 @@ class Pattern_Builder_API
 
 		$data = $controller->prepare_response_for_collection($response);
 
+		$meta = get_post_meta($post->ID);
+
+		if (isset($meta)) {
+			if (isset($meta['wp_pattern_block_types'])) {
+				$data['wp_pattern_block_types'] = array_map('trim', explode(',', $meta['wp_pattern_block_types'][0]));
+			}
+		}
+
 		$data['source'] = 'theme';
 
 		return $data;
@@ -453,6 +461,10 @@ class Pattern_Builder_API
 
 						if (isset($updated_pattern['wp_pattern_sync_status'])) {
 							$pattern->synced = $updated_pattern['wp_pattern_sync_status'] !== 'unsynced';
+						}
+
+						if (isset($updated_pattern['wp_pattern_block_types'])) {
+							$pattern->blockTypes = $updated_pattern['wp_pattern_block_types'];
 						}
 
 						if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'user') {
