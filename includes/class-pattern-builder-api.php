@@ -228,51 +228,7 @@ class Pattern_Builder_API
 
 		foreach ($patterns as $pattern) {
 
-			$post = get_page_by_path($this->controller->format_pattern_slug_for_post($pattern->name), OBJECT, ['pb_block']);
-
-			if (!$post) {
-				// If the post doesn't exist, create it.
-				$post = $this->controller->create_pb_block_post_for_pattern($pattern);
-			}
-			else {
-
-				// if the post content is out of date we need to update it
-
-				// TODO: When users are able to edit these patterns and ONLY effect the database content we will have to enact some conflict resolution.
-
-				$post_changed = false;
-
-				if ($post->post_content !== $pattern->content) {
-					$post->post_content = $pattern->content;
-					$post_changed = true;
-				}
-
-				if ($post->post_title !== $pattern->title) {
-					$post->post_title = $pattern->title;
-					$post_changed = true;
-				}
-
-				if ($post->post_excerpt !== $pattern->description) {
-					$post->post_excerpt = $pattern->description;
-					$post_changed = true;
-				}
-
-				if ($post_changed) {
-					wp_update_post($post);
-				}
-
-				if ($pattern->synced) {
-					delete_post_meta($post->ID, 'wp_pattern_sync_status');
-				} else {
-					update_post_meta($post->ID, 'wp_pattern_sync_status', 'unsynced');
-				}
-
-				if ($pattern->inserter) {
-					delete_post_meta($post->ID, 'wp_pattern_inserter');
-				} else {
-					update_post_meta($post->ID, 'wp_pattern_inserter', 'no');
-				}
-			}
+			$post = $this->controller->create_pb_block_post_for_pattern($pattern);
 
 			if ($pattern_registry->is_registered($pattern->name)) {
 				$pattern_registry->unregister($pattern->name);

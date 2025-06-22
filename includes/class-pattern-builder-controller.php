@@ -37,6 +37,10 @@ class Pattern_Builder_Controller
 
 	public function create_pb_block_post_for_pattern($pattern)
 	{
+		$existing_post = get_page_by_path($this->format_pattern_slug_for_post($pattern->name), OBJECT, ['pb_block']);
+
+		$post_id = $existing_post ? $existing_post->ID : null;
+
 		$meta = [];
 
 		if ( ! $pattern->synced ) {
@@ -56,6 +60,7 @@ class Pattern_Builder_Controller
 		}
 
 		$post_id = wp_insert_post(array(
+			'ID' => $post_id,
 			'post_title' => $pattern->title,
 			'post_name' =>$this->format_pattern_slug_for_post($pattern->name),
 			'post_content' => $pattern->content,
