@@ -623,6 +623,8 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		$this->copy_test_pattern('theme_restrictions_test.php');
 
+		do_action('init');
+
 		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
 		$response = rest_do_request($request);
 		$data = $response->get_data();

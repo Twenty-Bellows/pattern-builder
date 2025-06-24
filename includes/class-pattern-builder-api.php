@@ -240,28 +240,23 @@ class Pattern_Builder_API
 				$pattern_registry->unregister($pattern->name);
 			}
 
+			$pattern_content = $pattern->content;
 			if ($pattern->synced) {
-
 				self::$synced_theme_patterns[$pattern->name] = $post->ID;
-
-				$pattern_registry->register(
-					$pattern->name,
-					array(
-						'title'   => $pattern->title,
-						'inserter' => false,
-						'content' => '<!-- wp:block {"ref":' . $post->ID . '} /-->',
-					)
-				);
-			} else {
-				$pattern_registry->register(
-					$pattern->name,
-					array(
-						'title'   => $pattern->title,
-						'inserter' => false,
-						'content' => $pattern->content,
-					)
-				);
+				$pattern_content = '<!-- wp:block {"ref":' . $post->ID . '} /-->';
 			}
+			$pattern_registry->register(
+				$pattern->name,
+				array(
+					'title'   => $pattern->title,
+					'inserter' => false,
+					'content' => $pattern_content,
+					'source' => 'theme',
+					'blockTypes' => $pattern->blockTypes,
+					'postTypes' => $pattern->postTypes,
+					'templateTypes' => $pattern->templateTypes,
+				)
+			);
 		}
 	}
 
