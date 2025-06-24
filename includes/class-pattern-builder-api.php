@@ -424,6 +424,14 @@ class Pattern_Builder_API
 							$pattern->blockTypes = $updated_pattern['wp_pattern_block_types'];
 						}
 
+						if (isset($updated_pattern['wp_pattern_post_types'])) {
+							$pattern->postTypes = $updated_pattern['wp_pattern_post_types'];
+						}
+
+						if (isset($updated_pattern['wp_pattern_template_types'])) {
+							$pattern->templateTypes = $updated_pattern['wp_pattern_template_types'];
+						}
+
 						if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'user') {
 							// we are attempting to convert a THEME pattern to a USER pattern.
 							$this->controller->update_user_pattern($pattern);
