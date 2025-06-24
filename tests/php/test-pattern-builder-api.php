@@ -631,6 +631,8 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals(200, $response->get_status());
 
 		$this->assertEquals(array('core/heading', 'core/group'), $pattern['wp_pattern_block_types']);
+		$this->assertEquals(array('page'), $pattern['wp_pattern_post_types']);
+		$this->assertEquals(array('front-page'), $pattern['wp_pattern_template_types']);
 
 	}
 

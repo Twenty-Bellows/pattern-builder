@@ -4,6 +4,8 @@
  * Slug: simple-theme/theme-restrictions-test
  * Description: A pattern to test theme restrictions metadata.
  * Block Types: core/heading, core/group
+ * Post Types: page
+ * Template Types: front-page
  */
 ?>
 <!-- wp:group {"layout":{"type":"default"}} -->

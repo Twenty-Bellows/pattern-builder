@@ -204,6 +204,12 @@ class Pattern_Builder_API
 			if (isset($meta['wp_pattern_block_types'])) {
 				$data['wp_pattern_block_types'] = array_map('trim', explode(',', $meta['wp_pattern_block_types'][0]));
 			}
+			if (isset($meta['wp_pattern_post_types'])) {
+				$data['wp_pattern_post_types'] = array_map('trim', explode(',', $meta['wp_pattern_post_types'][0]));
+			}
+			if (isset($meta['wp_pattern_template_types'])) {
+				$data['wp_pattern_template_types'] = array_map('trim', explode(',', $meta['wp_pattern_template_types'][0]));
+			}
 		}
 
 		$data['source'] = 'theme';
