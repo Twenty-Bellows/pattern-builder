@@ -501,9 +501,8 @@ class Pattern_Builder_API
 				if ( $post->post_type === 'pb_block') {
 					$slug = Pattern_Builder_Controller::format_pattern_slug_from_post($post->post_name);
 					$block['blockName'] = 'core/pattern';
-					$block['attrs'] = [
-						'slug' => $slug,
-					];
+					$block['attrs'] = isset($block['attrs']) ? $block['attrs'] : [];
+					$block['attrs']['slug'] = $slug;
 					if ( !empty($post->post_title) ) {
 						$block['attrs']['title'] = $post->post_title;
 					}

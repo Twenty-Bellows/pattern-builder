@@ -19,7 +19,6 @@ class Pattern_Builder_Editor {
             plugins_url('../build/PatternBuilder_EditorTools.js', __FILE__),
             $asset_file['dependencies'],
             $asset_file['version'],
-            false
         );
 
         wp_enqueue_style(
