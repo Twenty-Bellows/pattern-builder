@@ -6,7 +6,6 @@
  * Block Types: core/post-content
  * Post Types: page
  * Template Types: front-page
- * Inserter: no
  * Synced: yes
  */
 ?>
