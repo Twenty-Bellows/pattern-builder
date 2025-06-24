@@ -1,5 +1,7 @@
 <?php
 
+namespace TwentyBellows\PatternBuilder;
+
 require_once __DIR__ . '/licensing.php';
 require_once __DIR__ . '/class-pattern-builder-api.php';
 require_once __DIR__ . '/class-pattern-builder-admin.php';
@@ -38,6 +40,3 @@ class Pattern_Builder
         return self::$instance;
     }
 }
-
-// Automatically instantiate the class when the file is included.
-Pattern_Builder::get_instance();

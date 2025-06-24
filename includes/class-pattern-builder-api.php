@@ -1,5 +1,15 @@
 <?php
 
+namespace TwentyBellows\PatternBuilder;
+
+use WP_Block_Patterns_Registry;
+use WP_REST_Request;
+use WP_REST_Response;
+use WP_Error;
+use WP_Query;
+use WP_REST_Blocks_Controller;
+use WP_Block_Editor_Context;
+
 require_once __DIR__ . '/class-pattern-builder-abstract-pattern.php';
 require_once __DIR__ . '/class-pattern-builder-controller.php';
 

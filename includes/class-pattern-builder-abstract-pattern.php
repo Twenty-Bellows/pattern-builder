@@ -1,5 +1,7 @@
 <?php
 
+namespace TwentyBellows\PatternBuilder;
+
 class Abstract_Pattern
 {
 	public $id;
