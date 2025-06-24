@@ -13,6 +13,7 @@ import { SyncedPatternRenderer } from '../components/SyncedPatternRenderer';
  */
 export const syncedPatternFilter = (BlockEdit) => (props) => {
 	const { name, attributes } = props;
+
 	if (name === 'core/pattern' && attributes.slug && attributes.content) {
 		const selectedPattern = useSelect(
 			(select) =>

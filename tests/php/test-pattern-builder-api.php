@@ -100,6 +100,10 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals('', $pattern['wp_pattern_sync_status']);
 		$this->assertCount(1, $pattern['wp_pattern_category']);
 		$this->assertIsInt($pattern['wp_pattern_category'][0]);
+
+		$this->assertArrayNotHasKey('wp_pattern_block_types', $pattern);
+		$this->assertArrayNotHasKey('wp_pattern_post_types', $pattern);
+		$this->assertArrayNotHasKey('wp_pattern_template_types', $pattern);
 	}
 
 	/**
@@ -263,17 +267,6 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertStringContainsString('Updated Title', $pattern_content);
 		$this->assertStringContainsString('Updated description', $pattern_content);
 
-		// TODO: Test manipulation of categories, keywords, blockTypes, templateTypes, and postTypes
-
-		// $this->assertTrue(in_array('text', $pattern->categories));
-		// $this->assertTrue(in_array('design', $pattern->categories));
-
-		// $this->assertTrue(in_array('updated', $pattern->keywords));
-		// $this->assertTrue(in_array('test', $pattern->keywords));
-
-		// $this->assertTrue(in_array('core/paragraph', $pattern->blockTypes));
-		// $this->assertTrue(in_array('post', $pattern->templateTypes));
-		// $this->assertTrue(in_array('post', $pattern->postTypes));
 	}
 
 	/**
@@ -646,7 +639,6 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals(array('core/post-content'), $pattern['wp_pattern_block_types']);
 		$this->assertEquals(array('page'), $pattern['wp_pattern_post_types']);
 		$this->assertEquals(array('front-page'), $pattern['wp_pattern_template_types']);
-
 	}
 
 	/**

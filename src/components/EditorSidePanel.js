@@ -77,7 +77,6 @@ export const EditorSidePanel = () => {
 				}
 			}
 			if (pattern.inserter && ( !pattern.categories || pattern.categories.length === 0 )) {
-				console.log('Pattern without categories:', pattern);
 				if (!acc['uncategorized']) {
 					acc['uncategorized'] = {
 						label: __('Uncategorized', 'pattern-builder'),

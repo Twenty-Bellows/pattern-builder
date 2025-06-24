@@ -18,7 +18,7 @@ class Pattern_Builder_API
 
 		// TODO: This is shared code with the Synced Patterns for Themes plugin.
 		// It should be moved to a common location and make sure there are no conflicts.
-		add_filter('rest_request_after_callbacks', [$this, 'inject_theme_synced_patterns'], 10, 3);
+		add_filter('rest_request_after_callbacks', [$this, 'inject_theme_patterns'], 10, 3);
 
 		add_filter('rest_pre_dispatch', [$this, 'handle_hijack_block_update'], 10, 3);
 		add_filter('rest_pre_dispatch', [$this, 'handle_hijack_block_delete'], 10, 3);
@@ -150,7 +150,7 @@ class Pattern_Builder_API
 		return rest_ensure_response($all_patterns);
 	}
 
-	public function inject_theme_synced_patterns($response, $server, $request)
+	public function inject_theme_patterns($response, $server, $request)
 	{
 		// Requesting a single pattern.  Inject the synced theme pattern.
 		if (preg_match('#/wp/v2/blocks/(?P<id>\d+)#', $request->get_route(), $matches)) {
@@ -253,17 +253,25 @@ class Pattern_Builder_API
 				self::$synced_theme_patterns[$pattern->name] = $post->ID;
 				$pattern_content = '<!-- wp:block {"ref":' . $post->ID . '} /-->';
 			}
-			register_block_pattern(
-				$pattern->name,
-				array(
+
+			$pattern_data = array(
 					'title'   => $pattern->title,
 					'inserter' => false,
 					'content' => $pattern_content,
 					'source' => 'theme',
 					'blockTypes' => $pattern->blockTypes,
-					'postTypes' => $pattern->postTypes,
 					'templateTypes' => $pattern->templateTypes,
-				)
+			);
+
+			// NOTE: Setting the postTypes to an empty array will cause the pattern to not be available
+			// or perhaps a registration error... or some strange behavior.  So it only optionally set here.
+			if ( $pattern->postTypes ) {
+				$pattern_data['postTypes'] = $pattern->postTypes;
+			}
+
+			$pattern_registry->register(
+				$pattern->name,
+				$pattern_data
 			);
 		}
 	}

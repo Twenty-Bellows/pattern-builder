@@ -45,26 +45,44 @@ class Pattern_Builder_Controller
 
 		if ( ! $pattern->synced ) {
 			$meta['wp_pattern_sync_status'] = "unsynced";
-		} else {
-			$meta['wp_pattern_sync_status'] = "";
 		}
+		else {
+			delete_post_meta($post_id, 'wp_pattern_sync_status');
+		}
+
 		if ( $pattern->blockTypes ) {
 			$meta['wp_pattern_block_types'] = implode(',', $pattern->blockTypes);
 		}
+		else {
+			delete_post_meta($post_id, 'wp_pattern_block_types');
+		}
+
 		if ( $pattern->templateTypes ) {
 			$meta['wp_pattern_template_types'] = implode(',', $pattern->templateTypes);
 		}
+		else {
+			delete_post_meta($post_id, 'wp_pattern_template_types');
+		}
+
 		if ( $pattern->postTypes ) {
 			$meta['wp_pattern_post_types'] = implode(',', $pattern->postTypes);
 		}
+		else {
+			delete_post_meta($post_id, 'wp_pattern_post_types');
+		}
+
 		if ( $pattern->keywords ) {
 			$meta['wp_pattern_keywords'] = implode(',', $pattern->keywords);
 		}
+		else {
+			delete_post_meta($post_id, 'wp_pattern_keywords');
+		}
+
 		if ( $pattern->inserter === false ) {
 			$meta['wp_pattern_inserter'] = "no";
 		}
 		else {
-			$meta['wp_pattern_inserter'] = "";
+			delete_post_meta($post_id, 'wp_pattern_inserter');
 		}
 
 		$post_id = wp_insert_post(array(
