@@ -14,7 +14,7 @@ class Pattern_Builder_API
 		$this->controller = new Pattern_Builder_Controller();
 
 		add_action('rest_api_init', [$this, 'register_routes']);
-		add_action('init', array($this, 'register_patterns'));
+		add_action('init', array($this, 'register_patterns'), 9 );
 
 		// TODO: This is shared code with the Synced Patterns for Themes plugin.
 		// It should be moved to a common location and make sure there are no conflicts.
@@ -174,6 +174,11 @@ class Pattern_Builder_API
 			$data = $response->get_data();
 			$patterns = $this->controller->get_block_patterns_from_theme_files();
 
+			// filter out patterns that should be exluded from the inserter
+			$patterns = array_filter($patterns, function ($pattern) {
+				return $pattern->inserter;
+			});
+
 			foreach ($patterns as $pattern) {
 				$post = $this->controller->get_pb_block_post_for_pattern($pattern);
 				$data[] = $this->format_pb_block_response($post, $request);
@@ -203,6 +208,15 @@ class Pattern_Builder_API
 		if (isset($meta)) {
 			if (isset($meta['wp_pattern_block_types'])) {
 				$data['wp_pattern_block_types'] = array_map('trim', explode(',', $meta['wp_pattern_block_types'][0]));
+			}
+			if (isset($meta['wp_pattern_post_types'])) {
+				$data['wp_pattern_post_types'] = array_map('trim', explode(',', $meta['wp_pattern_post_types'][0]));
+			}
+			if (isset($meta['wp_pattern_template_types'])) {
+				$data['wp_pattern_template_types'] = array_map('trim', explode(',', $meta['wp_pattern_template_types'][0]));
+			}
+			if (isset($meta['wp_pattern_inserter'])) {
+				$data['wp_pattern_inserter'] = $meta['wp_pattern_inserter'][0];
 			}
 		}
 
@@ -234,28 +248,23 @@ class Pattern_Builder_API
 				$pattern_registry->unregister($pattern->name);
 			}
 
+			$pattern_content = $pattern->content;
 			if ($pattern->synced) {
-
 				self::$synced_theme_patterns[$pattern->name] = $post->ID;
-
-				$pattern_registry->register(
-					$pattern->name,
-					array(
-						'title'   => $pattern->title,
-						'inserter' => false,
-						'content' => '<!-- wp:block {"ref":' . $post->ID . '} /-->',
-					)
-				);
-			} else {
-				$pattern_registry->register(
-					$pattern->name,
-					array(
-						'title'   => $pattern->title,
-						'inserter' => false,
-						'content' => $pattern->content,
-					)
-				);
+				$pattern_content = '<!-- wp:block {"ref":' . $post->ID . '} /-->';
 			}
+			register_block_pattern(
+				$pattern->name,
+				array(
+					'title'   => $pattern->title,
+					'inserter' => false,
+					'content' => $pattern_content,
+					'source' => 'theme',
+					'blockTypes' => $pattern->blockTypes,
+					'postTypes' => $pattern->postTypes,
+					'templateTypes' => $pattern->templateTypes,
+				)
+			);
 		}
 	}
 
@@ -421,6 +430,18 @@ class Pattern_Builder_API
 
 						if (isset($updated_pattern['wp_pattern_block_types'])) {
 							$pattern->blockTypes = $updated_pattern['wp_pattern_block_types'];
+						}
+
+						if (isset($updated_pattern['wp_pattern_post_types'])) {
+							$pattern->postTypes = $updated_pattern['wp_pattern_post_types'];
+						}
+
+						if (isset($updated_pattern['wp_pattern_template_types'])) {
+							$pattern->templateTypes = $updated_pattern['wp_pattern_template_types'];
+						}
+
+						if (isset($updated_pattern['wp_pattern_inserter'])) {
+							$pattern->inserter = $updated_pattern['wp_pattern_inserter'] === 'no' ? false : true;
 						}
 
 						if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'user') {

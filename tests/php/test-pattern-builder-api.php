@@ -81,6 +81,8 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		$this->copy_test_pattern('theme_synced_pattern.php');
 
+		do_action('init');
+
 		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
@@ -106,6 +108,8 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 	public function test_core_get_blocks_api_with_synced_theme_pattern() {
 
 		$this->copy_test_pattern('theme_synced_pattern.php');
+
+		do_action('init');
 
 		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
 		$response = rest_do_request($request);
@@ -136,7 +140,6 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		$this->copy_test_pattern('theme_synced_pattern.php');
 
-		// trigger the 'init' action to register the patterns
 		do_action('init');
 
 		$request = new WP_REST_Request('GET', '/wp/v2/block-patterns/patterns');
@@ -164,6 +167,8 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		$this->copy_test_pattern('theme_unsynced_pattern.php');
 
+		do_action('init');
+
 		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
@@ -178,7 +183,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals('Theme Unsynced Pattern', $pattern['title']['raw']);
 		$this->assertEquals('simple-theme/theme-unsynced-pattern', $pattern['slug']);
 		$this->assertEquals('An UNSYNCED pattern that comes with the theme to be used for testing.', $pattern['excerpt']['raw']);
-		$this->assertEquals('', $pattern['wp_pattern_sync_status']);
+		$this->assertEquals('unsynced', $pattern['wp_pattern_sync_status']);
 		$this->assertCount(1, $pattern['wp_pattern_category']);
 		$this->assertIsInt($pattern['wp_pattern_category'][0]);
 		$this->assertEquals('wp_block', $pattern['type']);
@@ -453,6 +458,8 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		$this->copy_test_pattern('theme_image_test.php');
 
+		do_action('init');
+
 		// Copy the logo image to the test theme assets directory
 		$assets_dir = $this->test_dir . '/assets/images';
 		mkdir($assets_dir, 0777, true);
@@ -562,6 +569,8 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		$this->copy_test_pattern('theme_unsynced_pattern.php');
 
+		do_action('init');
+
 		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
@@ -594,6 +603,8 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		$this->copy_test_pattern('theme_synced_pattern.php');
 
+		do_action('init');
+
 		$request = new WP_REST_Request('GET', '/pattern-builder/v1/patterns');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
@@ -623,6 +634,8 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		$this->copy_test_pattern('theme_restrictions_test.php');
 
+		do_action('init');
+
 		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
 		$response = rest_do_request($request);
 		$data = $response->get_data();
@@ -630,7 +643,10 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		$this->assertEquals(200, $response->get_status());
 
-		$this->assertEquals(array('core/heading', 'core/group'), $pattern['wp_pattern_block_types']);
+		$this->assertEquals(array('core/post-content'), $pattern['wp_pattern_block_types']);
+		$this->assertEquals(array('page'), $pattern['wp_pattern_post_types']);
+		$this->assertEquals(array('front-page'), $pattern['wp_pattern_template_types']);
+		$this->assertEquals('no', $pattern['wp_pattern_inserter']);
 
 	}
 
@@ -640,6 +656,8 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 	function test_updating_a_theme_pattern_with_restrictions() {
 
 		$this->copy_test_pattern('theme_restrictions_test.php');
+
+		do_action('init');
 
 		$request = new WP_REST_Request('GET', '/wp/v2/blocks');
 		$response = rest_do_request($request);

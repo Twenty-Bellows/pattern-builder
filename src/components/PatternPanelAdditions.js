@@ -3,7 +3,7 @@ import { useSelect } from '@wordpress/data';
 
 import { PatternSourcePanel } from './PatternSourcePanel';
 import { PatternSyncedStatusPanel } from './PatternSyncedStatusPanel';
-import { PatternRestrictionsPanel } from './PatternRestrictionsPanel';
+import { PatternAssociationsPanel } from './PatternAssociationsPanel';
 
 export const PatternPanelAdditionsPlugin = () => {
 
@@ -46,9 +46,9 @@ export const PatternBuilderPanel = ({ patternPost }) => {
 
 		<PluginDocumentSettingPanel
 			name={'pattern-panel-additions-restrictions'}
-			title={'Pattern Restrictions'}
+			title={'Pattern Associations'}
 		>
-			<PatternRestrictionsPanel patternPost={patternPost} />
+			<PatternAssociationsPanel patternPost={patternPost} />
 		</PluginDocumentSettingPanel>
 
 		{/* <PluginDocumentSettingPanel

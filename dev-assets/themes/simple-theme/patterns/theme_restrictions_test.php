@@ -3,7 +3,11 @@
  * Title: Theme Restrictions Test Pattern
  * Slug: simple-theme/theme-restrictions-test
  * Description: A pattern to test theme restrictions metadata.
- * Block Types: core/heading, core/group
+ * Block Types: core/post-content
+ * Post Types: page
+ * Template Types: front-page
+ * Inserter: no
+ * Synced: yes
  */
 ?>
 <!-- wp:group {"layout":{"type":"default"}} -->

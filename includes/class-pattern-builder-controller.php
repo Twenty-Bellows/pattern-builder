@@ -45,6 +45,8 @@ class Pattern_Builder_Controller
 
 		if ( ! $pattern->synced ) {
 			$meta['wp_pattern_sync_status'] = "unsynced";
+		} else {
+			$meta['wp_pattern_sync_status'] = "";
 		}
 		if ( $pattern->blockTypes ) {
 			$meta['wp_pattern_block_types'] = implode(',', $pattern->blockTypes);
@@ -57,6 +59,12 @@ class Pattern_Builder_Controller
 		}
 		if ( $pattern->keywords ) {
 			$meta['wp_pattern_keywords'] = implode(',', $pattern->keywords);
+		}
+		if ( $pattern->inserter === false ) {
+			$meta['wp_pattern_inserter'] = "no";
+		}
+		else {
+			$meta['wp_pattern_inserter'] = "";
 		}
 
 		$post_id = wp_insert_post(array(
@@ -523,20 +531,20 @@ class Pattern_Builder_Controller
 	private function build_pattern_file_metadata(Abstract_Pattern $pattern): string
 	{
 
-		$synced = $pattern->synced ? "\n * Synced: yes" : '';
-		$inserter = $pattern->inserter ? '' : "\n * Inserter: no";
 		$categories = $pattern->categories ? "\n * Categories: " . implode(', ', $pattern->categories) : '';
 		$keywords = $pattern->keywords ? "\n * Keywords: " . implode(', ', $pattern->keywords) : '';
 		$blockTypes = $pattern->blockTypes ? "\n * Block Types: " . implode(', ', $pattern->blockTypes) : '';
-		$templateTypes = $pattern->templateTypes ? "\n * Template Types: " . implode(', ', $pattern->templateTypes) : '';
 		$postTypes = $pattern->postTypes ? "\n * Post Types: " . implode(', ', $pattern->postTypes) : '';
+		$templateTypes = $pattern->templateTypes ? "\n * Template Types: " . implode(', ', $pattern->templateTypes) : '';
+		$inserter = $pattern->inserter ? '' : "\n * Inserter: no";
+		$synced = $pattern->synced ? "\n * Synced: yes" : '';
 
 		return <<<METADATA
 	<?php
 	/**
 	 * Title: $pattern->title
 	 * Slug: $pattern->name
-	 * Description: $pattern->description$synced$inserter$categories$keywords$blockTypes$templateTypes$postTypes
+	 * Description: $pattern->description$categories$keywords$blockTypes$postTypes$templateTypes$inserter$synced
 	 */
 	?>
 
