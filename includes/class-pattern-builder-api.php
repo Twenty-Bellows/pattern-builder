@@ -174,6 +174,11 @@ class Pattern_Builder_API
 			$data = $response->get_data();
 			$patterns = $this->controller->get_block_patterns_from_theme_files();
 
+			// filter out patterns that should be exluded from the inserter
+			$patterns = array_filter($patterns, function ($pattern) {
+				return $pattern->inserter;
+			});
+
 			foreach ($patterns as $pattern) {
 				$post = $this->controller->get_pb_block_post_for_pattern($pattern);
 				$data[] = $this->format_pb_block_response($post, $request);
