@@ -14,7 +14,7 @@ class Pattern_Builder_API
 		$this->controller = new Pattern_Builder_Controller();
 
 		add_action('rest_api_init', [$this, 'register_routes']);
-		add_action('init', array($this, 'register_patterns'));
+		add_action('init', array($this, 'register_patterns'), 9 );
 
 		// TODO: This is shared code with the Synced Patterns for Themes plugin.
 		// It should be moved to a common location and make sure there are no conflicts.
@@ -245,11 +245,11 @@ class Pattern_Builder_API
 				self::$synced_theme_patterns[$pattern->name] = $post->ID;
 				$pattern_content = '<!-- wp:block {"ref":' . $post->ID . '} /-->';
 			}
-			$pattern_registry->register(
+			register_block_pattern(
 				$pattern->name,
 				array(
 					'title'   => $pattern->title,
-					'inserter' => false,
+					'inserter' => true,
 					'content' => $pattern_content,
 					'source' => 'theme',
 					'blockTypes' => $pattern->blockTypes,
