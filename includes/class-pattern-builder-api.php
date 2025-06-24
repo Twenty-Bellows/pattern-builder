@@ -210,6 +210,9 @@ class Pattern_Builder_API
 			if (isset($meta['wp_pattern_template_types'])) {
 				$data['wp_pattern_template_types'] = array_map('trim', explode(',', $meta['wp_pattern_template_types'][0]));
 			}
+			if (isset($meta['wp_pattern_inserter'])) {
+				$data['wp_pattern_inserter'] = $meta['wp_pattern_inserter'][0];
+			}
 		}
 
 		$data['source'] = 'theme';
@@ -249,7 +252,7 @@ class Pattern_Builder_API
 				$pattern->name,
 				array(
 					'title'   => $pattern->title,
-					'inserter' => true,
+					'inserter' => false,
 					'content' => $pattern_content,
 					'source' => 'theme',
 					'blockTypes' => $pattern->blockTypes,
@@ -430,6 +433,10 @@ class Pattern_Builder_API
 
 						if (isset($updated_pattern['wp_pattern_template_types'])) {
 							$pattern->templateTypes = $updated_pattern['wp_pattern_template_types'];
+						}
+
+						if (isset($updated_pattern['wp_pattern_inserter'])) {
+							$pattern->inserter = $updated_pattern['wp_pattern_inserter'] === 'no' ? false : true;
 						}
 
 						if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'user') {

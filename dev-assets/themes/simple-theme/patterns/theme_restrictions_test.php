@@ -4,8 +4,8 @@
  * Slug: simple-theme/theme-restrictions-test
  * Description: A pattern to test theme restrictions metadata.
  * Block Types: core/post-content
- * Template Types: front-page
  * Post Types: page
+ * Template Types: front-page
  * Inserter: no
  * Synced: yes
  */
