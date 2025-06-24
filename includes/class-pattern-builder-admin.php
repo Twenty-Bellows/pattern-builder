@@ -1,5 +1,7 @@
 <?php
 
+namespace TwentyBellows\PatternBuilder;
+
 class Pattern_Builder_Admin {
 
     private const PAGE_SLUG = 'pattern-builder';

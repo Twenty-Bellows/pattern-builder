@@ -18,3 +18,8 @@ if (! defined('ABSPATH')) {
 
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/includes/class-pattern-builder.php';
+
+use TwentyBellows\PatternBuilder\Pattern_Builder;
+
+// Initialize the plugin
+Pattern_Builder::get_instance();

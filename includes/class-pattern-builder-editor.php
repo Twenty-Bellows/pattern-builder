@@ -1,5 +1,7 @@
 <?php
 
+namespace TwentyBellows\PatternBuilder;
+
 class Pattern_Builder_Editor {
 
     public function __construct() {
