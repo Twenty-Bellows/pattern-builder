@@ -10,7 +10,9 @@
  */
 ?>
 <!-- wp:group {"layout":{"type":"default"}} -->
-<div class="wp-block-group"><!-- wp:heading {"level":1} -->
-<h1 class="wp-block-heading">This is a Pattern with Restrictions</h1>
-<!-- /wp:heading --></div>
+  <div class="wp-block-group">
+    <!-- wp:heading {"level":1} -->
+      <h1 class="wp-block-heading"><?php echo wp_kses_post( 'This is a Pattern with Restrictions', 'simple-theme' ); ?></h1>
+    <!-- /wp:heading -->
+  </div>
 <!-- /wp:group -->

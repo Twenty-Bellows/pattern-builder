@@ -49,6 +49,16 @@ class Pattern_Builder_API {
 			)
 		);
 
+		register_rest_route(
+			self::$base_route,
+			'/process-theme',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'process_theme_patterns' ),
+				'permission_callback' => array( $this, 'write_permission_callback' ),
+			)
+		);
+
 	}
 
 	/**
@@ -93,6 +103,75 @@ class Pattern_Builder_API {
 	}
 
 	// Callback functions //////////
+
+	/**
+	 * Processes all theme patterns with current configuration settings.
+	 *
+	 * @param WP_REST_Request $request The REST request object.
+	 * @return WP_REST_Response
+	 */
+	public function process_theme_patterns( WP_REST_Request $request ): WP_REST_Response {
+		// Check premium access
+		if ( ! pb_fs()->can_use_premium_code__premium_only() && ! pb_fs_testing() ) {
+			return new WP_Error(
+				'premium_required',
+				__( 'Processing theme patterns requires the premium version of Pattern Builder.', 'pattern-builder' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		$localize = $request->get_param( 'localize' ) === 'true';
+		$import_images = $request->get_param( 'importImages' ) !== 'false';
+		
+		$options = array(
+			'localize' => $localize,
+			'import_images' => $import_images,
+		);
+
+		// Get all theme patterns
+		$theme_patterns = $this->controller->get_block_patterns_from_theme_files();
+		
+		$processed_count = 0;
+		$error_count = 0;
+		$errors = array();
+
+		foreach ( $theme_patterns as $pattern ) {
+			try {
+				$this->controller->update_theme_pattern( $pattern, $options );
+				$processed_count++;
+			} catch ( Exception $e ) {
+				$error_count++;
+				$errors[] = array(
+					'pattern' => $pattern->name,
+					'error' => $e->getMessage(),
+				);
+			}
+		}
+
+		$total_patterns = count( $theme_patterns );
+		$success = $error_count === 0;
+
+		$response_data = array(
+			'success' => $success,
+			'message' => sprintf(
+				__( 'Processed %d of %d theme patterns successfully.', 'pattern-builder' ),
+				$processed_count,
+				$total_patterns
+			),
+			'stats' => array(
+				'total' => $total_patterns,
+				'processed' => $processed_count,
+				'errors' => $error_count,
+			),
+			'settings' => $options,
+		);
+
+		if ( ! empty( $errors ) ) {
+			$response_data['errors'] = $errors;
+		}
+
+		return rest_ensure_response( $response_data );
+	}
 
 	/**
 	 * Retrieves all block patterns.
