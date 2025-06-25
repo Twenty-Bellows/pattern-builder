@@ -3,9 +3,7 @@
 	"port": 8498,
 	"testsPort": 8499,
 	"plugins": [ "." ],
-	"themes": [
-		"./dev-assets/themes/simple-theme"
-	],
+	"themes": [ "./dev-assets/themes/simple-theme" ],
 	"mappings": {
 		"wp-content/themes/": "./dev-assets/themes"
 	},
