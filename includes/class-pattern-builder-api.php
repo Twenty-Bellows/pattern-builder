@@ -460,7 +460,23 @@ class Pattern_Builder_API {
 							// we are attempting to convert a THEME pattern to a USER pattern.
 							$this->controller->update_user_pattern( $pattern );
 						} else {
-							$this->controller->update_theme_pattern( $pattern );
+							// Check configuration options via query parameters
+							$options = array();
+							
+							$localize_param = $request->get_param( 'patternBuilderLocalize' );
+							if ( $localize_param === 'true' ) {
+								$options['localize'] = true;
+							}
+							
+							$import_images_param = $request->get_param( 'patternBuilderImportImages' );
+							if ( $import_images_param === 'false' ) {
+								$options['import_images'] = false;
+							} else {
+								// Default to true if not explicitly disabled
+								$options['import_images'] = true;
+							}
+							
+							$this->controller->update_theme_pattern( $pattern, $options );
 						}
 
 						$post               = get_post( $pattern->id );

@@ -6,6 +6,7 @@ use WP_Error;
 use WP_Query;
 
 require_once __DIR__ . '/class-pattern-builder-abstract-pattern.php';
+require_once __DIR__ . '/class-pattern-builder-localization.php';
 require_once ABSPATH . 'wp-admin/includes/file.php';
 
 global $pb_fs;
@@ -110,7 +111,7 @@ class Pattern_Builder_Controller {
 		return $post;
 	}
 
-	public function update_theme_pattern( Abstract_Pattern $pattern ) {
+	public function update_theme_pattern( Abstract_Pattern $pattern, $options = array() ) {
 		if ( pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing() ) {
 
 			// get the pb_block post if it already exists
@@ -121,7 +122,15 @@ class Pattern_Builder_Controller {
 				$pattern->name = get_stylesheet() . '/' . $pattern->name;
 			}
 
-			$pattern = $this->import_pattern_image_assets( $pattern );
+			// Check if image importing is enabled (default to true for backward compatibility)
+			if ( ! isset( $options['import_images'] ) || $options['import_images'] === true ) {
+				$pattern = $this->import_pattern_image_assets( $pattern );
+			}
+
+			// Check if localization is enabled
+			if ( isset( $options['localize'] ) && $options['localize'] === true ) {
+				$pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
+			}
 
 			// update the pattern file
 			$this->update_theme_pattern_file( $pattern );

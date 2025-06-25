@@ -2,22 +2,10 @@
  * WordPress dependencies
  */
 import { __, _x } from '@wordpress/i18n';
-import apiFetch from '@wordpress/api-fetch';
 import { useState } from '@wordpress/element';
-import { useSelect } from '@wordpress/data';
 import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
-import {
-	TextControl,
-	TextareaControl,
-	SelectControl,
-	ToggleControl,
-	Button,
-	FormTokenField,
-	Panel,
-	PanelBody,
-} from '@wordpress/components';
-import { Navigator } from '@wordpress/components';
-import { useNavigator } from '@wordpress/components';
+import { PanelBody } from '@wordpress/components';
+import { Navigator, Icon } from '@wordpress/components';
 import {
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalVStack as VStack,
@@ -28,37 +16,25 @@ import {
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalDivider as Divider,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
-	Icon,
-	FlexItem,
-	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalHeading as Heading,
-	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
-	__experimentalSpacer as Spacer,
-	__experimentalToggleGroupControl as ToggleGroupControl,
-	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
 } from '@wordpress/components';
 import {
 	widget,
-	tool,
 	addTemplate,
 	category as categoryIcon,
 	download,
-	edit,
-	code,
 	chevronLeft,
 	chevronRight,
 	addCard,
-	blockMeta,
-	help,
-	trash,
+	cog,
 } from '@wordpress/icons';
-import { store as blockEditorStore } from '@wordpress/block-editor';
 
 import { fetchAllPatterns } from '../utils/resolvers';
 import { PatternCreatePanel } from './PatternCreatePanel';
 import { useEffect } from 'react';
 import { useMemo } from 'react';
 import { PatternBrowserPanel } from './PatternBrowserPanel';
+import { PatternBuilderConfiguration } from './PatternBuilderConfiguration';
 import { patternBuilderAppIcon } from '../assets/icons';
 
 export const EditorSidePanel = () => {
@@ -173,6 +149,21 @@ export const EditorSidePanel = () => {
 										<Icon icon={ chevronRight } />
 									</Navigator.Button>
 								) ) }
+								<Divider/>
+								<Navigator.Button
+									icon={ cog }
+									path="/configuration"
+								>
+									<Text
+										style={ { flex: 1, textAlign: 'left' } }
+									>
+										{ __(
+											'Configuration',
+											'pattern-builder'
+										) }
+									</Text>
+									<Icon icon={ chevronRight } />
+								</Navigator.Button>
 							</VStack>
 						</PanelBody>
 					</Navigator.Screen>
@@ -219,6 +210,32 @@ export const EditorSidePanel = () => {
 								<PatternBrowserPanel
 									allPatterns={ allPatterns }
 								/>
+							</VStack>
+						</PanelBody>
+					</Navigator.Screen>
+					<Navigator.Screen path="/configuration">
+						<PanelBody>
+							<VStack spacing={ 4 }>
+								<HStack spacing={ 2 } alignment="left">
+									<Navigator.BackButton
+										icon={ chevronLeft }
+										label={ __(
+											'Back',
+											'pattern-builder'
+										) }
+									/>
+									<Heading
+										level={ 2 }
+										size={ 13 }
+										style={ { margin: 0 } }
+									>
+										{ __(
+											'Configuration',
+											'pattern-builder'
+										) }
+									</Heading>
+								</HStack>
+								<PatternBuilderConfiguration />
 							</VStack>
 						</PanelBody>
 					</Navigator.Screen>
