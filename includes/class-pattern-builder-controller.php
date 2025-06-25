@@ -531,7 +531,7 @@ class Pattern_Builder_Controller
 		$path = $this->get_pattern_filepath($pattern);
 
 		if (!$path) {
-			$filename = str_replace('-', '_', basename($pattern->name));
+			$filename = basename($pattern->name);
 			$path = get_stylesheet_directory() . '/patterns/' . $filename . '.php';
 		}
 
@@ -664,6 +664,9 @@ class Pattern_Builder_Controller
 
 		// Normalize multiple newlines into a single one
 		$block_markup = preg_replace( '/\n{2,}/', "\n", $block_markup );
+
+		// eliminate blank lines
+		$block_markup = preg_replace( '/^\s*[\r\n]/m', '', $block_markup );
 
 		return $block_markup;
 	}
