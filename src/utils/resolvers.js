@@ -9,10 +9,9 @@ export async function fetchAllPatterns() {
 		headers: {
 			'Content-Type': 'application/json',
 		},
-	} )
-	.then( ( response ) => {
+	} ).then( ( response ) => {
 		return response.map( ( pattern ) => {
 			return new AbstractPattern( pattern );
 		} );
-	});
+	} );
 }

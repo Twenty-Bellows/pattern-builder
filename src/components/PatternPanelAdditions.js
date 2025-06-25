@@ -6,56 +6,58 @@ import { PatternSyncedStatusPanel } from './PatternSyncedStatusPanel';
 import { PatternAssociationsPanel } from './PatternAssociationsPanel';
 
 export const PatternPanelAdditionsPlugin = () => {
+	const { postType, post } = useSelect( ( select ) => {
+		const postType = select( 'core/editor' ).getCurrentPostType();
+		const postId = select( 'core/editor' ).getCurrentPostId();
+		const post = select( 'core' ).getEntityRecord(
+			'postType',
+			postType,
+			postId
+		);
+		return { postType, post };
+	} );
 
-	const { postType, post } = useSelect(
-		(select) => {
-			const postType = select('core/editor').getCurrentPostType();
-			const postId = select('core/editor').getCurrentPostId();
-			const post = select('core').getEntityRecord('postType', postType, postId);
-			return { postType, post };
-		}
-	);
-
-	if (postType !== 'wp_block') {
+	if ( postType !== 'wp_block' ) {
 		return null;
 	}
 
-	return <PatternBuilderPanel patternPost={post} />;
-}
+	return <PatternBuilderPanel patternPost={ post } />;
+};
 
-export const PatternBuilderPanel = ({ patternPost }) => {
-
-	if (!patternPost) {
+export const PatternBuilderPanel = ( { patternPost } ) => {
+	if ( ! patternPost ) {
 		return null;
 	}
 
-	return (<>
-		<PluginDocumentSettingPanel
-			name={'pattern-panel-additions-source'}
-			title={'Pattern Source'}
-		>
-			<PatternSourcePanel patternPost={patternPost} />
-		</PluginDocumentSettingPanel>
+	return (
+		<>
+			<PluginDocumentSettingPanel
+				name={ 'pattern-panel-additions-source' }
+				title={ 'Pattern Source' }
+			>
+				<PatternSourcePanel patternPost={ patternPost } />
+			</PluginDocumentSettingPanel>
 
-		<PluginDocumentSettingPanel
-			name={'pattern-panel-additions-synced-status'}
-			title={'Pattern Synced Status'}
-		>
-			<PatternSyncedStatusPanel patternPost={patternPost} />
-		</PluginDocumentSettingPanel>
+			<PluginDocumentSettingPanel
+				name={ 'pattern-panel-additions-synced-status' }
+				title={ 'Pattern Synced Status' }
+			>
+				<PatternSyncedStatusPanel patternPost={ patternPost } />
+			</PluginDocumentSettingPanel>
 
-		<PluginDocumentSettingPanel
-			name={'pattern-panel-additions-restrictions'}
-			title={'Pattern Associations'}
-		>
-			<PatternAssociationsPanel patternPost={patternPost} />
-		</PluginDocumentSettingPanel>
+			<PluginDocumentSettingPanel
+				name={ 'pattern-panel-additions-restrictions' }
+				title={ 'Pattern Associations' }
+			>
+				<PatternAssociationsPanel patternPost={ patternPost } />
+			</PluginDocumentSettingPanel>
 
-		{/* <PluginDocumentSettingPanel
+			{ /* <PluginDocumentSettingPanel
 			name={'pattern-panel-additions-bindings'}
 			title={'Pattern Bindings'}
 		>
 			<BlockBindingsPanel />
-		</PluginDocumentSettingPanel> */}
-	</>);
+		</PluginDocumentSettingPanel> */ }
+		</>
+	);
 };

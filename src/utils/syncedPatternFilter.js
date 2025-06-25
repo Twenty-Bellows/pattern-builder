@@ -12,8 +12,7 @@ import {
  *
  * Renders a Theme Synced Pattern block, passing the content on to the referenced Core Pattern block.
  */
-export const SyncedPatternRenderer = ( { attributes, clientId } ) =>{
-
+export const SyncedPatternRenderer = ( { attributes, clientId } ) => {
 	const registry = useRegistry();
 
 	const selectedPattern = useSelect(
@@ -38,8 +37,8 @@ export const SyncedPatternRenderer = ( { attributes, clientId } ) =>{
 			const rootClientId = getBlockRootClientId( clientId );
 			const clonedBlocks = selectedPattern.blocks.map( ( block ) => {
 				block.attributes.content = attributes.content;
-				return cloneBlock(block);
-			});
+				return cloneBlock( block );
+			} );
 
 			const rootEditingMode = getBlockEditingMode( rootClientId );
 			registry.batch( () => {
@@ -67,7 +66,7 @@ export const SyncedPatternRenderer = ( { attributes, clientId } ) =>{
 	const props = useBlockProps();
 
 	return <div { ...props } />;
-}
+};
 
 /**
  *
@@ -77,26 +76,26 @@ export const SyncedPatternRenderer = ( { attributes, clientId } ) =>{
  * If so, it renders the SyncedPatternRenderer component instead of the default BlockEdit.
  *
  */
-export const syncedPatternFilter = (BlockEdit) => (props) => {
+export const syncedPatternFilter = ( BlockEdit ) => ( props ) => {
 	const { name, attributes } = props;
 
-	if (name === 'core/pattern' && attributes.slug && attributes.content) {
+	if ( name === 'core/pattern' && attributes.slug && attributes.content ) {
 		const selectedPattern = useSelect(
-			(select) =>
-				select(blockEditorStore).__experimentalGetParsedPattern(
+			( select ) =>
+				select( blockEditorStore ).__experimentalGetParsedPattern(
 					attributes.slug
 				),
-			[props.attributes.slug]
+			[ props.attributes.slug ]
 		);
-		if (selectedPattern?.blocks?.length === 1 && selectedPattern.blocks[0].name === 'core/block') {
-			return <SyncedPatternRenderer {
-				...props
-			} />;
+		if (
+			selectedPattern?.blocks?.length === 1 &&
+			selectedPattern.blocks[ 0 ].name === 'core/block'
+		) {
+			return <SyncedPatternRenderer { ...props } />;
 		}
 	}
-	return <BlockEdit {...props} />;
+	return <BlockEdit { ...props } />;
 };
-
 
 addFilter(
 	'editor.BlockEdit',

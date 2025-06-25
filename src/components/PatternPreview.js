@@ -19,41 +19,48 @@ function PatternPreviewPlaceholder() {
 	);
 }
 
-export const PatternPreview = ({ pattern, onClick, onEditClick }) => {
-
+export const PatternPreview = ( { pattern, onClick, onEditClick } ) => {
 	const { title, description } = pattern;
 	const blocks = pattern.getBlocks();
 
 	return (
-
-		<Card className="pattern-builder__pattern-preview" onClick={() => {
-				if (onClick) {
-					onClick(pattern);
+		<Card
+			className="pattern-builder__pattern-preview"
+			onClick={ () => {
+				if ( onClick ) {
+					onClick( pattern );
 				}
-			}}
+			} }
 		>
 			<CardHeader className="pattern-builder__pattern-preview__header">
-				<Text>{title}</Text>
-				<Button variant='primary' onClick={(event)=>{
-					event.stopPropagation(); // Prevent the card click event
-					if (onEditClick) {
-						onEditClick(pattern);
-					}
-				}}>{__('Edit', 'pattern-builder')}</Button>
+				<Text>{ title }</Text>
+				<Button
+					variant="primary"
+					onClick={ ( event ) => {
+						event.stopPropagation(); // Prevent the card click event
+						if ( onEditClick ) {
+							onEditClick( pattern );
+						}
+					} }
+				>
+					{ __( 'Edit', 'pattern-builder' ) }
+				</Button>
 			</CardHeader>
 			<CardBody>
 				<VStack>
 					<BlockPreview.Async
-						placeholder={<PatternPreviewPlaceholder />}
+						placeholder={ <PatternPreviewPlaceholder /> }
 					>
 						<BlockPreview
-							blocks={blocks}
-							viewportWidth={1200}
+							blocks={ blocks }
+							viewportWidth={ 1200 }
 						/>
 					</BlockPreview.Async>
-					<Text variant="muted" size="11px">{description}</Text>
+					<Text variant="muted" size="11px">
+						{ description }
+					</Text>
 				</VStack>
 			</CardBody>
 		</Card>
 	);
-}
+};
