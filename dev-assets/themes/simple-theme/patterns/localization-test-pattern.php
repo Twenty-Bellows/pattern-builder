@@ -108,3 +108,4 @@
   <!-- /wp:paragraph -->
 </details>
 <!-- /wp:details -->
+<!-- wp:search {"label":"<?php echo esc_attr__( 'Search Label', 'simple-theme' ); ?>","placeholder":"<?php echo esc_attr__( 'Search Placeholder...', 'simple-theme' ); ?>","buttonText":"<?php echo esc_attr__( 'Search Button', 'simple-theme' ); ?>"} /-->

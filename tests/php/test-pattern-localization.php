@@ -451,4 +451,77 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 		// But the paragraph content should still be localized
 		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Content here', 'test-theme' ); ?>", $localized_pattern->content );
 	}
+
+	/**
+	 * Test that search blocks with all attributes are localized correctly.
+	 */
+	public function test_localize_search_block_with_all_attributes() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:search {"label":"Search Label","placeholder":"Search Placeholder...","buttonText":"Search Button"} /-->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Check that all three attributes are localized
+		$this->assertStringContainsString( '"label":"<?php echo esc_attr__( \'Search Label\', \'test-theme\' ); ?>"', $localized_pattern->content );
+		$this->assertStringContainsString( '"placeholder":"<?php echo esc_attr__( \'Search Placeholder...\', \'test-theme\' ); ?>"', $localized_pattern->content );
+		$this->assertStringContainsString( '"buttonText":"<?php echo esc_attr__( \'Search Button\', \'test-theme\' ); ?>"', $localized_pattern->content );
+		$this->assertStringContainsString( '/-->', $localized_pattern->content );
+	}
+
+	/**
+	 * Test that search blocks with only some attributes are localized correctly.
+	 */
+	public function test_localize_search_block_with_partial_attributes() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:search {"label":"Find Content","showLabel":false} /-->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Check that only the label is localized, other attributes remain
+		$this->assertStringContainsString( '"label":"<?php echo esc_attr__( \'Find Content\', \'test-theme\' ); ?>"', $localized_pattern->content );
+		$this->assertStringContainsString( '"showLabel":false', $localized_pattern->content );
+		$this->assertStringContainsString( '/-->', $localized_pattern->content );
+	}
+
+	/**
+	 * Test that search blocks with placeholder and buttonText only are localized correctly.
+	 */
+	public function test_localize_search_block_with_placeholder_and_button() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:search {"placeholder":"Type your search...","buttonText":"Go"} /-->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Check that placeholder and buttonText are localized
+		$this->assertStringContainsString( '"placeholder":"<?php echo esc_attr__( \'Type your search...\', \'test-theme\' ); ?>"', $localized_pattern->content );
+		$this->assertStringContainsString( '"buttonText":"<?php echo esc_attr__( \'Go\', \'test-theme\' ); ?>"', $localized_pattern->content );
+		$this->assertStringContainsString( '/-->', $localized_pattern->content );
+	}
+
+	/**
+	 * Test that search blocks without localizable attributes are not affected.
+	 */
+	public function test_localize_search_block_without_text_attributes() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:search {"showLabel":false,"buttonUseIcon":true} /-->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Should not contain any localization functions since there are no text attributes
+		$this->assertStringNotContainsString( 'esc_attr__', $localized_pattern->content );
+		$this->assertStringNotContainsString( 'wp_kses_post', $localized_pattern->content );
+		$this->assertEquals( '<!-- wp:search {"showLabel":false,"buttonUseIcon":true} /-->', $localized_pattern->content );
+	}
 }

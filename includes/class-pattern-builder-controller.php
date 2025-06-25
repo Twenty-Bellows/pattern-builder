@@ -389,6 +389,10 @@ class Pattern_Builder_Controller {
 					$block = $this->localize_details_block( $block );
 					break;
 
+				case 'core/search':
+					$block = $this->localize_search_block( $block );
+					break;
+
 			}
 
 			// Process inner blocks recursively.
@@ -635,6 +639,30 @@ class Pattern_Builder_Controller {
 						break;
 					}
 				}
+			}
+		}
+
+		return $block;
+	}
+
+	/**
+	 * Localizes search blocks.
+	 *
+	 * @param array $block Block to localize.
+	 * @return array Localized block.
+	 */
+	private function localize_search_block( $block ) {
+		// For search blocks, we need to handle multiple text attributes:
+		// label, placeholder, and buttonText
+		// These blocks are self-closing and the attributes should be localized within the JSON.
+
+		$localizable_attributes = array( 'label', 'placeholder', 'buttonText' );
+
+		foreach ( $localizable_attributes as $attribute ) {
+			if ( ! empty( $block['attrs'][ $attribute ] ) ) {
+				$text                            = $block['attrs'][ $attribute ];
+				$localized_text                  = $this->create_localized_string( $text, 'esc_attr__' );
+				$block['attrs'][ $attribute ]    = $localized_text;
 			}
 		}
 
