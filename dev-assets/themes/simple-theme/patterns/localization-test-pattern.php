@@ -2,7 +2,7 @@
 /**
  * Title: Localization Test Pattern
  * Slug: simple-theme/localization-test-pattern
- * Description: 
+ * Description:
  */
 ?>
 <!-- wp:paragraph -->
@@ -47,3 +47,21 @@
 <!-- wp:pullquote -->
   <figure class="wp-block-pullquote"><blockquote><p><?php echo wp_kses_post( 'Pullquote Quote', 'simple-theme' ); ?></p><cite><?php echo wp_kses_post( 'and the citation', 'simple-theme' ); ?></cite></blockquote></figure>
 <!-- /wp:pullquote -->
+<!-- wp:query {"queryId":1,"query":{"perPage":10,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","author":"","search":"","exclude":[],"sticky":"","inherit":false,"taxQuery":null,"parents":[],"format":[]}} -->
+  <div class="wp-block-query">
+    <!-- wp:post-template -->
+      <!-- wp:post-title /-->
+      <!-- wp:post-date /-->
+    <!-- /wp:post-template -->
+    <!-- wp:query-pagination -->
+      <!-- wp:query-pagination-previous {"label":"previous label"} /-->
+      <!-- wp:query-pagination-numbers /-->
+      <!-- wp:query-pagination-next  {"label":"next label"} /-->
+    <!-- /wp:query-pagination -->
+    <!-- wp:query-no-results -->
+      <!-- wp:paragraph {"placeholder":"Add text or blocks that will display when a query returns no results."} -->
+        <p><?php echo wp_kses_post( 'This is the no results message.', 'simple-theme' ); ?></p>
+      <!-- /wp:paragraph -->
+    <!-- /wp:query-no-results -->
+  </div>
+<!-- /wp:query -->
