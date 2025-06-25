@@ -45,5 +45,5 @@
   <figure class="wp-block-image size-full"><img src="<?php echo get_stylesheet_directory_uri() . '/assets/images/Screenshot-2025-06-03-at-8.46.24 AM.png'; ?>" alt="<?php echo esc_attr__( 'This is Image Alt Text', 'simple-theme' ); ?>" class="wp-image-211"/></figure>
 <!-- /wp:image -->
 <!-- wp:pullquote -->
-  <figure class="wp-block-pullquote"><?php echo wp_kses_post( '<blockquote><p>Pullquote Quote</p><cite>and the citation</cite></blockquote>', 'simple-theme' ); ?></figure>
+  <figure class="wp-block-pullquote"><blockquote><p><?php echo wp_kses_post( 'Pullquote Quote', 'simple-theme' ); ?></p><cite><?php echo wp_kses_post( 'and the citation', 'simple-theme' ); ?></cite></blockquote></figure>
 <!-- /wp:pullquote -->

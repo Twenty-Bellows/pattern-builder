@@ -344,10 +344,13 @@ class Pattern_Builder_Controller {
 				case 'core/list':
 				case 'core/list-item':
 				case 'core/quote':
-				case 'core/pullquote':
 				case 'core/verse':
 				case 'core/preformatted':
 					$block = $this->localize_text_block( $block );
+					break;
+
+				case 'core/pullquote':
+					$block = $this->localize_pullquote_block( $block );
 					break;
 
 				case 'core/button':
@@ -395,6 +398,51 @@ class Pattern_Builder_Controller {
 				$block['innerHTML'] = str_replace( $content, $localized, $block['innerHTML'] );
 				$block['innerContent'] = array( $block['innerHTML'] );
 			}
+		}
+
+		return $block;
+	}
+
+	/**
+	 * Localizes pullquote blocks with special handling for paragraph and citation content.
+	 *
+	 * @param array $block Block to localize.
+	 * @return array Localized block.
+	 */
+	private function localize_pullquote_block( $block ) {
+		if ( ! empty( $block['innerHTML'] ) ) {
+			$html = $block['innerHTML'];
+			
+			// Localize paragraph content(s) within the blockquote
+			$html = preg_replace_callback(
+				'/<p[^>]*>([^<]+)<\/p>/',
+				function( $matches ) {
+					$paragraph_content = trim( $matches[1] );
+					if ( ! empty( $paragraph_content ) ) {
+						$localized = $this->create_localized_string( $paragraph_content );
+						return str_replace( $matches[1], $localized, $matches[0] );
+					}
+					return $matches[0];
+				},
+				$html
+			);
+			
+			// Localize citation content
+			$html = preg_replace_callback(
+				'/<cite[^>]*>([^<]+)<\/cite>/',
+				function( $matches ) {
+					$cite_content = trim( $matches[1] );
+					if ( ! empty( $cite_content ) ) {
+						$localized = $this->create_localized_string( $cite_content );
+						return str_replace( $matches[1], $localized, $matches[0] );
+					}
+					return $matches[0];
+				},
+				$html
+			);
+			
+			$block['innerHTML'] = $html;
+			$block['innerContent'] = array( $html );
 		}
 
 		return $block;

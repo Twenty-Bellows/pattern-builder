@@ -66,7 +66,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 
 		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
 
-		$this->assertStringContainsString( "<?php echo esc_html__( 'Hello World', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Hello World', 'test-theme' ); ?>", $localized_pattern->content );
 	}
 
 	/**
@@ -81,7 +81,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 
 		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
 
-		$this->assertStringContainsString( "<?php echo esc_html__( 'Welcome to Our Site', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Welcome to Our Site', 'test-theme' ); ?>", $localized_pattern->content );
 	}
 
 	/**
@@ -96,7 +96,31 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 
 		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
 
-		$this->assertStringContainsString( "<?php echo esc_html__( 'Contact Us', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Contact Us', 'test-theme' ); ?>", $localized_pattern->content );
+	}
+
+	/**
+	 * Test that pullquote blocks are localized with separate calls for paragraph and citation.
+	 */
+	public function test_localize_pullquote_block() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:pullquote --><figure class="wp-block-pullquote"><blockquote><p>Pullquote Quote</p><cite>and the citation</cite></blockquote></figure><!-- /wp:pullquote -->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Check that the paragraph content is localized separately
+		$this->assertStringContainsString( "<p><?php echo wp_kses_post( 'Pullquote Quote', 'test-theme' ); ?></p>", $localized_pattern->content );
+		
+		// Check that the citation content is localized separately
+		$this->assertStringContainsString( "<cite><?php echo wp_kses_post( 'and the citation', 'test-theme' ); ?></cite>", $localized_pattern->content );
+		
+		// Verify that the blockquote tags themselves are not included in the localization calls
+		$this->assertStringNotContainsString( "wp_kses_post( '<blockquote>", $localized_pattern->content );
+		$this->assertStringNotContainsString( "wp_kses_post( '<p>", $localized_pattern->content );
+		$this->assertStringNotContainsString( "wp_kses_post( '<cite>", $localized_pattern->content );
 	}
 
 	/**
@@ -127,7 +151,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 
 		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
 
-		$this->assertStringContainsString( "<?php echo esc_html__( 'A beautiful sunset over the ocean', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'A beautiful sunset over the ocean', 'test-theme' ); ?>", $localized_pattern->content );
 	}
 
 	/**
@@ -159,10 +183,10 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 
 		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
 
-		$this->assertStringContainsString( "<?php echo esc_html__( 'Name', 'test-theme' ); ?>", $localized_pattern->content );
-		$this->assertStringContainsString( "<?php echo esc_html__( 'Age', 'test-theme' ); ?>", $localized_pattern->content );
-		$this->assertStringContainsString( "<?php echo esc_html__( 'John', 'test-theme' ); ?>", $localized_pattern->content );
-		$this->assertStringContainsString( "<?php echo esc_html__( '25', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Name', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Age', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'John', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( '25', 'test-theme' ); ?>", $localized_pattern->content );
 	}
 
 	/**
@@ -177,8 +201,8 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 
 		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
 
-		$this->assertStringContainsString( "<?php echo esc_html__( 'Section Title', 'test-theme' ); ?>", $localized_pattern->content );
-		$this->assertStringContainsString( "<?php echo esc_html__( 'Section content goes here.', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Section Title', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Section content goes here.', 'test-theme' ); ?>", $localized_pattern->content );
 	}
 
 	/**
@@ -193,7 +217,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 
 		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
 
-		$this->assertStringContainsString( "<?php echo esc_html__( 'It\\'s a beautiful day!', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'It\\'s a beautiful day!', 'test-theme' ); ?>", $localized_pattern->content );
 	}
 
 	/**
@@ -209,8 +233,8 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
 
 		// Should not contain any localization functions for empty content.
-		$this->assertStringNotContainsString( "esc_html__( '', ", $localized_pattern->content );
-		$this->assertStringNotContainsString( "esc_html__( ' ', ", $localized_pattern->content );
+		$this->assertStringNotContainsString( "wp_kses_post( '', ", $localized_pattern->content );
+		$this->assertStringNotContainsString( "wp_kses_post( ' ', ", $localized_pattern->content );
 	}
 
 	/**
@@ -226,7 +250,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
 
 		// Should not contain any localization functions.
-		$this->assertStringNotContainsString( 'esc_html__', $localized_pattern->content );
+		$this->assertStringNotContainsString( 'wp_kses_post', $localized_pattern->content );
 		$this->assertStringNotContainsString( 'esc_attr__', $localized_pattern->content );
 	}
 
@@ -242,8 +266,28 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 
 		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
 
-		$this->assertStringContainsString( "<?php echo esc_html__( 'Our Services', 'test-theme' ); ?>", $localized_pattern->content );
-		$this->assertStringContainsString( "<?php echo esc_html__( 'We provide excellent services for our clients.', 'test-theme' ); ?>", $localized_pattern->content );
-		$this->assertStringContainsString( "<?php echo esc_html__( 'Learn More', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Our Services', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'We provide excellent services for our clients.', 'test-theme' ); ?>", $localized_pattern->content );
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Learn More', 'test-theme' ); ?>", $localized_pattern->content );
+	}
+
+	/**
+	 * Test that pullquote blocks with multiple paragraphs are handled correctly.
+	 */
+	public function test_localize_pullquote_block_multiple_paragraphs() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:pullquote --><figure class="wp-block-pullquote"><blockquote><p>First paragraph of the quote.</p><p>Second paragraph of the quote.</p><cite>Quote Author</cite></blockquote></figure><!-- /wp:pullquote -->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Check that both paragraph contents are localized separately
+		$this->assertStringContainsString( "<p><?php echo wp_kses_post( 'First paragraph of the quote.', 'test-theme' ); ?></p>", $localized_pattern->content );
+		$this->assertStringContainsString( "<p><?php echo wp_kses_post( 'Second paragraph of the quote.', 'test-theme' ); ?></p>", $localized_pattern->content );
+		
+		// Check that the citation content is localized separately
+		$this->assertStringContainsString( "<cite><?php echo wp_kses_post( 'Quote Author', 'test-theme' ); ?></cite>", $localized_pattern->content );
 	}
 }
