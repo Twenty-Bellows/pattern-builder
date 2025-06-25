@@ -321,6 +321,10 @@ class Pattern_Builder_Controller {
 		// Serialize blocks back to content.
 		$pattern->content = serialize_blocks( $blocks );
 
+		// Fix encoded PHP tags that get encoded during serialization.
+		$pattern->content = str_replace( '\u003c', '<', $pattern->content );
+		$pattern->content = str_replace( '\u003e', '>', $pattern->content );
+
 		return $pattern;
 	}
 
@@ -368,6 +372,11 @@ class Pattern_Builder_Controller {
 
 				case 'core/table':
 					$block = $this->localize_table_block( $block );
+					break;
+
+				case 'core/query-pagination-next':
+				case 'core/query-pagination-previous':
+					$block = $this->localize_query_pagination_block( $block );
 					break;
 
 			}
@@ -540,6 +549,26 @@ class Pattern_Builder_Controller {
 				$block['innerHTML']
 			);
 			$block['innerContent'] = array( $block['innerHTML'] );
+		}
+
+		return $block;
+	}
+
+	/**
+	 * Localizes query pagination blocks (next/previous).
+	 *
+	 * @param array $block Block to localize.
+	 * @return array Localized block.
+	 */
+	private function localize_query_pagination_block( $block ) {
+		// For query pagination blocks, we need to handle the label attribute.
+		// These blocks are self-closing and the label should be localized within the attribute.
+
+		// Check if there's a label attribute to localize.
+		if ( ! empty( $block['attrs']['label'] ) ) {
+			$label                     = $block['attrs']['label'];
+			$localized_label           = $this->create_localized_string( $label, 'esc_attr__' );
+			$block['attrs']['label']   = $localized_label;
 		}
 
 		return $block;

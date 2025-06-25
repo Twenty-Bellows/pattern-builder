@@ -290,4 +290,56 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 		// Check that the citation content is localized separately
 		$this->assertStringContainsString( "<cite><?php echo wp_kses_post( 'Quote Author', 'test-theme' ); ?></cite>", $localized_pattern->content );
 	}
+
+	/**
+	 * Test that query pagination next blocks are localized correctly.
+	 */
+	public function test_localize_query_pagination_next_block() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:query-pagination-next {"label":"Next Page"} /-->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Check that the label attribute content is localized within the JSON attribute
+		$this->assertStringContainsString( '{"label":"<?php echo esc_attr__( \'Next Page\', \'test-theme\' ); ?>"}', $localized_pattern->content );
+		$this->assertStringContainsString( '/-->', $localized_pattern->content );
+	}
+
+	/**
+	 * Test that query pagination previous blocks are localized correctly.
+	 */
+	public function test_localize_query_pagination_previous_block() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:query-pagination-previous {"label":"Previous Page"} /-->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Check that the label attribute content is localized within the JSON attribute
+		$this->assertStringContainsString( '{"label":"<?php echo esc_attr__( \'Previous Page\', \'test-theme\' ); ?>"}', $localized_pattern->content );
+		$this->assertStringContainsString( '/-->', $localized_pattern->content );
+	}
+
+	/**
+	 * Test that query pagination blocks without labels are not affected.
+	 */
+	public function test_localize_query_pagination_block_without_label() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:query-pagination-next /-->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Should not contain any localization functions since there's no label
+		$this->assertStringNotContainsString( 'esc_attr__', $localized_pattern->content );
+		$this->assertStringNotContainsString( 'wp_kses_post', $localized_pattern->content );
+		$this->assertEquals( '<!-- wp:query-pagination-next /-->', $localized_pattern->content );
+	}
 }
