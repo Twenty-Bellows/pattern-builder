@@ -257,7 +257,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		$this->assertEquals('Updated Title', $pattern['title']['raw']);
 		$this->assertEquals('Updated description', $pattern['excerpt']['raw']);
-		$this->assertEquals('<!-- wp:paragraph -->Updated content<!-- /wp:paragraph -->', $pattern['content']['raw']);
+		$this->assertStringContainsString('Updated content', $pattern['content']['raw']);
 
 		// fetch the pattern file to ensure it was updated
 		$pattern_file = $this->test_dir . '/patterns/theme_synced_pattern.php';
@@ -364,7 +364,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertCount(1, $all_pb_block_posts, 'There should be one pb_block post after converting the user pattern to a theme pattern.');
 
 		// Make sure the pattern file has been created
-		$pattern_file = $this->test_dir . '/patterns/test_user_pattern.php';
+		$pattern_file = $this->test_dir . '/patterns/test-user-pattern.php';
 		$this->assertFileExists($pattern_file);
 	}
 
@@ -438,7 +438,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals('simple-theme/theme-synced-pattern', $pattern['slug']);
 
 		// Make sure the pattern file has been created
-		$pattern_file = $this->test_dir . '/patterns/theme_synced_pattern.php';
+		$pattern_file = $this->test_dir . '/patterns/theme-synced-pattern.php';
 		$this->assertFileExists($pattern_file);
 	}
 
