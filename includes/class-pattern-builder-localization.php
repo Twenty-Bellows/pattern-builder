@@ -340,12 +340,27 @@ class Pattern_Builder_Localization {
 				$block['innerHTML']
 			);
 
-			// Update innerContent first element if it exists and matches innerHTML
+			// Update innerContent if it exists and has been split
 			if ( ! empty( $block['innerContent'] ) && is_array( $block['innerContent'] ) ) {
-				// Find and update the innerHTML part in innerContent
+				// For details blocks with inner blocks, innerContent typically has:
+				// [0] = opening part with summary, [1] = null (for inner blocks), [2] = closing </details>
+				
+				// Find the opening part that contains the summary and update it with localized content
 				foreach ( $block['innerContent'] as $index => $content ) {
 					if ( is_string( $content ) && strpos( $content, '<summary' ) !== false ) {
-						$block['innerContent'][ $index ] = $block['innerHTML'];
+						// Apply the same localization to this part
+						$block['innerContent'][ $index ] = preg_replace_callback(
+							'/<summary[^>]*>([^<]+)<\/summary>/',
+							function ( $matches ) {
+								$summary_content = trim( $matches[1] );
+								if ( ! empty( $summary_content ) ) {
+									$localized = self::create_localized_string( $summary_content );
+									return str_replace( $matches[1], $localized, $matches[0] );
+								}
+								return $matches[0];
+							},
+							$content
+						);
 						break;
 					}
 				}

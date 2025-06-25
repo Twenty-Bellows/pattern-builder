@@ -522,4 +522,32 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'wp_kses_post', $localized_pattern->content );
 		$this->assertEquals( '<!-- wp:search {"showLabel":false,"buttonUseIcon":true} /-->', $localized_pattern->content );
 	}
+
+	/**
+	 * Test that details blocks with inner blocks don't create duplicate closing tags.
+	 */
+	public function test_localize_details_block_with_inner_blocks_no_duplicate_tags() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:details --><details class="wp-block-details"><summary>This is a details block</summary><!-- wp:paragraph {"placeholder":"Type / to add a hidden block"} --><p>And this is the hidden content</p><!-- /wp:paragraph --></details><!-- /wp:details -->'
+		) );
+
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
+
+		// Check that the summary content is localized
+		$this->assertStringContainsString( '<summary><?php echo wp_kses_post( \'This is a details block\', \'test-theme\' ); ?></summary>', $localized_pattern->content );
+
+		// Check that the paragraph content is also localized
+		$this->assertStringContainsString( '<?php echo wp_kses_post( \'And this is the hidden content\', \'test-theme\' ); ?>', $localized_pattern->content );
+
+		// Critical test: Should NOT have duplicate </details> closing tags
+		$closing_tags_count = substr_count( $localized_pattern->content, '</details>' );
+		$this->assertEquals( 1, $closing_tags_count, 'Should only have one closing </details> tag, but found ' . $closing_tags_count );
+
+		// Should not have orphaned closing tags
+		$this->assertStringNotContainsString( '</details><!-- /wp:paragraph -->', $localized_pattern->content );
+		$this->assertStringNotContainsString( '</details></details>', $localized_pattern->content );
+	}
+
 }
