@@ -5,7 +5,6 @@
  * Description: A pattern to test nested patterns
  */
 ?>
-
 <!-- wp:pattern {"slug":"simple-theme/theme-unsynced-pattern"} /-->
 <!-- wp:pattern {"slug":"simple-theme/theme-synced-pattern"} /-->
 <!-- wp:pattern {"slug":"simple-theme/theme-restrictions-test"} /-->
