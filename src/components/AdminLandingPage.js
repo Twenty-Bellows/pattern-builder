@@ -35,15 +35,7 @@ export const AdminLandingPage = () => {
 							href="https://twentybellows.com/pattern-builder-help#what-are-patterns"
 							target="_blank"
 						>
-							What are <b>Patterns</b>?
-						</a>
-					</li>
-					<li>
-						<a
-							href="https://twentybellows.com/pattern-builder-help#how-patterns-improve-wordpress"
-							target="_blank"
-						>
-							How do patterns make <b>WordPress</b> better?
+							What are <b>Patterns</b> and how are they different than <b>Custom Blocks</b>?
 						</a>
 					</li>
 					<li>
@@ -115,6 +107,30 @@ export const AdminLandingPage = () => {
 						>
 							Add Patterns to Posts, Pages, Templates (and even
 							other patterns)
+						</a>
+					</li>
+					<li>
+						<a
+							href="https://twentybellows.com/pattern-builder-help#include-images-in-patterns"
+							target="_blank"
+						>
+							Include image assets used in patterns in your Theme
+						</a>
+					</li>
+					<li>
+						<a
+							href="https://twentybellows.com/pattern-builder-help#localize-patterns"
+							target="_blank"
+						>
+							Prepare Patterns for Localization
+						</a>
+					</li>
+					<li>
+						<a
+							href="https://twentybellows.com/pattern-builder-help#bind-pattern-content"
+							target="_blank"
+						>
+							Allow users to override Pattern Content without changing the pattern itself
 						</a>
 					</li>
 				</ul>
