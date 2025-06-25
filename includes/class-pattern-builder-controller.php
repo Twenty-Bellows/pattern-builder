@@ -520,7 +520,7 @@ class Pattern_Builder_Controller {
 	 * @param string $function Localization function to use.
 	 * @return string Localized string in PHP format.
 	 */
-	private function create_localized_string( $text, $function = 'esc_html__' ) {
+	private function create_localized_string( $text, $function = 'wp_kses_post' ) {
 		// Escape single quotes in the text.
 		$escaped_text = str_replace( "'", "\\'", $text );
 
