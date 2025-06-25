@@ -6,9 +6,7 @@ use WP_Block_Patterns_Registry;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_Error;
-use WP_Query;
 use WP_REST_Blocks_Controller;
-use WP_Block_Editor_Context;
 
 require_once __DIR__ . '/class-pattern-builder-abstract-pattern.php';
 require_once __DIR__ . '/class-pattern-builder-controller.php';
@@ -25,8 +23,6 @@ class Pattern_Builder_API {
 		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
 		add_action( 'init', array( $this, 'register_patterns' ), 9 );
 
-		// TODO: This is shared code with the Synced Patterns for Themes plugin.
-		// It should be moved to a common location and make sure there are no conflicts.
 		add_filter( 'rest_request_after_callbacks', array( $this, 'inject_theme_patterns' ), 10, 3 );
 
 		add_filter( 'rest_pre_dispatch', array( $this, 'handle_hijack_block_update' ), 10, 3 );
@@ -34,7 +30,6 @@ class Pattern_Builder_API {
 
 		add_filter( 'rest_request_before_callbacks', array( $this, 'handle_block_to_pattern_conversion' ), 10, 3 );
 
-		// Add filter for wp:pattern block pre-rendering to modify block data
 		add_filter( 'pre_render_block', array( $this, 'filter_pattern_block_attributes' ), 10, 2 );
 	}
 
@@ -43,11 +38,6 @@ class Pattern_Builder_API {
 	 * Registers REST API routes for the Pattern Builder.
 	 */
 	public function register_routes(): void {
-		// register_rest_route(self::$base_route, '/global-styles', [
-		// 'methods'  => 'GET',
-		// 'callback' => [$this, 'get_global_styles'],
-		// 'permission_callback' => [$this, 'read_permission_callback'],
-		// ]);
 
 		register_rest_route(
 			self::$base_route,
@@ -59,17 +49,6 @@ class Pattern_Builder_API {
 			)
 		);
 
-		// register_rest_route(self::$base_route, '/pattern', [
-		// 'methods'  => ['PUT', 'POST'],
-		// 'callback' => [$this, 'save_block_pattern'],
-		// 'permission_callback' => [$this, 'write_permission_callback'],
-		// ]);
-
-		// register_rest_route(self::$base_route, '/pattern', [
-		// 'methods'  => 'DELETE',
-		// 'callback' => [$this, 'delete_block_pattern'],
-		// 'permission_callback' => [$this, 'write_permission_callback'],
-		// ]);
 	}
 
 	/**
@@ -114,21 +93,6 @@ class Pattern_Builder_API {
 	}
 
 	// Callback functions //////////
-
-	/**
-	 * Retrieves global styles.
-	 *
-	 * @param WP_REST_Request $request The REST request object.
-	 * @return WP_REST_Response
-	 */
-	public function get_global_styles( WP_REST_Request $request ): WP_REST_Response {
-		$editor_context           = new WP_Block_Editor_Context( array( 'name' => 'core/edit-site' ) );
-		$settings                 = get_block_editor_settings( array(), $editor_context );
-		$settings['mediaUpload']  = true;
-		$settings['mediaLibrary'] = true;
-
-		return rest_ensure_response( $settings );
-	}
 
 	/**
 	 * Retrieves all block patterns.
@@ -285,55 +249,13 @@ class Pattern_Builder_API {
 		}
 	}
 
+
 	/**
-	 * Saves a block pattern.
 	 *
-	 * @param WP_REST_Request $request The REST request object.
-	 * @return WP_REST_Response|WP_Error
+	 * Filters delete calls and if the item being deleted is a 'pb_block' (theme pattern)
+	 * delete the related pattern php file as well.
+	 *
 	 */
-	public function save_block_pattern( WP_REST_Request $request ) {
-		$pattern_data = json_decode( $request->get_body(), true );
-
-		if ( empty( $pattern_data ) ) {
-			return new WP_Error( 'no_patterns', 'No pattern to save', array( 'status' => 400 ) );
-		}
-
-		$pattern = new Abstract_Pattern( $pattern_data );
-
-		$pattern = $this->controller->remap_patterns( $pattern );
-
-		if ( $pattern->source === 'user' ) {
-			$response = $this->controller->update_user_pattern( $pattern );
-		} elseif ( $pattern->source === 'theme' ) {
-			$response = $this->controller->update_theme_pattern( $pattern );
-		} else {
-			return new WP_Error( 'invalid_pattern', 'Pattern source is not valid', array( 'status' => 400 ) );
-		}
-
-		return rest_ensure_response( $response );
-	}
-
-
-	public function delete_block_pattern( WP_REST_Request $request ) {
-		$pattern_data = json_decode( $request->get_body(), true );
-
-		if ( empty( $pattern_data ) ) {
-			return new WP_Error( 'no_patterns', 'No pattern to save', array( 'status' => 400 ) );
-		}
-
-		$pattern = new Abstract_Pattern( $pattern_data );
-
-		if ( $pattern->source === 'user' ) {
-			$response = $this->controller->delete_user_pattern( $pattern );
-		} elseif ( $pattern->source === 'theme' ) {
-			$response = $this->controller->delete_theme_pattern( $pattern );
-		} else {
-			return new WP_Error( 'invalid_pattern', 'Pattern source is not valid', array( 'status' => 400 ) );
-		}
-
-		return rest_ensure_response( $response );
-	}
-
 	function handle_hijack_block_delete( $response, $server, $request ) {
 
 		$route = $request->get_route();
@@ -373,6 +295,14 @@ class Pattern_Builder_API {
 		return $response;
 	}
 
+	/**
+	 *
+	 * This filter handles additional logic when a pb_block (theme pattern) is updated.
+	 * It updates the pattern file as well as associated metadata for the pattern.
+	 * Additionally it will optionally localize the content as well as import any media
+	 * referenced by the pattern into the theme.
+	 *
+	 */
 	function handle_hijack_block_update( $response, $handler, $request ) {
 		if ( pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing() ) {
 
@@ -462,12 +392,12 @@ class Pattern_Builder_API {
 						} else {
 							// Check configuration options via query parameters
 							$options = array();
-							
+
 							$localize_param = $request->get_param( 'patternBuilderLocalize' );
 							if ( $localize_param === 'true' ) {
 								$options['localize'] = true;
 							}
-							
+
 							$import_images_param = $request->get_param( 'patternBuilderImportImages' );
 							if ( $import_images_param === 'false' ) {
 								$options['import_images'] = false;
@@ -475,7 +405,7 @@ class Pattern_Builder_API {
 								// Default to true if not explicitly disabled
 								$options['import_images'] = true;
 							}
-							
+
 							$this->controller->update_theme_pattern( $pattern, $options );
 						}
 
@@ -489,6 +419,9 @@ class Pattern_Builder_API {
 		return $response;
 	}
 
+	/**
+	 * When anything is saved any wp:block that references a theme pattern is converted to a wp:pattern block instead.
+	 */
 	public function handle_block_to_pattern_conversion( $response, $handler, $request ) {
 		if ( $request->get_method() === 'PUT' || $request->get_method() === 'POST' ) {
 			$body = json_decode( $request->get_body(), true );
