@@ -1,6 +1,6 @@
 {
 	"name": "pattern-builder",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Manage patterns in WordPress",
 	"author": "twentybellows",
 	"main": "build/index.js",
