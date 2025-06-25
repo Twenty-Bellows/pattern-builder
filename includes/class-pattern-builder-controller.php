@@ -535,7 +535,8 @@ class Pattern_Builder_Controller
 			$path = get_stylesheet_directory() . '/patterns/' . $filename . '.php';
 		}
 
-		$file_content = $this->build_pattern_file_metadata($pattern) . $pattern->content;
+		$formatted_content = $this->format_block_markup($pattern->content);
+		$file_content = $this->build_pattern_file_metadata($pattern) . $formatted_content;
 		$response = file_put_contents($path, $file_content);
 
 		if (!$response) {
@@ -626,5 +627,89 @@ class Pattern_Builder_Controller
 		);
 
 		return $pattern;
+	}
+
+	/**
+	 * Formats block markup to be nicely readable.
+	 * This is a PHP port of the JavaScript formatBlockMarkup() function.
+	 *
+	 * @param string $block_markup The block markup to format.
+	 * @return string The formatted block markup.
+	 */
+	public function format_block_markup( $block_markup ) {
+		$block_markup = $this->add_new_lines_to_block_markup( $block_markup );
+		$block_markup = $this->indent_block_markup( $block_markup );
+		return trim( $block_markup );
+	}
+
+	/**
+	 * Adds new lines to block markup for better readability.
+	 *
+	 * @param string $block_markup The block markup to add new lines to.
+	 * @return string The block markup with new lines added.
+	 */
+	private function add_new_lines_to_block_markup( $block_markup ) {
+		// Add newlines before and after each comment
+		$block_markup = preg_replace_callback(
+			'/<!--(.*?)-->/s',
+			function( $matches ) {
+				$content = trim( $matches[1] );
+				return "\n<!-- {$content} -->\n";
+			},
+			$block_markup
+		);
+
+		// Fix spacing for self-closing blocks
+		$block_markup = str_replace( '/ -->', '/-->', $block_markup );
+
+		// Normalize multiple newlines into a single one
+		$block_markup = preg_replace( '/\n{2,}/', "\n", $block_markup );
+
+		return $block_markup;
+	}
+
+	/**
+	 * Indents block markup for better readability.
+	 *
+	 * @param string $block_markup The block markup to indent.
+	 * @return string The indented block markup.
+	 */
+	private function indent_block_markup( $block_markup ) {
+		$lines = explode( "\n", $block_markup );
+		$lines = array_map( 'trim', $lines );
+		$indent_str = '  ';
+		$indent_level = 0;
+		$output = [];
+
+		foreach ( $lines as $line ) {
+			// Detect closing tags/comments (should reduce indent before rendering)
+			$is_closing_comment = preg_match( '/^<!--\s*\/[\w:-]+\s*-->$/', $line );
+			$is_closing_tag = preg_match( '/^<\/[\w:-]+>$/', $line );
+
+			if ( $is_closing_comment || $is_closing_tag ) {
+				$indent_level = max( $indent_level - 1, 0 );
+			}
+
+			$output[] = str_repeat( $indent_str, $indent_level ) . $line;
+
+			// Detect opening comment (not self-closing)
+			$is_opening_comment = preg_match( '/^<!--\s*[\w:-]+\b.*-->$/', $line ) &&
+				! preg_match( '/\/\s*-->$/', $line );
+
+			// Detect opening tag (not self-closing)
+			$is_opening_tag = preg_match( '/^<([\w:-]+)(\s[^>]*)?>$/', $line );
+
+			// Self-closing HTML tag
+			$is_self_closing_tag = preg_match( '/^<[^>]+\/>$/', $line );
+
+			// Self-closing block markup
+			$is_self_closing_comment = preg_match( '/^<!--.*\/\s*-->$/', $line );
+
+			if ( ( $is_opening_comment || $is_opening_tag ) && ! $is_self_closing_tag && ! $is_self_closing_comment ) {
+				$indent_level++;
+			}
+		}
+
+		return implode( "\n", $output );
 	}
 }
