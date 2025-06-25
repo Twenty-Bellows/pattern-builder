@@ -4,7 +4,10 @@
 		"phpunit/phpunit": "^9.3",
 		"wp-phpunit/wp-phpunit": "^6.6",
 		"yoast/phpunit-polyfills": "^1.1",
-		"spatie/phpunit-watcher": "^1.23"
+		"spatie/phpunit-watcher": "^1.23",
+		"squizlabs/php_codesniffer": "^3.7",
+		"wp-coding-standards/wpcs": "^3.0",
+		"dealerdirect/phpcodesniffer-composer-installer": "^1.0"
 	},
 	"require": {
 		"freemius/wordpress-sdk": "^2.12"
@@ -23,5 +26,10 @@
 			"name": "Jason Crist",
 			"email": "jcrist@pbking.com"
 		}
-	]
+	],
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
+	}
 }
