@@ -385,6 +385,10 @@ class Pattern_Builder_Controller {
 					$block = $this->localize_post_excerpt_block( $block );
 					break;
 
+				case 'core/details':
+					$block = $this->localize_details_block( $block );
+					break;
+
 			}
 
 			// Process inner blocks recursively.
@@ -595,6 +599,43 @@ class Pattern_Builder_Controller {
 			$more_text                     = $block['attrs']['moreText'];
 			$localized_more_text           = $this->create_localized_string( $more_text, 'esc_attr__' );
 			$block['attrs']['moreText']    = $localized_more_text;
+		}
+
+		return $block;
+	}
+
+	/**
+	 * Localizes details blocks with special handling for summary content.
+	 *
+	 * @param array $block Block to localize.
+	 * @return array Localized block.
+	 */
+	private function localize_details_block( $block ) {
+		if ( ! empty( $block['innerHTML'] ) ) {
+			// Localize summary content in innerHTML
+			$block['innerHTML'] = preg_replace_callback(
+				'/<summary[^>]*>([^<]+)<\/summary>/',
+				function ( $matches ) {
+					$summary_content = trim( $matches[1] );
+					if ( ! empty( $summary_content ) ) {
+						$localized = $this->create_localized_string( $summary_content );
+						return str_replace( $matches[1], $localized, $matches[0] );
+					}
+					return $matches[0];
+				},
+				$block['innerHTML']
+			);
+
+			// Update innerContent first element if it exists and matches innerHTML
+			if ( ! empty( $block['innerContent'] ) && is_array( $block['innerContent'] ) ) {
+				// Find and update the innerHTML part in innerContent
+				foreach ( $block['innerContent'] as $index => $content ) {
+					if ( is_string( $content ) && strpos( $content, '<summary' ) !== false ) {
+						$block['innerContent'][ $index ] = $block['innerHTML'];
+						break;
+					}
+				}
+			}
 		}
 
 		return $block;

@@ -101,3 +101,10 @@
     <!-- wp:post-comments-form /-->
   </div>
 <!-- /wp:comments -->
+<!-- wp:details -->
+  <details class="wp-block-details"><summary><?php echo wp_kses_post( 'This is a details block', 'simple-theme' ); ?></summary></details>
+  <!-- wp:paragraph {"placeholder":"Type / to add a hidden block"} -->
+    <p><?php echo wp_kses_post( 'And this is the hidden content', 'simple-theme' ); ?></p>
+  <!-- /wp:paragraph -->
+</details>
+<!-- /wp:details -->

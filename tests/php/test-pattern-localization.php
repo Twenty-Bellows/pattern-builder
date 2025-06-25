@@ -11,11 +11,11 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 	public function setUp(): void {
 		parent::setUp();
 		$this->controller = new Pattern_Builder_Controller();
-		
+
 		// Set up test theme directory.
 		$this->test_dir = get_temp_dir() . 'pattern-builder-test-' . time();
 		wp_mkdir_p( $this->test_dir );
-		
+
 		// Mock get_stylesheet_directory to return our test directory.
 		add_filter( 'stylesheet_directory', array( $this, 'mock_stylesheet_directory' ) );
 		add_filter( 'stylesheet', array( $this, 'mock_stylesheet' ) );
@@ -26,10 +26,10 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 		if ( is_dir( $this->test_dir ) ) {
 			$this->delete_directory( $this->test_dir );
 		}
-		
+
 		remove_filter( 'stylesheet_directory', array( $this, 'mock_stylesheet_directory' ) );
 		remove_filter( 'stylesheet', array( $this, 'mock_stylesheet' ) );
-		
+
 		parent::tearDown();
 	}
 
@@ -45,7 +45,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 		if ( ! is_dir( $dir ) ) {
 			return;
 		}
-		
+
 		$files = array_diff( scandir( $dir ), array( '.', '..' ) );
 		foreach ( $files as $file ) {
 			$path = $dir . '/' . $file;
@@ -113,10 +113,10 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 
 		// Check that the paragraph content is localized separately
 		$this->assertStringContainsString( "<p><?php echo wp_kses_post( 'Pullquote Quote', 'test-theme' ); ?></p>", $localized_pattern->content );
-		
+
 		// Check that the citation content is localized separately
 		$this->assertStringContainsString( "<cite><?php echo wp_kses_post( 'and the citation', 'test-theme' ); ?></cite>", $localized_pattern->content );
-		
+
 		// Verify that the blockquote tags themselves are not included in the localization calls
 		$this->assertStringNotContainsString( "wp_kses_post( '<blockquote>", $localized_pattern->content );
 		$this->assertStringNotContainsString( "wp_kses_post( '<p>", $localized_pattern->content );
@@ -286,7 +286,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 		// Check that both paragraph contents are localized separately
 		$this->assertStringContainsString( "<p><?php echo wp_kses_post( 'First paragraph of the quote.', 'test-theme' ); ?></p>", $localized_pattern->content );
 		$this->assertStringContainsString( "<p><?php echo wp_kses_post( 'Second paragraph of the quote.', 'test-theme' ); ?></p>", $localized_pattern->content );
-		
+
 		// Check that the citation content is localized separately
 		$this->assertStringContainsString( "<cite><?php echo wp_kses_post( 'Quote Author', 'test-theme' ); ?></cite>", $localized_pattern->content );
 	}
@@ -393,5 +393,62 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'esc_attr__', $localized_pattern->content );
 		$this->assertStringNotContainsString( 'wp_kses_post', $localized_pattern->content );
 		$this->assertEquals( '<!-- wp:post-excerpt /-->', $localized_pattern->content );
+	}
+
+	/**
+	 * Test that details blocks with summary content are localized correctly.
+	 */
+	public function test_localize_details_block_with_summary() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:details --><details class="wp-block-details"><summary>Click to expand</summary><!-- wp:paragraph --><p>Hidden content here</p><!-- /wp:paragraph --></details><!-- /wp:details -->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Check that the summary content is localized
+		$this->assertStringContainsString( "<summary><?php echo wp_kses_post( 'Click to expand', 'test-theme' ); ?></summary>", $localized_pattern->content );
+
+		// Check that the paragraph content is also localized (existing functionality)
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Hidden content here', 'test-theme' ); ?>", $localized_pattern->content );
+	}
+
+	/**
+	 * Test that details blocks with complex summary content are localized correctly.
+	 */
+	public function test_localize_details_block_with_complex_summary() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:details --><details class="wp-block-details"><summary>FAQ: What is this?</summary><!-- wp:paragraph --><p>This is the answer to the question.</p><!-- /wp:paragraph --></details><!-- /wp:details -->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Check that the summary content with special characters is localized
+		$this->assertStringContainsString( "<summary><?php echo wp_kses_post( 'FAQ: What is this?', 'test-theme' ); ?></summary>", $localized_pattern->content );
+
+		// Check that the paragraph content is also localized
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'This is the answer to the question.', 'test-theme' ); ?>", $localized_pattern->content );
+	}
+
+	/**
+	 * Test that details blocks with empty summary are not affected.
+	 */
+	public function test_localize_details_block_with_empty_summary() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:details --><details class="wp-block-details"><summary></summary><!-- wp:paragraph --><p>Content here</p><!-- /wp:paragraph --></details><!-- /wp:details -->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Check that empty summary is not localized
+		$this->assertStringContainsString( '<summary></summary>', $localized_pattern->content );
+
+		// But the paragraph content should still be localized
+		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Content here', 'test-theme' ); ?>", $localized_pattern->content );
 	}
 }
