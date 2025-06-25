@@ -381,6 +381,10 @@ class Pattern_Builder_Controller {
 					$block = $this->localize_query_pagination_block( $block );
 					break;
 
+				case 'core/post-excerpt':
+					$block = $this->localize_post_excerpt_block( $block );
+					break;
+
 			}
 
 			// Process inner blocks recursively.
@@ -571,6 +575,26 @@ class Pattern_Builder_Controller {
 			$label                     = $block['attrs']['label'];
 			$localized_label           = $this->create_localized_string( $label, 'esc_attr__' );
 			$block['attrs']['label']   = $localized_label;
+		}
+
+		return $block;
+	}
+
+	/**
+	 * Localizes post excerpt blocks.
+	 *
+	 * @param array $block Block to localize.
+	 * @return array Localized block.
+	 */
+	private function localize_post_excerpt_block( $block ) {
+		// For post excerpt blocks, we need to handle the moreText attribute.
+		// These blocks are self-closing and the moreText should be localized within the attribute.
+
+		// Check if there's a moreText attribute to localize.
+		if ( ! empty( $block['attrs']['moreText'] ) ) {
+			$more_text                     = $block['attrs']['moreText'];
+			$localized_more_text           = $this->create_localized_string( $more_text, 'esc_attr__' );
+			$block['attrs']['moreText']    = $localized_more_text;
 		}
 
 		return $block;

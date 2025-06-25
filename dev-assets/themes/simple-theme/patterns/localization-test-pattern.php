@@ -52,6 +52,7 @@
     <!-- wp:post-template -->
       <!-- wp:post-title /-->
       <!-- wp:post-date /-->
+      <!-- wp:post-excerpt {"moreText":"<?php echo esc_attr__( 'exerpt more label', 'simple-theme' ); ?>"} /-->
     <!-- /wp:post-template -->
     <!-- wp:query-pagination -->
       <!-- wp:query-pagination-previous {"label":"<?php echo esc_attr__( 'previous label', 'simple-theme' ); ?>"} /-->

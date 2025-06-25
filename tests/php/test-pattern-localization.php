@@ -342,4 +342,56 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'wp_kses_post', $localized_pattern->content );
 		$this->assertEquals( '<!-- wp:query-pagination-next /-->', $localized_pattern->content );
 	}
+
+	/**
+	 * Test that post excerpt blocks with moreText are localized correctly.
+	 */
+	public function test_localize_post_excerpt_block_with_more_text() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:post-excerpt {"moreText":"Read More"} /-->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Check that the moreText attribute content is localized within the JSON attribute
+		$this->assertStringContainsString( '{"moreText":"<?php echo esc_attr__( \'Read More\', \'test-theme\' ); ?>"}', $localized_pattern->content );
+		$this->assertStringContainsString( '/-->', $localized_pattern->content );
+	}
+
+	/**
+	 * Test that post excerpt blocks with custom moreText are localized correctly.
+	 */
+	public function test_localize_post_excerpt_block_with_custom_more_text() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:post-excerpt {"moreText":"Continue Reading..."} /-->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Check that the moreText attribute content is localized within the JSON attribute
+		$this->assertStringContainsString( '{"moreText":"<?php echo esc_attr__( \'Continue Reading...\', \'test-theme\' ); ?>"}', $localized_pattern->content );
+		$this->assertStringContainsString( '/-->', $localized_pattern->content );
+	}
+
+	/**
+	 * Test that post excerpt blocks without moreText are not affected.
+	 */
+	public function test_localize_post_excerpt_block_without_more_text() {
+		$pattern = new Abstract_Pattern( array(
+			'name'    => 'test-pattern',
+			'title'   => 'Test Pattern',
+			'content' => '<!-- wp:post-excerpt /-->'
+		) );
+
+		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+
+		// Should not contain any localization functions since there's no moreText
+		$this->assertStringNotContainsString( 'esc_attr__', $localized_pattern->content );
+		$this->assertStringNotContainsString( 'wp_kses_post', $localized_pattern->content );
+		$this->assertEquals( '<!-- wp:post-excerpt /-->', $localized_pattern->content );
+	}
 }
