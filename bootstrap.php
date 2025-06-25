@@ -23,14 +23,14 @@ require_once "{$_tests_dir}/includes/functions.php";
  */
 function _manually_load_plugin() {
 	// Load composer autoloader here, after WordPress core is loaded
-	require dirname( __FILE__ ) . '/vendor/autoload.php';
+	require __DIR__ . '/vendor/autoload.php';
 
 	// Manually ensure Freemius SDK is loaded since it checks for ABSPATH
 	if ( ! function_exists( 'fs_dynamic_init' ) ) {
-		require dirname( __FILE__ ) . '/vendor/freemius/wordpress-sdk/start.php';
+		require __DIR__ . '/vendor/freemius/wordpress-sdk/start.php';
 	}
 
-	require dirname( __FILE__ ) . '/pattern-builder.php';
+	require __DIR__ . '/pattern-builder.php';
 }
 
 tests_add_filter( 'muplugins_loaded', '_manually_load_plugin' );

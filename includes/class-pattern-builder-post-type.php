@@ -2,32 +2,30 @@
 
 namespace TwentyBellows\PatternBuilder;
 
-class Pattern_Builder_Post_Type
-{
-	public function __construct()
-	{
-		add_action('init', [$this, 'register_pb_block_post_type']);
-		add_filter('render_block', [$this, 'render_pb_blocks'] , 10, 2);
-		add_filter('register_block_type_args', [$this, 'add_content_attribute_to_core_pattern_block'] , 10, 2);
+class Pattern_Builder_Post_Type {
+
+	public function __construct() {
+		add_action( 'init', array( $this, 'register_pb_block_post_type' ) );
+		add_filter( 'render_block', array( $this, 'render_pb_blocks' ), 10, 2 );
+		add_filter( 'register_block_type_args', array( $this, 'add_content_attribute_to_core_pattern_block' ), 10, 2 );
 	}
 
 	/**
 	 * Adds a "content" attribute to the core/pattern block type.
 	 * This is used to store the pattern overrides for the block.
 	 *
-	 * @param array $args The block type arguments.
+	 * @param array  $args The block type arguments.
 	 * @param string $block_type The block type name.
 	 * @return array
 	 */
-	public function add_content_attribute_to_core_pattern_block($args, $block_type)
-	{
-		if ($block_type === 'core/pattern') {
-			$extra_attributes = array(
-				"content" => array(
-					"type" => "object",
-				)
+	public function add_content_attribute_to_core_pattern_block( $args, $block_type ) {
+		if ( $block_type === 'core/pattern' ) {
+			$extra_attributes   = array(
+				'content' => array(
+					'type' => 'object',
+				),
 			);
-			$args['attributes'] = array_merge($args['attributes'], $extra_attributes);
+			$args['attributes'] = array_merge( $args['attributes'], $extra_attributes );
 		}
 		return $args;
 	}
@@ -35,68 +33,85 @@ class Pattern_Builder_Post_Type
 	/**
 	 * Registers the pb_block custom post type.
 	 */
-	public function register_pb_block_post_type()
-	{
-		$labels = [
-			'name'               => __('PB Blocks', 'pattern-builder'),
-			'singular_name'      => __('PB Block', 'pattern-builder'),
-		];
+	public function register_pb_block_post_type() {
+		$labels = array(
+			'name'          => __( 'PB Blocks', 'pattern-builder' ),
+			'singular_name' => __( 'PB Block', 'pattern-builder' ),
+		);
 
-		$args = [
-			'labels'             => $labels,
+		$args = array(
+			'labels'          => $labels,
 
-			'public'             => true,
-			'show_ui'            => true,
-			'show_in_menu'       => false,
-			'show_in_rest'       => true,
-			'rest_base'          => 'pb_blocks',
-			'supports'           => ['title', 'editor', 'revisions'],
-			'hierarchical'       => false,
-			'capability_type'    => 'pb_block',
-			'map_meta_cap'       => true,
-		];
+			'public'          => true,
+			'show_ui'         => true,
+			'show_in_menu'    => false,
+			'show_in_rest'    => true,
+			'rest_base'       => 'pb_blocks',
+			'supports'        => array( 'title', 'editor', 'revisions' ),
+			'hierarchical'    => false,
+			'capability_type' => 'pb_block',
+			'map_meta_cap'    => true,
+		);
 
-		register_post_type('pb_block', $args);
+		register_post_type( 'pb_block', $args );
 
-		register_post_meta('pb_block', 'wp_pattern_sync_status', [
-			'show_in_rest' => true,
-			'type'         => 'string',
-			'single'       => true,
-		]);
+		register_post_meta(
+			'pb_block',
+			'wp_pattern_sync_status',
+			array(
+				'show_in_rest' => true,
+				'type'         => 'string',
+				'single'       => true,
+			)
+		);
 
-		register_post_meta('pb_block', 'wp_pattern_block_types', [
-			'show_in_rest' => true,
-			'type'         => 'string',
-			'single'       => true,
-		]);
+		register_post_meta(
+			'pb_block',
+			'wp_pattern_block_types',
+			array(
+				'show_in_rest' => true,
+				'type'         => 'string',
+				'single'       => true,
+			)
+		);
 
-		register_post_meta('pb_block', 'wp_pattern_template_types', [
-			'show_in_rest' => true,
-			'type'         => 'string',
-			'single'       => true,
-		]);
+		register_post_meta(
+			'pb_block',
+			'wp_pattern_template_types',
+			array(
+				'show_in_rest' => true,
+				'type'         => 'string',
+				'single'       => true,
+			)
+		);
 
-		register_post_meta('pb_block', 'wp_pattern_inserter', [
-			'show_in_rest' => true,
-			'type'         => 'string',
-			'single'       => true,
-		]);
+		register_post_meta(
+			'pb_block',
+			'wp_pattern_inserter',
+			array(
+				'show_in_rest' => true,
+				'type'         => 'string',
+				'single'       => true,
+			)
+		);
 
-		register_post_meta('pb_block', 'wp_pattern_post_types', [
-			'show_in_rest' => true,
-			'type'         => 'string',
-			'single'       => true,
-		]);
-
-
+		register_post_meta(
+			'pb_block',
+			'wp_pattern_post_types',
+			array(
+				'show_in_rest' => true,
+				'type'         => 'string',
+				'single'       => true,
+			)
+		);
 
 		/**
 		 * Add custom capabilities for the pb_block post type.
 		 */
 
-		$roles = ['administrator', 'editor'];
+		$roles = array( 'administrator', 'editor' );
 
-		$capabilities = [
+		$capabilities = array(
 			'edit_pb_block',
 			'read_pb_block',
 			'delete_pb_block',
@@ -110,14 +125,14 @@ class Pattern_Builder_Post_Type
 			'delete_others_pb_blocks',
 			'edit_private_pb_blocks',
 			'edit_published_pb_blocks',
-		];
+		);
 
 		// Assign capabilities to each role
-		foreach ($roles as $role_name) {
-			$role = get_role($role_name);
-			if ($role) {
-				foreach ($capabilities as $capability) {
-					$role->add_cap($capability);
+		foreach ( $roles as $role_name ) {
+			$role = get_role( $role_name );
+			if ( $role ) {
+				foreach ( $capabilities as $capability ) {
+					$role->add_cap( $capability );
 				}
 			}
 		}
@@ -134,23 +149,22 @@ class Pattern_Builder_Post_Type
 	 * @param array  $block        The block data.
 	 * @return string
 	 */
-	public function render_pb_blocks($block_content, $block)
-	{
+	public function render_pb_blocks( $block_content, $block ) {
 		// store a reference to the block to prevent infinite recursion
 		static $seen_refs = array();
 
 		// if we have a block pattern with no content we PROBABLY are trying to render
 		// a pb_block (theme pattern)
-		if ($block['blockName'] === 'core/block' && $block_content === '') {
+		if ( $block['blockName'] === 'core/block' && $block_content === '' ) {
 
-			$attributes = $block['attrs'] ?? [];
+			$attributes = $block['attrs'] ?? array();
 
-			if (empty($attributes['ref'])) {
+			if ( empty( $attributes['ref'] ) ) {
 				return '';
 			}
 
-			$post = get_post($attributes['ref']);
-			if (! $post || 'pb_block' !== $post->post_type) {
+			$post = get_post( $attributes['ref'] );
+			if ( ! $post || 'pb_block' !== $post->post_type ) {
 				return '';
 			}
 
@@ -159,12 +173,11 @@ class Pattern_Builder_Post_Type
 				return '';
 			}
 
-			if ('publish' !== $post->post_status || ! empty($post->post_password)) {
+			if ( 'publish' !== $post->post_status || ! empty( $post->post_password ) ) {
 				return '';
 			}
 
 			$seen_refs[ $attributes['ref'] ] = true;
-
 
 			// Handle embeds for reusable blocks.
 			global $wp_embed;
@@ -176,26 +189,26 @@ class Pattern_Builder_Post_Type
 			 * filter so that it is available when a pattern's inner blocks are
 			 * rendering via do_blocks given it only receives the inner content.
 			 */
-			$has_pattern_overrides = isset($attributes['content']) && null !== get_block_bindings_source('core/pattern-overrides');
-			if ($has_pattern_overrides) {
-				$filter_block_context = static function ($context) use ($attributes) {
+			$has_pattern_overrides = isset( $attributes['content'] ) && null !== get_block_bindings_source( 'core/pattern-overrides' );
+			if ( $has_pattern_overrides ) {
+				$filter_block_context = static function ( $context ) use ( $attributes ) {
 					$context['pattern/overrides'] = $attributes['content'];
 					return $context;
 				};
-				add_filter('render_block_context', $filter_block_context, 1);
+				add_filter( 'render_block_context', $filter_block_context, 1 );
 			}
 
 			// Apply Block Hooks.
-			$content = apply_block_hooks_to_content_from_post_object($content, $post);
+			$content = apply_block_hooks_to_content_from_post_object( $content, $post );
 
 			// Render the block content.
-			$content = do_blocks($content);
+			$content = do_blocks( $content );
 
 			// It is safe to render this block again.  No infinite recursion worries.
-			unset($seen_refs[$attributes['ref']]);
+			unset( $seen_refs[ $attributes['ref'] ] );
 
-			if ($has_pattern_overrides) {
-				remove_filter('render_block_context', $filter_block_context, 1);
+			if ( $has_pattern_overrides ) {
+				remove_filter( 'render_block_context', $filter_block_context, 1 );
 			}
 
 			return $content;

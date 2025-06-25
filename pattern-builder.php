@@ -2,7 +2,7 @@
 
 /**
  * Plugin Name:       Pattern Builder
- * Plugin URI: 	      https://www.twentybellows.com/pattern-builder/
+ * Plugin URI:        https://www.twentybellows.com/pattern-builder/
  * Description:       Manage Patterns in the WordPress Editor.
  * Requires at least: 6.6
  * Requires PHP:      7.2
@@ -12,7 +12,7 @@
  * Text Domain:       pattern-builder
  */
 
-if (! defined('ABSPATH')) {
+if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
