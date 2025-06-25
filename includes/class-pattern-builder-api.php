@@ -460,7 +460,14 @@ class Pattern_Builder_API {
 							// we are attempting to convert a THEME pattern to a USER pattern.
 							$this->controller->update_user_pattern( $pattern );
 						} else {
-							$this->controller->update_theme_pattern( $pattern );
+							// Check if localization was requested via the query parameter
+							$options = array();
+							$localize_param = $request->get_param( 'patternBuilderLocalize' );
+							if ( $localize_param === 'true' ) {
+								$options['localize'] = true;
+							}
+							
+							$this->controller->update_theme_pattern( $pattern, $options );
 						}
 
 						$post               = get_post( $pattern->id );

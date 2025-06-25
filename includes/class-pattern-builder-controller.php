@@ -111,7 +111,7 @@ class Pattern_Builder_Controller {
 		return $post;
 	}
 
-	public function update_theme_pattern( Abstract_Pattern $pattern ) {
+	public function update_theme_pattern( Abstract_Pattern $pattern, $options = array() ) {
 		if ( pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing() ) {
 
 			// get the pb_block post if it already exists
@@ -123,7 +123,10 @@ class Pattern_Builder_Controller {
 			}
 
 			$pattern = $this->import_pattern_image_assets( $pattern );
-			$pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
+
+			if ( isset( $options['localize'] ) && $options['localize'] === true ) {
+				$pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
+			}
 
 			// update the pattern file
 			$this->update_theme_pattern_file( $pattern );

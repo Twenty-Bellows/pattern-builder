@@ -11,3 +11,5 @@ export {
 } from './localStorage';
 
 export { fetchAllPatterns } from './resolvers';
+
+export { PatternSaveMonitor } from './patternSaveMonitor';
