@@ -1,16 +1,14 @@
 <?php
 
-use TwentyBellows\PatternBuilder\Pattern_Builder_Controller;
+use TwentyBellows\PatternBuilder\Pattern_Builder_Localization;
 use TwentyBellows\PatternBuilder\Abstract_Pattern;
 
 class Test_Pattern_Localization extends WP_UnitTestCase {
 
-	private $controller;
 	private $test_dir;
 
 	public function setUp(): void {
 		parent::setUp();
-		$this->controller = new Pattern_Builder_Controller();
 
 		// Set up test theme directory.
 		$this->test_dir = get_temp_dir() . 'pattern-builder-test-' . time();
@@ -64,7 +62,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:paragraph --><p>Hello World</p><!-- /wp:paragraph -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Hello World', 'test-theme' ); ?>", $localized_pattern->content );
 	}
@@ -79,7 +77,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:heading --><h2>Welcome to Our Site</h2><!-- /wp:heading -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Welcome to Our Site', 'test-theme' ); ?>", $localized_pattern->content );
 	}
@@ -94,7 +92,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="/contact">Contact Us</a></div><!-- /wp:button -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Contact Us', 'test-theme' ); ?>", $localized_pattern->content );
 	}
@@ -109,7 +107,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:pullquote --><figure class="wp-block-pullquote"><blockquote><p>Pullquote Quote</p><cite>and the citation</cite></blockquote></figure><!-- /wp:pullquote -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Check that the paragraph content is localized separately
 		$this->assertStringContainsString( "<p><?php echo wp_kses_post( 'Pullquote Quote', 'test-theme' ); ?></p>", $localized_pattern->content );
@@ -133,7 +131,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:image {"alt":"Beautiful sunset"} --><figure class="wp-block-image"><img src="sunset.jpg" alt="Beautiful sunset"/></figure><!-- /wp:image -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Check that alt attribute was localized in the HTML.
 		$this->assertStringContainsString( 'alt="<?php echo esc_attr__( \'Beautiful sunset\', \'test-theme\' ); ?>"', $localized_pattern->content );
@@ -149,7 +147,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:image --><figure class="wp-block-image"><img src="sunset.jpg"/><figcaption>A beautiful sunset over the ocean</figcaption></figure><!-- /wp:image -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		$this->assertStringContainsString( "<?php echo wp_kses_post( 'A beautiful sunset over the ocean', 'test-theme' ); ?>", $localized_pattern->content );
 	}
@@ -164,7 +162,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:navigation-link {"label":"About Us","url":"/about"} /-->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// For now, navigation links are not localized due to serialization encoding issues.
 		// The content should remain unchanged.
@@ -181,7 +179,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:table --><figure class="wp-block-table"><table><thead><tr><th>Name</th><th>Age</th></tr></thead><tbody><tr><td>John</td><td>25</td></tr></tbody></table></figure><!-- /wp:table -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Name', 'test-theme' ); ?>", $localized_pattern->content );
 		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Age', 'test-theme' ); ?>", $localized_pattern->content );
@@ -199,7 +197,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:group --><div class="wp-block-group"><!-- wp:heading --><h2>Section Title</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Section content goes here.</p><!-- /wp:paragraph --></div><!-- /wp:group -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Section Title', 'test-theme' ); ?>", $localized_pattern->content );
 		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Section content goes here.', 'test-theme' ); ?>", $localized_pattern->content );
@@ -215,7 +213,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:paragraph --><p>It\'s a beautiful day!</p><!-- /wp:paragraph -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		$this->assertStringContainsString( "<?php echo wp_kses_post( 'It\\'s a beautiful day!', 'test-theme' ); ?>", $localized_pattern->content );
 	}
@@ -230,7 +228,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:paragraph --><p></p><!-- /wp:paragraph --><!-- wp:spacer --><div style="height:50px" aria-hidden="true" class="wp-block-spacer"></div><!-- /wp:spacer -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Should not contain any localization functions for empty content.
 		$this->assertStringNotContainsString( "wp_kses_post( '', ", $localized_pattern->content );
@@ -247,7 +245,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:separator --><hr class="wp-block-separator has-alpha-channel-opacity"/><!-- /wp:separator -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Should not contain any localization functions.
 		$this->assertStringNotContainsString( 'wp_kses_post', $localized_pattern->content );
@@ -264,7 +262,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:group --><div class="wp-block-group"><!-- wp:heading --><h2>Our Services</h2><!-- /wp:heading --><!-- wp:paragraph --><p>We provide excellent services for our clients.</p><!-- /wp:paragraph --><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="/services">Learn More</a></div><!-- /wp:button --></div><!-- /wp:group -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		$this->assertStringContainsString( "<?php echo wp_kses_post( 'Our Services', 'test-theme' ); ?>", $localized_pattern->content );
 		$this->assertStringContainsString( "<?php echo wp_kses_post( 'We provide excellent services for our clients.', 'test-theme' ); ?>", $localized_pattern->content );
@@ -281,7 +279,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:pullquote --><figure class="wp-block-pullquote"><blockquote><p>First paragraph of the quote.</p><p>Second paragraph of the quote.</p><cite>Quote Author</cite></blockquote></figure><!-- /wp:pullquote -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Check that both paragraph contents are localized separately
 		$this->assertStringContainsString( "<p><?php echo wp_kses_post( 'First paragraph of the quote.', 'test-theme' ); ?></p>", $localized_pattern->content );
@@ -301,7 +299,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:query-pagination-next {"label":"Next Page"} /-->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Check that the label attribute content is localized within the JSON attribute
 		$this->assertStringContainsString( '{"label":"<?php echo esc_attr__( \'Next Page\', \'test-theme\' ); ?>"}', $localized_pattern->content );
@@ -318,7 +316,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:query-pagination-previous {"label":"Previous Page"} /-->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Check that the label attribute content is localized within the JSON attribute
 		$this->assertStringContainsString( '{"label":"<?php echo esc_attr__( \'Previous Page\', \'test-theme\' ); ?>"}', $localized_pattern->content );
@@ -335,7 +333,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:query-pagination-next /-->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Should not contain any localization functions since there's no label
 		$this->assertStringNotContainsString( 'esc_attr__', $localized_pattern->content );
@@ -353,7 +351,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:post-excerpt {"moreText":"Read More"} /-->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Check that the moreText attribute content is localized within the JSON attribute
 		$this->assertStringContainsString( '{"moreText":"<?php echo esc_attr__( \'Read More\', \'test-theme\' ); ?>"}', $localized_pattern->content );
@@ -370,7 +368,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:post-excerpt {"moreText":"Continue Reading..."} /-->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Check that the moreText attribute content is localized within the JSON attribute
 		$this->assertStringContainsString( '{"moreText":"<?php echo esc_attr__( \'Continue Reading...\', \'test-theme\' ); ?>"}', $localized_pattern->content );
@@ -387,7 +385,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:post-excerpt /-->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Should not contain any localization functions since there's no moreText
 		$this->assertStringNotContainsString( 'esc_attr__', $localized_pattern->content );
@@ -405,7 +403,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:details --><details class="wp-block-details"><summary>Click to expand</summary><!-- wp:paragraph --><p>Hidden content here</p><!-- /wp:paragraph --></details><!-- /wp:details -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Check that the summary content is localized
 		$this->assertStringContainsString( "<summary><?php echo wp_kses_post( 'Click to expand', 'test-theme' ); ?></summary>", $localized_pattern->content );
@@ -424,7 +422,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:details --><details class="wp-block-details"><summary>FAQ: What is this?</summary><!-- wp:paragraph --><p>This is the answer to the question.</p><!-- /wp:paragraph --></details><!-- /wp:details -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Check that the summary content with special characters is localized
 		$this->assertStringContainsString( "<summary><?php echo wp_kses_post( 'FAQ: What is this?', 'test-theme' ); ?></summary>", $localized_pattern->content );
@@ -443,7 +441,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:details --><details class="wp-block-details"><summary></summary><!-- wp:paragraph --><p>Content here</p><!-- /wp:paragraph --></details><!-- /wp:details -->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Check that empty summary is not localized
 		$this->assertStringContainsString( '<summary></summary>', $localized_pattern->content );
@@ -462,7 +460,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:search {"label":"Search Label","placeholder":"Search Placeholder...","buttonText":"Search Button"} /-->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Check that all three attributes are localized
 		$this->assertStringContainsString( '"label":"<?php echo esc_attr__( \'Search Label\', \'test-theme\' ); ?>"', $localized_pattern->content );
@@ -481,7 +479,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:search {"label":"Find Content","showLabel":false} /-->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Check that only the label is localized, other attributes remain
 		$this->assertStringContainsString( '"label":"<?php echo esc_attr__( \'Find Content\', \'test-theme\' ); ?>"', $localized_pattern->content );
@@ -499,7 +497,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:search {"placeholder":"Type your search...","buttonText":"Go"} /-->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Check that placeholder and buttonText are localized
 		$this->assertStringContainsString( '"placeholder":"<?php echo esc_attr__( \'Type your search...\', \'test-theme\' ); ?>"', $localized_pattern->content );
@@ -517,7 +515,7 @@ class Test_Pattern_Localization extends WP_UnitTestCase {
 			'content' => '<!-- wp:search {"showLabel":false,"buttonUseIcon":true} /-->'
 		) );
 
-		$localized_pattern = $this->controller->localize_pattern_content( $pattern );
+		$localized_pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 
 		// Should not contain any localization functions since there are no text attributes
 		$this->assertStringNotContainsString( 'esc_attr__', $localized_pattern->content );

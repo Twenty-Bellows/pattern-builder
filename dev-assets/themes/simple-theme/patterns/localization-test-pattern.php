@@ -2,7 +2,7 @@
 /**
  * Title: Localization Test Pattern
  * Slug: simple-theme/localization-test-pattern
- * Description: 
+ * Description:
  */
 ?>
 <!-- wp:paragraph -->
@@ -102,10 +102,10 @@
   </div>
 <!-- /wp:comments -->
 <!-- wp:details -->
-  <details class="wp-block-details"><summary><?php echo wp_kses_post( 'This is a details block', 'simple-theme' ); ?></summary></details>
-  <!-- wp:paragraph {"placeholder":"Type / to add a hidden block"} -->
-    <p><?php echo wp_kses_post( 'And this is the hidden content', 'simple-theme' ); ?></p>
-  <!-- /wp:paragraph -->
-</details>
+  <details class="wp-block-details"><summary><?php echo wp_kses_post( 'This is a details block', 'simple-theme' ); ?></summary>
+		<!-- wp:paragraph {"placeholder":"Type / to add a hidden block"} -->
+  		<p><?php echo wp_kses_post( 'And this is the hidden content', 'simple-theme' ); ?></p>
+		<!-- /wp:paragraph -->
+	</details>
 <!-- /wp:details -->
 <!-- wp:search {"label":"<?php echo esc_attr__( 'Search Label', 'simple-theme' ); ?>","placeholder":"<?php echo esc_attr__( 'Search Placeholder...', 'simple-theme' ); ?>","buttonText":"<?php echo esc_attr__( 'Search Button', 'simple-theme' ); ?>"} /-->
