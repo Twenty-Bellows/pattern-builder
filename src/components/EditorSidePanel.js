@@ -123,20 +123,6 @@ export const EditorSidePanel = () => {
 									</Text>
 									<Icon icon={ chevronRight } />
 								</Navigator.Button>
-								<Navigator.Button
-									icon={ cog }
-									path="/configuration"
-								>
-									<Text
-										style={ { flex: 1, textAlign: 'left' } }
-									>
-										{ __(
-											'Configuration',
-											'pattern-builder'
-										) }
-									</Text>
-									<Icon icon={ chevronRight } />
-								</Navigator.Button>
 								<Divider />
 								<Text style={ { marginBottom: '10px' } }>
 									{ __(
@@ -163,6 +149,21 @@ export const EditorSidePanel = () => {
 										<Icon icon={ chevronRight } />
 									</Navigator.Button>
 								) ) }
+								<Divider/>
+								<Navigator.Button
+									icon={ cog }
+									path="/configuration"
+								>
+									<Text
+										style={ { flex: 1, textAlign: 'left' } }
+									>
+										{ __(
+											'Configuration',
+											'pattern-builder'
+										) }
+									</Text>
+									<Icon icon={ chevronRight } />
+								</Navigator.Button>
 							</VStack>
 						</PanelBody>
 					</Navigator.Screen>

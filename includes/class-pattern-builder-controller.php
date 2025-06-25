@@ -122,8 +122,12 @@ class Pattern_Builder_Controller {
 				$pattern->name = get_stylesheet() . '/' . $pattern->name;
 			}
 
-			$pattern = $this->import_pattern_image_assets( $pattern );
+			// Check if image importing is enabled (default to true for backward compatibility)
+			if ( ! isset( $options['import_images'] ) || $options['import_images'] === true ) {
+				$pattern = $this->import_pattern_image_assets( $pattern );
+			}
 
+			// Check if localization is enabled
 			if ( isset( $options['localize'] ) && $options['localize'] === true ) {
 				$pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 			}

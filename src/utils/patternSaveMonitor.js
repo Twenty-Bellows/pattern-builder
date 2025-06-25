@@ -8,7 +8,7 @@ import apiFetch from '@wordpress/api-fetch';
 /**
  * Internal dependencies
  */
-import { getLocalizePatternsSetting } from './localStorage';
+import { getLocalizePatternsSetting, getImportImagesSetting } from './localStorage';
 
 /**
  * Component to monitor pattern saving and add localization flag when needed
@@ -34,13 +34,26 @@ export const PatternSaveMonitor = () => {
 					options.path.includes( '/pattern-builder/v1/' ) ||
 					( options.path.includes( '/wp/v2/posts/' ) && options.data?.type === 'pb_block' )
 				) ) {
-					// Check if localization is enabled
+					// Check settings
 					const shouldLocalize = getLocalizePatternsSetting();
+					const shouldImportImages = getImportImagesSetting();
 
+					// Build query parameters
+					const params = [];
+					
 					if ( shouldLocalize ) {
-						// Add query parameter to indicate this request should trigger localization
+						params.push( 'patternBuilderLocalize=true' );
+					}
+					
+					if ( ! shouldImportImages ) {
+						// Only add parameter if disabled (since default is true)
+						params.push( 'patternBuilderImportImages=false' );
+					}
+
+					// Add parameters to the path if any are needed
+					if ( params.length > 0 ) {
 						const separator = options.path.includes( '?' ) ? '&' : '?';
-						options.path = options.path + separator + 'patternBuilderLocalize=true';
+						options.path = options.path + separator + params.join( '&' );
 					}
 				}
 			}
@@ -62,8 +75,14 @@ export const PatternSaveMonitor = () => {
 	useEffect( () => {
 		if ( isSavingPost && postType === 'pb_block' ) {
 			const shouldLocalize = getLocalizePatternsSetting();
-			if ( shouldLocalize ) {
-				console.log( 'Saving theme pattern with localization enabled (patternBuilderLocalize=true):', currentPost?.title );
+			const shouldImportImages = getImportImagesSetting();
+			
+			const settings = [];
+			if ( shouldLocalize ) settings.push( 'localize=true' );
+			if ( ! shouldImportImages ) settings.push( 'importImages=false' );
+			
+			if ( settings.length > 0 ) {
+				console.log( `Saving theme pattern with settings (${settings.join(', ')}):`, currentPost?.title );
 			}
 		}
 	}, [ isSavingPost, postType, currentPost ] );

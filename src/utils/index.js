@@ -7,7 +7,9 @@ export {
 	setLocalStorageValue, 
 	removeLocalStorageValue, 
 	getLocalizePatternsSetting, 
-	setLocalizePatternsSetting 
+	setLocalizePatternsSetting,
+	getImportImagesSetting,
+	setImportImagesSetting
 } from './localStorage';
 
 export { fetchAllPatterns } from './resolvers';

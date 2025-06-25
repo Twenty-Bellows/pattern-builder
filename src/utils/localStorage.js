@@ -60,3 +60,19 @@ export const getLocalizePatternsSetting = () => {
 export const setLocalizePatternsSetting = ( value ) => {
 	setLocalStorageValue( 'localizePatterns', value );
 };
+
+/**
+ * Gets the import images setting from localStorage
+ * @returns {boolean} Whether image importing is enabled (defaults to true)
+ */
+export const getImportImagesSetting = () => {
+	return getLocalStorageValue( 'importImages', true );
+};
+
+/**
+ * Sets the import images setting in localStorage
+ * @param {boolean} value - Whether to enable image importing
+ */
+export const setImportImagesSetting = ( value ) => {
+	setLocalStorageValue( 'importImages', value );
+};

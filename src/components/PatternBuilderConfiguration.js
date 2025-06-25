@@ -9,21 +9,29 @@ import {
 	__experimentalVStack as VStack,
 } from '@wordpress/components';
 
-import { getLocalizePatternsSetting, setLocalizePatternsSetting } from '../utils/localStorage';
+import { getLocalizePatternsSetting, setLocalizePatternsSetting, getImportImagesSetting, setImportImagesSetting } from '../utils/localStorage';
 
 export const PatternBuilderConfiguration = () => {
 	const [ localizePatterns, setLocalizePatterns ] = useState( false );
+	const [ importImages, setImportImages ] = useState( true );
 
-	// Load the setting from localStorage on component mount
+	// Load the settings from localStorage on component mount
 	useEffect( () => {
-		const savedValue = getLocalizePatternsSetting();
-		setLocalizePatterns( savedValue );
+		const savedLocalizeValue = getLocalizePatternsSetting();
+		const savedImportValue = getImportImagesSetting();
+		setLocalizePatterns( savedLocalizeValue );
+		setImportImages( savedImportValue );
 	}, [] );
 
-	// Handle toggle change
+	// Handle toggle changes
 	const handleLocalizeToggle = ( value ) => {
 		setLocalizePatterns( value );
 		setLocalizePatternsSetting( value );
+	};
+
+	const handleImportImagesToggle = ( value ) => {
+		setImportImages( value );
+		setImportImagesSetting( value );
 	};
 
 	return (
@@ -36,6 +44,15 @@ export const PatternBuilderConfiguration = () => {
 				) }
 				checked={ localizePatterns }
 				onChange={ handleLocalizeToggle }
+			/>
+			<ToggleControl
+				label={ __( 'Import Images to Theme', 'pattern-builder' ) }
+				help={ __(
+					'When enabled, images will be downloaded and imported into the theme assets folder when saving theme patterns.',
+					'pattern-builder'
+				) }
+				checked={ importImages }
+				onChange={ handleImportImagesToggle }
 			/>
 		</VStack>
 	);
