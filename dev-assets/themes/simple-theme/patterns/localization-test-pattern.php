@@ -2,7 +2,7 @@
 /**
  * Title: Localization Test Pattern
  * Slug: simple-theme/localization-test-pattern
- * Description:
+ * Description: 
  */
 ?>
 <!-- wp:paragraph -->
@@ -93,9 +93,9 @@
       <!-- /wp:columns -->
     <!-- /wp:comment-template -->
     <!-- wp:comments-pagination -->
-      <!-- wp:comments-pagination-previous {"label":"previous label"} /-->
+      <!-- wp:comments-pagination-previous {"label":"<?php echo esc_attr__( 'previous label', 'simple-theme' ); ?>"} /-->
       <!-- wp:comments-pagination-numbers /-->
-      <!-- wp:comments-pagination-next {"label": "next label"} /-->
+      <!-- wp:comments-pagination-next {"label":"<?php echo esc_attr__( 'next label', 'simple-theme' ); ?>"} /-->
     <!-- /wp:comments-pagination -->
     <!-- wp:post-comments-form /-->
   </div>

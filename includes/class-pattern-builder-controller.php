@@ -376,6 +376,8 @@ class Pattern_Builder_Controller {
 
 				case 'core/query-pagination-next':
 				case 'core/query-pagination-previous':
+				case 'core/comments-pagination-previous':
+				case 'core/comments-pagination-next':
 					$block = $this->localize_query_pagination_block( $block );
 					break;
 
@@ -421,7 +423,7 @@ class Pattern_Builder_Controller {
 	private function localize_pullquote_block( $block ) {
 		if ( ! empty( $block['innerHTML'] ) ) {
 			$html = $block['innerHTML'];
-			
+
 			// Localize paragraph content(s) within the blockquote
 			$html = preg_replace_callback(
 				'/<p[^>]*>([^<]+)<\/p>/',
@@ -435,7 +437,7 @@ class Pattern_Builder_Controller {
 				},
 				$html
 			);
-			
+
 			// Localize citation content
 			$html = preg_replace_callback(
 				'/<cite[^>]*>([^<]+)<\/cite>/',
@@ -449,7 +451,7 @@ class Pattern_Builder_Controller {
 				},
 				$html
 			);
-			
+
 			$block['innerHTML'] = $html;
 			$block['innerContent'] = array( $html );
 		}
