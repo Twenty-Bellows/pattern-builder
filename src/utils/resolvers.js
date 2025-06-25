@@ -1,6 +1,5 @@
 import apiFetch from '@wordpress/api-fetch';
 import AbstractPattern from '../objects/AbstractPattern';
-import { formatBlockMarkup } from './formatters';
 
 export async function fetchAllPatterns() {
 	return apiFetch( {
