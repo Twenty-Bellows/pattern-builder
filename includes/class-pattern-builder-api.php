@@ -111,18 +111,10 @@ class Pattern_Builder_API {
 	 * @return WP_REST_Response
 	 */
 	public function process_theme_patterns( WP_REST_Request $request ): WP_REST_Response {
-		// Check premium access
-		if ( ! pb_fs()->can_use_premium_code__premium_only() && ! pb_fs_testing() ) {
-			return new WP_Error(
-				'premium_required',
-				__( 'Processing theme patterns requires the premium version of Pattern Builder.', 'pattern-builder' ),
-				array( 'status' => 403 )
-			);
-		}
 
 		$localize = $request->get_param( 'localize' ) === 'true';
 		$import_images = $request->get_param( 'importImages' ) !== 'false';
-		
+
 		$options = array(
 			'localize' => $localize,
 			'import_images' => $import_images,
@@ -130,7 +122,7 @@ class Pattern_Builder_API {
 
 		// Get all theme patterns
 		$theme_patterns = $this->controller->get_block_patterns_from_theme_files();
-		
+
 		$processed_count = 0;
 		$error_count = 0;
 		$errors = array();
@@ -382,116 +374,114 @@ class Pattern_Builder_API {
 	 * referenced by the pattern into the theme.
 	 *
 	 */
-	function handle_hijack_block_update( $response, $handler, $request ) {
-		if ( pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing() ) {
+	function handle_hijack_block_update($response, $handler, $request)
+	{
+		$route = $request->get_route();
 
-			$route = $request->get_route();
+		if (preg_match('#^/wp/v2/blocks/(\d+)$#', $route, $matches)) {
 
-			if ( preg_match( '#^/wp/v2/blocks/(\d+)$#', $route, $matches ) ) {
+			$id   = intval($matches[1]);
+			$post = get_post($id);
 
-				$id   = intval( $matches[1] );
-				$post = get_post( $id );
+			if ($post && $request->get_method() === 'PUT') {
 
-				if ( $post && $request->get_method() === 'PUT' ) {
+				$updated_pattern = json_decode($request->get_body(), true);
 
-					$updated_pattern = json_decode( $request->get_body(), true );
+				$convert_user_pattern_to_theme_pattern = false;
 
-					$convert_user_pattern_to_theme_pattern = false;
+				if ($post->post_type === 'wp_block') {
 
-					if ( $post->post_type === 'wp_block' ) {
+					if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'theme') {
+						// we are attempting to convert a USER pattern to a THEME pattern.
+						$convert_user_pattern_to_theme_pattern = true;
+					}
+				}
 
-						if ( isset( $updated_pattern['source'] ) && $updated_pattern['source'] === 'theme' ) {
-							// we are attempting to convert a USER pattern to a THEME pattern.
-							$convert_user_pattern_to_theme_pattern = true;
-						}
+				if ($post->post_type === 'pb_block' || $convert_user_pattern_to_theme_pattern) {
+
+					// Check write permissions before allowing update
+					if (! current_user_can('edit_others_posts')) {
+						return new WP_Error(
+							'rest_forbidden',
+							__('You do not have permission to edit patterns.', 'pattern-builder'),
+							array('status' => 403)
+						);
 					}
 
-					if ( $post->post_type === 'pb_block' || $convert_user_pattern_to_theme_pattern ) {
+					// Verify the REST API nonce
+					$nonce = $request->get_header('X-WP-Nonce');
+					if (! $nonce || ! wp_verify_nonce($nonce, 'wp_rest')) {
+						return new WP_Error(
+							'rest_cookie_invalid_nonce',
+							__('Cookie nonce is invalid', 'pattern-builder'),
+							array('status' => 403)
+						);
+					}
 
-						// Check write permissions before allowing update
-						if ( ! current_user_can( 'edit_others_posts' ) ) {
-							return new WP_Error(
-								'rest_forbidden',
-								__( 'You do not have permission to edit patterns.', 'pattern-builder' ),
-								array( 'status' => 403 )
-							);
+					$pattern = Abstract_Pattern::from_post($post);
+
+					if (isset($updated_pattern['content'])) {
+						// remap pb_blocks to patterns
+						$blocks           = parse_blocks($updated_pattern['content']);
+						$blocks           = $this->convert_blocks_to_patterns($blocks);
+						$pattern->content = serialize_blocks($blocks);
+						// TODO: Format the content to be easy on the eyes.
+					}
+
+					if (isset($updated_pattern['title'])) {
+						$pattern->title = $updated_pattern['title'];
+					}
+
+					if (isset($updated_pattern['excerpt'])) {
+						$pattern->description = $updated_pattern['excerpt'];
+					}
+
+					if (isset($updated_pattern['wp_pattern_sync_status'])) {
+						$pattern->synced = $updated_pattern['wp_pattern_sync_status'] !== 'unsynced';
+					}
+
+					if (isset($updated_pattern['wp_pattern_block_types'])) {
+						$pattern->blockTypes = $updated_pattern['wp_pattern_block_types'];
+					}
+
+					if (isset($updated_pattern['wp_pattern_post_types'])) {
+						$pattern->postTypes = $updated_pattern['wp_pattern_post_types'];
+					}
+
+					if (isset($updated_pattern['wp_pattern_template_types'])) {
+						$pattern->templateTypes = $updated_pattern['wp_pattern_template_types'];
+					}
+
+					if (isset($updated_pattern['wp_pattern_inserter'])) {
+						$pattern->inserter = $updated_pattern['wp_pattern_inserter'] === 'no' ? false : true;
+					}
+
+					if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'user') {
+						// we are attempting to convert a THEME pattern to a USER pattern.
+						$this->controller->update_user_pattern($pattern);
+					} else {
+						// Check configuration options via query parameters
+						$options = array();
+
+						$localize_param = $request->get_param('patternBuilderLocalize');
+						if ($localize_param === 'true') {
+							$options['localize'] = true;
 						}
 
-						// Verify the REST API nonce
-						$nonce = $request->get_header( 'X-WP-Nonce' );
-						if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
-							return new WP_Error(
-								'rest_cookie_invalid_nonce',
-								__( 'Cookie nonce is invalid', 'pattern-builder' ),
-								array( 'status' => 403 )
-							);
-						}
-
-						$pattern = Abstract_Pattern::from_post( $post );
-
-						if ( isset( $updated_pattern['content'] ) ) {
-							// remap pb_blocks to patterns
-							$blocks           = parse_blocks( $updated_pattern['content'] );
-							$blocks           = $this->convert_blocks_to_patterns( $blocks );
-							$pattern->content = serialize_blocks( $blocks );
-							// TODO: Format the content to be easy on the eyes.
-						}
-
-						if ( isset( $updated_pattern['title'] ) ) {
-							$pattern->title = $updated_pattern['title'];
-						}
-
-						if ( isset( $updated_pattern['excerpt'] ) ) {
-							$pattern->description = $updated_pattern['excerpt'];
-						}
-
-						if ( isset( $updated_pattern['wp_pattern_sync_status'] ) ) {
-							$pattern->synced = $updated_pattern['wp_pattern_sync_status'] !== 'unsynced';
-						}
-
-						if ( isset( $updated_pattern['wp_pattern_block_types'] ) ) {
-							$pattern->blockTypes = $updated_pattern['wp_pattern_block_types'];
-						}
-
-						if ( isset( $updated_pattern['wp_pattern_post_types'] ) ) {
-							$pattern->postTypes = $updated_pattern['wp_pattern_post_types'];
-						}
-
-						if ( isset( $updated_pattern['wp_pattern_template_types'] ) ) {
-							$pattern->templateTypes = $updated_pattern['wp_pattern_template_types'];
-						}
-
-						if ( isset( $updated_pattern['wp_pattern_inserter'] ) ) {
-							$pattern->inserter = $updated_pattern['wp_pattern_inserter'] === 'no' ? false : true;
-						}
-
-						if ( isset( $updated_pattern['source'] ) && $updated_pattern['source'] === 'user' ) {
-							// we are attempting to convert a THEME pattern to a USER pattern.
-							$this->controller->update_user_pattern( $pattern );
+						$import_images_param = $request->get_param('patternBuilderImportImages');
+						if ($import_images_param === 'false') {
+							$options['import_images'] = false;
 						} else {
-							// Check configuration options via query parameters
-							$options = array();
-
-							$localize_param = $request->get_param( 'patternBuilderLocalize' );
-							if ( $localize_param === 'true' ) {
-								$options['localize'] = true;
-							}
-
-							$import_images_param = $request->get_param( 'patternBuilderImportImages' );
-							if ( $import_images_param === 'false' ) {
-								$options['import_images'] = false;
-							} else {
-								// Default to true if not explicitly disabled
-								$options['import_images'] = true;
-							}
-
-							$this->controller->update_theme_pattern( $pattern, $options );
+							// Default to true if not explicitly disabled
+							$options['import_images'] = true;
 						}
 
-						$post               = get_post( $pattern->id );
-						$formatted_response = $this->format_pb_block_response( $post, $request );
-						$response           = new WP_REST_Response( $formatted_response, 200 );
+						$this->controller->update_theme_pattern($pattern, $options);
 					}
+
+					$post               = get_post($pattern->id);
+					$formatted_response = $this->format_pb_block_response($post, $request);
+					$response           = new WP_REST_Response($formatted_response, 200);
 				}
 			}
 		}

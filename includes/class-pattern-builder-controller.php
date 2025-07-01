@@ -9,8 +9,6 @@ require_once __DIR__ . '/class-pattern-builder-abstract-pattern.php';
 require_once __DIR__ . '/class-pattern-builder-localization.php';
 require_once ABSPATH . 'wp-admin/includes/file.php';
 
-global $pb_fs;
-
 class Pattern_Builder_Controller {
 
 	public function format_pattern_slug_for_post( $slug ) {
@@ -111,81 +109,79 @@ class Pattern_Builder_Controller {
 		return $post;
 	}
 
-	public function update_theme_pattern( Abstract_Pattern $pattern, $options = array() ) {
-		if ( pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing() ) {
+	public function update_theme_pattern(Abstract_Pattern $pattern, $options = array())
+	{
+		// get the pb_block post if it already exists
+		$post = get_page_by_path($this->format_pattern_slug_for_post($pattern->name), OBJECT, array('pb_block', 'wp_block'));
 
-			// get the pb_block post if it already exists
-			$post = get_page_by_path( $this->format_pattern_slug_for_post( $pattern->name ), OBJECT, array( 'pb_block', 'wp_block' ) );
-
-			if ( $post && $post->post_type === 'wp_block' ) {
-				// this is being converted to theme patterns, change the slug to include the theme domain
-				$pattern->name = get_stylesheet() . '/' . $pattern->name;
-			}
-
-			// Check if image importing is enabled (default to true for backward compatibility)
-			if ( ! isset( $options['import_images'] ) || $options['import_images'] === true ) {
-				$pattern = $this->import_pattern_image_assets( $pattern );
-			}
-
-			// Check if localization is enabled
-			if ( isset( $options['localize'] ) && $options['localize'] === true ) {
-				$pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
-			}
-
-			// update the pattern file
-			$this->update_theme_pattern_file( $pattern );
-
-			// rebuild the pattern from the file (so that the content has no PHP tags)
-			$pattern = Abstract_Pattern::from_file( $this->get_pattern_filepath( $pattern ) );
-
-			$post_id = wp_update_post(
-				array(
-					'ID'           => $post ? $post->ID : null,
-					'post_title'   => $pattern->title,
-					'post_name'    => $this->format_pattern_slug_for_post( $pattern->name ),
-					'post_excerpt' => $pattern->description,
-					'post_content' => $pattern->content,
-					'post_type'    => 'pb_block',
-				)
-			);
-
-			if ( $pattern->synced ) {
-				delete_post_meta( $post_id, 'wp_pattern_sync_status' );
-			} else {
-				update_post_meta( $post_id, 'wp_pattern_sync_status', 'unsynced' );
-			}
-
-			if ( $pattern->keywords ) {
-				update_post_meta( $post_id, 'wp_pattern_keywords', implode( ',', $pattern->keywords ) );
-			} else {
-				delete_post_meta( $post_id, 'wp_pattern_keywords' );
-			}
-
-			if ( $pattern->blockTypes ) {
-				update_post_meta( $post_id, 'wp_pattern_block_types', implode( ',', $pattern->blockTypes ) );
-			} else {
-				delete_post_meta( $post_id, 'wp_pattern_block_types' );
-			}
-
-			if ( $pattern->templateTypes ) {
-				update_post_meta( $post_id, 'wp_pattern_template_types', implode( ',', $pattern->templateTypes ) );
-			} else {
-				delete_post_meta( $post_id, 'wp_pattern_template_types' );
-			}
-
-			if ( $pattern->postTypes ) {
-				update_post_meta( $post_id, 'wp_pattern_post_types', implode( ',', $pattern->postTypes ) );
-			} else {
-				delete_post_meta( $post_id, 'wp_pattern_post_types' );
-			}
-
-			// store categories
-			wp_set_object_terms( $post_id, $pattern->categories, 'wp_pattern_category', false );
-
-			return $pattern;
+		if ($post && $post->post_type === 'wp_block') {
+			// this is being converted to theme patterns, change the slug to include the theme domain
+			$pattern->name = get_stylesheet() . '/' . $pattern->name;
 		}
 
-		return new WP_Error( 'premium_required', 'Saving Theme Patterns requires the premium version of Pattern Builder.', array( 'status' => 403 ) );
+		// Check if image importing is enabled (default to true for backward compatibility)
+		if (! isset($options['import_images']) || $options['import_images'] === true) {
+			$pattern = $this->import_pattern_image_assets($pattern);
+		}
+
+		// Check if localization is enabled
+		if (isset($options['localize']) && $options['localize'] === true) {
+			$pattern = Pattern_Builder_Localization::localize_pattern_content($pattern);
+		}
+
+		// update the pattern file
+		$this->update_theme_pattern_file($pattern);
+
+		// rebuild the pattern from the file (so that the content has no PHP tags)
+		$pattern = Abstract_Pattern::from_file($this->get_pattern_filepath($pattern));
+
+		$post_id = wp_update_post(
+			array(
+				'ID'           => $post ? $post->ID : null,
+				'post_title'   => $pattern->title,
+				'post_name'    => $this->format_pattern_slug_for_post($pattern->name),
+				'post_excerpt' => $pattern->description,
+				'post_content' => $pattern->content,
+				'post_type'    => 'pb_block',
+			)
+		);
+
+		if ($pattern->synced) {
+			delete_post_meta($post_id, 'wp_pattern_sync_status');
+		} else {
+			update_post_meta($post_id, 'wp_pattern_sync_status', 'unsynced');
+		}
+
+		if ($pattern->keywords) {
+			update_post_meta($post_id, 'wp_pattern_keywords', implode(',', $pattern->keywords));
+		} else {
+			delete_post_meta($post_id, 'wp_pattern_keywords');
+		}
+
+		if ($pattern->blockTypes) {
+			update_post_meta($post_id, 'wp_pattern_block_types', implode(',', $pattern->blockTypes));
+		} else {
+			delete_post_meta($post_id, 'wp_pattern_block_types');
+		}
+
+		if ($pattern->templateTypes) {
+			update_post_meta($post_id, 'wp_pattern_template_types', implode(',', $pattern->templateTypes));
+		} else {
+			delete_post_meta($post_id, 'wp_pattern_template_types');
+		}
+
+		if ($pattern->postTypes) {
+			update_post_meta($post_id, 'wp_pattern_post_types', implode(',', $pattern->postTypes));
+		} else {
+			delete_post_meta($post_id, 'wp_pattern_post_types');
+		}
+
+		// store categories
+		wp_set_object_terms($post_id, $pattern->categories, 'wp_pattern_category', false);
+
+		return $pattern;
+
+		return new WP_Error('premium_required', 'Saving Theme Patterns requires the premium version of Pattern Builder.', array('status' => 403));
 	}
 
 	private function export_pattern_image_assets( $pattern ) {
@@ -393,10 +389,6 @@ class Pattern_Builder_Controller {
 			$convert_from_theme_pattern = true;
 		}
 
-		if ( $convert_from_theme_pattern && ! pb_fs()->can_use_premium_code() && ! pb_fs_testing() ) {
-			return new WP_Error( 'premium_required', 'Converting Theme Patterns to User Patterns requires the premium version of Pattern Builder.', array( 'status' => 403 ) );
-		}
-
 		// upload any assets from the theme
 		$pattern = $this->export_pattern_image_assets( $pattern );
 
@@ -507,7 +499,6 @@ class Pattern_Builder_Controller {
 	}
 
 	public function delete_theme_pattern( Abstract_Pattern $pattern ) {
-		if ( pb_fs()->can_use_premium_code__premium_only() || pb_fs_testing() ) {
 
 			$path = $this->get_pattern_filepath( $pattern );
 
@@ -529,7 +520,6 @@ class Pattern_Builder_Controller {
 			}
 
 			return array( 'message' => 'Pattern deleted successfully' );
-		}
 
 		return new WP_Error( 'premium_required', 'Deleting Theme Patterns requires the premium version of Pattern Builder.', array( 'status' => 403 ) );
 	}
