@@ -25,11 +25,6 @@ function _manually_load_plugin() {
 	// Load composer autoloader here, after WordPress core is loaded
 	require __DIR__ . '/vendor/autoload.php';
 
-	// Manually ensure Freemius SDK is loaded since it checks for ABSPATH
-	if ( ! function_exists( 'fs_dynamic_init' ) ) {
-		require __DIR__ . '/vendor/freemius/wordpress-sdk/start.php';
-	}
-
 	require __DIR__ . '/pattern-builder.php';
 }
 
