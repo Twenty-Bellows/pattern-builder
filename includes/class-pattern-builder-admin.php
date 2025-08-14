@@ -19,8 +19,8 @@ class Pattern_Builder_Admin {
 	 */
 	public function create_admin_menu(): void {
 		add_theme_page(
-			_x( self::PAGE_TITLE, 'UI String', 'pattern-builder' ),
-			_x( self::PAGE_TITLE, 'UI String', 'pattern-builder' ),
+			_x( 'Pattern Builder', 'UI String', 'pattern-builder' ),
+			_x( 'Pattern Builder', 'UI String', 'pattern-builder' ),
 			'edit_theme_options',
 			self::PAGE_SLUG,
 			array( $this, 'render_admin_menu_page' )

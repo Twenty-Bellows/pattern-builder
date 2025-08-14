@@ -146,7 +146,8 @@ class Pattern_Builder_API {
 		$response_data = array(
 			'success' => $success,
 			'message' => sprintf(
-				__( 'Processed %d of %d theme patterns successfully.', 'pattern-builder' ),
+				/* translators: 1: Number of patterns processed, 2: Total number of patterns */
+				__( 'Processed %1$d of %2$d theme patterns successfully.', 'pattern-builder' ),
 				$processed_count,
 				$total_patterns
 			),
@@ -352,7 +353,7 @@ class Pattern_Builder_API {
 					return new WP_Error( 'pattern_not_found', 'Pattern not found', array( 'status' => 404 ) );
 				}
 
-				$deleted = unlink( $path );
+				$deleted = wp_delete_file( $path );
 
 				if ( ! $deleted ) {
 					return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern', array( 'status' => 500 ) );

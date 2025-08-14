@@ -121,7 +121,7 @@ class Pattern_Builder_Localization {
 	 * @return array Localized block.
 	 */
 	private static function localize_text_block( $block ) {
-		if ( ! empty( $block['innerHTML'] ) && ! empty( trim( strip_tags( $block['innerHTML'] ) ) ) ) {
+		if ( ! empty( $block['innerHTML'] ) && ! empty( trim( wp_strip_all_tags( $block['innerHTML'] ) ) ) ) {
 			// Extract the text content from innerHTML.
 			$content = self::extract_text_content( $block['innerHTML'] );
 
@@ -191,7 +191,7 @@ class Pattern_Builder_Localization {
 		if ( ! empty( $block['innerHTML'] ) ) {
 			// Extract button text from the anchor tag.
 			if ( preg_match( '/<a[^>]*>(.*?)<\/a>/s', $block['innerHTML'], $matches ) ) {
-				$button_text = strip_tags( $matches[1] );
+				$button_text = wp_strip_all_tags( $matches[1] );
 				if ( ! empty( trim( $button_text ) ) ) {
 					$localized             = self::create_localized_string( $button_text );
 					$block['innerHTML']    = str_replace( '>' . $matches[1] . '<', '>' . $localized . '<', $block['innerHTML'] );
@@ -216,7 +216,7 @@ class Pattern_Builder_Localization {
 		// Localize caption if present.
 		if ( ! empty( $block['innerHTML'] ) && strpos( $block['innerHTML'], '<figcaption' ) !== false ) {
 			if ( preg_match( '/<figcaption[^>]*>(.*?)<\/figcaption>/s', $block['innerHTML'], $matches ) ) {
-				$caption = strip_tags( $matches[1] );
+				$caption = wp_strip_all_tags( $matches[1] );
 				if ( ! empty( trim( $caption ) ) ) {
 					$localized             = self::create_localized_string( $caption );
 					$block['innerHTML']    = str_replace( '>' . $matches[1] . '<', '>' . $localized . '<', $block['innerHTML'] );

@@ -218,7 +218,7 @@ class Pattern_Builder_Controller {
 				// we're going to try again with a new URL
 				// we might be running this in a docker container
 				// and if that's the case let's try again on port 80
-				$parsed_url = parse_url( $url );
+				$parsed_url = wp_parse_url( $url );
 				if ( 'localhost' === $parsed_url['host'] && '80' !== $parsed_url['port'] ) {
 					$download_file = download_url( str_replace( 'localhost:' . $parsed_url['port'], 'localhost:80', $url ) );
 				}
@@ -243,7 +243,11 @@ class Pattern_Builder_Controller {
 			}
 
 			// Move the downloaded file to the uploads directory
-			if ( ! rename( $download_file, $upload_file ) ) {
+			global $wp_filesystem;
+			if ( ! $wp_filesystem ) {
+				WP_Filesystem();
+			}
+			if ( ! $wp_filesystem->move( $download_file, $upload_file ) ) {
 				return false;
 			}
 
@@ -320,7 +324,7 @@ class Pattern_Builder_Controller {
 				// we're going to try again with a new URL
 				// we might be running this in a docker container
 				// and if that's the case let's try again on port 80
-				$parsed_url = parse_url( $url );
+				$parsed_url = wp_parse_url( $url );
 				if ( 'localhost' === $parsed_url['host'] && '80' !== $parsed_url['port'] ) {
 					$download_file = download_url( str_replace( 'localhost:' . $parsed_url['port'], 'localhost:80', $url ) );
 				}
@@ -336,7 +340,11 @@ class Pattern_Builder_Controller {
 				wp_mkdir_p( $asset_dir );
 			}
 
-			rename( $download_file, $asset_dir . $filename );
+			global $wp_filesystem;
+			if ( ! $wp_filesystem ) {
+				WP_Filesystem();
+			}
+			$wp_filesystem->move( $download_file, $asset_dir . $filename );
 
 			return '/assets/images/' . $filename;
 		};
@@ -430,7 +438,7 @@ class Pattern_Builder_Controller {
 		if ( $convert_from_theme_pattern ) {
 			$path = $this->get_pattern_filepath( $pattern );
 			if ( $path ) {
-				$deleted = unlink( $path );
+				$deleted = wp_delete_file( $path );
 			}
 		}
 
@@ -506,7 +514,7 @@ class Pattern_Builder_Controller {
 				return new WP_Error( 'pattern_not_found', 'Pattern not found', array( 'status' => 404 ) );
 			}
 
-			$deleted = unlink( $path );
+			$deleted = wp_delete_file( $path );
 
 			if ( ! $deleted ) {
 				return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern', array( 'status' => 500 ) );
@@ -559,16 +567,14 @@ class Pattern_Builder_Controller {
 		$inserter      = $pattern->inserter ? '' : "\n * Inserter: no";
 		$synced        = $pattern->synced ? "\n * Synced: yes" : '';
 
-		return <<<METADATA
-	<?php
-	/**
-	 * Title: $pattern->title
-	 * Slug: $pattern->name
-	 * Description: $pattern->description$categories$keywords$blockTypes$postTypes$templateTypes$inserter$synced
-	 */
-	?>
-
-	METADATA;
+		$metadata = "<?php\n";
+		$metadata .= "/**\n";
+		$metadata .= " * Title: $pattern->title\n";
+		$metadata .= " * Slug: $pattern->name\n";
+		$metadata .= " * Description: $pattern->description$categories$keywords$blockTypes$postTypes$templateTypes$inserter$synced\n";
+		$metadata .= " */\n";
+		$metadata .= "?>\n";
+		return $metadata;
 	}
 
 	/**
