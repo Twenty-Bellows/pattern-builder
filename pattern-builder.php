@@ -6,7 +6,7 @@
  * Description:       Manage Patterns in the WordPress Editor.
  * Requires at least: 6.6
  * Requires PHP:      7.2
- * Version:           1.0.0
+ * Version:           1.0.1
  * Author:            Twenty Bellows
  * Author URI:        https://twentybellows.com
  * Text Domain:       pattern-builder
