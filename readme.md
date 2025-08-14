@@ -2,7 +2,6 @@
 
 **Manage Block Patterns Like a Pro** - Create, edit, and organize WordPress block patterns directly in your admin area with a powerful, intuitive interface.
 
-
 ## Features
 
 ### Pattern Management Made Easy
@@ -22,13 +21,13 @@
 -  **Asset Management** - Automatically handles pattern images and media
 - **Block Bindings** - Advanced pattern configuration with block bindings support
 
-## 📋 Requirements
+## Requirements
 
 - WordPress 6.6 or higher
 - PHP 7.2 or higher
 - Modern browser with JavaScript enabled
 
-## 💻 Development
+## Development
 
 ### Quick Start
 
@@ -51,7 +50,7 @@ npm run start
 npm run watch
 ```
 
-## 🎯 Use Cases
+## Use Cases
 
 ### For Theme Developers
 - Create and manage theme patterns visually
@@ -79,20 +78,14 @@ npm run watch
 - Write tests for new features
 - Update documentation as needed
 
-## 📄 License
-
-This project is proprietary and fully owned by Twenty Bellows. Redistribution or modification without permission is prohibited.
-
-## 🙏 Credits
+## Credits
 
 Pattern Builder is developed and maintained by [Twenty Bellows](https://github.com/Twenty-Bellows).
 
-## 💬 Support
+## Support
 
-- 📧 Email: support@twentybellows.com
-- 🐛 Issues: [GitHub Issues](https://github.com/Twenty-Bellows/pattern-builder/issues)
-- 📚 Documentation: [Wiki](https://github.com/Twenty-Bellows/pattern-builder/wiki)
+- Email: support@twentybellows.com
+- Issues: [GitHub Issues](https://github.com/Twenty-Bellows/pattern-builder/issues)
+- Documentation: [Wiki](https://github.com/Twenty-Bellows/pattern-builder/wiki)
 
 ---
-
-**Pattern Builder** - Making WordPress patterns powerful and accessible 🚀
