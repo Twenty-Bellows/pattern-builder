@@ -7,6 +7,7 @@ use WP_Query;
 
 require_once __DIR__ . '/class-pattern-builder-abstract-pattern.php';
 require_once __DIR__ . '/class-pattern-builder-localization.php';
+require_once __DIR__ . '/class-pattern-builder-security.php';
 require_once ABSPATH . 'wp-admin/includes/file.php';
 
 class Pattern_Builder_Controller {
@@ -83,38 +84,40 @@ class Pattern_Builder_Controller {
 		} else {
 			delete_post_meta( $post_id, 'wp_pattern_inserter' );
 		}
-		if (!$post_id) {
+		if ( ! $post_id ) {
 
-		$post_id = wp_insert_post(
-			array(
-				'post_title'     => $pattern->title,
-				'post_name'      => $this->format_pattern_slug_for_post( $pattern->name ),
-				'post_content'   => $pattern->content,
-				'post_excerpt'   => $pattern->description,
-				'post_type'      => 'tbell_pattern_block',
-				'post_status'    => 'publish',
-				'ping_status'    => 'closed',
-				'comment_status' => 'closed',
-				'meta_input'     => $meta,
-			), true
-		);
+			$post_id = wp_insert_post(
+				array(
+					'post_title'     => $pattern->title,
+					'post_name'      => $this->format_pattern_slug_for_post( $pattern->name ),
+					'post_content'   => $pattern->content,
+					'post_excerpt'   => $pattern->description,
+					'post_type'      => 'tbell_pattern_block',
+					'post_status'    => 'publish',
+					'ping_status'    => 'closed',
+					'comment_status' => 'closed',
+					'meta_input'     => $meta,
+				),
+				true
+			);
 
 		} else {
 
-		$post_id = wp_insert_post(
-			array(
-				'ID'             => $post_id,
-				'post_title'     => $pattern->title,
-				'post_name'      => $this->format_pattern_slug_for_post( $pattern->name ),
-				'post_content'   => $pattern->content,
-				'post_excerpt'   => $pattern->description,
-				'post_type'      => 'tbell_pattern_block',
-				'post_status'    => 'publish',
-				'ping_status'    => 'closed',
-				'comment_status' => 'closed',
-				'meta_input'     => $meta,
-			), true
-		);
+			$post_id = wp_insert_post(
+				array(
+					'ID'             => $post_id,
+					'post_title'     => $pattern->title,
+					'post_name'      => $this->format_pattern_slug_for_post( $pattern->name ),
+					'post_content'   => $pattern->content,
+					'post_excerpt'   => $pattern->description,
+					'post_type'      => 'tbell_pattern_block',
+					'post_status'    => 'publish',
+					'ping_status'    => 'closed',
+					'comment_status' => 'closed',
+					'meta_input'     => $meta,
+				),
+				true
+			);
 
 		}
 
@@ -128,79 +131,78 @@ class Pattern_Builder_Controller {
 		return $post;
 	}
 
-	public function update_theme_pattern(Abstract_Pattern $pattern, $options = array())
-	{
+	public function update_theme_pattern( Abstract_Pattern $pattern, $options = array() ) {
 		// get the tbell_pattern_block post if it already exists
-		$post = get_page_by_path($this->format_pattern_slug_for_post($pattern->name), OBJECT, array('tbell_pattern_block', 'wp_block'));
+		$post = get_page_by_path( $this->format_pattern_slug_for_post( $pattern->name ), OBJECT, array( 'tbell_pattern_block', 'wp_block' ) );
 
-		if ($post && $post->post_type === 'wp_block') {
+		if ( $post && $post->post_type === 'wp_block' ) {
 			// this is being converted to theme patterns, change the slug to include the theme domain
 			$pattern->name = get_stylesheet() . '/' . $pattern->name;
 		}
 
 		// Check if image importing is enabled (default to true for backward compatibility)
-		if (! isset($options['import_images']) || $options['import_images'] === true) {
-			$pattern = $this->import_pattern_image_assets($pattern);
+		if ( ! isset( $options['import_images'] ) || $options['import_images'] === true ) {
+			$pattern = $this->import_pattern_image_assets( $pattern );
 		}
 
 		// Check if localization is enabled
-		if (isset($options['localize']) && $options['localize'] === true) {
-			$pattern = Pattern_Builder_Localization::localize_pattern_content($pattern);
+		if ( isset( $options['localize'] ) && $options['localize'] === true ) {
+			$pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 		}
 
 		// update the pattern file
-		$this->update_theme_pattern_file($pattern);
+		$this->update_theme_pattern_file( $pattern );
 
 		// rebuild the pattern from the file (so that the content has no PHP tags)
-		$pattern = Abstract_Pattern::from_file($this->get_pattern_filepath($pattern));
+		$pattern = Abstract_Pattern::from_file( $this->get_pattern_filepath( $pattern ) );
 
 		$post_id = wp_update_post(
 			array(
 				'ID'           => $post ? $post->ID : null,
 				'post_title'   => $pattern->title,
-				'post_name'    => $this->format_pattern_slug_for_post($pattern->name),
+				'post_name'    => $this->format_pattern_slug_for_post( $pattern->name ),
 				'post_excerpt' => $pattern->description,
 				'post_content' => $pattern->content,
 				'post_type'    => 'tbell_pattern_block',
 			)
 		);
 
-		if ($pattern->synced) {
-			delete_post_meta($post_id, 'wp_pattern_sync_status');
+		if ( $pattern->synced ) {
+			delete_post_meta( $post_id, 'wp_pattern_sync_status' );
 		} else {
-			update_post_meta($post_id, 'wp_pattern_sync_status', 'unsynced');
+			update_post_meta( $post_id, 'wp_pattern_sync_status', 'unsynced' );
 		}
 
-		if ($pattern->keywords) {
-			update_post_meta($post_id, 'wp_pattern_keywords', implode(',', $pattern->keywords));
+		if ( $pattern->keywords ) {
+			update_post_meta( $post_id, 'wp_pattern_keywords', implode( ',', $pattern->keywords ) );
 		} else {
-			delete_post_meta($post_id, 'wp_pattern_keywords');
+			delete_post_meta( $post_id, 'wp_pattern_keywords' );
 		}
 
-		if ($pattern->blockTypes) {
-			update_post_meta($post_id, 'wp_pattern_block_types', implode(',', $pattern->blockTypes));
+		if ( $pattern->blockTypes ) {
+			update_post_meta( $post_id, 'wp_pattern_block_types', implode( ',', $pattern->blockTypes ) );
 		} else {
-			delete_post_meta($post_id, 'wp_pattern_block_types');
+			delete_post_meta( $post_id, 'wp_pattern_block_types' );
 		}
 
-		if ($pattern->templateTypes) {
-			update_post_meta($post_id, 'wp_pattern_template_types', implode(',', $pattern->templateTypes));
+		if ( $pattern->templateTypes ) {
+			update_post_meta( $post_id, 'wp_pattern_template_types', implode( ',', $pattern->templateTypes ) );
 		} else {
-			delete_post_meta($post_id, 'wp_pattern_template_types');
+			delete_post_meta( $post_id, 'wp_pattern_template_types' );
 		}
 
-		if ($pattern->postTypes) {
-			update_post_meta($post_id, 'wp_pattern_post_types', implode(',', $pattern->postTypes));
+		if ( $pattern->postTypes ) {
+			update_post_meta( $post_id, 'wp_pattern_post_types', implode( ',', $pattern->postTypes ) );
 		} else {
-			delete_post_meta($post_id, 'wp_pattern_post_types');
+			delete_post_meta( $post_id, 'wp_pattern_post_types' );
 		}
 
 		// store categories
-		wp_set_object_terms($post_id, $pattern->categories, 'wp_pattern_category', false);
+		wp_set_object_terms( $post_id, $pattern->categories, 'wp_pattern_category', false );
 
 		return $pattern;
 
-		return new WP_Error('premium_required', 'Saving Theme Patterns requires the premium version of Pattern Builder.', array('status' => 403));
+		return new WP_Error( 'premium_required', 'Saving Theme Patterns requires the premium version of Pattern Builder.', array( 'status' => 403 ) );
 	}
 
 	private function export_pattern_image_assets( $pattern ) {
@@ -353,17 +355,38 @@ class Pattern_Builder_Controller {
 				return false;
 			}
 
-			$filename  = basename( $url );
-			$asset_dir = get_stylesheet_directory() . '/assets/images/';
+			$filename         = \Pattern_Builder_Security::sanitize_filename( basename( $url ) );
+			$asset_dir        = get_stylesheet_directory() . '/assets/images/';
+			$destination_path = $asset_dir . $filename;
+
+			// Validate destination path
+			$validation = \Pattern_Builder_Security::validate_asset_path( $destination_path );
+			if ( is_wp_error( $validation ) ) {
+				// Clean up the temp file and return false
+				if ( file_exists( $download_file ) ) {
+					wp_delete_file( $download_file );
+				}
+				return false;
+			}
+
 			if ( ! is_dir( $asset_dir ) ) {
 				wp_mkdir_p( $asset_dir );
 			}
 
-			global $wp_filesystem;
-			if ( ! $wp_filesystem ) {
-				WP_Filesystem();
+			// Use secure file move operation
+			$allowed_dirs = array(
+				get_stylesheet_directory() . '/assets',
+				get_template_directory() . '/assets',
+			);
+			$result       = \Pattern_Builder_Security::safe_file_move( $download_file, $destination_path, $allowed_dirs );
+
+			if ( is_wp_error( $result ) ) {
+				// Clean up the temp file if move failed
+				if ( file_exists( $download_file ) ) {
+					wp_delete_file( $download_file );
+				}
+				return false;
 			}
-			$wp_filesystem->move( $download_file, $asset_dir . $filename );
 
 			return '/assets/images/' . $filename;
 		};
@@ -457,7 +480,16 @@ class Pattern_Builder_Controller {
 		if ( $convert_from_theme_pattern ) {
 			$path = $this->get_pattern_filepath( $pattern );
 			if ( $path ) {
-				$deleted = wp_delete_file( $path );
+				// Validate that the path is within the patterns directory
+				$validation = \Pattern_Builder_Security::validate_pattern_path( $path );
+				if ( ! is_wp_error( $validation ) ) {
+					// Use secure file delete operation
+					$allowed_dirs = array(
+						get_stylesheet_directory() . '/patterns',
+						get_template_directory() . '/patterns',
+					);
+					$deleted      = \Pattern_Builder_Security::safe_file_delete( $path, $allowed_dirs );
+				}
 			}
 		}
 
@@ -469,8 +501,12 @@ class Pattern_Builder_Controller {
 		$patterns      = array();
 
 		foreach ( $pattern_files as $pattern_file ) {
-			$pattern    = Abstract_Pattern::from_file( $pattern_file );
-			$patterns[] = $pattern;
+			// Validate each pattern file path
+			$validation = \Pattern_Builder_Security::validate_pattern_path( $pattern_file );
+			if ( ! is_wp_error( $validation ) ) {
+				$pattern    = Abstract_Pattern::from_file( $pattern_file );
+				$patterns[] = $pattern;
+			}
 		}
 
 		return $patterns;
@@ -504,7 +540,13 @@ class Pattern_Builder_Controller {
 	}
 
 	public function get_pattern_filepath( $pattern ) {
-		$path = $pattern->filePath ?? get_stylesheet_directory() . '/patterns/' . basename( $pattern->name ) . '.php';
+		$path = $pattern->filePath ?? get_stylesheet_directory() . '/patterns/' . \Pattern_Builder_Security::sanitize_filename( basename( $pattern->name ) );
+
+		// Validate the path before checking existence
+		$validation = \Pattern_Builder_Security::validate_pattern_path( $path );
+		if ( is_wp_error( $validation ) ) {
+			return null;
+		}
 
 		if ( file_exists( $path ) ) {
 			return $path;
@@ -518,8 +560,12 @@ class Pattern_Builder_Controller {
 			}
 		);
 
-		if ( $pattern && file_exists( $pattern->filePath ) ) {
-			return $pattern->filePath;
+		if ( $pattern && isset( $pattern->filePath ) ) {
+			// Validate the found path as well
+			$validation = \Pattern_Builder_Security::validate_pattern_path( $pattern->filePath );
+			if ( ! is_wp_error( $validation ) && file_exists( $pattern->filePath ) ) {
+				return $pattern->filePath;
+			}
 		}
 
 		return null;
@@ -529,18 +575,29 @@ class Pattern_Builder_Controller {
 
 			$path = $this->get_pattern_filepath( $pattern );
 
-			if ( ! $path ) {
-				return new WP_Error( 'pattern_not_found', 'Pattern not found', array( 'status' => 404 ) );
-			}
+		if ( ! $path ) {
+			return new WP_Error( 'pattern_not_found', 'Pattern not found', array( 'status' => 404 ) );
+		}
 
-			$deleted = wp_delete_file( $path );
+			// Validate that the path is within the patterns directory
+			$validation = \Pattern_Builder_Security::validate_pattern_path( $path );
+		if ( is_wp_error( $validation ) ) {
+			return $validation;
+		}
 
-			if ( ! $deleted ) {
-				return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern', array( 'status' => 500 ) );
+			// Use secure file delete operation
+			$allowed_dirs = array(
+				get_stylesheet_directory() . '/patterns',
+				get_template_directory() . '/patterns',
+			);
+			$deleted      = \Pattern_Builder_Security::safe_file_delete( $path, $allowed_dirs );
+
+			if ( is_wp_error( $deleted ) ) {
+				return $deleted;
 			}
 
 			$tbell_pattern_block_post = $this->get_tbell_pattern_block_post_for_pattern( $pattern );
-			$deleted       = wp_delete_post( $tbell_pattern_block_post->ID, true );
+			$deleted                  = wp_delete_post( $tbell_pattern_block_post->ID, true );
 
 			if ( ! $deleted ) {
 				return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern', array( 'status' => 500 ) );
@@ -548,23 +605,35 @@ class Pattern_Builder_Controller {
 
 			return array( 'message' => 'Pattern deleted successfully' );
 
-		return new WP_Error( 'premium_required', 'Deleting Theme Patterns requires the premium version of Pattern Builder.', array( 'status' => 403 ) );
+			return new WP_Error( 'premium_required', 'Deleting Theme Patterns requires the premium version of Pattern Builder.', array( 'status' => 403 ) );
 	}
 
 	public function update_theme_pattern_file( Abstract_Pattern $pattern ) {
 		$path = $this->get_pattern_filepath( $pattern );
 
 		if ( ! $path ) {
-			$filename = basename( $pattern->name );
-			$path     = get_stylesheet_directory() . '/patterns/' . $filename . '.php';
+			$filename = \Pattern_Builder_Security::sanitize_filename( basename( $pattern->name ) );
+			$path     = get_stylesheet_directory() . '/patterns/' . $filename;
+		}
+
+		// Validate that the path is within the patterns directory
+		$validation = \Pattern_Builder_Security::validate_pattern_path( $path );
+		if ( is_wp_error( $validation ) ) {
+			return $validation;
 		}
 
 		$formatted_content = $this->format_block_markup( $pattern->content );
 		$file_content      = $this->build_pattern_file_metadata( $pattern ) . $formatted_content;
-		$response          = file_put_contents( $path, $file_content );
 
-		if ( ! $response ) {
-			return new WP_Error( 'file_creation_failed', 'Failed to create pattern file', array( 'status' => 500 ) );
+		// Use secure file write operation
+		$allowed_dirs = array(
+			get_stylesheet_directory() . '/patterns',
+			get_template_directory() . '/patterns',
+		);
+		$response     = \Pattern_Builder_Security::safe_file_write( $path, $file_content, $allowed_dirs );
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
 		}
 
 		return $pattern;
@@ -586,7 +655,7 @@ class Pattern_Builder_Controller {
 		$inserter      = $pattern->inserter ? '' : "\n * Inserter: no";
 		$synced        = $pattern->synced ? "\n * Synced: yes" : '';
 
-		$metadata = "<?php\n";
+		$metadata  = "<?php\n";
 		$metadata .= "/**\n";
 		$metadata .= " * Title: $pattern->title\n";
 		$metadata .= " * Slug: $pattern->name\n";
