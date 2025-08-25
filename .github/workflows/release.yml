@@ -1,10 +1,10 @@
-name: Deploy
+name: Release
 
 on:
     workflow_dispatch:
         inputs:
             confirmation:
-                description: 'Type RELEASE to confirm deployment'
+                description: 'Type RELEASE to confirm creating a new release'
                 required: true
                 type: string
 
