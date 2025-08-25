@@ -323,9 +323,13 @@ class Pattern_Builder_API {
 
 
 	/**
-	 *
 	 * Filters delete calls and if the item being deleted is a 'tbell_pattern_block' (theme pattern)
 	 * delete the related pattern php file as well.
+	 *
+	 * @param mixed           $response The response from the REST API.
+	 * @param WP_REST_Server  $server   The REST server instance.
+	 * @param WP_REST_Request $request  The REST request object.
+	 * @return mixed|WP_Error The response or WP_Error on failure.
 	 */
 	function handle_hijack_block_delete( $response, $server, $request ) {
 
@@ -337,6 +341,16 @@ class Pattern_Builder_API {
 			$post = get_post( $id );
 
 			if ( $post && $post->post_type === 'tbell_pattern_block' && $request->get_method() === 'DELETE' ) {
+
+				// Verify nonce for additional security
+				$nonce = $request->get_header( 'X-WP-Nonce' );
+				if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+					return new WP_Error(
+						'rest_cookie_invalid_nonce',
+						__( 'Cookie nonce is invalid', 'pattern-builder' ),
+						array( 'status' => 403 )
+					);
+				}
 
 				$deleted = wp_delete_post( $id, true );
 
@@ -578,9 +592,25 @@ class Pattern_Builder_API {
 
 	/**
 	 * When anything is saved any wp:block that references a theme pattern is converted to a wp:pattern block instead.
+	 *
+	 * @param mixed           $response The response from the REST API.
+	 * @param mixed           $handler  The handler object.
+	 * @param WP_REST_Request $request  The REST request object.
+	 * @return mixed The response, potentially modified.
 	 */
 	public function handle_block_to_pattern_conversion( $response, $handler, $request ) {
 		if ( $request->get_method() === 'PUT' || $request->get_method() === 'POST' ) {
+			
+			// Verify nonce for additional security on state-changing operations
+			$nonce = $request->get_header( 'X-WP-Nonce' );
+			if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+				return new WP_Error(
+					'rest_cookie_invalid_nonce',
+					__( 'Cookie nonce is invalid', 'pattern-builder' ),
+					array( 'status' => 403 )
+				);
+			}
+			
 			$body = json_decode( $request->get_body(), true );
 
 			// Validate JSON decode was successful
