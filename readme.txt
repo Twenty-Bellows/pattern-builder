@@ -53,12 +53,6 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 * Speed up development workflow
 * Maintain brand consistency
 
-= Support =
-
-* Email: support@twentybellows.com
-* Issues: [GitHub Issues](https://github.com/Twenty-Bellows/pattern-builder/issues)
-* Documentation: [GitHub Wiki](https://github.com/Twenty-Bellows/pattern-builder/wiki)
-
 == Installation ==
 
 = From WordPress Admin =
