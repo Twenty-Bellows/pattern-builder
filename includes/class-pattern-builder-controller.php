@@ -32,28 +32,30 @@ class Pattern_Builder_Controller {
 		// Sanitize the pattern name for safe database usage
 		$sanitized_name = sanitize_title_with_dashes( $pattern->name );
 		$sanitized_name = wp_strip_all_tags( $sanitized_name );
-		$path = $this->format_pattern_slug_for_post( $sanitized_name );
-		
+		$path           = $this->format_pattern_slug_for_post( $sanitized_name );
+
 		// Create cache key for this specific pattern
-		$cache_key = 'tbell_pattern_post_' . md5( $sanitized_name );
+		$cache_key    = 'tbell_pattern_post_' . md5( $sanitized_name );
 		$pattern_post = get_transient( $cache_key );
-		
+
 		if ( false === $pattern_post ) {
 			// Use WP_Query for better performance and security
-			$query = new WP_Query( array(
-				'name'                   => sanitize_title( $path ),
-				'post_type'              => 'tbell_pattern_block',
-				'posts_per_page'         => 1,
-				'no_found_rows'          => true,
-				'update_post_meta_cache' => false,
-				'update_post_term_cache' => false,
-			) );
+			$query = new WP_Query(
+				array(
+					'name'                   => sanitize_title( $path ),
+					'post_type'              => 'tbell_pattern_block',
+					'posts_per_page'         => 1,
+					'no_found_rows'          => true,
+					'update_post_meta_cache' => false,
+					'update_post_term_cache' => false,
+				)
+			);
 
 			$pattern_post = $query->have_posts() ? $query->posts[0] : null;
-			
+
 			// Cache the result for 1 hour
 			set_transient( $cache_key, $pattern_post, HOUR_IN_SECONDS );
-			
+
 			// Clean up
 			wp_reset_postdata();
 		}
@@ -78,35 +80,37 @@ class Pattern_Builder_Controller {
 		// Sanitize the page path
 		$sanitized_path = sanitize_title_with_dashes( $page_path );
 		$sanitized_path = wp_strip_all_tags( $sanitized_path );
-		
+
 		// Ensure post_type is safe
 		$post_types = is_array( $post_type ) ? $post_type : array( $post_type );
 		$post_types = array_map( 'sanitize_key', $post_types );
-		
+
 		// Create cache key
-		$cache_key = 'page_by_path_' . md5( $sanitized_path . serialize( $post_types ) );
+		$cache_key   = 'page_by_path_' . md5( $sanitized_path . serialize( $post_types ) );
 		$cached_post = get_transient( $cache_key );
-		
+
 		if ( false === $cached_post ) {
 			// Use WP_Query instead of direct get_page_by_path
-			$query = new WP_Query( array(
-				'name'                   => $sanitized_path,
-				'post_type'              => $post_types,
-				'posts_per_page'         => 1,
-				'no_found_rows'          => true,
-				'update_post_meta_cache' => false,
-				'update_post_term_cache' => false,
-			) );
+			$query = new WP_Query(
+				array(
+					'name'                   => $sanitized_path,
+					'post_type'              => $post_types,
+					'posts_per_page'         => 1,
+					'no_found_rows'          => true,
+					'update_post_meta_cache' => false,
+					'update_post_term_cache' => false,
+				)
+			);
 
 			$cached_post = $query->have_posts() ? $query->posts[0] : null;
-			
+
 			// Cache for 30 minutes (shorter than pattern cache due to potentially more frequent changes)
 			set_transient( $cache_key, $cached_post, 30 * MINUTE_IN_SECONDS );
-			
+
 			// Clean up
 			wp_reset_postdata();
 		}
-		
+
 		if ( $cached_post && $output === OBJECT ) {
 			return $cached_post;
 		} elseif ( $cached_post && $output === ARRAY_A ) {
@@ -114,7 +118,7 @@ class Pattern_Builder_Controller {
 		} elseif ( $cached_post && $output === ARRAY_N ) {
 			return array_values( get_object_vars( $cached_post ) );
 		}
-		
+
 		return null;
 	}
 
@@ -127,7 +131,7 @@ class Pattern_Builder_Controller {
 		// Sanitize the pattern name
 		$sanitized_name = sanitize_title_with_dashes( $pattern_name );
 		$sanitized_name = wp_strip_all_tags( $sanitized_name );
-		
+
 		// Delete relevant transients
 		$cache_keys = array(
 			'tbell_pattern_post_' . md5( $sanitized_name ),
@@ -135,7 +139,7 @@ class Pattern_Builder_Controller {
 			'page_by_path_' . md5( $sanitized_name . serialize( array( 'tbell_pattern_block' ) ) ),
 			'page_by_path_' . md5( $this->format_pattern_slug_for_post( $sanitized_name ) . serialize( array( 'tbell_pattern_block' ) ) ),
 		);
-		
+
 		foreach ( $cache_keys as $key ) {
 			delete_transient( $key );
 		}
@@ -367,9 +371,9 @@ class Pattern_Builder_Controller {
 				return \Pattern_Builder_Security::create_error(
 					'image_download_failed',
 					__( 'Failed to download image asset.', 'pattern-builder' ),
-					array( 
-						'url' => $url,
-						'error' => $download_file->get_error_message() 
+					array(
+						'url'   => $url,
+						'error' => $download_file->get_error_message(),
 					),
 					__METHOD__
 				);
@@ -398,9 +402,9 @@ class Pattern_Builder_Controller {
 				return \Pattern_Builder_Security::create_error(
 					'file_move_failed',
 					__( 'Failed to move image file to uploads directory.', 'pattern-builder' ),
-					array( 
-						'source' => $download_file,
-						'destination' => $upload_file 
+					array(
+						'source'      => $download_file,
+						'destination' => $upload_file,
 					),
 					__METHOD__
 				);
@@ -422,9 +426,9 @@ class Pattern_Builder_Controller {
 				return \Pattern_Builder_Security::create_error(
 					'attachment_insert_failed',
 					__( 'Failed to create media library attachment.', 'pattern-builder' ),
-					array( 
-						'file' => $upload_file,
-						'error' => $attachment_id->get_error_message()
+					array(
+						'file'  => $upload_file,
+						'error' => $attachment_id->get_error_message(),
 					),
 					__METHOD__
 				);
@@ -660,8 +664,8 @@ class Pattern_Builder_Controller {
 						get_stylesheet_directory() . '/patterns',
 						get_template_directory() . '/patterns',
 					);
-					$deleted = \Pattern_Builder_Security::safe_file_delete( $path, $allowed_dirs );
-					
+					$deleted      = \Pattern_Builder_Security::safe_file_delete( $path, $allowed_dirs );
+
 					// Log if deletion failed but don't break the conversion
 					if ( is_wp_error( $deleted ) ) {
 						\Pattern_Builder_Security::log_error(
@@ -820,7 +824,7 @@ class Pattern_Builder_Controller {
 				return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern', array( 'status' => 500 ) );
 			}
 
-		return array( 'message' => 'Pattern deleted successfully' );
+			return array( 'message' => 'Pattern deleted successfully' );
 	}
 
 	public function update_theme_pattern_file( Abstract_Pattern $pattern ) {

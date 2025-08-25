@@ -26,7 +26,7 @@ class Pattern_Builder_Security {
 	public static function validate_file_path( $path, $allowed_dirs = array() ) {
 		// First normalize the path without realpath to handle non-existing files.
 		$normalized_path = wp_normalize_path( $path );
-		
+
 		// If the file exists, use realpath for stronger validation.
 		if ( file_exists( $path ) ) {
 			$real_path = wp_normalize_path( realpath( $path ) );
@@ -324,7 +324,7 @@ class Pattern_Builder_Security {
 
 	/**
 	 * Log an error with context for debugging purposes.
-	 * 
+	 *
 	 * Respects WordPress debug settings and provides consistent error logging
 	 * throughout the plugin.
 	 *
@@ -341,13 +341,13 @@ class Pattern_Builder_Security {
 
 		// Build the log message
 		$log_message = '[Pattern Builder] ';
-		
+
 		if ( ! empty( $context ) ) {
 			$log_message .= "[$context] ";
 		}
-		
+
 		$log_message .= $message;
-		
+
 		if ( ! is_null( $data ) ) {
 			$log_message .= ' | Data: ' . wp_json_encode( $data );
 		}
@@ -356,7 +356,7 @@ class Pattern_Builder_Security {
 		if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
 			error_log( $log_message );
 		}
-		
+
 		// Also trigger WordPress action for extensibility
 		do_action( 'pattern_builder_log_error', $level, $message, $context, $data );
 	}
@@ -373,7 +373,14 @@ class Pattern_Builder_Security {
 	 */
 	public static function create_error( $code, $message, $data = array(), $context = '', $log_error = true ) {
 		if ( $log_error ) {
-			self::log_error( $message, $context, array( 'code' => $code, 'data' => $data ) );
+			self::log_error(
+				$message,
+				$context,
+				array(
+					'code' => $code,
+					'data' => $data,
+				)
+			);
 		}
 
 		return new WP_Error( $code, $message, $data );
