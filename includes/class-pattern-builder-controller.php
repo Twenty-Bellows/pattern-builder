@@ -22,17 +22,41 @@ class Pattern_Builder_Controller {
 		return $new_slug;
 	}
 
+	/**
+	 * Get tbell_pattern_block post for a pattern with proper sanitization and caching.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern object.
+	 * @return WP_Post|null The pattern post or null if not found.
+	 */
 	public function get_tbell_pattern_block_post_for_pattern( $pattern ) {
-		$path = $this->format_pattern_slug_for_post( $pattern->name );
+		// Sanitize the pattern name for safe database usage
+		$sanitized_name = sanitize_title_with_dashes( $pattern->name );
+		$sanitized_name = wp_strip_all_tags( $sanitized_name );
+		$path = $this->format_pattern_slug_for_post( $sanitized_name );
+		
+		// Create cache key for this specific pattern
+		$cache_key = 'tbell_pattern_post_' . md5( $sanitized_name );
+		$pattern_post = get_transient( $cache_key );
+		
+		if ( false === $pattern_post ) {
+			// Use WP_Query for better performance and security
+			$query = new WP_Query( array(
+				'name'                   => sanitize_title( $path ),
+				'post_type'              => 'tbell_pattern_block',
+				'posts_per_page'         => 1,
+				'no_found_rows'          => true,
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+			) );
 
-		$posts = get_posts(
-			array(
-				'name'      => $path,
-				'post_type' => 'tbell_pattern_block',
-			)
-		);
-
-		$pattern_post = $posts ? $posts[0] : null;
+			$pattern_post = $query->have_posts() ? $query->posts[0] : null;
+			
+			// Cache the result for 1 hour
+			set_transient( $cache_key, $pattern_post, HOUR_IN_SECONDS );
+			
+			// Clean up
+			wp_reset_postdata();
+		}
 
 		if ( $pattern_post ) {
 			$pattern_post->post_name = $pattern->name;
@@ -42,8 +66,83 @@ class Pattern_Builder_Controller {
 		return $this->create_tbell_pattern_block_post_for_pattern( $pattern );
 	}
 
+	/**
+	 * Secure alternative to get_page_by_path with proper sanitization and caching.
+	 *
+	 * @param string       $page_path  The page path to search for.
+	 * @param string       $output     Optional. Output type. OBJECT, ARRAY_N, or ARRAY_A.
+	 * @param string|array $post_type  Optional. Post type or types to search.
+	 * @return WP_Post|array|null The page object or null if not found.
+	 */
+	private function get_page_by_path_secure( $page_path, $output = OBJECT, $post_type = 'page' ) {
+		// Sanitize the page path
+		$sanitized_path = sanitize_title_with_dashes( $page_path );
+		$sanitized_path = wp_strip_all_tags( $sanitized_path );
+		
+		// Ensure post_type is safe
+		$post_types = is_array( $post_type ) ? $post_type : array( $post_type );
+		$post_types = array_map( 'sanitize_key', $post_types );
+		
+		// Create cache key
+		$cache_key = 'page_by_path_' . md5( $sanitized_path . serialize( $post_types ) );
+		$cached_post = get_transient( $cache_key );
+		
+		if ( false === $cached_post ) {
+			// Use WP_Query instead of direct get_page_by_path
+			$query = new WP_Query( array(
+				'name'                   => $sanitized_path,
+				'post_type'              => $post_types,
+				'posts_per_page'         => 1,
+				'no_found_rows'          => true,
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+			) );
+
+			$cached_post = $query->have_posts() ? $query->posts[0] : null;
+			
+			// Cache for 30 minutes (shorter than pattern cache due to potentially more frequent changes)
+			set_transient( $cache_key, $cached_post, 30 * MINUTE_IN_SECONDS );
+			
+			// Clean up
+			wp_reset_postdata();
+		}
+		
+		if ( $cached_post && $output === OBJECT ) {
+			return $cached_post;
+		} elseif ( $cached_post && $output === ARRAY_A ) {
+			return get_object_vars( $cached_post );
+		} elseif ( $cached_post && $output === ARRAY_N ) {
+			return array_values( get_object_vars( $cached_post ) );
+		}
+		
+		return null;
+	}
+
+	/**
+	 * Invalidate pattern-related caches when patterns are modified.
+	 *
+	 * @param string $pattern_name The pattern name that was modified.
+	 */
+	private function invalidate_pattern_cache( $pattern_name ) {
+		// Sanitize the pattern name
+		$sanitized_name = sanitize_title_with_dashes( $pattern_name );
+		$sanitized_name = wp_strip_all_tags( $sanitized_name );
+		
+		// Delete relevant transients
+		$cache_keys = array(
+			'tbell_pattern_post_' . md5( $sanitized_name ),
+			'page_by_path_' . md5( $sanitized_name . serialize( array( 'wp_block' ) ) ),
+			'page_by_path_' . md5( $sanitized_name . serialize( array( 'tbell_pattern_block' ) ) ),
+			'page_by_path_' . md5( $this->format_pattern_slug_for_post( $sanitized_name ) . serialize( array( 'tbell_pattern_block' ) ) ),
+		);
+		
+		foreach ( $cache_keys as $key ) {
+			delete_transient( $key );
+		}
+	}
+
 	public function create_tbell_pattern_block_post_for_pattern( $pattern ) {
-		$existing_post = get_page_by_path( $this->format_pattern_slug_for_post( $pattern->name ), OBJECT, array( 'tbell_pattern_block' ) );
+		$existing_post = $this->get_page_by_path_secure( $this->format_pattern_slug_for_post( $pattern->name ), OBJECT, array( 'tbell_pattern_block' ) );
 
 		$post_id = $existing_post ? $existing_post->ID : null;
 
@@ -142,7 +241,7 @@ class Pattern_Builder_Controller {
 		}
 
 		// get the tbell_pattern_block post if it already exists
-		$post = get_page_by_path( $this->format_pattern_slug_for_post( $pattern->name ), OBJECT, array( 'tbell_pattern_block', 'wp_block' ) );
+		$post = $this->get_page_by_path_secure( $this->format_pattern_slug_for_post( $pattern->name ), OBJECT, array( 'tbell_pattern_block', 'wp_block' ) );
 
 		if ( $post && $post->post_type === 'wp_block' ) {
 			// this is being converted to theme patterns, change the slug to include the theme domain
@@ -211,6 +310,9 @@ class Pattern_Builder_Controller {
 
 		// store categories
 		wp_set_object_terms( $post_id, $pattern->categories, 'wp_pattern_category', false );
+
+		// Invalidate cache for this pattern
+		$this->invalidate_pattern_cache( $pattern->name );
 
 		return $pattern;
 	}
@@ -497,7 +599,7 @@ class Pattern_Builder_Controller {
 				array( 'status' => 403 )
 			);
 		}
-		$post                       = get_page_by_path( $pattern->name, OBJECT, 'wp_block' );
+		$post                       = $this->get_page_by_path_secure( $pattern->name, OBJECT, 'wp_block' );
 		$convert_from_theme_pattern = false;
 
 		if ( empty( $post ) ) {
@@ -505,7 +607,7 @@ class Pattern_Builder_Controller {
 			// this is for any user patterns that are being converted from theme patterns
 			// It will be converted to a wp_block post when it is updated
 			$slug                       = $this->format_pattern_slug_for_post( $pattern->name );
-			$post                       = get_page_by_path( $slug, OBJECT, 'tbell_pattern_block' );
+			$post                       = $this->get_page_by_path_secure( $slug, OBJECT, 'tbell_pattern_block' );
 			$convert_from_theme_pattern = true;
 		}
 
@@ -572,6 +674,9 @@ class Pattern_Builder_Controller {
 			}
 		}
 
+		// Invalidate cache for this pattern
+		$this->invalidate_pattern_cache( $pattern->name );
+
 		return $pattern;
 	}
 
@@ -612,7 +717,7 @@ class Pattern_Builder_Controller {
 			);
 		}
 
-		$post = get_page_by_path( $pattern->name, OBJECT, 'wp_block' );
+		$post = $this->get_page_by_path_secure( $pattern->name, OBJECT, 'wp_block' );
 
 		if ( empty( $post ) ) {
 			return new WP_Error( 'pattern_not_found', 'Pattern not found', array( 'status' => 404 ) );
