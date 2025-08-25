@@ -344,7 +344,7 @@ class Pattern_Builder_Localization {
 			if ( ! empty( $block['innerContent'] ) && is_array( $block['innerContent'] ) ) {
 				// For details blocks with inner blocks, innerContent typically has:
 				// [0] = opening part with summary, [1] = null (for inner blocks), [2] = closing </details>
-				
+
 				// Find the opening part that contains the summary and update it with localized content
 				foreach ( $block['innerContent'] as $index => $content ) {
 					if ( is_string( $content ) && strpos( $content, '<summary' ) !== false ) {

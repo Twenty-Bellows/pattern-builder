@@ -10,6 +10,7 @@ use WP_REST_Blocks_Controller;
 
 require_once __DIR__ . '/class-pattern-builder-abstract-pattern.php';
 require_once __DIR__ . '/class-pattern-builder-controller.php';
+require_once __DIR__ . '/class-pattern-builder-security.php';
 
 class Pattern_Builder_API {
 
@@ -58,7 +59,6 @@ class Pattern_Builder_API {
 				'permission_callback' => array( $this, 'write_permission_callback' ),
 			)
 		);
-
 	}
 
 	/**
@@ -112,11 +112,11 @@ class Pattern_Builder_API {
 	 */
 	public function process_theme_patterns( WP_REST_Request $request ): WP_REST_Response {
 
-		$localize = $request->get_param( 'localize' ) === 'true';
+		$localize      = $request->get_param( 'localize' ) === 'true';
 		$import_images = $request->get_param( 'importImages' ) !== 'false';
 
 		$options = array(
-			'localize' => $localize,
+			'localize'      => $localize,
 			'import_images' => $import_images,
 		);
 
@@ -124,37 +124,37 @@ class Pattern_Builder_API {
 		$theme_patterns = $this->controller->get_block_patterns_from_theme_files();
 
 		$processed_count = 0;
-		$error_count = 0;
-		$errors = array();
+		$error_count     = 0;
+		$errors          = array();
 
 		foreach ( $theme_patterns as $pattern ) {
 			try {
 				$this->controller->update_theme_pattern( $pattern, $options );
-				$processed_count++;
+				++$processed_count;
 			} catch ( Exception $e ) {
-				$error_count++;
+				++$error_count;
 				$errors[] = array(
 					'pattern' => $pattern->name,
-					'error' => $e->getMessage(),
+					'error'   => $e->getMessage(),
 				);
 			}
 		}
 
 		$total_patterns = count( $theme_patterns );
-		$success = $error_count === 0;
+		$success        = $error_count === 0;
 
 		$response_data = array(
-			'success' => $success,
-			'message' => sprintf(
+			'success'  => $success,
+			'message'  => sprintf(
 				/* translators: 1: Number of patterns processed, 2: Total number of patterns */
 				__( 'Processed %1$d of %2$d theme patterns successfully.', 'pattern-builder' ),
 				$processed_count,
 				$total_patterns
 			),
-			'stats' => array(
-				'total' => $total_patterns,
+			'stats'    => array(
+				'total'     => $total_patterns,
 				'processed' => $processed_count,
-				'errors' => $error_count,
+				'errors'    => $error_count,
 			),
 			'settings' => $options,
 		);
@@ -199,7 +199,7 @@ class Pattern_Builder_API {
 	public function inject_theme_patterns( $response, $server, $request ) {
 		// Requesting a single pattern.  Inject the synced theme pattern.
 		if ( preg_match( '#/wp/v2/blocks/(?P<id>\d+)#', $request->get_route(), $matches ) ) {
-			$block_id = intval( $matches['id'] );
+			$block_id            = intval( $matches['id'] );
 			$tbell_pattern_block = get_post( $block_id );
 			if ( $tbell_pattern_block && $tbell_pattern_block->post_type === 'tbell_pattern_block' ) {
 				// make sure the pattern has a pattern file
@@ -208,8 +208,8 @@ class Pattern_Builder_API {
 					return $response; // No pattern file found, return the original response
 				}
 				$tbell_pattern_block->post_name = $this->controller->format_pattern_slug_from_post( $tbell_pattern_block->post_name );
-				$data                = $this->format_tbell_pattern_block_response( $tbell_pattern_block, $request );
-				$response            = new WP_REST_Response( $data );
+				$data                           = $this->format_tbell_pattern_block_response( $tbell_pattern_block, $request );
+				$response                       = new WP_REST_Response( $data );
 			}
 		}
 
@@ -326,7 +326,6 @@ class Pattern_Builder_API {
 	 *
 	 * Filters delete calls and if the item being deleted is a 'tbell_pattern_block' (theme pattern)
 	 * delete the related pattern php file as well.
-	 *
 	 */
 	function handle_hijack_block_delete( $response, $server, $request ) {
 
@@ -353,10 +352,21 @@ class Pattern_Builder_API {
 					return new WP_Error( 'pattern_not_found', 'Pattern not found', array( 'status' => 404 ) );
 				}
 
-				$deleted = wp_delete_file( $path );
+				// Validate that the path is within the patterns directory
+				$validation = \Pattern_Builder_Security::validate_pattern_path( $path );
+				if ( is_wp_error( $validation ) ) {
+					return $validation;
+				}
 
-				if ( ! $deleted ) {
-					return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern', array( 'status' => 500 ) );
+				// Use secure file delete operation
+				$allowed_dirs = array(
+					get_stylesheet_directory() . '/patterns',
+					get_template_directory() . '/patterns',
+				);
+				$deleted      = \Pattern_Builder_Security::safe_file_delete( $path, $allowed_dirs );
+
+				if ( is_wp_error( $deleted ) ) {
+					return $deleted;
 				}
 
 				return new WP_REST_Response( array( 'message' => 'Pattern deleted successfully' ), 200 );
@@ -373,116 +383,114 @@ class Pattern_Builder_API {
 	 * It updates the pattern file as well as associated metadata for the pattern.
 	 * Additionally it will optionally localize the content as well as import any media
 	 * referenced by the pattern into the theme.
-	 *
 	 */
-	function handle_hijack_block_update($response, $handler, $request)
-	{
+	function handle_hijack_block_update( $response, $handler, $request ) {
 		$route = $request->get_route();
 
-		if (preg_match('#^/wp/v2/blocks/(\d+)$#', $route, $matches)) {
+		if ( preg_match( '#^/wp/v2/blocks/(\d+)$#', $route, $matches ) ) {
 
-			$id   = intval($matches[1]);
-			$post = get_post($id);
+			$id   = intval( $matches[1] );
+			$post = get_post( $id );
 
-			if ($post && $request->get_method() === 'PUT') {
+			if ( $post && $request->get_method() === 'PUT' ) {
 
-				$updated_pattern = json_decode($request->get_body(), true);
+				$updated_pattern = json_decode( $request->get_body(), true );
 
 				$convert_user_pattern_to_theme_pattern = false;
 
-				if ($post->post_type === 'wp_block') {
+				if ( $post->post_type === 'wp_block' ) {
 
-					if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'theme') {
+					if ( isset( $updated_pattern['source'] ) && $updated_pattern['source'] === 'theme' ) {
 						// we are attempting to convert a USER pattern to a THEME pattern.
 						$convert_user_pattern_to_theme_pattern = true;
 					}
 				}
 
-				if ($post->post_type === 'tbell_pattern_block' || $convert_user_pattern_to_theme_pattern) {
+				if ( $post->post_type === 'tbell_pattern_block' || $convert_user_pattern_to_theme_pattern ) {
 
 					// Check write permissions before allowing update
-					if (! current_user_can('edit_others_posts')) {
+					if ( ! current_user_can( 'edit_others_posts' ) ) {
 						return new WP_Error(
 							'rest_forbidden',
-							__('You do not have permission to edit patterns.', 'pattern-builder'),
-							array('status' => 403)
+							__( 'You do not have permission to edit patterns.', 'pattern-builder' ),
+							array( 'status' => 403 )
 						);
 					}
 
 					// Verify the REST API nonce
-					$nonce = $request->get_header('X-WP-Nonce');
-					if (! $nonce || ! wp_verify_nonce($nonce, 'wp_rest')) {
+					$nonce = $request->get_header( 'X-WP-Nonce' );
+					if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
 						return new WP_Error(
 							'rest_cookie_invalid_nonce',
-							__('Cookie nonce is invalid', 'pattern-builder'),
-							array('status' => 403)
+							__( 'Cookie nonce is invalid', 'pattern-builder' ),
+							array( 'status' => 403 )
 						);
 					}
 
-					$pattern = Abstract_Pattern::from_post($post);
+					$pattern = Abstract_Pattern::from_post( $post );
 
-					if (isset($updated_pattern['content'])) {
+					if ( isset( $updated_pattern['content'] ) ) {
 						// remap tbell_pattern_blocks to patterns
-						$blocks           = parse_blocks($updated_pattern['content']);
-						$blocks           = $this->convert_blocks_to_patterns($blocks);
-						$pattern->content = serialize_blocks($blocks);
+						$blocks           = parse_blocks( $updated_pattern['content'] );
+						$blocks           = $this->convert_blocks_to_patterns( $blocks );
+						$pattern->content = serialize_blocks( $blocks );
 						// TODO: Format the content to be easy on the eyes.
 					}
 
-					if (isset($updated_pattern['title'])) {
+					if ( isset( $updated_pattern['title'] ) ) {
 						$pattern->title = $updated_pattern['title'];
 					}
 
-					if (isset($updated_pattern['excerpt'])) {
+					if ( isset( $updated_pattern['excerpt'] ) ) {
 						$pattern->description = $updated_pattern['excerpt'];
 					}
 
-					if (isset($updated_pattern['wp_pattern_sync_status'])) {
+					if ( isset( $updated_pattern['wp_pattern_sync_status'] ) ) {
 						$pattern->synced = $updated_pattern['wp_pattern_sync_status'] !== 'unsynced';
 					}
 
-					if (isset($updated_pattern['wp_pattern_block_types'])) {
+					if ( isset( $updated_pattern['wp_pattern_block_types'] ) ) {
 						$pattern->blockTypes = $updated_pattern['wp_pattern_block_types'];
 					}
 
-					if (isset($updated_pattern['wp_pattern_post_types'])) {
+					if ( isset( $updated_pattern['wp_pattern_post_types'] ) ) {
 						$pattern->postTypes = $updated_pattern['wp_pattern_post_types'];
 					}
 
-					if (isset($updated_pattern['wp_pattern_template_types'])) {
+					if ( isset( $updated_pattern['wp_pattern_template_types'] ) ) {
 						$pattern->templateTypes = $updated_pattern['wp_pattern_template_types'];
 					}
 
-					if (isset($updated_pattern['wp_pattern_inserter'])) {
+					if ( isset( $updated_pattern['wp_pattern_inserter'] ) ) {
 						$pattern->inserter = $updated_pattern['wp_pattern_inserter'] === 'no' ? false : true;
 					}
 
-					if (isset($updated_pattern['source']) && $updated_pattern['source'] === 'user') {
+					if ( isset( $updated_pattern['source'] ) && $updated_pattern['source'] === 'user' ) {
 						// we are attempting to convert a THEME pattern to a USER pattern.
-						$this->controller->update_user_pattern($pattern);
+						$this->controller->update_user_pattern( $pattern );
 					} else {
 						// Check configuration options via query parameters
 						$options = array();
 
-						$localize_param = $request->get_param('patternBuilderLocalize');
-						if ($localize_param === 'true') {
+						$localize_param = $request->get_param( 'patternBuilderLocalize' );
+						if ( $localize_param === 'true' ) {
 							$options['localize'] = true;
 						}
 
-						$import_images_param = $request->get_param('patternBuilderImportImages');
-						if ($import_images_param === 'false') {
+						$import_images_param = $request->get_param( 'patternBuilderImportImages' );
+						if ( $import_images_param === 'false' ) {
 							$options['import_images'] = false;
 						} else {
 							// Default to true if not explicitly disabled
 							$options['import_images'] = true;
 						}
 
-						$this->controller->update_theme_pattern($pattern, $options);
+						$this->controller->update_theme_pattern( $pattern, $options );
 					}
 
-					$post               = get_post($pattern->id);
-					$formatted_response = $this->format_tbell_pattern_block_response($post, $request);
-					$response           = new WP_REST_Response($formatted_response, 200);
+					$post               = get_post( $pattern->id );
+					$formatted_response = $this->format_tbell_pattern_block_response( $post, $request );
+					$response           = new WP_REST_Response( $formatted_response, 200 );
 				}
 			}
 		}
