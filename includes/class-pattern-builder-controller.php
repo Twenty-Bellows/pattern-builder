@@ -154,7 +154,10 @@ class Pattern_Builder_Controller {
 		$this->update_theme_pattern_file( $pattern );
 
 		// rebuild the pattern from the file (so that the content has no PHP tags)
-		$pattern = Abstract_Pattern::from_file( $this->get_pattern_filepath( $pattern ) );
+		$filepath = $this->get_pattern_filepath( $pattern );
+		if ( $filepath ) {
+			$pattern = Abstract_Pattern::from_file( $filepath );
+		}
 
 		$post_id = wp_update_post(
 			array(

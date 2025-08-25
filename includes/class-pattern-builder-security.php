@@ -24,15 +24,23 @@ class Pattern_Builder_Security {
 	 * @return bool|WP_Error True if path is valid, WP_Error otherwise.
 	 */
 	public static function validate_file_path( $path, $allowed_dirs = array() ) {
-		// Normalize the path to prevent traversal attempts.
-		$path = wp_normalize_path( realpath( $path ) );
-
-		if ( false === $path ) {
-			return new WP_Error(
-				'invalid_path',
-				__( 'Invalid file path provided.', 'pattern-builder' ),
-				array( 'status' => 400 )
-			);
+		// First normalize the path without realpath to handle non-existing files.
+		$normalized_path = wp_normalize_path( $path );
+		
+		// If the file exists, use realpath for stronger validation.
+		if ( file_exists( $path ) ) {
+			$real_path = wp_normalize_path( realpath( $path ) );
+			if ( false === $real_path ) {
+				return new WP_Error(
+					'invalid_path',
+					__( 'Invalid file path provided.', 'pattern-builder' ),
+					array( 'status' => 400 )
+				);
+			}
+			$path = $real_path;
+		} else {
+			// For non-existing files, validate the normalized path.
+			$path = $normalized_path;
 		}
 
 		// Default to theme directory if no allowed directories specified.
