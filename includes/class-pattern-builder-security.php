@@ -321,4 +321,61 @@ class Pattern_Builder_Security {
 
 		return $filename;
 	}
+
+	/**
+	 * Log an error with context for debugging purposes.
+	 * 
+	 * Respects WordPress debug settings and provides consistent error logging
+	 * throughout the plugin.
+	 *
+	 * @param string $message   The error message to log.
+	 * @param string $context   Optional. Context where the error occurred (method name, etc.).
+	 * @param mixed  $data      Optional. Additional data to log (will be serialized).
+	 * @param string $level     Optional. Error level: 'error', 'warning', 'info', 'debug'. Default 'error'.
+	 */
+	public static function log_error( $message, $context = '', $data = null, $level = 'error' ) {
+		// Only log if WordPress debugging is enabled
+		if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
+			return;
+		}
+
+		// Build the log message
+		$log_message = '[Pattern Builder] ';
+		
+		if ( ! empty( $context ) ) {
+			$log_message .= "[$context] ";
+		}
+		
+		$log_message .= $message;
+		
+		if ( ! is_null( $data ) ) {
+			$log_message .= ' | Data: ' . wp_json_encode( $data );
+		}
+
+		// Log to WordPress debug log if enabled
+		if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
+			error_log( $log_message );
+		}
+		
+		// Also trigger WordPress action for extensibility
+		do_action( 'pattern_builder_log_error', $level, $message, $context, $data );
+	}
+
+	/**
+	 * Create a standardized WP_Error with optional logging.
+	 *
+	 * @param string $code       Error code.
+	 * @param string $message    Error message.
+	 * @param array  $data       Optional. Error data array.
+	 * @param string $context    Optional. Context where error occurred.
+	 * @param bool   $log_error  Optional. Whether to log this error. Default true.
+	 * @return WP_Error
+	 */
+	public static function create_error( $code, $message, $data = array(), $context = '', $log_error = true ) {
+		if ( $log_error ) {
+			self::log_error( $message, $context, array( 'code' => $code, 'data' => $data ) );
+		}
+
+		return new WP_Error( $code, $message, $data );
+	}
 }

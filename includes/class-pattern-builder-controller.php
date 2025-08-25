@@ -213,8 +213,6 @@ class Pattern_Builder_Controller {
 		wp_set_object_terms( $post_id, $pattern->categories, 'wp_pattern_category', false );
 
 		return $pattern;
-
-		return new WP_Error( 'premium_required', 'Saving Theme Patterns requires the premium version of Pattern Builder.', array( 'status' => 403 ) );
 	}
 
 	private function export_pattern_image_assets( $pattern ) {
@@ -226,7 +224,13 @@ class Pattern_Builder_Controller {
 
 			// skip if the asset isn't an image
 			if ( ! preg_match( '/\.(jpg|jpeg|png|gif|webp|svg)$/i', $url ) ) {
-				return false;
+				return \Pattern_Builder_Security::create_error(
+					'invalid_image_type',
+					__( 'Asset is not a valid image type.', 'pattern-builder' ),
+					array( 'url' => $url ),
+					__METHOD__,
+					false // Don't log this as it's expected behavior
+				);
 			}
 
 			$download_file = false;
@@ -258,7 +262,15 @@ class Pattern_Builder_Controller {
 			}
 
 			if ( is_wp_error( $download_file ) ) {
-				return false;
+				return \Pattern_Builder_Security::create_error(
+					'image_download_failed',
+					__( 'Failed to download image asset.', 'pattern-builder' ),
+					array( 
+						'url' => $url,
+						'error' => $download_file->get_error_message() 
+					),
+					__METHOD__
+				);
 			}
 
 			// upload to the media library
@@ -281,7 +293,15 @@ class Pattern_Builder_Controller {
 				WP_Filesystem();
 			}
 			if ( ! $wp_filesystem->move( $download_file, $upload_file ) ) {
-				return false;
+				return \Pattern_Builder_Security::create_error(
+					'file_move_failed',
+					__( 'Failed to move image file to uploads directory.', 'pattern-builder' ),
+					array( 
+						'source' => $download_file,
+						'destination' => $upload_file 
+					),
+					__METHOD__
+				);
 			}
 
 			// Get the file type and create an attachment
@@ -297,7 +317,15 @@ class Pattern_Builder_Controller {
 			// Insert the attachment into the media library
 			$attachment_id = wp_insert_attachment( $attachment, $upload_file );
 			if ( is_wp_error( $attachment_id ) ) {
-				return false;
+				return \Pattern_Builder_Security::create_error(
+					'attachment_insert_failed',
+					__( 'Failed to create media library attachment.', 'pattern-builder' ),
+					array( 
+						'file' => $upload_file,
+						'error' => $attachment_id->get_error_message()
+					),
+					__METHOD__
+				);
 			}
 
 			// Generate attachment metadata and update the attachment
@@ -315,8 +343,16 @@ class Pattern_Builder_Controller {
 			'/(src|href)="(' . preg_quote( $home_url, '/' ) . '[^"]+)"/',
 			function ( $matches ) use ( $upload_image ) {
 				$new_url = $upload_image( $matches[2] );
-				if ( $new_url ) {
+				if ( $new_url && ! is_wp_error( $new_url ) ) {
 					return $matches[1] . '="' . $new_url . '"';
+				}
+				// Log error if image upload failed, but don't break the pattern
+				if ( is_wp_error( $new_url ) ) {
+					\Pattern_Builder_Security::log_error(
+						'Image upload failed during pattern import: ' . $new_url->get_error_message(),
+						'import_pattern_image_assets',
+						array( 'url' => $matches[2] )
+					);
 				}
 				return $matches[0];
 			},
@@ -329,8 +365,16 @@ class Pattern_Builder_Controller {
 			function ( $matches ) use ( $upload_image ) {
 				$url     = $matches[1];
 				$new_url = $upload_image( $url );
-				if ( $new_url ) {
+				if ( $new_url && ! is_wp_error( $new_url ) ) {
 					return '"url":"' . $new_url . '"';
+				}
+				// Log error if image upload failed, but don't break the pattern
+				if ( is_wp_error( $new_url ) ) {
+					\Pattern_Builder_Security::log_error(
+						'JSON URL image upload failed during pattern import: ' . $new_url->get_error_message(),
+						'import_pattern_image_assets',
+						array( 'url' => $url )
+					);
 				}
 				return $matches[0];
 			},
@@ -340,6 +384,12 @@ class Pattern_Builder_Controller {
 		return $pattern;
 	}
 
+	/**
+	 * Import image assets for a pattern into the media library.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern object.
+	 * @return Abstract_Pattern Updated pattern object with new asset URLs.
+	 */
 	private function import_pattern_image_assets( $pattern ) {
 
 		$home_url = home_url();
@@ -508,7 +558,16 @@ class Pattern_Builder_Controller {
 						get_stylesheet_directory() . '/patterns',
 						get_template_directory() . '/patterns',
 					);
-					$deleted      = \Pattern_Builder_Security::safe_file_delete( $path, $allowed_dirs );
+					$deleted = \Pattern_Builder_Security::safe_file_delete( $path, $allowed_dirs );
+					
+					// Log if deletion failed but don't break the conversion
+					if ( is_wp_error( $deleted ) ) {
+						\Pattern_Builder_Security::log_error(
+							'Failed to delete theme pattern file during conversion: ' . $deleted->get_error_message(),
+							__METHOD__,
+							array( 'path' => $path )
+						);
+					}
 				}
 			}
 		}
@@ -568,13 +627,24 @@ class Pattern_Builder_Controller {
 		return array( 'message' => 'Pattern deleted successfully' );
 	}
 
+	/**
+	 * Get the file path for a pattern.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern object.
+	 * @return string|WP_Error Pattern file path on success, WP_Error on failure.
+	 */
 	public function get_pattern_filepath( $pattern ) {
 		$path = $pattern->filePath ?? get_stylesheet_directory() . '/patterns/' . \Pattern_Builder_Security::sanitize_filename( basename( $pattern->name ) );
 
 		// Validate the path before checking existence
 		$validation = \Pattern_Builder_Security::validate_pattern_path( $path );
 		if ( is_wp_error( $validation ) ) {
-			return null;
+			return \Pattern_Builder_Security::create_error(
+				'invalid_pattern_path',
+				__( 'Pattern file path validation failed.', 'pattern-builder' ),
+				array( 'status' => 400 ),
+				__METHOD__
+			);
 		}
 
 		if ( file_exists( $path ) ) {
@@ -597,7 +667,12 @@ class Pattern_Builder_Controller {
 			}
 		}
 
-		return null;
+		return \Pattern_Builder_Security::create_error(
+			'pattern_file_not_found',
+			__( 'Pattern file not found.', 'pattern-builder' ),
+			array( 'status' => 404 ),
+			__METHOD__
+		);
 	}
 
 	public function delete_theme_pattern( Abstract_Pattern $pattern ) {
@@ -612,12 +687,12 @@ class Pattern_Builder_Controller {
 
 		$path = $this->get_pattern_filepath( $pattern );
 
-		if ( ! $path ) {
-			return new WP_Error( 'pattern_not_found', 'Pattern not found', array( 'status' => 404 ) );
+		if ( is_wp_error( $path ) ) {
+			return $path; // Return the error from get_pattern_filepath
 		}
 
-			// Validate that the path is within the patterns directory
-			$validation = \Pattern_Builder_Security::validate_pattern_path( $path );
+		// Validate that the path is within the patterns directory
+		$validation = \Pattern_Builder_Security::validate_pattern_path( $path );
 		if ( is_wp_error( $validation ) ) {
 			return $validation;
 		}
@@ -640,15 +715,14 @@ class Pattern_Builder_Controller {
 				return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern', array( 'status' => 500 ) );
 			}
 
-			return array( 'message' => 'Pattern deleted successfully' );
-
-			return new WP_Error( 'premium_required', 'Deleting Theme Patterns requires the premium version of Pattern Builder.', array( 'status' => 403 ) );
+		return array( 'message' => 'Pattern deleted successfully' );
 	}
 
 	public function update_theme_pattern_file( Abstract_Pattern $pattern ) {
 		$path = $this->get_pattern_filepath( $pattern );
 
-		if ( ! $path ) {
+		// If get_pattern_filepath returns an error, create a new path
+		if ( is_wp_error( $path ) ) {
 			$filename = \Pattern_Builder_Security::sanitize_filename( basename( $pattern->name ) );
 			$path     = get_stylesheet_directory() . '/patterns/' . $filename;
 		}
