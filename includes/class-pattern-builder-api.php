@@ -176,7 +176,7 @@ class Pattern_Builder_API {
 		$theme_patterns = $this->controller->get_block_patterns_from_theme_files();
 		$theme_patterns = array_map(
 			function ( $pattern ) {
-				$pattern_post      = $this->controller->get_pb_block_post_for_pattern( $pattern );
+				$pattern_post      = $this->controller->get_tbell_pattern_block_post_for_pattern( $pattern );
 				$pattern_from_post = Abstract_Pattern::from_post( $pattern_post );
 				// TODO: The slug doesn't survive the trip to post and back since it has to be normalized.
 				// so we just pull it form the original pattern and reset it here.  Not sure if that is the best way to do this.
@@ -200,15 +200,15 @@ class Pattern_Builder_API {
 		// Requesting a single pattern.  Inject the synced theme pattern.
 		if ( preg_match( '#/wp/v2/blocks/(?P<id>\d+)#', $request->get_route(), $matches ) ) {
 			$block_id = intval( $matches['id'] );
-			$pb_block = get_post( $block_id );
-			if ( $pb_block && $pb_block->post_type === 'pb_block' ) {
+			$tbell_pattern_block = get_post( $block_id );
+			if ( $tbell_pattern_block && $tbell_pattern_block->post_type === 'tbell_pattern_block' ) {
 				// make sure the pattern has a pattern file
-				$pattern_file_path = $this->controller->get_pattern_filepath( Abstract_Pattern::from_post( $pb_block ) );
+				$pattern_file_path = $this->controller->get_pattern_filepath( Abstract_Pattern::from_post( $tbell_pattern_block ) );
 				if ( ! $pattern_file_path ) {
 					return $response; // No pattern file found, return the original response
 				}
-				$pb_block->post_name = $this->controller->format_pattern_slug_from_post( $pb_block->post_name );
-				$data                = $this->format_pb_block_response( $pb_block, $request );
+				$tbell_pattern_block->post_name = $this->controller->format_pattern_slug_from_post( $tbell_pattern_block->post_name );
+				$data                = $this->format_tbell_pattern_block_response( $tbell_pattern_block, $request );
 				$response            = new WP_REST_Response( $data );
 			}
 		}
@@ -228,8 +228,8 @@ class Pattern_Builder_API {
 			);
 
 			foreach ( $patterns as $pattern ) {
-				$post   = $this->controller->get_pb_block_post_for_pattern( $pattern );
-				$data[] = $this->format_pb_block_response( $post, $request );
+				$post   = $this->controller->get_tbell_pattern_block_post_for_pattern( $pattern );
+				$data[] = $this->format_tbell_pattern_block_response( $post, $request );
 			}
 
 			$response->set_data( $data );
@@ -238,7 +238,7 @@ class Pattern_Builder_API {
 		return $response;
 	}
 
-	public function format_pb_block_response( $post, $request ) {
+	public function format_tbell_pattern_block_response( $post, $request ) {
 		$post->post_type = 'wp_block';
 
 		// Create a mock request to pass to the controller
@@ -277,7 +277,7 @@ class Pattern_Builder_API {
 	 *
 	 * If the patterns are ALREADY registered, unregister them first.
 	 * Synced patterns are registered with a reference to the post ID of their pattern.
-	 * Unsynced patterns are registered with the content from the pb_block post.
+	 * Unsynced patterns are registered with the content from the tbell_pattern_block post.
 	 */
 	public function register_patterns() {
 
@@ -287,7 +287,7 @@ class Pattern_Builder_API {
 
 		foreach ( $patterns as $pattern ) {
 
-			$post = $this->controller->create_pb_block_post_for_pattern( $pattern );
+			$post = $this->controller->create_tbell_pattern_block_post_for_pattern( $pattern );
 
 			if ( $pattern_registry->is_registered( $pattern->name ) ) {
 				$pattern_registry->unregister( $pattern->name );
@@ -324,7 +324,7 @@ class Pattern_Builder_API {
 
 	/**
 	 *
-	 * Filters delete calls and if the item being deleted is a 'pb_block' (theme pattern)
+	 * Filters delete calls and if the item being deleted is a 'tbell_pattern_block' (theme pattern)
 	 * delete the related pattern php file as well.
 	 *
 	 */
@@ -337,7 +337,7 @@ class Pattern_Builder_API {
 			$id   = intval( $matches[1] );
 			$post = get_post( $id );
 
-			if ( $post && $post->post_type === 'pb_block' && $request->get_method() === 'DELETE' ) {
+			if ( $post && $post->post_type === 'tbell_pattern_block' && $request->get_method() === 'DELETE' ) {
 
 				$deleted = wp_delete_post( $id, true );
 
@@ -369,7 +369,7 @@ class Pattern_Builder_API {
 
 	/**
 	 *
-	 * This filter handles additional logic when a pb_block (theme pattern) is updated.
+	 * This filter handles additional logic when a tbell_pattern_block (theme pattern) is updated.
 	 * It updates the pattern file as well as associated metadata for the pattern.
 	 * Additionally it will optionally localize the content as well as import any media
 	 * referenced by the pattern into the theme.
@@ -398,7 +398,7 @@ class Pattern_Builder_API {
 					}
 				}
 
-				if ($post->post_type === 'pb_block' || $convert_user_pattern_to_theme_pattern) {
+				if ($post->post_type === 'tbell_pattern_block' || $convert_user_pattern_to_theme_pattern) {
 
 					// Check write permissions before allowing update
 					if (! current_user_can('edit_others_posts')) {
@@ -422,7 +422,7 @@ class Pattern_Builder_API {
 					$pattern = Abstract_Pattern::from_post($post);
 
 					if (isset($updated_pattern['content'])) {
-						// remap pb_blocks to patterns
+						// remap tbell_pattern_blocks to patterns
 						$blocks           = parse_blocks($updated_pattern['content']);
 						$blocks           = $this->convert_blocks_to_patterns($blocks);
 						$pattern->content = serialize_blocks($blocks);
@@ -481,7 +481,7 @@ class Pattern_Builder_API {
 					}
 
 					$post               = get_post($pattern->id);
-					$formatted_response = $this->format_pb_block_response($post, $request);
+					$formatted_response = $this->format_tbell_pattern_block_response($post, $request);
 					$response           = new WP_REST_Response($formatted_response, 200);
 				}
 			}
@@ -511,7 +511,7 @@ class Pattern_Builder_API {
 		foreach ( $blocks as &$block ) {
 			if ( isset( $block['blockName'] ) && $block['blockName'] === 'core/block' ) {
 				$post = get_post( $block['attrs']['ref'] );
-				if ( $post->post_type === 'pb_block' ) {
+				if ( $post->post_type === 'tbell_pattern_block' ) {
 					$slug                   = Pattern_Builder_Controller::format_pattern_slug_from_post( $post->post_name );
 					$block['blockName']     = 'core/pattern';
 					$block['attrs']         = isset( $block['attrs'] ) ? $block['attrs'] : array();

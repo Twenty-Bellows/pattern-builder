@@ -138,7 +138,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 	/**
 	 * Test that a theme synced pattern is registered and returned in this route: /wp/v2/block-patterns/patterns.
-	 * It should be hidden from the inserter and reference the corresponding pb_block.
+	 * It should be hidden from the inserter and reference the corresponding tbell_pattern_block.
 	 */
 	public function test_core_get_pattern_api_with_synced_theme_pattern() {
 
@@ -304,14 +304,14 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey('source', $pattern);
 		$this->assertEquals('theme-synced-pattern', $pattern['slug']);
 
-		//Ensure there is not a pb_block post for this pattern
-		// get app 'pb_block' posts
-		$all_pb_block_posts = get_posts([
-			'post_type' => 'pb_block',
+		//Ensure there is not a tbell_pattern_block post for this pattern
+		// get app 'tbell_pattern_block' posts
+		$all_tbell_pattern_block_posts = get_posts([
+			'post_type' => 'tbell_pattern_block',
 			'numberposts' => -1,
 			'post_status' => 'any',
 		]);
-		$this->assertEmpty($all_pb_block_posts, 'There should be no pb_block posts after converting the theme pattern to a user pattern.');
+		$this->assertEmpty($all_tbell_pattern_block_posts, 'There should be no tbell_pattern_block posts after converting the theme pattern to a user pattern.');
 
 		// Make sure the pattern file has been removed
 		$pattern_file = $this->test_dir . '/patterns/theme_synced_pattern.php';
@@ -355,13 +355,13 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertEquals('theme', $pattern['source']);
 		$this->assertCount(1, $data);
 
-		//fetch all of the pb_block posts
-		$all_pb_block_posts = get_posts([
-			'post_type' => 'pb_block',
+		//fetch all of the tbell_pattern_block posts
+		$all_tbell_pattern_block_posts = get_posts([
+			'post_type' => 'tbell_pattern_block',
 			'numberposts' => -1,
 			'post_status' => 'any',
 		]);
-		$this->assertCount(1, $all_pb_block_posts, 'There should be one pb_block post after converting the user pattern to a theme pattern.');
+		$this->assertCount(1, $all_tbell_pattern_block_posts, 'There should be one tbell_pattern_block post after converting the user pattern to a theme pattern.');
 
 		// Make sure the pattern file has been created
 		$pattern_file = $this->test_dir . '/patterns/test-user-pattern.php';
@@ -403,14 +403,14 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey('source', $pattern);
 		$this->assertCount(1, $data);
 
-		//Ensure there is not a pb_block post for this pattern
-		// get app 'pb_block' posts
-		$all_pb_block_posts = get_posts([
-			'post_type' => 'pb_block',
+		//Ensure there is not a tbell_pattern_block post for this pattern
+		// get app 'tbell_pattern_block' posts
+		$all_tbell_pattern_block_posts = get_posts([
+			'post_type' => 'tbell_pattern_block',
 			'numberposts' => -1,
 			'post_status' => 'any',
 		]);
-		$this->assertEmpty($all_pb_block_posts, 'There should be no pb_block posts after converting the theme pattern to a user pattern.');
+		$this->assertEmpty($all_tbell_pattern_block_posts, 'There should be no tbell_pattern_block posts after converting the theme pattern to a user pattern.');
 
 		// Make sure the pattern file has been removed
 		$pattern_file = $this->test_dir . '/patterns/theme_synced_pattern.php';
@@ -519,13 +519,13 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		$this->assertEquals(200, $response->get_status());
 
-		// confirm that there are no pb_block posts
-		$all_pb_block_posts = get_posts([
-			'post_type' => 'pb_block',
+		// confirm that there are no tbell_pattern_block posts
+		$all_tbell_pattern_block_posts = get_posts([
+			'post_type' => 'tbell_pattern_block',
 			'numberposts' => -1,
 			'post_status' => 'any',
 		]);
-		$this->assertEmpty($all_pb_block_posts, 'There should be no pb_block posts after deleting the theme pattern.');
+		$this->assertEmpty($all_tbell_pattern_block_posts, 'There should be no tbell_pattern_block posts after deleting the theme pattern.');
 
 		//confirm that the pattern file has been deleted
 		$pattern_file = $this->test_dir . '/patterns/theme_synced_pattern.php';

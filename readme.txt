@@ -3,7 +3,7 @@ Contributors:      twentybellows, pbking
 Tags:              block-patterns, patterns, block-editor, gutenberg, design
 Requires at least: 6.6
 Tested up to:      6.8
-Stable tag:        1.0.1
+Stable tag:        1.0.2
 Requires PHP:      7.2
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -52,12 +52,6 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 * Standardize design systems
 * Speed up development workflow
 * Maintain brand consistency
-
-= Support =
-
-* Email: support@twentybellows.com
-* Issues: [GitHub Issues](https://github.com/Twenty-Bellows/pattern-builder/issues)
-* Documentation: [GitHub Wiki](https://github.com/Twenty-Bellows/pattern-builder/wiki)
 
 == Installation ==
 

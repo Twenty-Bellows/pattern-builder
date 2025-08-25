@@ -21,13 +21,13 @@ class Pattern_Builder_Controller {
 		return $new_slug;
 	}
 
-	public function get_pb_block_post_for_pattern( $pattern ) {
+	public function get_tbell_pattern_block_post_for_pattern( $pattern ) {
 		$path = $this->format_pattern_slug_for_post( $pattern->name );
 
 		$posts = get_posts(
 			array(
 				'name'      => $path,
-				'post_type' => 'pb_block',
+				'post_type' => 'tbell_pattern_block',
 			)
 		);
 
@@ -38,11 +38,11 @@ class Pattern_Builder_Controller {
 			return $pattern_post;
 		}
 
-		return $this->create_pb_block_post_for_pattern( $pattern );
+		return $this->create_tbell_pattern_block_post_for_pattern( $pattern );
 	}
 
-	public function create_pb_block_post_for_pattern( $pattern ) {
-		$existing_post = get_page_by_path( $this->format_pattern_slug_for_post( $pattern->name ), OBJECT, array( 'pb_block' ) );
+	public function create_tbell_pattern_block_post_for_pattern( $pattern ) {
+		$existing_post = get_page_by_path( $this->format_pattern_slug_for_post( $pattern->name ), OBJECT, array( 'tbell_pattern_block' ) );
 
 		$post_id = $existing_post ? $existing_post->ID : null;
 
@@ -83,6 +83,23 @@ class Pattern_Builder_Controller {
 		} else {
 			delete_post_meta( $post_id, 'wp_pattern_inserter' );
 		}
+		if (!$post_id) {
+
+		$post_id = wp_insert_post(
+			array(
+				'post_title'     => $pattern->title,
+				'post_name'      => $this->format_pattern_slug_for_post( $pattern->name ),
+				'post_content'   => $pattern->content,
+				'post_excerpt'   => $pattern->description,
+				'post_type'      => 'tbell_pattern_block',
+				'post_status'    => 'publish',
+				'ping_status'    => 'closed',
+				'comment_status' => 'closed',
+				'meta_input'     => $meta,
+			), true
+		);
+
+		} else {
 
 		$post_id = wp_insert_post(
 			array(
@@ -91,13 +108,15 @@ class Pattern_Builder_Controller {
 				'post_name'      => $this->format_pattern_slug_for_post( $pattern->name ),
 				'post_content'   => $pattern->content,
 				'post_excerpt'   => $pattern->description,
-				'post_type'      => 'pb_block',
+				'post_type'      => 'tbell_pattern_block',
 				'post_status'    => 'publish',
 				'ping_status'    => 'closed',
 				'comment_status' => 'closed',
 				'meta_input'     => $meta,
-			)
+			), true
 		);
+
+		}
 
 		// store categories
 		wp_set_object_terms( $post_id, $pattern->categories, 'wp_pattern_category', false );
@@ -111,8 +130,8 @@ class Pattern_Builder_Controller {
 
 	public function update_theme_pattern(Abstract_Pattern $pattern, $options = array())
 	{
-		// get the pb_block post if it already exists
-		$post = get_page_by_path($this->format_pattern_slug_for_post($pattern->name), OBJECT, array('pb_block', 'wp_block'));
+		// get the tbell_pattern_block post if it already exists
+		$post = get_page_by_path($this->format_pattern_slug_for_post($pattern->name), OBJECT, array('tbell_pattern_block', 'wp_block'));
 
 		if ($post && $post->post_type === 'wp_block') {
 			// this is being converted to theme patterns, change the slug to include the theme domain
@@ -142,7 +161,7 @@ class Pattern_Builder_Controller {
 				'post_name'    => $this->format_pattern_slug_for_post($pattern->name),
 				'post_excerpt' => $pattern->description,
 				'post_content' => $pattern->content,
-				'post_type'    => 'pb_block',
+				'post_type'    => 'tbell_pattern_block',
 			)
 		);
 
@@ -389,11 +408,11 @@ class Pattern_Builder_Controller {
 		$convert_from_theme_pattern = false;
 
 		if ( empty( $post ) ) {
-			// check if the pattern exists in the database as a pb_block post
+			// check if the pattern exists in the database as a tbell_pattern_block post
 			// this is for any user patterns that are being converted from theme patterns
 			// It will be converted to a wp_block post when it is updated
 			$slug                       = $this->format_pattern_slug_for_post( $pattern->name );
-			$post                       = get_page_by_path( $slug, OBJECT, 'pb_block' );
+			$post                       = get_page_by_path( $slug, OBJECT, 'tbell_pattern_block' );
 			$convert_from_theme_pattern = true;
 		}
 
@@ -520,8 +539,8 @@ class Pattern_Builder_Controller {
 				return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern', array( 'status' => 500 ) );
 			}
 
-			$pb_block_post = $this->get_pb_block_post_for_pattern( $pattern );
-			$deleted       = wp_delete_post( $pb_block_post->ID, true );
+			$tbell_pattern_block_post = $this->get_tbell_pattern_block_post_for_pattern( $pattern );
+			$deleted       = wp_delete_post( $tbell_pattern_block_post->ID, true );
 
 			if ( ! $deleted ) {
 				return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern', array( 'status' => 500 ) );
@@ -598,8 +617,8 @@ class Pattern_Builder_Controller {
 					// get the post of the pattern
 					$pattern_post = get_post( $attributes['ref'], OBJECT );
 
-					// if the post is a pb_block post, we can convert it to a wp:pattern block
-					if ( $pattern_post && $pattern_post->post_type === 'pb_block' ) {
+					// if the post is a tbell_pattern_block post, we can convert it to a wp:pattern block
+					if ( $pattern_post && $pattern_post->post_type === 'tbell_pattern_block' ) {
 
 						$pattern_slug = $pattern_post->post_name;
 

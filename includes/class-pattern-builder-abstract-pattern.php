@@ -132,7 +132,7 @@ class Abstract_Pattern {
 				'title'         => $post->post_title,
 				'description'   => $post->post_excerpt,
 				'content'       => $post->post_content,
-				'source'        => ( $post->post_type === 'pb_block' ) ? 'theme' : 'user',
+				'source'        => ( $post->post_type === 'tbell_pattern_block' ) ? 'theme' : 'user',
 				'synced'        => ( $metadata['wp_pattern_sync_status'][0] ?? 'synced' ) !== 'unsynced',
 
 				'blockTypes'    => isset( $metadata['wp_pattern_block_types'][0] ) ? explode( ',', $metadata['wp_pattern_block_types'][0] ) : array(),

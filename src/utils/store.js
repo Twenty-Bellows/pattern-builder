@@ -132,7 +132,7 @@ const actions = {
 					.dispatch( 'core' )
 					.invalidateResolution( 'getEntityRecord', [
 						'postType',
-						'pb_block',
+						'tbell_pattern_block',
 						savedPattern.id,
 					] );
 				wp.data
@@ -146,7 +146,7 @@ const actions = {
 					.dispatch( 'core' )
 					.invalidateResolution( 'getEntityRecords', [
 						'postType',
-						'pb_block',
+						'tbell_pattern_block',
 					] );
 				wp.data
 					.dispatch( 'core' )
