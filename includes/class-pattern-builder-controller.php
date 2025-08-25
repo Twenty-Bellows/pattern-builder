@@ -132,6 +132,16 @@ class Pattern_Builder_Controller {
 	}
 
 	public function update_theme_pattern( Abstract_Pattern $pattern, $options = array() ) {
+		// Check if user has permission to modify theme patterns
+		// Allow users with either theme options capability or general edit capability
+		if ( ! current_user_can( 'edit_theme_options' ) && ! current_user_can( 'edit_others_posts' ) ) {
+			return new WP_Error(
+				'insufficient_permissions',
+				__( 'You do not have permission to modify theme patterns.', 'pattern-builder' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		// get the tbell_pattern_block post if it already exists
 		$post = get_page_by_path( $this->format_pattern_slug_for_post( $pattern->name ), OBJECT, array( 'tbell_pattern_block', 'wp_block' ) );
 
@@ -430,6 +440,15 @@ class Pattern_Builder_Controller {
 	 * @return Abstract_Pattern|WP_Error
 	 */
 	public function update_user_pattern( Abstract_Pattern $pattern ) {
+		// Check if user has permission to modify user patterns
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new WP_Error(
+				'insufficient_permissions',
+				__( 'You do not have permission to modify user patterns.', 'pattern-builder' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		$post                       = get_page_by_path( $pattern->name, OBJECT, 'wp_block' );
 		$convert_from_theme_pattern = false;
 
@@ -575,6 +594,15 @@ class Pattern_Builder_Controller {
 	}
 
 	public function delete_theme_pattern( Abstract_Pattern $pattern ) {
+		// Check if user has permission to delete theme patterns
+		// Allow users with either theme options capability or general edit capability
+		if ( ! current_user_can( 'edit_theme_options' ) && ! current_user_can( 'edit_others_posts' ) ) {
+			return new WP_Error(
+				'insufficient_permissions',
+				__( 'You do not have permission to delete theme patterns.', 'pattern-builder' ),
+				array( 'status' => 403 )
+			);
+		}
 
 			$path = $this->get_pattern_filepath( $pattern );
 
@@ -612,6 +640,16 @@ class Pattern_Builder_Controller {
 	}
 
 	public function update_theme_pattern_file( Abstract_Pattern $pattern ) {
+		// Check if user has permission to modify theme patterns
+		// Allow users with either theme options capability or general edit capability
+		if ( ! current_user_can( 'edit_theme_options' ) && ! current_user_can( 'edit_others_posts' ) ) {
+			return new WP_Error(
+				'insufficient_permissions',
+				__( 'You do not have permission to modify theme patterns.', 'pattern-builder' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		$path = $this->get_pattern_filepath( $pattern );
 
 		if ( ! $path ) {

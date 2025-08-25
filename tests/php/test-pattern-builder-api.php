@@ -13,6 +13,29 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 		$admin_id = self::factory()->user->create(['role' => 'administrator']);
 		wp_set_current_user($admin_id);
 
+		// Ensure administrator has the required pattern builder capabilities for testing
+		$admin_role = get_role('administrator');
+		if ($admin_role) {
+			$capabilities = array(
+				'edit_tbell_pattern_block',
+				'read_tbell_pattern_block',
+				'delete_tbell_pattern_block',
+				'edit_tbell_pattern_blocks',
+				'edit_others_tbell_pattern_blocks',
+				'publish_tbell_pattern_blocks',
+				'read_private_tbell_pattern_blocks',
+				'delete_tbell_pattern_blocks',
+				'delete_private_tbell_pattern_blocks',
+				'delete_published_tbell_pattern_blocks',
+				'delete_others_tbell_pattern_blocks',
+				'edit_private_tbell_pattern_blocks',
+				'edit_published_tbell_pattern_blocks',
+			);
+			foreach ($capabilities as $capability) {
+				$admin_role->add_cap($capability);
+			}
+		}
+
 		// Create a temporary directory for the test patterns
 		$this->test_dir = sys_get_temp_dir() . '/pattern-builder-test';
 		$this->remove_test_directory($this->test_dir);
@@ -34,6 +57,30 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 	public function tearDown(): void {
 		$this->remove_test_directory($this->test_dir);
 		remove_filter('stylesheet_directory', [$this, 'get_test_directory']);
+
+		// Clean up capabilities added for testing
+		$admin_role = get_role('administrator');
+		if ($admin_role) {
+			$capabilities = array(
+				'edit_tbell_pattern_block',
+				'read_tbell_pattern_block',
+				'delete_tbell_pattern_block',
+				'edit_tbell_pattern_blocks',
+				'edit_others_tbell_pattern_blocks',
+				'publish_tbell_pattern_blocks',
+				'read_private_tbell_pattern_blocks',
+				'delete_tbell_pattern_blocks',
+				'delete_private_tbell_pattern_blocks',
+				'delete_published_tbell_pattern_blocks',
+				'delete_others_tbell_pattern_blocks',
+				'edit_private_tbell_pattern_blocks',
+				'edit_published_tbell_pattern_blocks',
+			);
+			foreach ($capabilities as $capability) {
+				$admin_role->remove_cap($capability);
+			}
+		}
+
 		parent::tearDown();
 	}
 
