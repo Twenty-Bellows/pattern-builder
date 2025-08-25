@@ -63,17 +63,17 @@ class Pattern_Builder_API {
 
 	/**
 	 * Permission callback for read operations.
-	 * Allows access to all logged-in users who can edit posts.
+	 * Allows access to users who can read pattern blocks.
 	 *
 	 * @return bool True if the user can read patterns, false otherwise.
 	 */
 	public function read_permission_callback() {
-		return current_user_can( 'edit_posts' );
+		return current_user_can( 'read_tbell_pattern_block' );
 	}
 
 	/**
 	 * Permission callback for write operations (PUT, POST, DELETE).
-	 * Restricts access to administrators and editors only.
+	 * Restricts access to users with pattern editing capabilities.
 	 * Also verifies the REST API nonce for additional security.
 	 *
 	 * @param WP_REST_Request $request The REST request object.
@@ -81,7 +81,7 @@ class Pattern_Builder_API {
 	 */
 	public function write_permission_callback( $request ) {
 		// First check if user has the required capability
-		if ( ! current_user_can( 'edit_others_posts' ) ) {
+		if ( ! current_user_can( 'edit_tbell_pattern_blocks' ) ) {
 			return new WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to modify patterns.', 'pattern-builder' ),
@@ -421,7 +421,7 @@ class Pattern_Builder_API {
 				if ( $post->post_type === 'tbell_pattern_block' || $convert_user_pattern_to_theme_pattern ) {
 
 					// Check write permissions before allowing update
-					if ( ! current_user_can( 'edit_others_posts' ) ) {
+					if ( ! current_user_can( 'edit_tbell_pattern_blocks' ) ) {
 						return new WP_Error(
 							'rest_forbidden',
 							__( 'You do not have permission to edit patterns.', 'pattern-builder' ),
