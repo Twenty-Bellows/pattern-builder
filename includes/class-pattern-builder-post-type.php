@@ -5,8 +5,8 @@ namespace TwentyBellows\PatternBuilder;
 class Pattern_Builder_Post_Type {
 
 	public function __construct() {
-		add_action( 'init', array( $this, 'register_pb_block_post_type' ) );
-		add_filter( 'render_block', array( $this, 'render_pb_blocks' ), 10, 2 );
+		add_action( 'init', array( $this, 'register_tbell_pattern_block_post_type' ) );
+		add_filter( 'render_block', array( $this, 'render_tbell_pattern_blocks' ), 10, 2 );
 		add_filter( 'register_block_type_args', array( $this, 'add_content_attribute_to_core_pattern_block' ), 10, 2 );
 	}
 
@@ -31,12 +31,12 @@ class Pattern_Builder_Post_Type {
 	}
 
 	/**
-	 * Registers the pb_block custom post type.
+	 * Registers the tbell_pattern_block custom post type.
 	 */
-	public function register_pb_block_post_type() {
+	public function register_tbell_pattern_block_post_type() {
 		$labels = array(
-			'name'          => __( 'PB Blocks', 'pattern-builder' ),
-			'singular_name' => __( 'PB Block', 'pattern-builder' ),
+			'name'          => __( 'Pattern Builder Blocks', 'pattern-builder' ),
+			'singular_name' => __( 'Pattern Builder Block', 'pattern-builder' ),
 		);
 
 		$args = array(
@@ -46,17 +46,17 @@ class Pattern_Builder_Post_Type {
 			'show_ui'         => true,
 			'show_in_menu'    => false,
 			'show_in_rest'    => true,
-			'rest_base'       => 'pb_blocks',
+			'rest_base'       => 'tbell_pattern_blocks',
 			'supports'        => array( 'title', 'editor', 'revisions' ),
 			'hierarchical'    => false,
-			'capability_type' => 'pb_block',
+			'capability_type' => 'tbell_pattern_block',
 			'map_meta_cap'    => true,
 		);
 
-		register_post_type( 'pb_block', $args );
+		$result = register_post_type( 'tbell_pattern_block', $args );
 
 		register_post_meta(
-			'pb_block',
+			'tbell_pattern_block',
 			'wp_pattern_sync_status',
 			array(
 				'show_in_rest' => true,
@@ -66,7 +66,7 @@ class Pattern_Builder_Post_Type {
 		);
 
 		register_post_meta(
-			'pb_block',
+			'tbell_pattern_block',
 			'wp_pattern_block_types',
 			array(
 				'show_in_rest' => true,
@@ -76,7 +76,7 @@ class Pattern_Builder_Post_Type {
 		);
 
 		register_post_meta(
-			'pb_block',
+			'tbell_pattern_block',
 			'wp_pattern_template_types',
 			array(
 				'show_in_rest' => true,
@@ -86,7 +86,7 @@ class Pattern_Builder_Post_Type {
 		);
 
 		register_post_meta(
-			'pb_block',
+			'tbell_pattern_block',
 			'wp_pattern_inserter',
 			array(
 				'show_in_rest' => true,
@@ -96,7 +96,7 @@ class Pattern_Builder_Post_Type {
 		);
 
 		register_post_meta(
-			'pb_block',
+			'tbell_pattern_block',
 			'wp_pattern_post_types',
 			array(
 				'show_in_rest' => true,
@@ -106,25 +106,25 @@ class Pattern_Builder_Post_Type {
 		);
 
 		/**
-		 * Add custom capabilities for the pb_block post type.
+		 * Add custom capabilities for the tbell_pattern_block post type.
 		 */
 
 		$roles = array( 'administrator', 'editor' );
 
 		$capabilities = array(
-			'edit_pb_block',
-			'read_pb_block',
-			'delete_pb_block',
-			'edit_pb_blocks',
-			'edit_others_pb_blocks',
-			'publish_pb_blocks',
-			'read_private_pb_blocks',
-			'delete_pb_blocks',
-			'delete_private_pb_blocks',
-			'delete_published_pb_blocks',
-			'delete_others_pb_blocks',
-			'edit_private_pb_blocks',
-			'edit_published_pb_blocks',
+			'edit_tbell_pattern_block',
+			'read_tbell_pattern_block',
+			'delete_tbell_pattern_block',
+			'edit_tbell_pattern_blocks',
+			'edit_others_tbell_pattern_blocks',
+			'publish_tbell_pattern_blocks',
+			'read_private_tbell_pattern_blocks',
+			'delete_tbell_pattern_blocks',
+			'delete_private_tbell_pattern_blocks',
+			'delete_published_tbell_pattern_blocks',
+			'delete_others_tbell_pattern_blocks',
+			'edit_private_tbell_pattern_blocks',
+			'edit_published_tbell_pattern_blocks',
 		);
 
 		// Assign capabilities to each role
@@ -139,8 +139,8 @@ class Pattern_Builder_Post_Type {
 	}
 
 	/**
-	 * Renders a "pb_block" block pattern.
-	 * This is a block pattern stored as a pb_block post type instead of a wp_block post type.
+	 * Renders a "tbell_pattern_block" block pattern.
+	 * This is a block pattern stored as a tbell_pattern_block post type instead of a wp_block post type.
 	 * Which means that it is a "theme pattern" instead of a "user pattern".
 	 *
 	 * This borrows heavily from the core block rendering function.
@@ -149,12 +149,12 @@ class Pattern_Builder_Post_Type {
 	 * @param array  $block        The block data.
 	 * @return string
 	 */
-	public function render_pb_blocks( $block_content, $block ) {
+	public function render_tbell_pattern_blocks( $block_content, $block ) {
 		// store a reference to the block to prevent infinite recursion
 		static $seen_refs = array();
 
 		// if we have a block pattern with no content we PROBABLY are trying to render
-		// a pb_block (theme pattern)
+		// a tbell_pattern_block (theme pattern)
 		if ( $block['blockName'] === 'core/block' && $block_content === '' ) {
 
 			$attributes = $block['attrs'] ?? array();
@@ -164,7 +164,7 @@ class Pattern_Builder_Post_Type {
 			}
 
 			$post = get_post( $attributes['ref'] );
-			if ( ! $post || 'pb_block' !== $post->post_type ) {
+			if ( ! $post || 'tbell_pattern_block' !== $post->post_type ) {
 				return '';
 			}
 

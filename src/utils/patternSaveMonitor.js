@@ -32,7 +32,7 @@ export const PatternSaveMonitor = () => {
 				if ( options.path && (
 					options.path.includes( '/wp/v2/blocks/' ) ||
 					options.path.includes( '/pattern-builder/v1/' ) ||
-					( options.path.includes( '/wp/v2/posts/' ) && options.data?.type === 'pb_block' )
+					( options.path.includes( '/wp/v2/posts/' ) && options.data?.type === 'tbell_pattern_block' )
 				) ) {
 					// Check settings
 					const shouldLocalize = getLocalizePatternsSetting();
@@ -40,11 +40,11 @@ export const PatternSaveMonitor = () => {
 
 					// Build query parameters
 					const params = [];
-					
+
 					if ( shouldLocalize ) {
 						params.push( 'patternBuilderLocalize=true' );
 					}
-					
+
 					if ( ! shouldImportImages ) {
 						// Only add parameter if disabled (since default is true)
 						params.push( 'patternBuilderImportImages=false' );
@@ -73,14 +73,14 @@ export const PatternSaveMonitor = () => {
 
 	// Also monitor the saving state for logging/debugging
 	useEffect( () => {
-		if ( isSavingPost && postType === 'pb_block' ) {
+		if ( isSavingPost && postType === 'tbell_pattern_block' ) {
 			const shouldLocalize = getLocalizePatternsSetting();
 			const shouldImportImages = getImportImagesSetting();
-			
+
 			const settings = [];
 			if ( shouldLocalize ) settings.push( 'localize=true' );
 			if ( ! shouldImportImages ) settings.push( 'importImages=false' );
-			
+
 			if ( settings.length > 0 ) {
 				console.log( `Saving theme pattern with settings (${settings.join(', ')}):`, currentPost?.title );
 			}
