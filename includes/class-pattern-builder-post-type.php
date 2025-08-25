@@ -112,19 +112,8 @@ class Pattern_Builder_Post_Type {
 		$roles = array( 'administrator', 'editor' );
 
 		$capabilities = array(
-			'edit_tbell_pattern_block',
-			'read_tbell_pattern_block',
 			'delete_tbell_pattern_block',
 			'edit_tbell_pattern_blocks',
-			'edit_others_tbell_pattern_blocks',
-			'publish_tbell_pattern_blocks',
-			'read_private_tbell_pattern_blocks',
-			'delete_tbell_pattern_blocks',
-			'delete_private_tbell_pattern_blocks',
-			'delete_published_tbell_pattern_blocks',
-			'delete_others_tbell_pattern_blocks',
-			'edit_private_tbell_pattern_blocks',
-			'edit_published_tbell_pattern_blocks',
 		);
 
 		// Assign capabilities to each role

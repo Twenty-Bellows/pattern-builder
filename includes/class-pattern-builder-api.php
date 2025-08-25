@@ -68,7 +68,7 @@ class Pattern_Builder_API {
 	 * @return bool True if the user can read patterns, false otherwise.
 	 */
 	public function read_permission_callback() {
-		return current_user_can( 'read_tbell_pattern_block' );
+		return current_user_can( 'edit_posts' );
 	}
 
 	/**
@@ -460,7 +460,6 @@ class Pattern_Builder_API {
 						$blocks           = parse_blocks( $updated_pattern['content'] );
 						$blocks           = $this->convert_blocks_to_patterns( $blocks );
 						$pattern->content = serialize_blocks( $blocks );
-						// TODO: Format the content to be easy on the eyes.
 					}
 
 					if ( isset( $updated_pattern['title'] ) ) {
@@ -600,7 +599,7 @@ class Pattern_Builder_API {
 	 */
 	public function handle_block_to_pattern_conversion( $response, $handler, $request ) {
 		if ( $request->get_method() === 'PUT' || $request->get_method() === 'POST' ) {
-			
+
 			// Verify nonce for additional security on state-changing operations
 			$nonce = $request->get_header( 'X-WP-Nonce' );
 			if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
@@ -610,7 +609,7 @@ class Pattern_Builder_API {
 					array( 'status' => 403 )
 				);
 			}
-			
+
 			$body = json_decode( $request->get_body(), true );
 
 			// Validate JSON decode was successful
