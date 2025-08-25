@@ -213,8 +213,6 @@ class Pattern_Builder_Controller {
 		wp_set_object_terms( $post_id, $pattern->categories, 'wp_pattern_category', false );
 
 		return $pattern;
-
-		return new WP_Error( 'premium_required', 'Saving Theme Patterns requires the premium version of Pattern Builder.', array( 'status' => 403 ) );
 	}
 
 	private function export_pattern_image_assets( $pattern ) {
@@ -560,7 +558,16 @@ class Pattern_Builder_Controller {
 						get_stylesheet_directory() . '/patterns',
 						get_template_directory() . '/patterns',
 					);
-					$deleted      = \Pattern_Builder_Security::safe_file_delete( $path, $allowed_dirs );
+					$deleted = \Pattern_Builder_Security::safe_file_delete( $path, $allowed_dirs );
+					
+					// Log if deletion failed but don't break the conversion
+					if ( is_wp_error( $deleted ) ) {
+						\Pattern_Builder_Security::log_error(
+							'Failed to delete theme pattern file during conversion: ' . $deleted->get_error_message(),
+							__METHOD__,
+							array( 'path' => $path )
+						);
+					}
 				}
 			}
 		}
@@ -680,12 +687,12 @@ class Pattern_Builder_Controller {
 
 		$path = $this->get_pattern_filepath( $pattern );
 
-		if ( ! $path ) {
-			return new WP_Error( 'pattern_not_found', 'Pattern not found', array( 'status' => 404 ) );
+		if ( is_wp_error( $path ) ) {
+			return $path; // Return the error from get_pattern_filepath
 		}
 
-			// Validate that the path is within the patterns directory
-			$validation = \Pattern_Builder_Security::validate_pattern_path( $path );
+		// Validate that the path is within the patterns directory
+		$validation = \Pattern_Builder_Security::validate_pattern_path( $path );
 		if ( is_wp_error( $validation ) ) {
 			return $validation;
 		}
@@ -708,15 +715,14 @@ class Pattern_Builder_Controller {
 				return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern', array( 'status' => 500 ) );
 			}
 
-			return array( 'message' => 'Pattern deleted successfully' );
-
-			return new WP_Error( 'premium_required', 'Deleting Theme Patterns requires the premium version of Pattern Builder.', array( 'status' => 403 ) );
+		return array( 'message' => 'Pattern deleted successfully' );
 	}
 
 	public function update_theme_pattern_file( Abstract_Pattern $pattern ) {
 		$path = $this->get_pattern_filepath( $pattern );
 
-		if ( ! $path ) {
+		// If get_pattern_filepath returns an error, create a new path
+		if ( is_wp_error( $path ) ) {
 			$filename = \Pattern_Builder_Security::sanitize_filename( basename( $pattern->name ) );
 			$path     = get_stylesheet_directory() . '/patterns/' . $filename;
 		}
