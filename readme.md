@@ -13,12 +13,12 @@
 ### Powerful Organization
 - **Categories** - Organize patterns by category for easy discovery
 - **Advanced Search** - Find patterns quickly with powerful filtering options
--  **Tags & Keywords** - Add metadata to make patterns discoverable
+- **Tags & Keywords** - Add metadata to make patterns discoverable
 - **Sync Status** - Manage synced and unsynced patterns effortlessly
 
 ### Developer-Friendly
 - **Export to Theme** - Convert user patterns to theme files with proper formatting
--  **Asset Management** - Automatically handles pattern images and media
+- **Asset Management** - Automatically handles pattern images and media
 - **Block Bindings** - Advanced pattern configuration with block bindings support
 
 ## Requirements

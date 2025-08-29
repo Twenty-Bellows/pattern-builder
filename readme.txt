@@ -92,6 +92,11 @@ Yes, Pattern Builder provides a unified interface to manage both theme patterns 
 
 == Changelog ==
 
+= 1.0.2 =
+* Documentation changes
+* API Hardening and security improvements
+* Namespace and prefix changes to prevent potential conflicts with other tools
+
 = 1.0.1 =
 * Fixed compatibility issues with WordPress 6.8
 * Improved pattern export functionality
