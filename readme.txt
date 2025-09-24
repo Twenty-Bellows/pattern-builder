@@ -3,7 +3,7 @@ Contributors:      twentybellows, pbking
 Tags:              block-patterns, patterns, block-editor, gutenberg, design
 Requires at least: 6.6
 Tested up to:      6.8
-Stable tag:        1.0.2
+Stable tag:        1.0.3
 Requires PHP:      7.2
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -91,6 +91,11 @@ Yes, Pattern Builder provides a unified interface to manage both theme patterns 
 == Screenshots ==
 
 == Changelog ==
+
+= 1.0.3 =
+* Fixed saving media for theme patterns
+* Fixed broken unit tests
+* Simplified code and removed unnecssary logic
 
 = 1.0.2 =
 * Documentation changes
