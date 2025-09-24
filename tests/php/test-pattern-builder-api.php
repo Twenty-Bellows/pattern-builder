@@ -12,21 +12,37 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 
 		$admin_id = self::factory()->user->create(['role' => 'administrator']);
 		wp_set_current_user($admin_id);
+		$admin_user = wp_get_current_user();
 
-		// Initialize the post type class to set up custom capabilities
-		new \TwentyBellows\PatternBuilder\Pattern_Builder_Post_Type();
-		do_action('init');
-
-		// Directly grant capabilities to the test user
-		$admin_user = new WP_User($admin_id);
+		// Grant capabilities to the test user
 		$admin_user->add_cap('read_tbell_pattern_block');
 		$admin_user->add_cap('edit_tbell_pattern_blocks');
 		$admin_user->add_cap('delete_tbell_pattern_blocks');
-		
+
 		// Refresh current user to pick up new capabilities
 		wp_cache_delete( $admin_id, 'users' );
 		wp_cache_delete( $admin_id, 'user_meta' );
 		wp_set_current_user( $admin_id );
+
+		// remove all existing tbell_pattern_block posts
+		$all_tbell_pattern_block_posts = get_posts([
+			'post_type' => 'tbell_pattern_block',
+			'numberposts' => -1,
+			'post_status' => 'any',
+		]);
+		foreach ($all_tbell_pattern_block_posts as $post) {
+			wp_delete_post($post->ID, true);
+		}
+
+		// remove all existing wp_block posts
+		$all_wp_block_posts = get_posts([
+			'post_type' => 'wp_block',
+			'numberposts' => -1,
+			'post_status' => 'any',
+		]);
+		foreach ($all_wp_block_posts as $post) {
+			wp_delete_post($post->ID, true);
+		}
 
 		// Create a temporary directory for the test patterns
 		$this->test_dir = sys_get_temp_dir() . '/pattern-builder-test';
@@ -54,7 +70,7 @@ class Pattern_Builder_API_Integration_Test extends WP_UnitTestCase {
 			$admin_role->remove_cap('edit_tbell_pattern_blocks');
 			$admin_role->remove_cap('delete_tbell_pattern_blocks');
 		}
-		
+
 		$this->remove_test_directory($this->test_dir);
 		remove_filter('stylesheet_directory', [$this, 'get_test_directory']);
 		parent::tearDown();

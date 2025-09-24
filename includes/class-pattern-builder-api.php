@@ -74,7 +74,6 @@ class Pattern_Builder_API {
 	/**
 	 * Permission callback for write operations (PUT, POST, DELETE).
 	 * Restricts access to users with pattern editing capabilities.
-	 * Also verifies the REST API nonce for additional security.
 	 *
 	 * @param WP_REST_Request $request The REST request object.
 	 * @return bool|WP_Error True if the user can modify patterns, WP_Error otherwise.
@@ -204,7 +203,7 @@ class Pattern_Builder_API {
 			if ( $tbell_pattern_block && $tbell_pattern_block->post_type === 'tbell_pattern_block' ) {
 				// make sure the pattern has a pattern file
 				$pattern_file_path = $this->controller->get_pattern_filepath( Abstract_Pattern::from_post( $tbell_pattern_block ) );
-				if ( ! $pattern_file_path ) {
+				if ( is_wp_error( $pattern_file_path ) || ! $pattern_file_path ) {
 					return $response; // No pattern file found, return the original response
 				}
 				$tbell_pattern_block->post_name = $this->controller->format_pattern_slug_from_post( $tbell_pattern_block->post_name );
@@ -342,16 +341,6 @@ class Pattern_Builder_API {
 
 			if ( $post && $post->post_type === 'tbell_pattern_block' && $request->get_method() === 'DELETE' ) {
 
-				// Verify nonce for additional security
-				$nonce = $request->get_header( 'X-WP-Nonce' );
-				if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
-					return new WP_Error(
-						'rest_cookie_invalid_nonce',
-						__( 'Cookie nonce is invalid', 'pattern-builder' ),
-						array( 'status' => 403 )
-					);
-				}
-
 				$deleted = wp_delete_post( $id, true );
 
 				if ( ! $deleted ) {
@@ -362,14 +351,12 @@ class Pattern_Builder_API {
 
 				$path = $this->controller->get_pattern_filepath( $abstract_pattern );
 
-				if ( ! $path ) {
-					return new WP_Error( 'pattern_not_found', 'Pattern not found', array( 'status' => 404 ) );
+				if ( is_wp_error( $path ) ) {
+					return $path;
 				}
 
-				// Validate that the path is within the patterns directory
-				$validation = \Pattern_Builder_Security::validate_pattern_path( $path );
-				if ( is_wp_error( $validation ) ) {
-					return $validation;
+				if ( ! $path ) {
+					return new WP_Error( 'pattern_not_found', 'Pattern not found', array( 'status' => 404 ) );
 				}
 
 				// Use secure file delete operation
@@ -439,16 +426,6 @@ class Pattern_Builder_API {
 						return new WP_Error(
 							'rest_forbidden',
 							__( 'You do not have permission to edit patterns.', 'pattern-builder' ),
-							array( 'status' => 403 )
-						);
-					}
-
-					// Verify the REST API nonce
-					$nonce = $request->get_header( 'X-WP-Nonce' );
-					if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
-						return new WP_Error(
-							'rest_cookie_invalid_nonce',
-							__( 'Cookie nonce is invalid', 'pattern-builder' ),
 							array( 'status' => 403 )
 						);
 					}
@@ -599,16 +576,6 @@ class Pattern_Builder_API {
 	 */
 	public function handle_block_to_pattern_conversion( $response, $handler, $request ) {
 		if ( $request->get_method() === 'PUT' || $request->get_method() === 'POST' ) {
-
-			// Verify nonce for additional security on state-changing operations
-			$nonce = $request->get_header( 'X-WP-Nonce' );
-			if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
-				return new WP_Error(
-					'rest_cookie_invalid_nonce',
-					__( 'Cookie nonce is invalid', 'pattern-builder' ),
-					array( 'status' => 403 )
-				);
-			}
 
 			$body = json_decode( $request->get_body(), true );
 
