@@ -83,52 +83,6 @@ class Pattern_Builder_Security {
 		return true;
 	}
 
-	/**
-	 * Validate pattern file path specifically.
-	 *
-	 * @param string $path The pattern file path to validate.
-	 * @return bool|WP_Error True if valid, WP_Error otherwise.
-	 */
-	public static function validate_pattern_path( $path ) {
-		// Pattern files should only be in the patterns directory.
-		$allowed_dirs = array(
-			wp_normalize_path( get_stylesheet_directory() . '/patterns' ),
-			wp_normalize_path( get_template_directory() . '/patterns' ),
-		);
-
-		$validation = self::validate_file_path( $path, $allowed_dirs );
-
-		if ( is_wp_error( $validation ) ) {
-			return $validation;
-		}
-
-		// Ensure it's a PHP file.
-		if ( '.php' !== substr( $path, -4 ) ) {
-			return new WP_Error(
-				'invalid_file_type',
-				__( 'Pattern files must be PHP files.', 'pattern-builder' ),
-				array( 'status' => 400 )
-			);
-		}
-
-		return true;
-	}
-
-	/**
-	 * Validate asset file path.
-	 *
-	 * @param string $path The asset file path to validate.
-	 * @return bool|WP_Error True if valid, WP_Error otherwise.
-	 */
-	public static function validate_asset_path( $path ) {
-		// Assets should only be in the assets directory.
-		$allowed_dirs = array(
-			wp_normalize_path( get_stylesheet_directory() . '/assets' ),
-			wp_normalize_path( get_template_directory() . '/assets' ),
-		);
-
-		return self::validate_file_path( $path, $allowed_dirs );
-	}
 
 	/**
 	 * Initialize WordPress Filesystem.
