@@ -406,9 +406,6 @@ class Pattern_Builder_API {
 					);
 				}
 
-				// Sanitize the input data
-				$updated_pattern = $this->sanitize_pattern_input( $updated_pattern );
-
 				$convert_user_pattern_to_theme_pattern = false;
 
 				if ( $post->post_type === 'wp_block' ) {
@@ -500,73 +497,6 @@ class Pattern_Builder_API {
 	}
 
 	/**
-	 * Sanitizes pattern input data to prevent XSS and ensure data integrity.
-	 *
-	 * @param array $input The input data to sanitize.
-	 * @return array Sanitized input data.
-	 */
-	private function sanitize_pattern_input( $input ) {
-		if ( ! is_array( $input ) ) {
-			return array();
-		}
-
-		$sanitized = array();
-
-		// Sanitize text fields
-		if ( isset( $input['title'] ) ) {
-			$sanitized['title'] = sanitize_text_field( $input['title'] );
-		}
-
-		if ( isset( $input['excerpt'] ) ) {
-			$sanitized['excerpt'] = sanitize_textarea_field( $input['excerpt'] );
-		}
-
-		// Sanitize content - allow HTML but sanitize it
-		if ( isset( $input['content'] ) ) {
-			$sanitized['content'] = wp_kses_post( $input['content'] );
-		}
-
-		// Sanitize source field
-		if ( isset( $input['source'] ) ) {
-			$sanitized['source'] = in_array( $input['source'], array( 'theme', 'user' ), true ) ? $input['source'] : 'user';
-		}
-
-		// Sanitize sync status
-		if ( isset( $input['wp_pattern_sync_status'] ) ) {
-			$sanitized['wp_pattern_sync_status'] = in_array( $input['wp_pattern_sync_status'], array( 'synced', 'unsynced' ), true ) ? $input['wp_pattern_sync_status'] : 'unsynced';
-		}
-
-		// Sanitize inserter setting
-		if ( isset( $input['wp_pattern_inserter'] ) ) {
-			$sanitized['wp_pattern_inserter'] = in_array( $input['wp_pattern_inserter'], array( 'yes', 'no' ), true ) ? $input['wp_pattern_inserter'] : 'yes';
-		}
-
-		// Sanitize array fields
-		$array_fields = array( 'wp_pattern_block_types', 'wp_pattern_post_types', 'wp_pattern_template_types' );
-		foreach ( $array_fields as $field ) {
-			if ( isset( $input[ $field ] ) ) {
-				if ( is_array( $input[ $field ] ) ) {
-					$sanitized[ $field ] = array_map( 'sanitize_text_field', $input[ $field ] );
-				} elseif ( is_string( $input[ $field ] ) ) {
-					// Handle comma-separated strings
-					$values              = explode( ',', $input[ $field ] );
-					$sanitized[ $field ] = array_map( 'sanitize_text_field', $values );
-				}
-			}
-		}
-
-		// Pass through other fields that don't need sanitization but need to be preserved
-		$passthrough_fields = array( 'id', 'date', 'date_gmt', 'modified', 'modified_gmt', 'status', 'type' );
-		foreach ( $passthrough_fields as $field ) {
-			if ( isset( $input[ $field ] ) ) {
-				$sanitized[ $field ] = $input[ $field ];
-			}
-		}
-
-		return $sanitized;
-	}
-
-	/**
 	 * When anything is saved any wp:block that references a theme pattern is converted to a wp:pattern block instead.
 	 *
 	 * @param mixed           $response The response from the REST API.
@@ -584,8 +514,6 @@ class Pattern_Builder_API {
 				return $response; // Return original response if JSON is invalid
 			}
 
-			// Sanitize the input data
-			$body = $this->sanitize_pattern_input( $body );
 			if ( isset( $body['content'] ) ) {
 				// parse the content string into blocks
 				$blocks = parse_blocks( $body['content'] );
