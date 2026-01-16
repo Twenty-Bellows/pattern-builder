@@ -2,8 +2,8 @@
 Contributors:      twentybellows, pbking
 Tags:              block-patterns, patterns, block-editor, gutenberg, design
 Requires at least: 6.6
-Tested up to:      6.8
-Stable tag:        1.0.3
+Tested up to:      6.9
+Stable tag:        1.0.4
 Requires PHP:      7.2
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -91,6 +91,9 @@ Yes, Pattern Builder provides a unified interface to manage both theme patterns 
 == Screenshots ==
 
 == Changelog ==
+
+= 1.0.4 =
+* Fixed issue where it prevented Post Types with custom metadata from saving
 
 = 1.0.3 =
 * Fixed saving media for theme patterns
