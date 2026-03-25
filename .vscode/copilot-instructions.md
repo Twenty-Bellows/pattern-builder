@@ -1,57 +1,36 @@
+# Pattern Builder - Copilot Instructions
 
-  You are an expert in WordPress, PHP, and related web development technologies.
+You are working on **Pattern Builder**, a WordPress plugin by Twenty Bellows that manages block patterns in the WordPress block editor.
 
-  Key Principles
-  - Write concise, technical responses with accurate PHP examples.
-  - Follow WordPress coding standards and best practices.
-  - Use object-oriented programming when appropriate, focusing on modularity.
-  - Prefer iteration and modularization over duplication.
-  - Use descriptive function, variable, and file names.
-  - Use lowercase with hyphens for directories (e.g., wp-content/themes/my-theme).
-  - Favor hooks (actions and filters) for extending functionality.
+## Project Context
+- WordPress plugin (GPL-2.0), requires WP 6.6+, PHP 7.2+
+- Manages both theme patterns (PHP files) and user patterns (custom post type)
+- Frontend: React components using `@wordpress` packages (Gutenberg ecosystem)
+- Backend: PHP OOP, singleton pattern, REST API under `/pattern-builder/v1/`
+- See `CLAUDE.md` for full architecture, commands, and environment notes
 
-  PHP/WordPress
-  - Use PHP 7.4+ features when appropriate (e.g., typed properties, arrow functions).
-  - Follow WordPress PHP Coding Standards.
-  - Use strict typing when possible: declare(strict_types=1);
-  - Utilize WordPress core functions and APIs when available.
-  - File structure: Follow WordPress theme and plugin directory structures and naming conventions.
-  - Implement proper error handling and logging:
-    - Use WordPress debug logging features.
-    - Create custom error handlers when necessary.
-    - Use try-catch blocks for expected exceptions.
-  - Use WordPress's built-in functions for data validation and sanitization.
-  - Implement proper nonce verification for form submissions.
-  - Utilize WordPress's database abstraction layer (wpdb) for database interactions.
-  - Use prepare() statements for secure database queries.
-  - Implement proper database schema changes using dbDelta() function.
+## Key Principles
+- Follow **WordPress Coding Standards** for PHP (WPCS 3.x via PHPCS)
+- Use `@wordpress` packages for editor integration — don't reinvent Gutenberg primitives
+- All state-changing REST endpoints must have **nonce verification** and **capability checks**
+- Sanitize inputs on the way in, escape outputs on the way out
+- Use `declare(strict_types=1)` in PHP files
+- Namespace: `TwentyBellows\PatternBuilder`
 
-  Dependencies
-  - WordPress (latest stable version)
-  - Composer for dependency management (when building advanced plugins or themes)
+## PHP/WordPress Rules
+- Use WordPress core functions and APIs when available (`wp_*`, `get_*`, `sanitize_*`, `esc_*`)
+- Use `$wpdb->prepare()` for all direct DB queries
+- Use WordPress transients API for caching
+- Implement hooks (actions/filters) for extensibility — avoid coupling
+- Follow WordPress plugin file/class naming: `class-pattern-builder-*.php` → `Pattern_Builder_*`
 
-  WordPress Best Practices
-  - Use WordPress hooks (actions and filters) instead of modifying core files.
-  - Implement proper theme functions using functions.php.
-  - Use WordPress's built-in user roles and capabilities system.
-  - Utilize WordPress's transients API for caching.
-  - Implement background processing for long-running tasks using wp_cron().
-  - Use WordPress's built-in testing tools (WP_UnitTestCase) for unit tests.
-  - Implement proper internationalization and localization using WordPress i18n functions.
-  - Implement proper security measures (nonces, data escaping, input sanitization).
-  - Use wp_enqueue_script() and wp_enqueue_style() for proper asset management.
-  - Implement custom post types and taxonomies when appropriate.
-  - Use WordPress's built-in options API for storing configuration data.
-  - Implement proper pagination using functions like paginate_links().
+## JavaScript/React Rules
+- Use `@wordpress/data` stores for state — see `src/utils/store.js`
+- Use `@wordpress/components` for UI primitives
+- Follow Gutenberg component patterns for editor panels and sidebar integration
+- Build output goes to `build/` — never edit files there directly
 
-  Key Conventions
-  1. Follow WordPress's plugin API for extending functionality.
-  2. Use WordPress's template hierarchy for theme development.
-  3. Implement proper data sanitization and validation using WordPress functions.
-  4. Use WordPress's template tags and conditional tags in themes.
-  5. Implement proper database queries using $wpdb or WP_Query.
-  6. Use WordPress's authentication and authorization functions.
-  7. Implement proper AJAX handling using admin-ajax.php or REST API.
-  8. Use WordPress's hook system for modular and extensible code.
-  9. Implement proper database operations using WordPress transactional functions.
-  10. Use WordPress's WP_Cron API for scheduling tasks.
+## Testing
+- JS unit tests: `npm run test:unit` (no Docker needed)
+- PHP integration tests: `npm run test:php` (requires Docker/wp-env)
+- Always run `npm run lint:js` and `composer lint` before committing
