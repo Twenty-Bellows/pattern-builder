@@ -12,6 +12,11 @@ require_once __DIR__ . '/class-pattern-builder-post-type.php';
  */
 class Pattern_Builder {
 
+	/**
+	 * Singleton instance.
+	 *
+	 * @var Pattern_Builder|null
+	 */
 	private static ?Pattern_Builder $instance = null;
 
 	/**
@@ -30,7 +35,7 @@ class Pattern_Builder {
 	 * @return Pattern_Builder
 	 */
 	public static function get_instance(): Pattern_Builder {
-		if ( self::$instance === null ) {
+		if ( null === self::$instance ) {
 			self::$instance = new self();
 		}
 

@@ -2,14 +2,14 @@
  * Utility exports
  */
 
-export { 
-	getLocalStorageValue, 
-	setLocalStorageValue, 
-	removeLocalStorageValue, 
-	getLocalizePatternsSetting, 
+export {
+	getLocalStorageValue,
+	setLocalStorageValue,
+	removeLocalStorageValue,
+	getLocalizePatternsSetting,
 	setLocalizePatternsSetting,
 	getImportImagesSetting,
-	setImportImagesSetting
+	setImportImagesSetting,
 } from './localStorage';
 
 export { fetchAllPatterns } from './resolvers';

@@ -5,7 +5,7 @@
  * Plugin URI:        https://www.twentybellows.com/pattern-builder/
  * Description:       Manage Patterns in the WordPress Editor.
  * Requires at least: 6.6
- * Requires PHP:      7.2
+ * Requires PHP:      7.4
  * Version: 1.0.4
  * Author:            Twenty Bellows
  * Author URI:        https://twentybellows.com
@@ -19,8 +19,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once __DIR__ . '/includes/class-pattern-builder.php';
+require_once __DIR__ . '/includes/class-pattern-builder-post-type.php'; // Loaded via class-pattern-builder.php chain; explicit here for IDE clarity.
 
 use TwentyBellows\PatternBuilder\Pattern_Builder;
+use TwentyBellows\PatternBuilder\Pattern_Builder_Post_Type;
 
-// Initialize the plugin
+// Assign role capabilities on activation (not on every init).
+register_activation_hook( __FILE__, array( Pattern_Builder_Post_Type::class, 'assign_capabilities' ) );
+
+// Initialize the plugin.
 Pattern_Builder::get_instance();

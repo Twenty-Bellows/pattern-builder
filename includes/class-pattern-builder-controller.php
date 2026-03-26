@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.NamingConventions.ValidVariableName -- camelCase properties intentionally mirror the JS AbstractPattern class.
 
 namespace TwentyBellows\PatternBuilder;
 
@@ -12,21 +13,33 @@ require_once ABSPATH . 'wp-admin/includes/file.php';
 
 class Pattern_Builder_Controller {
 
+	/**
+	 * Encodes a namespaced pattern slug for storage as a WordPress post_name.
+	 *
+	 * WordPress post_name does not support '/' — encode it as '-x-x-'.
+	 *
+	 * @param string $slug Pattern slug (e.g. 'my-theme/pattern-name').
+	 * @return string Encoded slug safe for post_name storage.
+	 */
 	public function format_pattern_slug_for_post( $slug ) {
-		$new_slug = str_replace( '/', '-x-x-', $slug );
-		return $new_slug;
-	}
-
-	public static function format_pattern_slug_from_post( $slug ) {
-		$new_slug = str_replace( '-x-x-', '/', $slug );
-		return $new_slug;
+		return str_replace( '/', '-x-x-', $slug );
 	}
 
 	/**
-	 * Get tbell_pattern_block post for a pattern.
+	 * Decodes a post_name-encoded slug back to the original namespaced slug.
+	 *
+	 * @param string $slug Encoded slug (e.g. 'my-theme-x-x-pattern-name').
+	 * @return string Decoded pattern slug.
+	 */
+	public static function format_pattern_slug_from_post( $slug ) {
+		return str_replace( '-x-x-', '/', $slug );
+	}
+
+	/**
+	 * Gets the tbell_pattern_block post for a pattern, creating it if it doesn't exist.
 	 *
 	 * @param Abstract_Pattern $pattern The pattern object.
-	 * @return WP_Post|null The pattern post or null if not found.
+	 * @return \WP_Post|null The pattern post or null if not found.
 	 */
 	public function get_tbell_pattern_block_post_for_pattern( $pattern ) {
 		$path = $this->format_pattern_slug_for_post( $pattern->name );
@@ -44,7 +57,7 @@ class Pattern_Builder_Controller {
 
 		$pattern_post = $query->have_posts() ? $query->posts[0] : null;
 
-		// Clean up
+		// Clean up after the query.
 		wp_reset_postdata();
 
 		if ( $pattern_post ) {
@@ -55,6 +68,12 @@ class Pattern_Builder_Controller {
 		return $this->create_tbell_pattern_block_post_for_pattern( $pattern );
 	}
 
+	/**
+	 * Creates or updates the tbell_pattern_block post that mirrors a theme pattern file.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern to upsert.
+	 * @return \WP_Post The created or updated post.
+	 */
 	public function create_tbell_pattern_block_post_for_pattern( $pattern ) {
 
 		$existing_post = get_page_by_path( $this->format_pattern_slug_for_post( $pattern->name ), OBJECT, array( 'tbell_pattern_block' ) );
@@ -93,60 +112,49 @@ class Pattern_Builder_Controller {
 			delete_post_meta( $post_id, 'wp_pattern_keywords' );
 		}
 
-		if ( $pattern->inserter === false ) {
+		if ( false === $pattern->inserter ) {
 			$meta['wp_pattern_inserter'] = 'no';
 		} else {
 			delete_post_meta( $post_id, 'wp_pattern_inserter' );
 		}
-		if ( ! $post_id ) {
 
-			$post_id = wp_insert_post(
-				array(
-					'post_title'     => $pattern->title,
-					'post_name'      => $this->format_pattern_slug_for_post( $pattern->name ),
-					'post_content'   => $pattern->content,
-					'post_excerpt'   => $pattern->description,
-					'post_type'      => 'tbell_pattern_block',
-					'post_status'    => 'publish',
-					'ping_status'    => 'closed',
-					'comment_status' => 'closed',
-					'meta_input'     => $meta,
-				),
-				true
-			);
+		$post_data = array(
+			'post_title'     => $pattern->title,
+			'post_name'      => $this->format_pattern_slug_for_post( $pattern->name ),
+			'post_content'   => $pattern->content,
+			'post_excerpt'   => $pattern->description,
+			'post_type'      => 'tbell_pattern_block',
+			'post_status'    => 'publish',
+			'ping_status'    => 'closed',
+			'comment_status' => 'closed',
+			'meta_input'     => $meta,
+		);
 
-		} else {
-
-			$post_id = wp_insert_post(
-				array(
-					'ID'             => $post_id,
-					'post_title'     => $pattern->title,
-					'post_name'      => $this->format_pattern_slug_for_post( $pattern->name ),
-					'post_content'   => $pattern->content,
-					'post_excerpt'   => $pattern->description,
-					'post_type'      => 'tbell_pattern_block',
-					'post_status'    => 'publish',
-					'ping_status'    => 'closed',
-					'comment_status' => 'closed',
-					'meta_input'     => $meta,
-				),
-				true
-			);
-
+		if ( $post_id ) {
+			$post_data['ID'] = $post_id;
 		}
 
-		// store categories
+		$post_id = wp_insert_post( $post_data, true );
+
+		// Store categories.
 		wp_set_object_terms( $post_id, $pattern->categories, 'wp_pattern_category', false );
 
-		// return the post by post id
+		// Return the post by post ID.
 		$post            = get_post( $post_id );
 		$post->post_name = $pattern->name;
 
 		return $post;
 	}
 
+	/**
+	 * Updates a theme pattern — writes the PHP file and syncs the DB post.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern to update.
+	 * @param array            $options Optional settings: 'localize' (bool), 'import_images' (bool).
+	 * @return Abstract_Pattern|WP_Error
+	 */
 	public function update_theme_pattern( Abstract_Pattern $pattern, $options = array() ) {
-		// Check if user has permission to modify theme patterns
+		// Check if user has permission to modify theme patterns.
 		if ( ! current_user_can( 'edit_theme_options' ) ) {
 			return new WP_Error(
 				'insufficient_permissions',
@@ -155,28 +163,27 @@ class Pattern_Builder_Controller {
 			);
 		}
 
-		// get the tbell_pattern_block post if it already exists
 		$post = get_page_by_path( $this->format_pattern_slug_for_post( $pattern->name ), OBJECT, array( 'tbell_pattern_block', 'wp_block' ) );
 
-		if ( $post && $post->post_type === 'wp_block' ) {
-			// this is being converted to theme patterns, change the slug to include the theme domain
+		if ( $post && 'wp_block' === $post->post_type ) {
+			// Being converted to a theme pattern; prefix the slug with the theme domain.
 			$pattern->name = get_stylesheet() . '/' . $pattern->name;
 		}
 
-		// Check if image importing is enabled (default to true for backward compatibility)
-		if ( ! isset( $options['import_images'] ) || $options['import_images'] === true ) {
+		// Import images unless explicitly disabled.
+		if ( ! isset( $options['import_images'] ) || true === $options['import_images'] ) {
 			$pattern = $this->import_pattern_image_assets( $pattern );
 		}
 
-		// Check if localization is enabled
-		if ( isset( $options['localize'] ) && $options['localize'] === true ) {
+		// Localize if enabled.
+		if ( isset( $options['localize'] ) && true === $options['localize'] ) {
 			$pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 		}
 
-		// update the pattern file
+		// Write the pattern file.
 		$this->update_theme_pattern_file( $pattern );
 
-		// rebuild the pattern from the file (so that the content has no PHP tags)
+		// Rebuild the pattern from the file (so that content has no PHP tags).
 		$filepath = $this->get_pattern_filepath( $pattern );
 		if ( ! is_wp_error( $filepath ) && $filepath ) {
 			$pattern = Abstract_Pattern::from_file( $filepath );
@@ -223,20 +230,33 @@ class Pattern_Builder_Controller {
 			delete_post_meta( $post_id, 'wp_pattern_post_types' );
 		}
 
-		// store categories
+		// Store categories.
 		wp_set_object_terms( $post_id, $pattern->categories, 'wp_pattern_category', false );
 
 		return $pattern;
 	}
 
+	/**
+	 * Exports pattern image assets from the theme directory to the WordPress media library.
+	 *
+	 * Used when converting a theme pattern to a user pattern.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern whose images should be exported.
+	 * @return Abstract_Pattern Updated pattern with media library URLs.
+	 */
 	private function export_pattern_image_assets( $pattern ) {
 
 		$home_url = home_url();
 
-		// Helper function to download and save image
+		/**
+		 * Downloads a URL and uploads it to the media library.
+		 *
+		 * @param string $url Source URL.
+		 * @return string|WP_Error New media library URL, or WP_Error on failure.
+		 */
 		$upload_image = function ( $url ) use ( $home_url ) {
 
-			// skip if the asset isn't an image
+			// Skip if the asset isn't an image.
 			if ( ! preg_match( '/\.(jpg|jpeg|png|gif|webp|svg)$/i', $url ) ) {
 				return new WP_Error(
 					'invalid_image_type',
@@ -247,13 +267,10 @@ class Pattern_Builder_Controller {
 
 			$download_file = false;
 
-			// convert the URL to a local file path
+			// Convert the URL to a local file path.
 			$file_path = str_replace( $home_url, ABSPATH, $url );
 			if ( file_exists( $file_path ) ) {
-
 				$temp_file = wp_tempnam( basename( $file_path ) );
-
-				// copy the image to a temporary location
 				if ( copy( $file_path, $temp_file ) ) {
 					$download_file = $temp_file;
 				}
@@ -264,11 +281,9 @@ class Pattern_Builder_Controller {
 			}
 
 			if ( is_wp_error( $download_file ) ) {
-				// we're going to try again with a new URL
-				// we might be running this in a docker container
-				// and if that's the case let's try again on port 80
+				// Try again with port 80 if we're inside a Docker container on localhost.
 				$parsed_url = wp_parse_url( $url );
-				if ( 'localhost' === $parsed_url['host'] && '80' !== $parsed_url['port'] ) {
+				if ( 'localhost' === $parsed_url['host'] && '80' !== ( $parsed_url['port'] ?? null ) ) {
 					$download_file = download_url( str_replace( 'localhost:' . $parsed_url['port'], 'localhost:80', $url ) );
 				}
 			}
@@ -284,7 +299,6 @@ class Pattern_Builder_Controller {
 				);
 			}
 
-			// upload to the media library
 			$upload_dir = wp_upload_dir();
 			if ( ! is_dir( $upload_dir['path'] ) ) {
 				wp_mkdir_p( $upload_dir['path'] );
@@ -292,13 +306,12 @@ class Pattern_Builder_Controller {
 
 			$upload_file = $upload_dir['path'] . '/' . basename( $url );
 
-			// check to see if the file is already in the uploads directory
+			// Return existing URL if the file is already in uploads.
 			if ( file_exists( $upload_file ) ) {
-				$uploaded_file_url = $upload_dir['url'] . '/' . basename( $upload_file );
-				return $uploaded_file_url;
+				return $upload_dir['url'] . '/' . basename( $upload_file );
 			}
 
-			// Move the downloaded file to the uploads directory
+			// Move the downloaded file to the uploads directory.
 			global $wp_filesystem;
 			if ( ! $wp_filesystem ) {
 				WP_Filesystem();
@@ -314,7 +327,6 @@ class Pattern_Builder_Controller {
 				);
 			}
 
-			// Get the file type and create an attachment
 			$filetype   = wp_check_filetype( basename( $upload_file ), null );
 			$attachment = array(
 				'guid'           => $upload_dir['url'] . '/' . basename( $upload_file ),
@@ -324,7 +336,6 @@ class Pattern_Builder_Controller {
 				'post_status'    => 'inherit',
 			);
 
-			// Insert the attachment into the media library
 			$attachment_id = wp_insert_attachment( $attachment, $upload_file );
 			if ( is_wp_error( $attachment_id ) ) {
 				return new WP_Error(
@@ -337,17 +348,14 @@ class Pattern_Builder_Controller {
 				);
 			}
 
-			// Generate attachment metadata and update the attachment
 			require_once ABSPATH . 'wp-admin/includes/image.php';
 			$metadata = wp_generate_attachment_metadata( $attachment_id, $upload_file );
 			wp_update_attachment_metadata( $attachment_id, $metadata );
 
-			$url = wp_get_attachment_url( $attachment_id );
-
-			return $url;
+			return wp_get_attachment_url( $attachment_id );
 		};
 
-		// First, handle HTML attributes (src and href)
+		// Handle HTML attributes (src and href).
 		$pattern->content = preg_replace_callback(
 			'/(src|href)="(' . preg_quote( $home_url, '/' ) . '[^"]+)"/',
 			function ( $matches ) use ( $upload_image ) {
@@ -355,16 +363,12 @@ class Pattern_Builder_Controller {
 				if ( $new_url && ! is_wp_error( $new_url ) ) {
 					return $matches[1] . '="' . $new_url . '"';
 				}
-				// Image upload failed, but don't break the pattern
-				if ( is_wp_error( $new_url ) ) {
-					// Error occurred but we continue without logging
-				}
 				return $matches[0];
 			},
 			$pattern->content
 		);
 
-		// Second, handle JSON-encoded URLs
+		// Handle JSON-encoded URLs.
 		$pattern->content = preg_replace_callback(
 			'/"url"\s*:\s*"(' . preg_quote( $home_url, '/' ) . '[^"]+)"/',
 			function ( $matches ) use ( $upload_image ) {
@@ -372,10 +376,6 @@ class Pattern_Builder_Controller {
 				$new_url = $upload_image( $url );
 				if ( $new_url && ! is_wp_error( $new_url ) ) {
 					return '"url":"' . $new_url . '"';
-				}
-				// Image upload failed, but don't break the pattern
-				if ( is_wp_error( $new_url ) ) {
-					// Error occurred but we continue without logging
 				}
 				return $matches[0];
 			},
@@ -386,18 +386,26 @@ class Pattern_Builder_Controller {
 	}
 
 	/**
-	 * Import image assets for a pattern into the media library.
+	 * Imports pattern image assets from the media library into the theme's assets directory.
 	 *
-	 * @param Abstract_Pattern $pattern The pattern object.
-	 * @return Abstract_Pattern Updated pattern object with new asset URLs.
+	 * Used when saving a theme pattern — downloads URLs pointing to home_url and
+	 * stores them as static theme assets, replacing the URLs with PHP template tags.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern whose images should be imported.
+	 * @return Abstract_Pattern Updated pattern with theme-relative asset paths.
 	 */
 	private function import_pattern_image_assets( $pattern ) {
 
 		$home_url = home_url();
 
-		// Helper function to download and save image
-		$download_and_save_image = function ( $url ) use ( $home_url ) {
-			// continue if the asset isn't an image
+		/**
+		 * Downloads a URL and saves it to the theme's assets/images directory.
+		 *
+		 * @param string $url Source URL.
+		 * @return string|false Theme-relative path on success, false on failure.
+		 */
+		$download_and_save_image = function ( $url ) {
+			// Skip if the asset isn't an image.
 			if ( ! preg_match( '/\.(jpg|jpeg|png|gif|webp|svg)$/i', $url ) ) {
 				return false;
 			}
@@ -405,11 +413,9 @@ class Pattern_Builder_Controller {
 			$download_file = download_url( $url );
 
 			if ( is_wp_error( $download_file ) ) {
-				// we're going to try again with a new URL
-				// we might be running this in a docker container
-				// and if that's the case let's try again on port 80
+				// Try again with port 80 if we're inside a Docker container on localhost.
 				$parsed_url = wp_parse_url( $url );
-				if ( 'localhost' === $parsed_url['host'] && '80' !== $parsed_url['port'] ) {
+				if ( 'localhost' === $parsed_url['host'] && '80' !== ( $parsed_url['port'] ?? null ) ) {
 					$download_file = download_url( str_replace( 'localhost:' . $parsed_url['port'], 'localhost:80', $url ) );
 				}
 			}
@@ -426,16 +432,14 @@ class Pattern_Builder_Controller {
 				wp_mkdir_p( $asset_dir );
 			}
 
-			// Use secure file move operation
 			$allowed_dirs = array(
 				'/tmp',
 				get_stylesheet_directory() . '/assets',
 				get_template_directory() . '/assets',
 			);
-			$result       = \Pattern_Builder_Security::safe_file_move( $download_file, $destination_path, $allowed_dirs );
+			$result       = Pattern_Builder_Security::safe_file_move( $download_file, $destination_path, $allowed_dirs );
 
 			if ( is_wp_error( $result ) ) {
-				// Clean up the temp file if move failed
 				if ( file_exists( $download_file ) ) {
 					wp_delete_file( $download_file );
 				}
@@ -445,7 +449,7 @@ class Pattern_Builder_Controller {
 			return '/assets/images/' . $filename;
 		};
 
-		// First, handle HTML attributes (src and href)
+		// Handle HTML attributes (src and href).
 		$pattern->content = preg_replace_callback(
 			'/(src|href)="(' . preg_quote( $home_url, '/' ) . '[^"]+)"/',
 			function ( $matches ) use ( $download_and_save_image ) {
@@ -458,7 +462,7 @@ class Pattern_Builder_Controller {
 			$pattern->content
 		);
 
-		// Second, handle JSON-encoded URLs
+		// Handle JSON-encoded URLs.
 		$pattern->content = preg_replace_callback(
 			'/"url"\s*:\s*"(' . preg_quote( $home_url, '/' ) . '[^"]+)"/',
 			function ( $matches ) use ( $download_and_save_image ) {
@@ -475,13 +479,13 @@ class Pattern_Builder_Controller {
 	}
 
 	/**
-	 * Updates a user pattern.
+	 * Updates a user pattern (wp_block post type).
 	 *
 	 * @param Abstract_Pattern $pattern The pattern to update.
 	 * @return Abstract_Pattern|WP_Error
 	 */
 	public function update_user_pattern( Abstract_Pattern $pattern ) {
-		// Check if user has permission to edit pattern blocks
+		// Check if user has permission to edit pattern blocks.
 		if ( ! current_user_can( 'edit_tbell_pattern_blocks' ) ) {
 			return new WP_Error(
 				'insufficient_permissions',
@@ -489,19 +493,18 @@ class Pattern_Builder_Controller {
 				array( 'status' => 403 )
 			);
 		}
+
 		$post                       = get_page_by_path( $pattern->name, OBJECT, 'wp_block' );
 		$convert_from_theme_pattern = false;
 
 		if ( empty( $post ) ) {
-			// check if the pattern exists in the database as a tbell_pattern_block post
-			// this is for any user patterns that are being converted from theme patterns
-			// It will be converted to a wp_block post when it is updated
+			// Check if the pattern exists as a tbell_pattern_block; if so it's being converted.
 			$slug                       = $this->format_pattern_slug_for_post( $pattern->name );
 			$post                       = get_page_by_path( $slug, OBJECT, 'tbell_pattern_block' );
 			$convert_from_theme_pattern = true;
 		}
 
-		// upload any assets from the theme
+		// Export any theme assets to the media library.
 		$pattern = $this->export_pattern_image_assets( $pattern );
 
 		if ( empty( $post ) ) {
@@ -528,27 +531,32 @@ class Pattern_Builder_Controller {
 			);
 		}
 
-		// ensure the 'synced' meta key is set
+		// Ensure the sync status meta key is accurate.
 		if ( $pattern->synced ) {
 			delete_post_meta( $post_id, 'wp_pattern_sync_status' );
 		} else {
 			update_post_meta( $post_id, 'wp_pattern_sync_status', 'unsynced' );
 		}
 
-		// store categories
+		// Store categories.
 		wp_set_object_terms( $post_id, $pattern->categories, 'wp_pattern_category', false );
 
-		// if we are converting a theme pattern to a user pattern delete the theme pattern file
+		// If converting from a theme pattern, delete the theme pattern file.
 		if ( $convert_from_theme_pattern ) {
 			$path = $this->get_pattern_filepath( $pattern );
 			if ( ! is_wp_error( $path ) && $path ) {
-					$deleted = \Pattern_Builder_Security::safe_file_delete( $path );
+				Pattern_Builder_Security::safe_file_delete( $path );
 			}
 		}
 
 		return $pattern;
 	}
 
+	/**
+	 * Returns all patterns found as PHP files in the active theme's /patterns/ directory.
+	 *
+	 * @return Abstract_Pattern[]
+	 */
 	public function get_block_patterns_from_theme_files() {
 		$pattern_files = glob( get_stylesheet_directory() . '/patterns/*.php' );
 		$patterns      = array();
@@ -561,6 +569,11 @@ class Pattern_Builder_Controller {
 		return $patterns;
 	}
 
+	/**
+	 * Returns all user patterns (wp_block posts) from the database.
+	 *
+	 * @return Abstract_Pattern[]
+	 */
 	public function get_block_patterns_from_database(): array {
 		$query    = new WP_Query( array( 'post_type' => 'wp_block' ) );
 		$patterns = array();
@@ -572,8 +585,14 @@ class Pattern_Builder_Controller {
 		return $patterns;
 	}
 
+	/**
+	 * Deletes a user pattern (wp_block) from the database.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern to delete.
+	 * @return array|WP_Error Success message array or WP_Error on failure.
+	 */
 	public function delete_user_pattern( Abstract_Pattern $pattern ) {
-		// Check if user has permission to delete pattern blocks
+		// Check if user has permission to delete pattern blocks.
 		if ( ! current_user_can( 'delete_tbell_pattern_blocks' ) ) {
 			return new WP_Error(
 				'insufficient_permissions',
@@ -585,23 +604,23 @@ class Pattern_Builder_Controller {
 		$post = get_page_by_path( $pattern->name, OBJECT, 'wp_block' );
 
 		if ( empty( $post ) ) {
-			return new WP_Error( 'pattern_not_found', 'Pattern not found', array( 'status' => 404 ) );
+			return new WP_Error( 'pattern_not_found', 'Pattern not found.', array( 'status' => 404 ) );
 		}
 
 		$deleted = wp_delete_post( $post->ID, true );
 
 		if ( ! $deleted ) {
-			return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern', array( 'status' => 500 ) );
+			return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern.', array( 'status' => 500 ) );
 		}
 
-		return array( 'message' => 'Pattern deleted successfully' );
+		return array( 'message' => 'Pattern deleted successfully.' );
 	}
 
 	/**
-	 * Get the file path for a pattern.
+	 * Gets the filesystem path for a pattern's PHP file.
 	 *
 	 * @param Abstract_Pattern $pattern The pattern object.
-	 * @return string|WP_Error Pattern file path on success, WP_Error on failure.
+	 * @return string|WP_Error Pattern file path on success, WP_Error if not found.
 	 */
 	public function get_pattern_filepath( $pattern ) {
 		$path = $pattern->filePath ?? get_stylesheet_directory() . '/patterns/' . sanitize_file_name( basename( $pattern->name ) ) . '.php';
@@ -610,16 +629,17 @@ class Pattern_Builder_Controller {
 			return $path;
 		}
 
-		$patterns = $this->get_block_patterns_from_theme_files();
-		$pattern  = array_find(
+		$patterns        = $this->get_block_patterns_from_theme_files();
+		$filtered        = array_filter(
 			$patterns,
 			function ( $p ) use ( $pattern ) {
 				return $p->name === $pattern->name;
 			}
 		);
+		$matched_pattern = reset( $filtered );
 
-		if ( $pattern && isset( $pattern->filePath ) ) {
-			return $pattern->filePath;
+		if ( $matched_pattern && isset( $matched_pattern->filePath ) ) {
+			return $matched_pattern->filePath;
 		}
 
 		return new WP_Error(
@@ -629,8 +649,14 @@ class Pattern_Builder_Controller {
 		);
 	}
 
+	/**
+	 * Deletes a theme pattern — removes the PHP file and the tbell_pattern_block post.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern to delete.
+	 * @return array|WP_Error Success message array or WP_Error on failure.
+	 */
 	public function delete_theme_pattern( Abstract_Pattern $pattern ) {
-		// Check if user has permission to modify theme patterns
+		// Check if user has permission to modify theme patterns.
 		if ( ! current_user_can( 'edit_theme_options' ) ) {
 			return new WP_Error(
 				'insufficient_permissions',
@@ -642,35 +668,41 @@ class Pattern_Builder_Controller {
 		$path = $this->get_pattern_filepath( $pattern );
 
 		if ( is_wp_error( $path ) ) {
-			return $path; // Return the error from get_pattern_filepath
+			return $path;
 		}
 
+		$allowed_dirs = array(
+			get_stylesheet_directory() . '/patterns',
+			get_template_directory() . '/patterns',
+		);
+		$deleted      = Pattern_Builder_Security::safe_file_delete( $path, $allowed_dirs );
 
-			// Use secure file delete operation
-			$allowed_dirs = array(
-				get_stylesheet_directory() . '/patterns',
-				get_template_directory() . '/patterns',
-			);
-			$deleted      = \Pattern_Builder_Security::safe_file_delete( $path, $allowed_dirs );
+		if ( is_wp_error( $deleted ) ) {
+			return $deleted;
+		}
 
-			if ( is_wp_error( $deleted ) ) {
-				return $deleted;
-			}
+		$tbell_pattern_block_post = $this->get_tbell_pattern_block_post_for_pattern( $pattern );
+		$deleted                  = wp_delete_post( $tbell_pattern_block_post->ID, true );
 
-			$tbell_pattern_block_post = $this->get_tbell_pattern_block_post_for_pattern( $pattern );
-			$deleted                  = wp_delete_post( $tbell_pattern_block_post->ID, true );
+		if ( ! $deleted ) {
+			return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern.', array( 'status' => 500 ) );
+		}
 
-			if ( ! $deleted ) {
-				return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern', array( 'status' => 500 ) );
-			}
-
-			return array( 'message' => 'Pattern deleted successfully' );
+		return array( 'message' => 'Pattern deleted successfully.' );
 	}
 
+	/**
+	 * Writes a theme pattern's PHP file to disk.
+	 *
+	 * Creates the file if it doesn't exist. Content is formatted before writing.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern to write.
+	 * @return Abstract_Pattern|WP_Error
+	 */
 	public function update_theme_pattern_file( Abstract_Pattern $pattern ) {
 		$path = $this->get_pattern_filepath( $pattern );
 
-		// If get_pattern_filepath returns an error, create a new path
+		// If get_pattern_filepath returns an error, construct a new path.
 		if ( is_wp_error( $path ) ) {
 			$filename = sanitize_file_name( basename( $pattern->name ) );
 			$path     = get_stylesheet_directory() . '/patterns/' . $filename . '.php';
@@ -679,12 +711,11 @@ class Pattern_Builder_Controller {
 		$formatted_content = $this->format_block_markup( $pattern->content );
 		$file_content      = $this->build_pattern_file_metadata( $pattern ) . $formatted_content;
 
-		// Use secure file write operation
 		$allowed_dirs = array(
 			get_stylesheet_directory() . '/patterns',
 			get_template_directory() . '/patterns',
 		);
-		$response     = \Pattern_Builder_Security::safe_file_write( $path, $file_content, $allowed_dirs );
+		$response     = Pattern_Builder_Security::safe_file_write( $path, $file_content, $allowed_dirs );
 
 		if ( is_wp_error( $response ) ) {
 			return $response;
@@ -694,10 +725,10 @@ class Pattern_Builder_Controller {
 	}
 
 	/**
-	 * Builds metadata for a pattern file.
+	 * Builds the PHP header metadata block for a pattern file.
 	 *
 	 * @param Abstract_Pattern $pattern The pattern object.
-	 * @return string
+	 * @return string PHP header comment string.
 	 */
 	private function build_pattern_file_metadata( Abstract_Pattern $pattern ): string {
 
@@ -722,13 +753,10 @@ class Pattern_Builder_Controller {
 	/**
 	 * Remaps wp:block blocks that reference theme patterns to wp:pattern blocks.
 	 *
-	 * @param Abstract_Pattern $pattern The pattern to remap.
+	 * @param Abstract_Pattern $pattern The pattern whose content should be remapped.
 	 * @return Abstract_Pattern
 	 */
 	public function remap_patterns( Abstract_Pattern $pattern ) {
-		// if this pattern's content contains wp:block blocks and they reference
-		// theme patterns, remap them to wp:pattern blocks.
-
 		$pattern->content = preg_replace_callback(
 			'/wp:block\s+({.*})\s*\/?-->/sU',
 			function ( $matches ) use ( $pattern ) {
@@ -737,30 +765,28 @@ class Pattern_Builder_Controller {
 
 				if ( isset( $attributes['ref'] ) ) {
 
-					// get the post of the pattern
 					$pattern_post = get_post( $attributes['ref'], OBJECT );
 
-					// if the post is a tbell_pattern_block post, we can convert it to a wp:pattern block
-					if ( $pattern_post && $pattern_post->post_type === 'tbell_pattern_block' ) {
+					if ( $pattern_post && 'tbell_pattern_block' === $pattern_post->post_type ) {
 
 						$pattern_slug = $pattern_post->post_name;
 
-						// TODO: Optimize this
-						// NOTE: Because the name of the post is the slug, but the slug has /'s removed, we have to find the ACTUALY slug from the file.
-						$all_patterns = $this->get_block_patterns_from_theme_files();
-						$pattern      = array_find(
+						// TODO: Optimize this.
+						// NOTE: Because the name of the post is the slug, but the slug has /'s removed,
+						// we have to find the actual slug from the file.
+						$all_patterns     = $this->get_block_patterns_from_theme_files();
+						$filtered_matches = array_filter(
 							$all_patterns,
 							function ( $p ) use ( $pattern_slug ) {
 								return sanitize_title( $p->name ) === sanitize_title( $pattern_slug );
 							}
 						);
+						$matched          = reset( $filtered_matches );
 
-						if ( $pattern ) {
-
+						if ( $matched ) {
 							unset( $attributes['ref'] );
-							$attributes['slug'] = $pattern->name;
-
-							return 'wp:pattern ' . json_encode( $attributes, JSON_UNESCAPED_SLASHES ) . ' /-->';
+							$attributes['slug'] = $matched->name;
+							return 'wp:pattern ' . wp_json_encode( $attributes, JSON_UNESCAPED_SLASHES ) . ' /-->';
 						}
 					}
 				}
@@ -774,11 +800,12 @@ class Pattern_Builder_Controller {
 	}
 
 	/**
-	 * Formats block markup to be nicely readable.
+	 * Formats block markup for readability.
+	 *
 	 * This is a PHP port of the JavaScript formatBlockMarkup() function.
 	 *
 	 * @param string $block_markup The block markup to format.
-	 * @return string The formatted block markup.
+	 * @return string Formatted block markup.
 	 */
 	public function format_block_markup( $block_markup ) {
 		$block_markup = $this->add_new_lines_to_block_markup( $block_markup );
@@ -787,13 +814,13 @@ class Pattern_Builder_Controller {
 	}
 
 	/**
-	 * Adds new lines to block markup for better readability.
+	 * Adds newlines around block comment markers for readability.
 	 *
-	 * @param string $block_markup The block markup to add new lines to.
-	 * @return string The block markup with new lines added.
+	 * @param string $block_markup The block markup.
+	 * @return string Block markup with newlines added.
 	 */
 	private function add_new_lines_to_block_markup( $block_markup ) {
-		// Add newlines before and after each comment
+		// Add newlines before and after each comment.
 		$block_markup = preg_replace_callback(
 			'/<!--(.*?)-->/s',
 			function ( $matches ) {
@@ -803,23 +830,23 @@ class Pattern_Builder_Controller {
 			$block_markup
 		);
 
-		// Fix spacing for self-closing blocks
+		// Fix spacing for self-closing blocks.
 		$block_markup = str_replace( '/ -->', '/-->', $block_markup );
 
-		// Normalize multiple newlines into a single one
+		// Normalize multiple newlines into a single one.
 		$block_markup = preg_replace( '/\n{2,}/', "\n", $block_markup );
 
-		// eliminate blank lines
+		// Eliminate blank lines.
 		$block_markup = preg_replace( '/^\s*[\r\n]/m', '', $block_markup );
 
 		return $block_markup;
 	}
 
 	/**
-	 * Indents block markup for better readability.
+	 * Applies indentation to block markup based on nesting depth.
 	 *
 	 * @param string $block_markup The block markup to indent.
-	 * @return string The indented block markup.
+	 * @return string Indented block markup.
 	 */
 	private function indent_block_markup( $block_markup ) {
 		$lines        = explode( "\n", $block_markup );
@@ -829,7 +856,7 @@ class Pattern_Builder_Controller {
 		$output       = array();
 
 		foreach ( $lines as $line ) {
-			// Detect closing tags/comments (should reduce indent before rendering)
+			// Detect closing tags/comments — reduce indent before rendering.
 			$is_closing_comment = preg_match( '/^<!--\s*\/[\w:-]+\s*-->$/', $line );
 			$is_closing_tag     = preg_match( '/^<\/[\w:-]+>$/', $line );
 
@@ -839,17 +866,17 @@ class Pattern_Builder_Controller {
 
 			$output[] = str_repeat( $indent_str, $indent_level ) . $line;
 
-			// Detect opening comment (not self-closing)
+			// Detect opening comment (not self-closing).
 			$is_opening_comment = preg_match( '/^<!--\s*[\w:-]+\b.*-->$/', $line ) &&
 				! preg_match( '/\/\s*-->$/', $line );
 
-			// Detect opening tag (not self-closing)
+			// Detect opening tag (not self-closing).
 			$is_opening_tag = preg_match( '/^<([\w:-]+)(\s[^>]*)?>$/', $line );
 
-			// Self-closing HTML tag
+			// Self-closing HTML tag.
 			$is_self_closing_tag = preg_match( '/^<[^>]+\/>$/', $line );
 
-			// Self-closing block markup
+			// Self-closing block markup.
 			$is_self_closing_comment = preg_match( '/^<!--.*\/\s*-->$/', $line );
 
 			if ( ( $is_opening_comment || $is_opening_tag ) && ! $is_self_closing_tag && ! $is_self_closing_comment ) {

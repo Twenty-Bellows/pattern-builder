@@ -45,7 +45,18 @@
 
 	<!-- Set minimum supported PHP version -->
 	<config name="minimum_supported_wp_version" value="6.6"/>
-	<config name="testVersion" value="7.2-"/>
+	<config name="testVersion" value="7.4-"/>
+
+	<!-- Register custom capabilities so PHPCS doesn't flag them as unknown -->
+	<rule ref="WordPress.WP.Capabilities">
+		<properties>
+			<property name="custom_capabilities" type="array">
+				<element value="edit_tbell_pattern_blocks"/>
+				<element value="delete_tbell_pattern_block"/>
+				<element value="delete_tbell_pattern_blocks"/>
+			</property>
+		</properties>
+	</rule>
 
 	<!-- Allow namespaces for our classes -->
 	<rule ref="WordPress.Files.FileName">

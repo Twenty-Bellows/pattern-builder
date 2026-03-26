@@ -22,7 +22,7 @@ require_once "{$_tests_dir}/includes/functions.php";
  * Manually load the plugin being tested.
  */
 function _manually_load_plugin() {
-	// Load composer autoloader here, after WordPress core is loaded
+	// Load composer autoloader here, after WordPress core is loaded.
 	require __DIR__ . '/vendor/autoload.php';
 
 	require __DIR__ . '/pattern-builder.php';

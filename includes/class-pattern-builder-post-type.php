@@ -4,6 +4,9 @@ namespace TwentyBellows\PatternBuilder;
 
 class Pattern_Builder_Post_Type {
 
+	/**
+	 * Constructor to initialize post type hooks.
+	 */
 	public function __construct() {
 		add_action( 'init', array( $this, 'register_tbell_pattern_block_post_type' ) );
 		add_filter( 'render_block', array( $this, 'render_tbell_pattern_blocks' ), 10, 2 );
@@ -14,12 +17,12 @@ class Pattern_Builder_Post_Type {
 	 * Adds a "content" attribute to the core/pattern block type.
 	 * This is used to store the pattern overrides for the block.
 	 *
-	 * @param array  $args The block type arguments.
+	 * @param array  $args       The block type arguments.
 	 * @param string $block_type The block type name.
 	 * @return array
 	 */
 	public function add_content_attribute_to_core_pattern_block( $args, $block_type ) {
-		if ( $block_type === 'core/pattern' ) {
+		if ( 'core/pattern' === $block_type ) {
 			$extra_attributes   = array(
 				'content' => array(
 					'type' => 'object',
@@ -33,7 +36,7 @@ class Pattern_Builder_Post_Type {
 	/**
 	 * Registers the tbell_pattern_block custom post type.
 	 */
-	public function register_tbell_pattern_block_post_type() {
+	public function register_tbell_pattern_block_post_type(): void {
 		$labels = array(
 			'name'          => __( 'Pattern Builder Blocks', 'pattern-builder' ),
 			'singular_name' => __( 'Pattern Builder Block', 'pattern-builder' ),
@@ -41,8 +44,7 @@ class Pattern_Builder_Post_Type {
 
 		$args = array(
 			'labels'          => $labels,
-
-			'public'          => true,
+			'public'          => false,
 			'show_ui'         => true,
 			'show_in_menu'    => false,
 			'show_in_rest'    => true,
@@ -53,7 +55,7 @@ class Pattern_Builder_Post_Type {
 			'map_meta_cap'    => true,
 		);
 
-		$result = register_post_type( 'tbell_pattern_block', $args );
+		register_post_type( 'tbell_pattern_block', $args );
 
 		register_post_meta(
 			'tbell_pattern_block',
@@ -105,10 +107,23 @@ class Pattern_Builder_Post_Type {
 			)
 		);
 
-		/**
-		 * Add custom capabilities for the tbell_pattern_block post type.
-		 */
+		register_post_meta(
+			'tbell_pattern_block',
+			'wp_pattern_keywords',
+			array(
+				'show_in_rest' => true,
+				'type'         => 'string',
+				'single'       => true,
+			)
+		);
+	}
 
+	/**
+	 * Assigns custom capabilities for the tbell_pattern_block post type to administrator and editor roles.
+	 *
+	 * Called once on plugin activation via register_activation_hook.
+	 */
+	public static function assign_capabilities(): void {
 		$roles = array( 'administrator', 'editor' );
 
 		$capabilities = array(
@@ -116,7 +131,6 @@ class Pattern_Builder_Post_Type {
 			'edit_tbell_pattern_blocks',
 		);
 
-		// Assign capabilities to each role
 		foreach ( $roles as $role_name ) {
 			$role = get_role( $role_name );
 			if ( $role ) {
@@ -129,22 +143,23 @@ class Pattern_Builder_Post_Type {
 
 	/**
 	 * Renders a "tbell_pattern_block" block pattern.
-	 * This is a block pattern stored as a tbell_pattern_block post type instead of a wp_block post type.
-	 * Which means that it is a "theme pattern" instead of a "user pattern".
+	 *
+	 * This is a block pattern stored as a tbell_pattern_block post type instead of a wp_block post type,
+	 * meaning it is a "theme pattern" instead of a "user pattern".
 	 *
 	 * This borrows heavily from the core block rendering function.
 	 *
 	 * @param string $block_content The block content.
-	 * @param array  $block        The block data.
+	 * @param array  $block         The block data.
 	 * @return string
 	 */
 	public function render_tbell_pattern_blocks( $block_content, $block ) {
-		// store a reference to the block to prevent infinite recursion
+		// Store a reference to the block to prevent infinite recursion.
 		static $seen_refs = array();
 
-		// if we have a block pattern with no content we PROBABLY are trying to render
-		// a tbell_pattern_block (theme pattern)
-		if ( $block['blockName'] === 'core/block' && $block_content === '' ) {
+		// If we have a block pattern with no content we PROBABLY are trying to render
+		// a tbell_pattern_block (theme pattern).
+		if ( 'core/block' === $block['blockName'] && '' === $block_content ) {
 
 			$attributes = $block['attrs'] ?? array();
 
@@ -157,7 +172,7 @@ class Pattern_Builder_Post_Type {
 				return '';
 			}
 
-			// if we have already seen this block, return an empty string to prevent recursion
+			// If we have already seen this block, return an empty string to prevent recursion.
 			if ( isset( $seen_refs[ $attributes['ref'] ] ) ) {
 				return '';
 			}
@@ -193,7 +208,7 @@ class Pattern_Builder_Post_Type {
 			// Render the block content.
 			$content = do_blocks( $content );
 
-			// It is safe to render this block again.  No infinite recursion worries.
+			// It is safe to render this block again — no infinite recursion risk.
 			unset( $seen_refs[ $attributes['ref'] ] );
 
 			if ( $has_pattern_overrides ) {

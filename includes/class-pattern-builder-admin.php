@@ -28,48 +28,26 @@ class Pattern_Builder_Admin {
 	}
 
 	/**
-	 * Renders the admin menu page.
+	 * Renders the admin menu page as a plain PHP page (no React build required).
 	 */
 	public function render_admin_menu_page(): void {
-		$this->enqueue_assets();
-		echo '<div id="pattern-builder-app"></div>';
-	}
+		?>
+		<div class="wrap">
+			<h1><?php echo esc_html_x( 'Pattern Builder', 'UI String', 'pattern-builder' ); ?> <span style="font-size:14px;font-weight:normal;color:#646970;"><?php esc_html_e( 'by Twenty Bellows', 'pattern-builder' ); ?></span></h1>
 
-	/**
-	 * Enqueues the necessary assets for the admin page.
-	 */
-	private function enqueue_assets(): void {
+			<p><?php esc_html_e( 'Pattern Builder adds functionality to the WordPress Editor to enhance the Pattern Building experience. All of the tools are available in the Site Editor and Block Editor — open a pattern there to get started.', 'pattern-builder' ); ?></p>
 
-		$screen = get_current_screen();
-
-		if ( $screen->id !== 'appearance_page_pattern-builder' ) {
-			return;
-		}
-
-		$asset_file = include plugin_dir_path( __FILE__ ) . '../build/PatternBuilder_Admin.asset.php';
-
-		wp_enqueue_script(
-			'pattern-builder-app',
-			plugins_url( '../build/PatternBuilder_Admin.js', __FILE__ ),
-			$asset_file['dependencies'],
-			$asset_file['version']
-		);
-
-		wp_enqueue_style(
-			'pattern-builder-editor-style',
-			plugins_url( '../build/PatternBuilder_Admin.css', __FILE__ ),
-			array(),
-			$asset_file['version']
-		);
-
-		// Enqueue core editor styles
-		// wp_enqueue_style( 'wp-edit-blocks' ); // Block editor base styles
-		// wp_enqueue_style( 'wp-block-library' ); // Front-end block styles
-		// wp_enqueue_style( 'wp-block-editor' ); // Editor layout styles
-
-		// Enqueue media library assets
-		// wp_enqueue_media();
-
-		wp_set_script_translations( 'pattern-builder-app', 'pattern-builder' );
+			<h2><?php esc_html_e( 'Learn More', 'pattern-builder' ); ?></h2>
+			<ul>
+				<li><a href="https://twentybellows.com/pattern-builder-help#what-are-patterns" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'What are Patterns and how are they different than Custom Blocks?', 'pattern-builder' ); ?></a></li>
+				<li><a href="https://twentybellows.com/pattern-builder-help#theme-vs-user-patterns" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'What is the difference between a Theme Pattern and a User Pattern?', 'pattern-builder' ); ?></a></li>
+				<li><a href="https://twentybellows.com/pattern-builder-help#synced-vs-unsynced-patterns" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'What is the difference between a Synced Pattern and an Unsynced Pattern?', 'pattern-builder' ); ?></a></li>
+				<li><a href="https://twentybellows.com/pattern-builder-help#themes-synced-patterns" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Can Themes have Synced Patterns?', 'pattern-builder' ); ?></a></li>
+				<li><a href="https://twentybellows.com/pattern-builder-help#edit-theme-patterns" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Edit Theme Patterns', 'pattern-builder' ); ?></a></li>
+				<li><a href="https://twentybellows.com/pattern-builder-help#include-images-in-patterns" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Include image assets used in patterns in your Theme', 'pattern-builder' ); ?></a></li>
+				<li><a href="https://twentybellows.com/pattern-builder-help#localize-patterns" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Prepare Patterns for Localization', 'pattern-builder' ); ?></a></li>
+			</ul>
+		</div>
+		<?php
 	}
 }

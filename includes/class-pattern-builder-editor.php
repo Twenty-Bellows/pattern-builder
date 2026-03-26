@@ -4,6 +4,9 @@ namespace TwentyBellows\PatternBuilder;
 
 class Pattern_Builder_Editor {
 
+	/**
+	 * Constructor to initialize editor hooks.
+	 */
 	public function __construct() {
 		add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_block_editor_assets' ) );
 	}
@@ -19,6 +22,7 @@ class Pattern_Builder_Editor {
 			plugins_url( '../build/PatternBuilder_EditorTools.js', __FILE__ ),
 			$asset_file['dependencies'],
 			$asset_file['version'],
+			true
 		);
 
 		wp_enqueue_style(
