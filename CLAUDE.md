@@ -12,6 +12,7 @@ This file provides guidance to Claude Code and other AI coding agents when worki
 - **Plugin URI:** https://www.twentybellows.com/pattern-builder/
 - **License:** GPL-2.0-or-later
 - **WordPress Requires:** 6.6+
+- **Target/test version:** WordPress 6.9.4 (latest production release — all development and testing targets this version)
 - **PHP Requires:** 7.2+
 
 ## Development Environment
@@ -50,7 +51,8 @@ A full architectural analysis is in [`docs/architecture.md`](docs/architecture.m
 ### Environment Notes
 - Docker is available (host socket shared). All `wp-env` commands work.
 - `wp-env` binary is at `node_modules/.bin/wp-env` — run via npm scripts from this directory.
-- First `npm run start` will pull WordPress Docker images (~1-2 min).
+- Target WordPress version: **6.9.4**. The `.wp-env.json` or override should pin this version.
+- wp-env containers (when running): `c66a7bb12251f6943ed9d46e3f7f65aa-wordpress-1` (main), `c66a7bb12251f6943ed9d46e3f7f65aa-tests-wordpress-1` (tests)
 
 ### Known Pre-Existing Issues
 - Several PHP lint violations exist in the codebase (Yoda conditions, inline comment formatting). These are pre-existing and not regressions. Fix them if you touch the file; don't feel obligated to fix unrelated files.
