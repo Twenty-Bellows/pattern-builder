@@ -215,17 +215,31 @@ class Pattern_Builder_API {
 	}
 
 	/**
-	 * Injects theme patterns into individual /wp/v2/blocks/{id} REST responses.
+	 * Injects theme patterns into /wp/v2/blocks REST responses.
 	 *
-	 * When the Site Editor or Pattern Builder sidebar requests a specific block by ID,
-	 * and that ID belongs to a tbell_pattern_block post, this filter returns a correctly
-	 * formatted response so the pattern can be opened and edited.
+	 * ### List injection (/wp/v2/blocks — GET)
 	 *
-	 * Note: Theme patterns are intentionally NOT injected into the /wp/v2/blocks LIST
-	 * response. The list is used by Gutenberg's getAllPatterns merge, and theme patterns
-	 * are now served exclusively via the /wp/v2/block-patterns/patterns endpoint
-	 * (see inject_faux_patterns()). Keeping them out of the blocks list prevents
-	 * the same content from appearing in both "My Patterns" and "Theme" inserter tabs.
+	 * All theme patterns are injected into the list response. This makes them appear as
+	 * `type: PATTERN_TYPES.user` (`"wp_block"`) in the Site Editor's data store, which is
+	 * the only way to make them appear as editable (without a lock icon) in the "All patterns"
+	 * page. Without list injection, edit-site.js hardcodes `type: PATTERN_TYPES.theme` for
+	 * everything from /wp/v2/block-patterns/patterns, and `isItemClickable` returns false for
+	 * those entries, producing the lock icon.
+	 *
+	 * A parallel faux-patterns filter (inject_faux_patterns) handles the patterns endpoint.
+	 * It sets source:'core' on faux entries, which causes edit-site.js EXCLUDED_PATTERN_SOURCES
+	 * to remove them from selectThemePatterns — preventing the "All patterns" page from showing
+	 * both a locked type:theme entry (from the patterns endpoint) AND an editable type:user
+	 * entry (from this list injection) for the same pattern.
+	 *
+	 * Side effect: theme patterns also appear in the block inserter's "My Patterns" tab
+	 * (Gutenberg classifies any entry from /wp/v2/blocks as a user pattern). This is
+	 * an acceptable trade-off to support full editability.
+	 *
+	 * ### Single-pattern injection (/wp/v2/blocks/{id} — GET)
+	 *
+	 * When a specific block is requested by ID and the ID belongs to a tbell_pattern_block
+	 * post, a correctly formatted response is returned so the pattern can be opened and edited.
 	 *
 	 * @param WP_REST_Response $response The REST response.
 	 * @param mixed            $server   The REST server.
@@ -233,27 +247,45 @@ class Pattern_Builder_API {
 	 * @return WP_REST_Response
 	 */
 	public function inject_theme_patterns( $response, $server, $request ) {
-		if ( ! preg_match( '#/wp/v2/blocks/(?P<id>\d+)#', $request->get_route(), $matches ) ) {
-			return $response;
+		if ( preg_match( '#/wp/v2/blocks/(?P<id>\d+)#', $request->get_route(), $matches ) ) {
+			// Single-pattern request — inject if the ID belongs to a tbell_pattern_block.
+			$block_id            = intval( $matches['id'] );
+			$tbell_pattern_block = get_post( $block_id );
+
+			if ( ! $tbell_pattern_block || 'tbell_pattern_block' !== $tbell_pattern_block->post_type ) {
+				return $response;
+			}
+
+			// Only inject if the pattern still has a backing file.
+			$pattern_file_path = $this->controller->get_pattern_filepath( Abstract_Pattern::from_post( $tbell_pattern_block ) );
+			if ( is_wp_error( $pattern_file_path ) || ! $pattern_file_path ) {
+				return $response;
+			}
+
+			$tbell_pattern_block->post_name = $this->controller->format_pattern_slug_from_post( $tbell_pattern_block->post_name );
+			$data                           = $this->format_tbell_pattern_block_response( $tbell_pattern_block, $request );
+
+			return new WP_REST_Response( $data );
 		}
 
-		$block_id            = intval( $matches['id'] );
-		$tbell_pattern_block = get_post( $block_id );
+		if ( '/wp/v2/blocks' === $request->get_route() && 'GET' === $request->get_method() ) {
+			// List request — inject all theme patterns so they appear as type:user in the store.
+			if ( is_wp_error( $response ) ) {
+				return $response;
+			}
 
-		if ( ! $tbell_pattern_block || 'tbell_pattern_block' !== $tbell_pattern_block->post_type ) {
-			return $response;
+			$data     = $response->get_data();
+			$patterns = $this->controller->get_block_patterns_from_theme_files();
+
+			foreach ( $patterns as $pattern ) {
+				$post   = $this->controller->get_tbell_pattern_block_post_for_pattern( $pattern );
+				$data[] = $this->format_tbell_pattern_block_response( $post, $request );
+			}
+
+			$response->set_data( $data );
 		}
 
-		// Only inject if the pattern still has a backing file.
-		$pattern_file_path = $this->controller->get_pattern_filepath( Abstract_Pattern::from_post( $tbell_pattern_block ) );
-		if ( is_wp_error( $pattern_file_path ) || ! $pattern_file_path ) {
-			return $response;
-		}
-
-		$tbell_pattern_block->post_name = $this->controller->format_pattern_slug_from_post( $tbell_pattern_block->post_name );
-		$data                           = $this->format_tbell_pattern_block_response( $tbell_pattern_block, $request );
-
-		return new WP_REST_Response( $data );
+		return $response;
 	}
 
 	/**
@@ -291,6 +323,11 @@ class Pattern_Builder_API {
 	 */
 	public function inject_faux_patterns( $response, $server, $request ) {
 		if ( '/wp/v2/block-patterns/patterns' !== $request->get_route() || 'GET' !== $request->get_method() ) {
+			return $response;
+		}
+
+		// Guard: unauthenticated or permission-denied requests return WP_Error, not WP_REST_Response.
+		if ( is_wp_error( $response ) ) {
 			return $response;
 		}
 
@@ -343,15 +380,19 @@ class Pattern_Builder_API {
 			// Start from the existing registry entry (preserves all metadata) and override only
 			// the fields that Pattern Builder controls.
 			//
-			// source: 'user' — removes the lock icon; WordPress treats source:'theme' as read-only
-			// in the "All patterns" Site Editor page.
-			// id: post ID    — enables the "Edit" button to route to /wp/v2/blocks/{id}, which
-			// Pattern Builder's inject_theme_patterns() hook already intercepts to serve
-			// the correct editable data.
+			// source: 'core' — WP 6.9.4 edit-site.js EXCLUDED_PATTERN_SOURCES removes these
+			// from selectThemePatterns, which hardcodes type:PATTERN_TYPES.theme for everything
+			// from this endpoint. Without exclusion, isItemClickable returns false (lock icon).
+			// block-editor.js getAllPatterns does NOT filter by EXCLUDED_PATTERN_SOURCES, so
+			// Starter Patterns continues to work via the faux inserter:true entry.
+			// Editable user-type entries come from /wp/v2/blocks (inject_theme_patterns list).
+			//
+			// id: post ID — enables the "Edit" button to route to /wp/v2/blocks/{id}, which
+			// inject_theme_patterns() already intercepts to serve correct editable data.
 			$faux             = $entry;
 			$faux['content']  = $content;
 			$faux['inserter'] = $inserter;
-			$faux['source']   = 'user';
+			$faux['source']   = 'core';
 			$faux['id']       = $post->ID;
 
 			$data[ $key ] = $faux;
