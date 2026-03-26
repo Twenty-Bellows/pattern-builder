@@ -342,9 +342,17 @@ class Pattern_Builder_API {
 
 			// Start from the existing registry entry (preserves all metadata) and override only
 			// the fields that Pattern Builder controls.
+			//
+			// source: 'user' — removes the lock icon; WordPress treats source:'theme' as read-only
+			// in the "All patterns" Site Editor page.
+			// id: post ID    — enables the "Edit" button to route to /wp/v2/blocks/{id}, which
+			// Pattern Builder's inject_theme_patterns() hook already intercepts to serve
+			// the correct editable data.
 			$faux             = $entry;
 			$faux['content']  = $content;
 			$faux['inserter'] = $inserter;
+			$faux['source']   = 'user';
+			$faux['id']       = $post->ID;
 
 			$data[ $key ] = $faux;
 			$modified     = true;
