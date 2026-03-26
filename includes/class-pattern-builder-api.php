@@ -46,6 +46,7 @@ class Pattern_Builder_API {
 		add_action( 'init', array( $this, 'register_patterns' ), 9 );
 
 		add_filter( 'rest_request_after_callbacks', array( $this, 'inject_theme_patterns' ), 10, 3 );
+		add_filter( 'rest_request_after_callbacks', array( $this, 'inject_faux_patterns' ), 10, 3 );
 
 		add_filter( 'rest_pre_dispatch', array( $this, 'handle_hijack_block_update' ), 10, 3 );
 		add_filter( 'rest_pre_dispatch', array( $this, 'handle_hijack_block_delete' ), 10, 3 );
@@ -214,7 +215,17 @@ class Pattern_Builder_API {
 	}
 
 	/**
-	 * Injects theme patterns into the /wp/v2/blocks REST responses.
+	 * Injects theme patterns into individual /wp/v2/blocks/{id} REST responses.
+	 *
+	 * When the Site Editor or Pattern Builder sidebar requests a specific block by ID,
+	 * and that ID belongs to a tbell_pattern_block post, this filter returns a correctly
+	 * formatted response so the pattern can be opened and edited.
+	 *
+	 * Note: Theme patterns are intentionally NOT injected into the /wp/v2/blocks LIST
+	 * response. The list is used by Gutenberg's getAllPatterns merge, and theme patterns
+	 * are now served exclusively via the /wp/v2/block-patterns/patterns endpoint
+	 * (see inject_faux_patterns()). Keeping them out of the blocks list prevents
+	 * the same content from appearing in both "My Patterns" and "Theme" inserter tabs.
 	 *
 	 * @param WP_REST_Response $response The REST response.
 	 * @param mixed            $server   The REST server.
@@ -222,38 +233,124 @@ class Pattern_Builder_API {
 	 * @return WP_REST_Response
 	 */
 	public function inject_theme_patterns( $response, $server, $request ) {
-		// Requesting a single pattern — inject the synced theme pattern.
-		if ( preg_match( '#/wp/v2/blocks/(?P<id>\d+)#', $request->get_route(), $matches ) ) {
-			$block_id            = intval( $matches['id'] );
-			$tbell_pattern_block = get_post( $block_id );
-			if ( $tbell_pattern_block && 'tbell_pattern_block' === $tbell_pattern_block->post_type ) {
-				// Make sure the pattern has a pattern file.
-				$pattern_file_path = $this->controller->get_pattern_filepath( Abstract_Pattern::from_post( $tbell_pattern_block ) );
-				if ( is_wp_error( $pattern_file_path ) || ! $pattern_file_path ) {
-					return $response;
-				}
-				$tbell_pattern_block->post_name = $this->controller->format_pattern_slug_from_post( $tbell_pattern_block->post_name );
-				$data                           = $this->format_tbell_pattern_block_response( $tbell_pattern_block, $request );
-				$response                       = new WP_REST_Response( $data );
+		if ( ! preg_match( '#/wp/v2/blocks/(?P<id>\d+)#', $request->get_route(), $matches ) ) {
+			return $response;
+		}
+
+		$block_id            = intval( $matches['id'] );
+		$tbell_pattern_block = get_post( $block_id );
+
+		if ( ! $tbell_pattern_block || 'tbell_pattern_block' !== $tbell_pattern_block->post_type ) {
+			return $response;
+		}
+
+		// Only inject if the pattern still has a backing file.
+		$pattern_file_path = $this->controller->get_pattern_filepath( Abstract_Pattern::from_post( $tbell_pattern_block ) );
+		if ( is_wp_error( $pattern_file_path ) || ! $pattern_file_path ) {
+			return $response;
+		}
+
+		$tbell_pattern_block->post_name = $this->controller->format_pattern_slug_from_post( $tbell_pattern_block->post_name );
+		$data                           = $this->format_tbell_pattern_block_response( $tbell_pattern_block, $request );
+
+		return new WP_REST_Response( $data );
+	}
+
+	/**
+	 * Replaces Pattern Builder–managed entries in the /wp/v2/block-patterns/patterns response
+	 * with "faux" versions that carry correct inserter and faux content.
+	 *
+	 * ### Why this is needed
+	 *
+	 * Pattern Builder registers theme patterns at priority 9 with `inserter: false` to prevent
+	 * WordPress from registering real (locked) versions at priority 10. The registry entries
+	 * therefore have `inserter: false` and hardcoded content, which is not what the editor
+	 * should see.
+	 *
+	 * This filter intercepts the REST response and replaces each managed pattern entry with
+	 * a faux version:
+	 *   - `content` is set to `<!-- wp:block {"ref": ID} /-->` for synced patterns, or the
+	 *     theme file content for unsynced patterns. This content goes through
+	 *     syncedPatternFilter.js on the JS side when rendered in the editor.
+	 *   - `inserter` is set to `true` for context-restricted patterns (those with `blockTypes`
+	 *     or `postTypes` declarations, e.g. Starter Patterns candidates), and `false` for all
+	 *     other theme patterns.
+	 *   - All other metadata (title, description, categories, keywords, blockTypes, postTypes,
+	 *     viewportWidth, source) is preserved from the existing registry entry.
+	 *
+	 * ### Deduplication
+	 *
+	 * Because theme patterns are no longer injected into the /wp/v2/blocks LIST, they do not
+	 * appear in Gutenberg's "My Patterns" tab. They appear exactly once in the patterns
+	 * endpoint response, as a faux entry.
+	 *
+	 * @param WP_REST_Response $response The REST response.
+	 * @param mixed            $server   The REST server.
+	 * @param WP_REST_Request  $request  The REST request.
+	 * @return WP_REST_Response
+	 */
+	public function inject_faux_patterns( $response, $server, $request ) {
+		if ( '/wp/v2/block-patterns/patterns' !== $request->get_route() || 'GET' !== $request->get_method() ) {
+			return $response;
+		}
+
+		$managed_patterns = $this->controller->get_block_patterns_from_theme_files();
+
+		if ( empty( $managed_patterns ) ) {
+			return $response;
+		}
+
+		// Build a map of pattern name → [pattern, post] for quick lookup.
+		$managed_map = array();
+		foreach ( $managed_patterns as $pattern ) {
+			$post = $this->controller->get_tbell_pattern_block_post_for_pattern( $pattern );
+			if ( $post ) {
+				$managed_map[ $pattern->name ] = array(
+					'pattern' => $pattern,
+					'post'    => $post,
+				);
 			}
-		} elseif ( '/wp/v2/blocks' === $request->get_route() && 'GET' === $request->get_method() ) {
-			// Requesting all patterns — inject all inserter-eligible theme patterns.
-			$data     = $response->get_data();
-			$patterns = $this->controller->get_block_patterns_from_theme_files();
+		}
 
-			// Filter out patterns that should be excluded from the inserter.
-			$patterns = array_filter(
-				$patterns,
-				function ( $pattern ) {
-					return $pattern->inserter;
-				}
-			);
+		if ( empty( $managed_map ) ) {
+			return $response;
+		}
 
-			foreach ( $patterns as $pattern ) {
-				$post   = $this->controller->get_tbell_pattern_block_post_for_pattern( $pattern );
-				$data[] = $this->format_tbell_pattern_block_response( $post, $request );
+		$data     = $response->get_data();
+		$modified = false;
+
+		foreach ( $data as $key => $entry ) {
+			$name = $entry['name'] ?? '';
+
+			if ( ! isset( $managed_map[ $name ] ) ) {
+				continue;
 			}
 
+			$pattern = $managed_map[ $name ]['pattern'];
+			$post    = $managed_map[ $name ]['post'];
+
+			// Faux content: synced patterns expose a wp:block ref; unsynced expose the theme file content.
+			$content = $pattern->synced
+				? '<!-- wp:block {"ref":' . $post->ID . '} /-->'
+				: $pattern->content;
+
+			// Context-restricted patterns (blockTypes/postTypes) must be visible in the Starter Patterns
+			// modal, which filters by inserter !== false before checking blockTypes. All other theme
+			// patterns remain hidden from the general inserter panel.
+			$has_context_restriction = ! empty( $pattern->blockTypes ) || ! empty( $pattern->postTypes );
+			$inserter                = (bool) ( $has_context_restriction ? $pattern->inserter : false );
+
+			// Start from the existing registry entry (preserves all metadata) and override only
+			// the fields that Pattern Builder controls.
+			$faux             = $entry;
+			$faux['content']  = $content;
+			$faux['inserter'] = $inserter;
+
+			$data[ $key ] = $faux;
+			$modified     = true;
+		}
+
+		if ( $modified ) {
 			$response->set_data( $data );
 		}
 
@@ -309,28 +406,18 @@ class Pattern_Builder_API {
 	 *
 	 * If the patterns are already registered, unregisters them first.
 	 * Synced patterns are registered with a reference to the post ID of their pattern.
-	 * Unsynced patterns are registered with the content from the tbell_pattern_block post.
+	 * Unsynced patterns are registered with the content from the theme file.
 	 *
-	 * ### Inserter visibility
+	 * ### Purpose: blocking WordPress's default registration
 	 *
-	 * By default, theme patterns are hidden from the regular block inserter panel
-	 * (`'inserter' => false`). However, patterns that declare `blockTypes` or `postTypes`
-	 * restrictions are specifically designed for context-sensitive surfaces — most notably
-	 * the Starter Patterns modal (shown when creating a new page), which uses
-	 * `getPatternsByBlockTypes('core/post-content')` on the JS side.
+	 * This runs at priority 9 so it fires before WordPress's own pattern registration
+	 * at priority 10. By registering first (with `inserter: false` and faux content),
+	 * Pattern Builder prevents WordPress from creating real/locked versions that would
+	 * bypass Plugin Builder's editing layer.
 	 *
-	 * Gutenberg's `__experimentalGetAllowedPatterns` selector filters out all patterns
-	 * where `inserter === false` *before* applying `blockTypes` filtering. Forcing
-	 * `inserter: false` on restricted patterns therefore breaks Starter Patterns entirely.
-	 *
-	 * Rule applied here:
-	 * - Pattern has `blockTypes` or `postTypes` → use the theme-declared `inserter` value
-	 *   (default: `true`). The context restriction already limits where the pattern
-	 *   appears; it will not clutter the general patterns panel.
-	 * - Pattern has no `blockTypes`/`postTypes` → force `inserter: false` to keep the
-	 *   general inserter panel free of raw theme patterns.
-	 * - In either case: if the theme explicitly sets `Inserter: no`, `$pattern->inserter`
-	 *   is `false` and that value is always respected.
+	 * What users actually see is controlled by inject_faux_patterns(), which replaces
+	 * the /wp/v2/block-patterns/patterns REST response with faux entries that carry
+	 * correct inserter values and the right content for each pattern type.
 	 */
 	public function register_patterns(): void {
 
@@ -353,12 +440,14 @@ class Pattern_Builder_API {
 			}
 
 			/*
-			 * Patterns with blockTypes/postTypes restrictions are context-specific
-			 * (e.g. Starter Patterns modal). Use the theme's declared inserter value.
-			 * All other theme patterns are hidden from the general block inserter.
+			 * Always register with inserter: false in the pattern registry.
+			 *
+			 * The registry is used only as a blocking mechanism — registering at priority 9
+			 * prevents WordPress from registering real/locked versions at priority 10.
+			 * What users actually see is controlled by inject_faux_patterns(), which
+			 * replaces the REST response with faux entries carrying correct inserter values.
 			 */
-			$has_context_restriction = ! empty( $pattern->blockTypes ) || ! empty( $pattern->postTypes );
-			$inserter_value          = $has_context_restriction ? $pattern->inserter : false;
+			$inserter_value = false;
 
 			$pattern_data = array(
 				'title'         => $pattern->title,
