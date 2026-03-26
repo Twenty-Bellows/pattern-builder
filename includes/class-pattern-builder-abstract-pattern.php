@@ -82,6 +82,13 @@ class Abstract_Pattern {
 	public $postTypes; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.PropertyNotSnakeCase
 
 	/**
+	 * Optional viewport width (in pixels) used for pattern preview rendering.
+	 *
+	 * @var int|null
+	 */
+	public $viewportWidth; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.PropertyNotSnakeCase
+
+	/**
 	 * Pattern source: 'theme' or 'user'.
 	 *
 	 * @var string
@@ -135,6 +142,9 @@ class Abstract_Pattern {
 		$this->templateTypes = $args['templateTypes'] ?? array(); // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 		$this->postTypes     = $args['postTypes'] ?? array(); // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 
+		$viewport_width      = $args['viewportWidth'] ?? null;
+		$this->viewportWidth = is_numeric( $viewport_width ) ? (int) $viewport_width : null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName
+
 		$this->filePath = $args['filePath'] ?? null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 	}
 
@@ -181,11 +191,12 @@ class Abstract_Pattern {
 				'description'   => $pattern_data['description'],
 				'content'       => self::render_pattern( $pattern_file ),
 				'filePath'      => $pattern_file,
-				'categories'    => '' === $pattern_data['categories'] ? array() : explode( ',', $pattern_data['categories'] ),
-				'keywords'      => '' === $pattern_data['keywords'] ? array() : explode( ',', $pattern_data['keywords'] ),
+				'categories'    => '' === $pattern_data['categories'] ? array() : array_map( 'trim', explode( ',', $pattern_data['categories'] ) ),
+				'keywords'      => '' === $pattern_data['keywords'] ? array() : array_map( 'trim', explode( ',', $pattern_data['keywords'] ) ),
 				'blockTypes'    => '' === $pattern_data['blockTypes'] ? array() : array_map( 'trim', explode( ',', $pattern_data['blockTypes'] ) ),
-				'postTypes'     => '' === $pattern_data['postTypes'] ? array() : explode( ',', $pattern_data['postTypes'] ),
-				'templateTypes' => '' === $pattern_data['templateTypes'] ? array() : explode( ',', $pattern_data['templateTypes'] ),
+				'postTypes'     => '' === $pattern_data['postTypes'] ? array() : array_map( 'trim', explode( ',', $pattern_data['postTypes'] ) ),
+				'templateTypes' => '' === $pattern_data['templateTypes'] ? array() : array_map( 'trim', explode( ',', $pattern_data['templateTypes'] ) ),
+				'viewportWidth' => $pattern_data['viewportWidth'],
 				'source'        => 'theme',
 				'synced'        => 'yes' === $pattern_data['synced'],
 				'inserter'      => 'no' !== $pattern_data['inserter'],

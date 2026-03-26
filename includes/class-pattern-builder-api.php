@@ -310,6 +310,27 @@ class Pattern_Builder_API {
 	 * If the patterns are already registered, unregisters them first.
 	 * Synced patterns are registered with a reference to the post ID of their pattern.
 	 * Unsynced patterns are registered with the content from the tbell_pattern_block post.
+	 *
+	 * ### Inserter visibility
+	 *
+	 * By default, theme patterns are hidden from the regular block inserter panel
+	 * (`'inserter' => false`). However, patterns that declare `blockTypes` or `postTypes`
+	 * restrictions are specifically designed for context-sensitive surfaces — most notably
+	 * the Starter Patterns modal (shown when creating a new page), which uses
+	 * `getPatternsByBlockTypes('core/post-content')` on the JS side.
+	 *
+	 * Gutenberg's `__experimentalGetAllowedPatterns` selector filters out all patterns
+	 * where `inserter === false` *before* applying `blockTypes` filtering. Forcing
+	 * `inserter: false` on restricted patterns therefore breaks Starter Patterns entirely.
+	 *
+	 * Rule applied here:
+	 * - Pattern has `blockTypes` or `postTypes` → use the theme-declared `inserter` value
+	 *   (default: `true`). The context restriction already limits where the pattern
+	 *   appears; it will not clutter the general patterns panel.
+	 * - Pattern has no `blockTypes`/`postTypes` → force `inserter: false` to keep the
+	 *   general inserter panel free of raw theme patterns.
+	 * - In either case: if the theme explicitly sets `Inserter: no`, `$pattern->inserter`
+	 *   is `false` and that value is always respected.
 	 */
 	public function register_patterns(): void {
 
@@ -331,17 +352,32 @@ class Pattern_Builder_API {
 				$pattern_content                               = '<!-- wp:block {"ref":' . $post->ID . '} /-->';
 			}
 
+			/*
+			 * Patterns with blockTypes/postTypes restrictions are context-specific
+			 * (e.g. Starter Patterns modal). Use the theme's declared inserter value.
+			 * All other theme patterns are hidden from the general block inserter.
+			 */
+			$has_context_restriction = ! empty( $pattern->blockTypes ) || ! empty( $pattern->postTypes );
+			$inserter_value          = $has_context_restriction ? $pattern->inserter : false;
+
 			$pattern_data = array(
 				'title'         => $pattern->title,
-				'inserter'      => false,
+				'description'   => $pattern->description,
+				'inserter'      => $inserter_value,
 				'content'       => $pattern_content,
 				'source'        => 'theme',
+				'categories'    => $pattern->categories,
+				'keywords'      => $pattern->keywords,
 				'blockTypes'    => $pattern->blockTypes,
 				'templateTypes' => $pattern->templateTypes,
 			);
 
-			// Setting postTypes to an empty array causes registration errors; only set it when non-empty.
-			if ( $pattern->postTypes ) {
+			if ( $pattern->viewportWidth ) {
+				$pattern_data['viewportWidth'] = $pattern->viewportWidth;
+			}
+
+			// Setting postTypes to an empty array causes registration issues; only include when non-empty.
+			if ( ! empty( $pattern->postTypes ) ) {
 				$pattern_data['postTypes'] = $pattern->postTypes;
 			}
 
