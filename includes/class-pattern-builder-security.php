@@ -254,6 +254,4 @@ class Pattern_Builder_Security {
 
 		return true;
 	}
-
-
 }

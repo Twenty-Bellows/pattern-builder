@@ -7,7 +7,6 @@ defaultConfig[ 0 ] = {
 	...{
 		entry: {
 			PatternBuilder_EditorTools: './src/PatternBuilder_EditorTools.js',
-			PatternBuilder_Admin: './src/PatternBuilder_Admin.js',
 		},
 	},
 };

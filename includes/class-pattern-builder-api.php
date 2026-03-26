@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.NamingConventions.ValidVariableName -- camelCase properties mirror the JS AbstractPattern class.
 
 namespace TwentyBellows\PatternBuilder;
 
@@ -14,10 +15,30 @@ require_once __DIR__ . '/class-pattern-builder-security.php';
 
 class Pattern_Builder_API {
 
+	/**
+	 * Cache of synced theme pattern name → post ID mappings.
+	 *
+	 * @var array
+	 */
 	private static $synced_theme_patterns = array();
-	private static $base_route            = 'pattern-builder/v1';
+
+	/**
+	 * REST API namespace/base route.
+	 *
+	 * @var string
+	 */
+	private static $base_route = 'pattern-builder/v1';
+
+	/**
+	 * Pattern controller instance.
+	 *
+	 * @var Pattern_Builder_Controller
+	 */
 	private $controller;
 
+	/**
+	 * Constructor to initialize API hooks.
+	 */
 	public function __construct() {
 		$this->controller = new Pattern_Builder_Controller();
 
@@ -79,7 +100,7 @@ class Pattern_Builder_API {
 	 * @return bool|WP_Error True if the user can modify patterns, WP_Error otherwise.
 	 */
 	public function write_permission_callback( $request ) {
-		// First check if user has the required capability
+		// Check if user has the required capability.
 		if ( ! current_user_can( 'edit_tbell_pattern_blocks' ) ) {
 			return new WP_Error(
 				'rest_forbidden',
@@ -88,20 +109,18 @@ class Pattern_Builder_API {
 			);
 		}
 
-		// Verify the REST API nonce
+		// Verify the REST API nonce.
 		$nonce = $request->get_header( 'X-WP-Nonce' );
 		if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
 			return new WP_Error(
 				'rest_cookie_invalid_nonce',
-				__( 'Cookie nonce is invalid', 'pattern-builder' ),
+				__( 'Cookie nonce is invalid.', 'pattern-builder' ),
 				array( 'status' => 403 )
 			);
 		}
 
 		return true;
 	}
-
-	// Callback functions //////////
 
 	/**
 	 * Processes all theme patterns with current configuration settings.
@@ -111,15 +130,14 @@ class Pattern_Builder_API {
 	 */
 	public function process_theme_patterns( WP_REST_Request $request ): WP_REST_Response {
 
-		$localize      = sanitize_text_field( $request->get_param( 'localize' ) ) === 'true';
-		$import_images = sanitize_text_field( $request->get_param( 'importImages' ) ) !== 'false';
+		$localize      = 'true' === sanitize_text_field( $request->get_param( 'localize' ) );
+		$import_images = 'false' !== sanitize_text_field( $request->get_param( 'importImages' ) );
 
 		$options = array(
 			'localize'      => $localize,
 			'import_images' => $import_images,
 		);
 
-		// Get all theme patterns
 		$theme_patterns = $this->controller->get_block_patterns_from_theme_files();
 
 		$processed_count = 0;
@@ -130,7 +148,7 @@ class Pattern_Builder_API {
 			try {
 				$this->controller->update_theme_pattern( $pattern, $options );
 				++$processed_count;
-			} catch ( Exception $e ) {
+			} catch ( \Exception $e ) {
 				++$error_count;
 				$errors[] = array(
 					'pattern' => $pattern->name,
@@ -140,7 +158,7 @@ class Pattern_Builder_API {
 		}
 
 		$total_patterns = count( $theme_patterns );
-		$success        = $error_count === 0;
+		$success        = 0 === $error_count;
 
 		$response_data = array(
 			'success'  => $success,
@@ -171,14 +189,14 @@ class Pattern_Builder_API {
 	 * @param WP_REST_Request $request The REST request object.
 	 * @return WP_REST_Response
 	 */
-	public function get_patterns( WP_REST_Request $request ): WP_REST_Response {
+	public function get_patterns( WP_REST_Request $request ): WP_REST_Response { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter -- required REST callback signature.
 		$theme_patterns = $this->controller->get_block_patterns_from_theme_files();
 		$theme_patterns = array_map(
 			function ( $pattern ) {
 				$pattern_post      = $this->controller->get_tbell_pattern_block_post_for_pattern( $pattern );
 				$pattern_from_post = Abstract_Pattern::from_post( $pattern_post );
 				// TODO: The slug doesn't survive the trip to post and back since it has to be normalized.
-				// so we just pull it form the original pattern and reset it here.  Not sure if that is the best way to do this.
+				// For now we pull it from the original pattern and reset it here.
 				$pattern_from_post->name = $pattern->name;
 				return $pattern_from_post;
 			},
@@ -195,30 +213,35 @@ class Pattern_Builder_API {
 		return rest_ensure_response( $all_patterns );
 	}
 
+	/**
+	 * Injects theme patterns into the /wp/v2/blocks REST responses.
+	 *
+	 * @param WP_REST_Response $response The REST response.
+	 * @param mixed            $server   The REST server.
+	 * @param WP_REST_Request  $request  The REST request.
+	 * @return WP_REST_Response
+	 */
 	public function inject_theme_patterns( $response, $server, $request ) {
-		// Requesting a single pattern.  Inject the synced theme pattern.
+		// Requesting a single pattern — inject the synced theme pattern.
 		if ( preg_match( '#/wp/v2/blocks/(?P<id>\d+)#', $request->get_route(), $matches ) ) {
 			$block_id            = intval( $matches['id'] );
 			$tbell_pattern_block = get_post( $block_id );
-			if ( $tbell_pattern_block && $tbell_pattern_block->post_type === 'tbell_pattern_block' ) {
-				// make sure the pattern has a pattern file
+			if ( $tbell_pattern_block && 'tbell_pattern_block' === $tbell_pattern_block->post_type ) {
+				// Make sure the pattern has a pattern file.
 				$pattern_file_path = $this->controller->get_pattern_filepath( Abstract_Pattern::from_post( $tbell_pattern_block ) );
 				if ( is_wp_error( $pattern_file_path ) || ! $pattern_file_path ) {
-					return $response; // No pattern file found, return the original response
+					return $response;
 				}
 				$tbell_pattern_block->post_name = $this->controller->format_pattern_slug_from_post( $tbell_pattern_block->post_name );
 				$data                           = $this->format_tbell_pattern_block_response( $tbell_pattern_block, $request );
 				$response                       = new WP_REST_Response( $data );
 			}
-		}
-
-		// Requesting all patterns.  Inject all of the synced theme patterns.
-		elseif ( $request->get_route() === '/wp/v2/blocks' && $request->get_method() === 'GET' ) {
-
+		} elseif ( '/wp/v2/blocks' === $request->get_route() && 'GET' === $request->get_method() ) {
+			// Requesting all patterns — inject all synced theme patterns.
 			$data     = $response->get_data();
 			$patterns = $this->controller->get_block_patterns_from_theme_files();
 
-			// filter out patterns that should be exluded from the inserter
+			// Filter out patterns that should be excluded from the inserter.
 			$patterns = array_filter(
 				$patterns,
 				function ( $pattern ) {
@@ -237,10 +260,20 @@ class Pattern_Builder_API {
 		return $response;
 	}
 
-	public function format_tbell_pattern_block_response( $post, $request ) {
+	/**
+	 * Formats a tbell_pattern_block post as a wp_block REST response.
+	 *
+	 * Temporarily sets post_type to 'wp_block' in memory so that WP_REST_Blocks_Controller
+	 * can produce a correctly structured response without needing a custom serializer.
+	 *
+	 * @param \WP_Post        $post    The tbell_pattern_block post.
+	 * @param WP_REST_Request $request The original REST request (used for context).
+	 * @return array Formatted REST response data.
+	 */
+	public function format_tbell_pattern_block_response( $post, $request ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter -- $request is part of the public interface and may be used by callers or future extensions.
 		$post->post_type = 'wp_block';
 
-		// Create a mock request to pass to the controller
+		// Create a mock request to pass to the controller.
 		$mock_request = new WP_REST_Request( 'GET', '/wp/v2/blocks/' . $post->ID );
 		$mock_request->set_param( 'context', 'edit' );
 
@@ -274,11 +307,11 @@ class Pattern_Builder_API {
 	/**
 	 * Registers block patterns for the theme.
 	 *
-	 * If the patterns are ALREADY registered, unregister them first.
+	 * If the patterns are already registered, unregisters them first.
 	 * Synced patterns are registered with a reference to the post ID of their pattern.
 	 * Unsynced patterns are registered with the content from the tbell_pattern_block post.
 	 */
-	public function register_patterns() {
+	public function register_patterns(): void {
 
 		$pattern_registry = WP_Block_Patterns_Registry::get_instance();
 
@@ -307,8 +340,7 @@ class Pattern_Builder_API {
 				'templateTypes' => $pattern->templateTypes,
 			);
 
-			// NOTE: Setting the postTypes to an empty array will cause the pattern to not be available
-			// or perhaps a registration error... or some strange behavior.  So it only optionally set here.
+			// Setting postTypes to an empty array causes registration errors; only set it when non-empty.
 			if ( $pattern->postTypes ) {
 				$pattern_data['postTypes'] = $pattern->postTypes;
 			}
@@ -322,15 +354,15 @@ class Pattern_Builder_API {
 
 
 	/**
-	 * Filters delete calls and if the item being deleted is a 'tbell_pattern_block' (theme pattern)
-	 * delete the related pattern php file as well.
+	 * Filters delete calls and, if the item being deleted is a tbell_pattern_block (theme pattern),
+	 * deletes the related pattern PHP file as well.
 	 *
 	 * @param mixed           $response The response from the REST API.
-	 * @param WP_REST_Server  $server   The REST server instance.
+	 * @param mixed           $server   The REST server instance.
 	 * @param WP_REST_Request $request  The REST request object.
 	 * @return mixed|WP_Error The response or WP_Error on failure.
 	 */
-	function handle_hijack_block_delete( $response, $server, $request ) {
+	public function handle_hijack_block_delete( $response, $server, $request ) {
 
 		$route = $request->get_route();
 
@@ -339,12 +371,12 @@ class Pattern_Builder_API {
 			$id   = intval( $matches[1] );
 			$post = get_post( $id );
 
-			if ( $post && $post->post_type === 'tbell_pattern_block' && $request->get_method() === 'DELETE' ) {
+			if ( $post && 'tbell_pattern_block' === $post->post_type && 'DELETE' === $request->get_method() ) {
 
 				$deleted = wp_delete_post( $id, true );
 
 				if ( ! $deleted ) {
-					return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern', array( 'status' => 500 ) );
+					return new WP_Error( 'pattern_delete_failed', 'Failed to delete pattern.', array( 'status' => 500 ) );
 				}
 
 				$abstract_pattern = Abstract_Pattern::from_post( $post );
@@ -356,21 +388,21 @@ class Pattern_Builder_API {
 				}
 
 				if ( ! $path ) {
-					return new WP_Error( 'pattern_not_found', 'Pattern not found', array( 'status' => 404 ) );
+					return new WP_Error( 'pattern_not_found', 'Pattern not found.', array( 'status' => 404 ) );
 				}
 
-				// Use secure file delete operation
+				// Use secure file delete operation.
 				$allowed_dirs = array(
 					get_stylesheet_directory() . '/patterns',
 					get_template_directory() . '/patterns',
 				);
-				$deleted      = \Pattern_Builder_Security::safe_file_delete( $path, $allowed_dirs );
+				$deleted      = Pattern_Builder_Security::safe_file_delete( $path, $allowed_dirs );
 
 				if ( is_wp_error( $deleted ) ) {
 					return $deleted;
 				}
 
-				return new WP_REST_Response( array( 'message' => 'Pattern deleted successfully' ), 200 );
+				return new WP_REST_Response( array( 'message' => 'Pattern deleted successfully.' ), 200 );
 
 			}
 		}
@@ -379,13 +411,17 @@ class Pattern_Builder_API {
 	}
 
 	/**
+	 * Handles additional logic when a tbell_pattern_block (theme pattern) is updated via the REST API.
 	 *
-	 * This filter handles additional logic when a tbell_pattern_block (theme pattern) is updated.
-	 * It updates the pattern file as well as associated metadata for the pattern.
-	 * Additionally it will optionally localize the content as well as import any media
-	 * referenced by the pattern into the theme.
+	 * Updates the pattern file and associated metadata. Optionally localizes the content and
+	 * imports any media referenced by the pattern into the theme.
+	 *
+	 * @param mixed           $response The response from the REST API.
+	 * @param mixed           $handler  The handler object.
+	 * @param WP_REST_Request $request  The REST request object.
+	 * @return mixed|WP_Error The response or WP_Error on failure.
 	 */
-	function handle_hijack_block_update( $response, $handler, $request ) {
+	public function handle_hijack_block_update( $response, $handler, $request ) {
 		$route = $request->get_route();
 
 		if ( preg_match( '#^/wp/v2/blocks/(\d+)$#', $route, $matches ) ) {
@@ -393,12 +429,12 @@ class Pattern_Builder_API {
 			$id   = intval( $matches[1] );
 			$post = get_post( $id );
 
-			if ( $post && $request->get_method() === 'PUT' ) {
+			if ( $post && 'PUT' === $request->get_method() ) {
 
 				$updated_pattern = json_decode( $request->get_body(), true );
 
-				// Validate JSON decode was successful
-				if ( json_last_error() !== JSON_ERROR_NONE ) {
+				// Validate JSON decode was successful.
+				if ( JSON_ERROR_NONE !== json_last_error() ) {
 					return new WP_Error(
 						'invalid_json',
 						__( 'Invalid JSON in request body.', 'pattern-builder' ),
@@ -408,17 +444,16 @@ class Pattern_Builder_API {
 
 				$convert_user_pattern_to_theme_pattern = false;
 
-				if ( $post->post_type === 'wp_block' ) {
-
-					if ( isset( $updated_pattern['source'] ) && $updated_pattern['source'] === 'theme' ) {
-						// we are attempting to convert a USER pattern to a THEME pattern.
+				if ( 'wp_block' === $post->post_type ) {
+					if ( isset( $updated_pattern['source'] ) && 'theme' === $updated_pattern['source'] ) {
+						// Attempting to convert a USER pattern to a THEME pattern.
 						$convert_user_pattern_to_theme_pattern = true;
 					}
 				}
 
-				if ( $post->post_type === 'tbell_pattern_block' || $convert_user_pattern_to_theme_pattern ) {
+				if ( 'tbell_pattern_block' === $post->post_type || $convert_user_pattern_to_theme_pattern ) {
 
-					// Check write permissions before allowing update
+					// Check write permissions before allowing update.
 					if ( ! current_user_can( 'edit_tbell_pattern_blocks' ) ) {
 						return new WP_Error(
 							'rest_forbidden',
@@ -430,7 +465,7 @@ class Pattern_Builder_API {
 					$pattern = Abstract_Pattern::from_post( $post );
 
 					if ( isset( $updated_pattern['content'] ) ) {
-						// remap tbell_pattern_blocks to patterns
+						// Remap tbell_pattern_blocks to patterns.
 						$blocks           = parse_blocks( $updated_pattern['content'] );
 						$blocks           = $this->convert_blocks_to_patterns( $blocks );
 						$pattern->content = serialize_blocks( $blocks );
@@ -445,7 +480,7 @@ class Pattern_Builder_API {
 					}
 
 					if ( isset( $updated_pattern['wp_pattern_sync_status'] ) ) {
-						$pattern->synced = $updated_pattern['wp_pattern_sync_status'] !== 'unsynced';
+						$pattern->synced = 'unsynced' !== $updated_pattern['wp_pattern_sync_status'];
 					}
 
 					if ( isset( $updated_pattern['wp_pattern_block_types'] ) ) {
@@ -461,26 +496,26 @@ class Pattern_Builder_API {
 					}
 
 					if ( isset( $updated_pattern['wp_pattern_inserter'] ) ) {
-						$pattern->inserter = $updated_pattern['wp_pattern_inserter'] === 'no' ? false : true;
+						$pattern->inserter = 'no' !== $updated_pattern['wp_pattern_inserter'];
 					}
 
-					if ( isset( $updated_pattern['source'] ) && $updated_pattern['source'] === 'user' ) {
-						// we are attempting to convert a THEME pattern to a USER pattern.
+					if ( isset( $updated_pattern['source'] ) && 'user' === $updated_pattern['source'] ) {
+						// Converting a THEME pattern to a USER pattern.
 						$this->controller->update_user_pattern( $pattern );
 					} else {
-						// Check configuration options via query parameters
+						// Check configuration options via query parameters.
 						$options = array();
 
 						$localize_param = sanitize_text_field( $request->get_param( 'patternBuilderLocalize' ) );
-						if ( $localize_param === 'true' ) {
+						if ( 'true' === $localize_param ) {
 							$options['localize'] = true;
 						}
 
 						$import_images_param = sanitize_text_field( $request->get_param( 'patternBuilderImportImages' ) );
-						if ( $import_images_param === 'false' ) {
+						if ( 'false' === $import_images_param ) {
 							$options['import_images'] = false;
 						} else {
-							// Default to true if not explicitly disabled
+							// Default to true if not explicitly disabled.
 							$options['import_images'] = true;
 						}
 
@@ -497,7 +532,7 @@ class Pattern_Builder_API {
 	}
 
 	/**
-	 * When anything is saved any wp:block that references a theme pattern is converted to a wp:pattern block instead.
+	 * When anything is saved, converts any wp:block blocks referencing a theme pattern to wp:pattern blocks instead.
 	 *
 	 * @param mixed           $response The response from the REST API.
 	 * @param mixed           $handler  The handler object.
@@ -505,20 +540,18 @@ class Pattern_Builder_API {
 	 * @return mixed The response, potentially modified.
 	 */
 	public function handle_block_to_pattern_conversion( $response, $handler, $request ) {
-		if ( $request->get_method() === 'PUT' || $request->get_method() === 'POST' ) {
+		if ( 'PUT' === $request->get_method() || 'POST' === $request->get_method() ) {
 
 			$body = json_decode( $request->get_body(), true );
 
-			// Validate JSON decode was successful
-			if ( json_last_error() !== JSON_ERROR_NONE ) {
-				return $response; // Return original response if JSON is invalid
+			// Return original response if JSON is invalid.
+			if ( JSON_ERROR_NONE !== json_last_error() ) {
+				return $response;
 			}
 
 			if ( isset( $body['content'] ) ) {
-				// parse the content string into blocks
-				$blocks = parse_blocks( $body['content'] );
-				$blocks = $this->convert_blocks_to_patterns( $blocks );
-				// convert the blocks back to a string
+				$blocks          = parse_blocks( $body['content'] );
+				$blocks          = $this->convert_blocks_to_patterns( $blocks );
 				$body['content'] = serialize_blocks( $blocks );
 				$request->set_body( wp_json_encode( $body ) );
 			}
@@ -526,11 +559,17 @@ class Pattern_Builder_API {
 		return $response;
 	}
 
+	/**
+	 * Recursively converts wp:block references pointing to tbell_pattern_block posts into wp:pattern blocks.
+	 *
+	 * @param array $blocks Array of parsed blocks.
+	 * @return array Modified blocks array.
+	 */
 	private function convert_blocks_to_patterns( $blocks ) {
 		foreach ( $blocks as &$block ) {
-			if ( isset( $block['blockName'] ) && $block['blockName'] === 'core/block' ) {
+			if ( isset( $block['blockName'] ) && 'core/block' === $block['blockName'] ) {
 				$post = get_post( $block['attrs']['ref'] );
-				if ( $post->post_type === 'tbell_pattern_block' ) {
+				if ( $post && 'tbell_pattern_block' === $post->post_type ) {
 					$slug                   = Pattern_Builder_Controller::format_pattern_slug_from_post( $post->post_name );
 					$block['blockName']     = 'core/pattern';
 					$block['attrs']         = isset( $block['attrs'] ) ? $block['attrs'] : array();
@@ -548,34 +587,33 @@ class Pattern_Builder_API {
 	}
 
 	/**
-	 * Filters pattern block data to apply attributes to nested wp:block.
+	 * Filters pattern block data to apply attributes to the nested wp:block reference.
 	 *
+	 * @param mixed $pre_render   The pre-render value (null to allow normal rendering).
 	 * @param array $parsed_block The parsed block data.
-	 * @param array $source_block The original block data.
-	 * @return array Modified block data.
+	 * @return mixed Modified pre-render value or null.
 	 */
 	public function filter_pattern_block_attributes( $pre_render, $parsed_block ) {
-		// Only process wp:pattern blocks
-		if ( $parsed_block['blockName'] !== 'core/pattern' ) {
+		// Only process wp:pattern blocks.
+		if ( 'core/pattern' !== $parsed_block['blockName'] ) {
 			return $pre_render;
 		}
 
-		// Extract attributes from the pattern block
 		$pattern_attrs = isset( $parsed_block['attrs'] ) ? $parsed_block['attrs'] : array();
+		$slug          = $pattern_attrs['slug'] ?? '';
 
-		$slug = $pattern_attrs['slug'] ?? '';
-
-		// Remove attributes we don't want to pass down
+		// Remove attributes we don't want to pass down.
 		unset( $pattern_attrs['slug'] );
 
-		// If no attributes to apply, return as-is
+		// If no attributes to apply, return as-is.
 		if ( empty( $pattern_attrs ) ) {
 			return $pre_render;
 		}
 
 		$synced_pattern_id = self::$synced_theme_patterns[ $slug ] ?? null;
 
-		// if there is a synced_pattern_id then contruct the block with a reference to the synced pattern that also has the rest of the pattern's attributes and render it.
+		// If there is a synced_pattern_id, construct the block with a reference to the synced pattern
+		// that also carries the rest of the pattern's attributes, then render it.
 		if ( $synced_pattern_id ) {
 			$block_attributes = array_merge(
 				array( 'ref' => $synced_pattern_id ),
