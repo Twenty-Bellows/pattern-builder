@@ -216,13 +216,32 @@ class Pattern_Builder_API {
 	/**
 	 * Injects theme patterns into the /wp/v2/blocks REST responses.
 	 *
+	 * ### Which patterns are injected into the /wp/v2/blocks LIST
+	 *
+	 * This filter makes theme patterns appear in the Site Editor's editable blocks list.
+	 * However, context-restricted patterns — those with `blockTypes` or `postTypes`
+	 * declarations — are intentionally excluded from the list injection.
+	 *
+	 * Reason: context-restricted patterns already have `inserter: true` in the pattern
+	 * registry (see register_patterns()) so they are correctly served via the
+	 * /wp/v2/block-patterns/patterns endpoint to context-aware surfaces like the Starter
+	 * Patterns modal. Including them in /wp/v2/blocks as well creates two separate entries
+	 * in Gutenberg's getAllPatterns merge (one as 'simple-theme/…' from the registry, one
+	 * as 'core/block/{id}' from the reusable blocks feed), which can surface as duplicates
+	 * in the Starter Patterns modal depending on how a given Gutenberg version resolves the
+	 * merge.
+	 *
+	 * Context-restricted patterns remain individually fetchable via /wp/v2/blocks/{id},
+	 * so they can still be opened and edited by navigating to them directly (e.g. via the
+	 * Pattern Builder sidebar).
+	 *
 	 * @param WP_REST_Response $response The REST response.
 	 * @param mixed            $server   The REST server.
 	 * @param WP_REST_Request  $request  The REST request.
 	 * @return WP_REST_Response
 	 */
 	public function inject_theme_patterns( $response, $server, $request ) {
-		// Requesting a single pattern — inject the synced theme pattern.
+		// Requesting a single pattern — inject the theme pattern regardless of context restrictions.
 		if ( preg_match( '#/wp/v2/blocks/(?P<id>\d+)#', $request->get_route(), $matches ) ) {
 			$block_id            = intval( $matches['id'] );
 			$tbell_pattern_block = get_post( $block_id );
@@ -237,15 +256,27 @@ class Pattern_Builder_API {
 				$response                       = new WP_REST_Response( $data );
 			}
 		} elseif ( '/wp/v2/blocks' === $request->get_route() && 'GET' === $request->get_method() ) {
-			// Requesting all patterns — inject all synced theme patterns.
+			// Requesting all patterns — inject theme patterns into the editable blocks list.
 			$data     = $response->get_data();
 			$patterns = $this->controller->get_block_patterns_from_theme_files();
 
-			// Filter out patterns that should be excluded from the inserter.
+			/*
+			 * Exclude patterns that:
+			 * (a) have their inserter explicitly disabled — they should not be browsable anywhere, or
+			 * (b) have blockTypes or postTypes restrictions — these are already served via the pattern
+			 *     registry with inserter:true, so injecting them here too would create duplicate
+			 *     entries in Gutenberg's getAllPatterns merge.
+			 */
 			$patterns = array_filter(
 				$patterns,
 				function ( $pattern ) {
-					return $pattern->inserter;
+					if ( ! $pattern->inserter ) {
+						return false;
+					}
+					if ( ! empty( $pattern->blockTypes ) || ! empty( $pattern->postTypes ) ) {
+						return false;
+					}
+					return true;
 				}
 			);
 
