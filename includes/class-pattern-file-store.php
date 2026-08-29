@@ -337,8 +337,10 @@ class Pattern_File_Store {
 	 * Forgets every cache derived from the theme's pattern files.
 	 *
 	 * Covers core's per-theme pattern header cache, this plugin's synced-slug
-	 * lookup, and — when the Synced Patterns for Themes plugin is active — its
-	 * synced-slug lookup too, so a file write is visible everywhere at once.
+	 * lookup, and the Synced Patterns for Themes transient. The companion
+	 * stays unloaded while this plugin is active, but its week-long cache may
+	 * survive from before — clearing it here keeps the companion current if
+	 * this plugin is ever deactivated.
 	 *
 	 * @return void
 	 */
@@ -355,9 +357,7 @@ class Pattern_File_Store {
 
 		Synced_Patterns::flush();
 
-		if ( class_exists( '\\TwentyBellows\\SyncedPatternsForThemes\\Synced_Patterns' ) ) {
-			\TwentyBellows\SyncedPatternsForThemes\Synced_Patterns::flush();
-		}
+		delete_transient( 'synced_patterns_for_themes_' . get_stylesheet() );
 	}
 
 	/**

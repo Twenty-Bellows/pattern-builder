@@ -91,17 +91,18 @@ Always the WordPress editor — the plugin ships no editor UI of its own.
 
 ## Coexistence with Synced Patterns for Themes
 
-The pattern runtime is one shared surface. At `plugins_loaded`, Pattern
-Builder checks for the companion's classes: if present, the companion owns
-the runtime (its filter registered first; both filters also carry an
-attribute-presence guard as belt and braces) and Pattern Builder skips its
-vendored copy entirely — PHP hooks and JS bundle both. Pattern Builder
-always owns the management layer; the companion has no write path, so there
-is no overlap. Both plugins read the same `Synced: yes` file header, and
-Pattern Builder flushes the companion's slug cache after every file write.
+One check in one place: at `plugins_loaded` the companion looks for
+`PATTERN_BUILDER_VERSION` (2.0+) and, when Pattern Builder is active, stays
+entirely unloaded — not even its class files are required. Pattern Builder
+always registers the full stack (its vendored runtime plus the management
+layer) and never has to coordinate. The vendored runtime is kept
+logic-identical to the companion's at release time, which is what makes the
+hand-off invisible in both directions. Pattern Builder also clears the
+companion's week-long transient after file writes, so the companion never
+wakes to a stale cache after Pattern Builder is deactivated.
 
 The product story: build with Pattern Builder in development, ship the theme
-with Synced Patterns for Themes in production — deactivating Pattern Builder
+with Synced Patterns for Themes in production — swapping one for the other
 changes nothing about how the site renders.
 
 ## What 1.x behaviors changed
