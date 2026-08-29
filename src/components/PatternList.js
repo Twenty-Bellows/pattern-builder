@@ -12,15 +12,21 @@ import { navigateToPattern } from '../utils/patternNavigation';
 /**
  * The blocks an inserted copy of a pattern consists of.
  *
- * A synced pattern is inserted as a reference to itself — a `core/pattern`
- * block naming it — so the copy keeps following the pattern file. Anything
- * else is inserted as a copy of its blocks.
+ * A synced pattern is inserted as a reference to itself, so the copy keeps
+ * following the original: a synced THEME pattern as a `core/pattern` naming
+ * the pattern file, a synced USER pattern as core's native `core/block`
+ * referencing the wp_block post. Anything else is inserted as a copy of its
+ * blocks.
  *
  * @param {Object} pattern The pattern.
  * @return {Array} Blocks to insert.
  */
 function getInsertionBlocks( pattern ) {
-	if ( pattern.synced && pattern.name ) {
+	if ( pattern.synced && pattern.source === 'user' && pattern.id ) {
+		return [ createBlock( 'core/block', { ref: pattern.id } ) ];
+	}
+
+	if ( pattern.synced && pattern.source === 'theme' && pattern.name ) {
 		return [ createBlock( 'core/pattern', { slug: pattern.name } ) ];
 	}
 

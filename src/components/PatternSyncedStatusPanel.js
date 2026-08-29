@@ -62,6 +62,11 @@ export const PatternSyncedStatusPanel = ( { patternPost, postType } ) => {
 			return;
 		}
 
+		/*
+		 * Core registers the meta with enum [partial, unsynced] — an empty
+		 * string fails REST validation. Synced is the ABSENCE of the meta,
+		 * and null is the REST meta API's delete.
+		 */
 		dispatch( 'core' ).editEntityRecord(
 			'postType',
 			'wp_block',
@@ -69,7 +74,8 @@ export const PatternSyncedStatusPanel = ( { patternPost, postType } ) => {
 			{
 				meta: {
 					...( patternPost.meta || {} ),
-					wp_pattern_sync_status: value === 'true' ? '' : 'unsynced',
+					wp_pattern_sync_status:
+						value === 'true' ? null : 'unsynced',
 				},
 			}
 		);
