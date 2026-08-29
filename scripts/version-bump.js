@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+/* eslint-disable no-console -- CLI tool; console output is its interface. */
+
 const fs = require( 'fs' );
 const path = require( 'path' );
 

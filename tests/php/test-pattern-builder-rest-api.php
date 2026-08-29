@@ -156,6 +156,11 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		$this->assertFalse( $data['synced'] );
 		$this->assertTrue( $data['inserter'] );
 		$this->assertStringContainsString( 'wp:group', $data['content']['raw'] );
+
+		// The editor's save button reads the publish action link off the
+		// record; without it, it degrades to "Submit for Review".
+		$this->assertArrayHasKey( '_links', $data );
+		$this->assertArrayHasKey( 'wp:action-publish', $data['_links'] );
 	}
 
 	public function test_get_unknown_pattern_is_404() {

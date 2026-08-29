@@ -1,6 +1,8 @@
-// The Appearance → Pattern Builder screen.
+// The Appearance → Pattern Builder screen — browse mode only. Edit mode
+// hands the whole page to core's edit-post editor, which brings its own
+// styles.
 
-#pattern-builder-admin {
+.pattern-builder-admin {
 	// Fill the admin content area edge to edge.
 	margin-left: -20px;
 	height: calc(100vh - 32px); // Below the admin bar.
@@ -35,86 +37,5 @@
 
 	&__create-modal .components-modal__content {
 		min-width: 360px;
-	}
-}
-
-.pattern-builder-editor {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
-	min-height: 0;
-
-	&__header {
-		flex: 0 0 auto;
-		padding: 8px 16px;
-		border-bottom: 1px solid #ddd;
-		background: #fff;
-		z-index: 30;
-	}
-
-	&__body {
-		display: flex;
-		flex: 1 1 auto;
-		min-height: 0;
-	}
-
-	&__canvas {
-		flex: 1 1 auto;
-		min-width: 0;
-		position: relative;
-		background: #ddd;
-
-		// Make the canvas iframe fill the pane. BlockTools renders an
-		// unstyled wrapper div, so the height chain needs every link.
-		> div {
-			height: 100%;
-		}
-
-		.block-editor-iframe__container,
-		.block-editor-iframe__scale-container {
-			height: 100%;
-		}
-
-		iframe[name="editor-canvas"] {
-			display: block;
-			width: 100%;
-			height: 100%;
-		}
-	}
-
-	&__sidebar {
-		flex: 0 0 280px;
-		border-left: 1px solid #ddd;
-		overflow-y: auto;
-		background: #fff;
-
-		.components-tab-panel__tabs {
-			border-bottom: 1px solid #ddd;
-			position: sticky;
-			top: 0;
-			background: #fff;
-			z-index: 1;
-
-			.components-tab-panel__tabs-item {
-				flex: 1;
-			}
-		}
-	}
-
-	&__loading {
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-		align-items: center;
-		justify-content: center;
-		height: 100%;
-	}
-
-	&__notices {
-		position: fixed;
-		bottom: 24px;
-		left: 50%;
-		transform: translateX(-50%);
-		z-index: 100;
 	}
 }
