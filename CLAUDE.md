@@ -20,7 +20,7 @@ Version 2.0 removed the 1.x DB-mirror + REST-hijacking design entirely. Theme pa
 
 **Theme patterns are file-backed REST entities.** A rowless post type `pb_pattern` (registered like core's `wp_template` — zero DB rows) hangs `Pattern_Builder_REST_Patterns_Controller` off core routing at `/pattern-builder/v1/patterns`. Theme patterns have string IDs (their namespaced name, e.g. `my-theme/hero`), templates-style. Reads come from the pattern files (child + parent theme); writes go back to the files (`Pattern_File_Store`). Because the type is `show_in_rest`, the block editor auto-creates a matching client-side entity from `/wp/v2/types`, which gives theme patterns entity-powered editing (undo, dirty tracking, save flow) for free.
 
-**Editing surfaces:** the post editor can open a `pb_pattern` entity in place via `onNavigateToEntityRecord`; everywhere else (including the Site Editor, whose canvas routing is closed to plugins) the Appearance → Pattern Builder page hosts a full-screen editor built from public `@wordpress/editor` pieces (`EditorProvider` + `BlockCanvas`), bound to the same entity.
+**Editing surfaces — always the WordPress editor, never a custom one.** The post editor opens any pattern in place via `onNavigateToEntityRecord` (both `wp_block` and `pb_pattern`). User patterns are otherwise edited by the Site Editor natively (its `/wp_block/:postId` route) — in place from within the Site Editor, deep-linked from everywhere else. Theme patterns cannot open in the Site Editor's canvas (core hard-codes the entity types its canvas binds and keeps route registration private), so from the Site Editor and the browse screen they open Appearance → Pattern Builder's edit mode (`&pattern={id}`), which boots core's own edit-post editor (`wp.editPost.initializeEditor`) against the `pb_pattern` entity — the genuine post-editor chrome, with a validated `back` URL whose Back button returns to the originating screen. The Appearance page's browse mode is a grid only.
 
 **Synced patterns via the `core/pattern` content runtime.** Synced theme patterns (`Synced: yes` file header) work exactly like Synced Patterns for Themes 2.0: `core/pattern` gets a `content` attribute + `pattern/overrides` context and a render callback that attaches the pattern's blocks as inner blocks (`Pattern_Block`); `Pattern_Resolver` composes editor-facing content; a synthesized `--synced-instance` companion entry puts a reference in the inserter. Inserted copies are plain `<!-- wp:pattern {"slug":…,"content":{…}} /-->` — no post ID anywhere.
 
@@ -28,7 +28,7 @@ Version 2.0 removed the 1.x DB-mirror + REST-hijacking design entirely. Theme pa
 
 **Migration from 1.x.** `Pattern_Builder_Migration` runs once on upgrade: it rewrites `wp:block` refs pointing at the old `tbell_pattern_block` mirror posts to `wp:pattern` slugs (in post content and theme files), then deletes the mirror posts and the old capabilities.
 
-**Webpack entries:** `PatternBuilder_EditorTools.js` (management: sidebar, panels, save monitor — all block-editor screens), `PatternBuilder_Runtime.js` (the vendored content runtime — enqueued only when this plugin owns it), `PatternBuilder_Admin.js` (the full-screen editor app).
+**Webpack entries:** `PatternBuilder_EditorTools.js` (management: sidebar, panels, save monitor — all block-editor screens), `PatternBuilder_Runtime.js` (the vendored content runtime — enqueued only when this plugin owns it), `PatternBuilder_Admin.js` (the browse grid, plus the edit-mode boot of core's edit-post editor).
 
 ---
 
@@ -84,7 +84,7 @@ The plugin follows a component-based OOP architecture with clear separation of c
    - `Pattern_Builder_REST_Patterns_Controller` - String-ID REST controller for theme patterns
    - `Pattern_File_Store` - Reads/writes pattern files; image import/export; conversions
    - `Pattern_Builder_API` - The `/pattern-builder/v1/process-theme` endpoint
-   - `Pattern_Builder_Admin` - Full-screen editor under Appearance → Pattern Builder
+   - `Pattern_Builder_Admin` - Appearance → Pattern Builder: browse grid + core-editor boot
    - `Pattern_Builder_Editor` - Block editor asset integration
    - `Pattern_Builder_Migration` - One-time 1.x → 2.0 upgrade
    - `Pattern_Builder_Security` - File-path validation and safe filesystem helpers
@@ -95,7 +95,7 @@ The plugin follows a component-based OOP architecture with clear separation of c
 - **Build System**: Webpack via `@wordpress/scripts` with three entry points:
   - `src/PatternBuilder_EditorTools.js` - Editor tools (sidebar, document panels, save monitor)
   - `src/PatternBuilder_Runtime.js` - The vendored core/pattern content runtime
-  - `src/PatternBuilder_Admin.js` - The full-screen editor app (Appearance → Pattern Builder page)
+  - `src/PatternBuilder_Admin.js` - The Appearance → Pattern Builder page (browse grid + edit-post boot)
 - **React Components** in `src/components/`:
   - `PatternBrowserPanel` - Main pattern browsing interface
   - `PatternCreatePanel` - Pattern creation flow
@@ -105,7 +105,7 @@ The plugin follows a component-based OOP architecture with clear separation of c
   - `EditorSidePanel` - Editor sidebar container
   - `PatternList` - Pattern list/grid view
   - `PatternBuilderConfiguration` - Plugin settings UI
-- **Admin app** in `src/admin/`: `App`, `PatternBrowser`, `PatternEditor`
+- **Admin app** in `src/admin/`: `App`, `PatternBrowser`, `editor-boot`
 - **Vendored runtime** in `src/runtime/` (keep identical to synced-patterns-for-themes `src/`)
 - **State Management**: core data stores (`core`, `core/editor`, `core/block-editor`) — no custom store
 

@@ -7,9 +7,13 @@ use WP_Block_Editor_Context;
 /**
  * The Appearance → Pattern Builder screen.
  *
- * Hosts the plugin's full-screen pattern editor: a block editor built from
- * public `@wordpress/editor` pieces, bound to the `pb_pattern` entity so theme
- * pattern edits save straight to the pattern files.
+ * Two modes, decided by the URL's `pattern` parameter:
+ *
+ * - Browse (no parameter): the pattern grid — search, filter, create.
+ * - Edit (`&pattern={id}`): the WordPress editor itself. The page boots
+ *   core's `@wordpress/edit-post` editor (the one that powers post.php)
+ *   bound to the `pb_pattern` entity, so theme pattern edits save straight
+ *   to the pattern files with the full core editing experience.
  */
 class Pattern_Builder_Admin {
 
@@ -41,10 +45,34 @@ class Pattern_Builder_Admin {
 			self::PAGE_SLUG,
 			array( $this, 'render_admin_menu_page' )
 		);
+
+		if ( $this->page_hook ) {
+			add_action( 'load-' . $this->page_hook, array( $this, 'setup_screen' ) );
+		}
 	}
 
 	/**
-	 * Enqueues the pattern editor app on the plugin's own page.
+	 * Marks the edit-mode screen as a block editor screen, as core's own
+	 * editor pages do — admin body classes and asset behavior key off it.
+	 */
+	public function setup_screen(): void {
+		if ( $this->get_requested_pattern() ) {
+			get_current_screen()->is_block_editor( true );
+		}
+	}
+
+	/**
+	 * The pattern id the page was asked to edit, if any.
+	 *
+	 * @return string The pattern id, or an empty string on the browse screen.
+	 */
+	private function get_requested_pattern(): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return isset( $_GET['pattern'] ) ? sanitize_text_field( wp_unslash( $_GET['pattern'] ) ) : '';
+	}
+
+	/**
+	 * Enqueues the pattern browser / editor boot on the plugin's own page.
 	 *
 	 * @param string $hook_suffix The current admin page.
 	 */
@@ -59,7 +87,8 @@ class Pattern_Builder_Admin {
 			return;
 		}
 
-		$asset = include $asset_path;
+		$asset   = include $asset_path;
+		$pattern = $this->get_requested_pattern();
 
 		// The block editor's client-side registry needs the server's block
 		// definitions and categories, exactly as core's editor screens set up.
@@ -87,6 +116,11 @@ class Pattern_Builder_Admin {
 
 		wp_set_script_translations( 'pattern-builder-admin', 'pattern-builder' );
 
+		if ( $pattern ) {
+			// The full editor skin — the same stylesheet stack post.php loads.
+			wp_enqueue_style( 'wp-edit-post' );
+		}
+
 		$css_path = plugin_dir_path( __FILE__ ) . '../build/PatternBuilder_Admin.css';
 		if ( file_exists( $css_path ) ) {
 			wp_enqueue_style(
@@ -110,6 +144,15 @@ class Pattern_Builder_Admin {
 			$editor_context
 		);
 
+		$browse_url = admin_url( 'themes.php?page=' . self::PAGE_SLUG );
+
+		/*
+		 * Where the editor's back button returns to: the screen the user
+		 * came from (the Site Editor, the browse screen, …), validated the
+		 * way core validates redirect targets, falling back to browse.
+		 */
+		$back_url = isset( $_GET['back'] ) ? wp_validate_redirect( sanitize_url( wp_unslash( $_GET['back'] ) ), '' ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
 		wp_add_inline_script(
 			'pattern-builder-admin',
 			sprintf(
@@ -117,8 +160,9 @@ class Pattern_Builder_Admin {
 				wp_json_encode(
 					array(
 						'editorSettings' => $settings,
-						'pattern'        => isset( $_GET['pattern'] ) ? sanitize_text_field( wp_unslash( $_GET['pattern'] ) ) : null, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-						'adminUrl'       => admin_url( 'themes.php?page=' . self::PAGE_SLUG ),
+						'pattern'        => $pattern ? $pattern : null,
+						'adminUrl'       => $browse_url,
+						'backUrl'        => $back_url ? $back_url : $browse_url,
 					)
 				)
 			),
@@ -134,9 +178,17 @@ class Pattern_Builder_Admin {
 	}
 
 	/**
-	 * Renders the mount point for the pattern editor app.
+	 * Renders the mount point for the pattern browser or editor.
 	 */
 	public function render_admin_menu_page(): void {
+		if ( $this->get_requested_pattern() ) {
+			// The div core's editor takes over — mirrors post.php's markup.
+			echo '<div class="block-editor">';
+			echo '<div id="pattern-builder-admin" class="block-editor__container hide-if-no-js"></div>';
+			echo '</div>';
+			return;
+		}
+
 		echo '<div id="pattern-builder-admin" class="pattern-builder-admin"></div>';
 	}
 }

@@ -41,7 +41,7 @@ uses for something else:
 | `Pattern_Builder_REST_Patterns_Controller` | String-ID CRUD for theme patterns; the collection also lists user patterns (`wp_block`, numeric IDs) so one request paints the whole library. Creation accepts `fromWpBlock` (user→theme conversion); an update with `source: "user"` converts theme→user. |
 | `Pattern_File_Store` | The file pipeline: parent+child theme scanning, header round-trip (Title, Slug, Description, Categories, Keywords, Block Types, Post Types, Template Types, Viewport Width, Inserter, Synced), image import (theme assets) / export (media library), formatting, conversions, cache flushing. |
 | `Pattern_Builder_API` | The one non-entity route: `POST /pattern-builder/v1/process-theme` (bulk localize / import-images). |
-| `Pattern_Builder_Admin` | Appearance → Pattern Builder: boots the full-screen editor app with real block-editor settings. |
+| `Pattern_Builder_Admin` | Appearance → Pattern Builder: the browse grid, and an edit mode that boots core's edit-post editor with real block-editor settings. |
 | `Pattern_Builder_Editor` | Enqueues the management bundle on block-editor screens. |
 | `Pattern_Builder_Migration` | One-time 1.x upgrade: rewrites `wp:block {"ref":N}` (mirror-post refs) to `wp:pattern {"slug":…}` in post content and theme files *while the mirror rows still exist as the ID→slug map*, then deletes the rows and the 1.x capabilities. |
 | `Pattern_Builder_Security` / `Pattern_Builder_Localization` | Path-validated filesystem helpers; pattern localization. |
@@ -61,20 +61,33 @@ Three webpack bundles:
   editing (`SyncedPatternEdit`), client-side expansion, and the
   `core/pattern-overrides` `setValues` amendment (marked with
   `patternHostAmended` so two providers never double-wrap).
-- **`PatternBuilder_Admin`** (the plugin's own page): pattern browser plus a
-  full-screen editor built from public APIs — `EditorProvider` bound to the
-  `pb_pattern` entity, `BlockCanvas`/`BlockTools`/`BlockInspector`, and the
-  same metadata panels. `registerCoreBlocks()` runs at boot because no core
-  editor screen did it for us.
+- **`PatternBuilder_Admin`** (the plugin's own page): the browse grid
+  (`registerCoreBlocks()` runs at boot for its previews), and — when the URL
+  carries `&pattern={id}` — the edit-mode boot: `wp.editPost.initializeEditor`
+  pointed at the `pb_pattern` entity, plus a `history.replaceState` guard
+  (the editor believes it lives at post.php and rewrites the address bar; a
+  string id would 404 there) and a `MainDashboardButton` fill whose Back
+  button returns to the server-validated `back` URL.
 
 ### Editing surfaces
 
+Always the WordPress editor — the plugin ships no editor UI of its own.
+
 - **Post editor:** in-context — the sidebar's Edit button resolves the entity
-  first, then swaps it into the canvas via `onNavigateToEntityRecord`.
-- **Everywhere else** (Site Editor included — its canvas routing is closed to
-  plugins): Appearance → Pattern Builder hosts the full-screen editor;
-  deep-linkable via `themes.php?page=pattern-builder&pattern={id}`.
-- **User patterns** stay core-owned (`wp_block`, `post.php`).
+  first, then swaps it into the canvas via `onNavigateToEntityRecord`
+  (`wp_block` and `pb_pattern` alike).
+- **User patterns everywhere else:** the Site Editor edits `wp_block`
+  natively (`/wp_block/:postId` route) — in place from within the Site
+  Editor, deep-linked from the browse grid and any other screen.
+- **Theme patterns everywhere else:** the Site Editor's canvas cannot bind a
+  `pb_pattern` — core hard-codes the entity types its canvas resolves
+  (template, template part, navigation, user pattern, attachment) and its
+  route registration is a private API. So the Site Editor and the browse
+  grid open Appearance → Pattern Builder's edit mode
+  (`themes.php?page=pattern-builder&pattern={id}&back={origin}`), which
+  boots core's own edit-post editor — the genuine post-editor chrome — and
+  its Back button returns to the originating screen. If core ever opens
+  site-editor routes to plugins, this URL is the only thing that changes.
 
 ## Coexistence with Synced Patterns for Themes
 

@@ -450,14 +450,33 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 		}
 
 		if ( $is_theme ) {
+			$self = rest_url( $this->namespace . '/' . $this->rest_base . '/' . $pattern->name );
+
 			$data['_links'] = array(
 				'self'       => array(
-					array( 'href' => rest_url( $this->namespace . '/' . $this->rest_base . '/' . $pattern->name ) ),
+					array( 'href' => $self ),
 				),
 				'collection' => array(
 					array( 'href' => rest_url( $this->namespace . '/' . $this->rest_base ) ),
 				),
 			);
+
+			/*
+			 * Action links, as core's posts controller advertises them. The
+			 * editor's save button reads `wp:action-publish` off the record;
+			 * without it, it assumes the user can only "Submit for Review".
+			 */
+			if ( current_user_can( 'edit_theme_options' ) ) {
+				$data['_links']['wp:action-publish'] = array(
+					array( 'href' => $self ),
+				);
+			}
+
+			if ( current_user_can( 'unfiltered_html' ) ) {
+				$data['_links']['wp:action-unfiltered-html'] = array(
+					array( 'href' => $self ),
+				);
+			}
 		}
 
 		return $data;
