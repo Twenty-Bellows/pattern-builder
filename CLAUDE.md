@@ -72,6 +72,13 @@ Version 2.0 removed the 1.x DB-mirror + REST-hijacking design entirely. Theme pa
 - `npm run plugin-test-env` - Start WP Playground for testing
 - `npm run plugin-test` - Full build, zip, and test workflow
 
+### Releasing to WordPress.org (same workflow as synced-patterns-for-themes)
+- `npm run plugin-ship:dry-run` - Stage everything (SVN sync, assets, tag) and stop before the commit
+- `npm run plugin-ship` - Ship the release to the WordPress.org SVN (asks for confirmation; SVN prompts for wp.org credentials)
+- `npm run plugin-ship:reset` - Put the `svn/` working copy back the way wp.org has it
+- The ship set is defined by `.distignore`; wp.org assets (icon) live in `.wordpress-org/`
+- Preflight requires the version to agree in `pattern-builder.php` (header), `package.json`, and readme.txt's `Stable tag`
+
 ## Architecture Overview
 
 ### Plugin Structure
