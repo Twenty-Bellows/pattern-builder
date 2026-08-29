@@ -15,6 +15,33 @@ import './admin/admin.scss';
 
 const settings = window.patternBuilderAdmin || {};
 
+/**
+ * Pins the app's bottom edge to the viewport so the browser panes scroll
+ * internally instead of the page. The container sits below whatever the
+ * admin renders above it (admin bar, notices, update nags), so its height
+ * is measured from its actual position — and re-measured when the window
+ * resizes or the content above it changes (a dismissed notice).
+ *
+ * @param {Element} el The app container.
+ */
+function lockToViewportBottom( el ) {
+	const update = () => {
+		const top = el.getBoundingClientRect().top + window.scrollY;
+		el.style.height = Math.max( 400, window.innerHeight - top ) + 'px';
+	};
+
+	update();
+	window.addEventListener( 'resize', update );
+
+	// The admin body keeps a viewport-locked height, but #wpbody-content
+	// grows and shrinks with the notices above the app.
+	if ( window.ResizeObserver ) {
+		new window.ResizeObserver( update ).observe(
+			document.getElementById( 'wpbody-content' ) || document.body
+		);
+	}
+}
+
 if ( settings.pattern ) {
 	bootPatternEditor( settings );
 } else {
@@ -24,6 +51,8 @@ if ( settings.pattern ) {
 		if ( ! mountPoint ) {
 			return;
 		}
+
+		lockToViewportBottom( mountPoint );
 
 		// Core's editor screens do this during boot; the browse screen (which
 		// renders block previews) boots itself. The edit mode must NOT do

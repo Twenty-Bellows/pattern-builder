@@ -2,10 +2,25 @@
 // hands the whole page to core's edit-post editor, which brings its own
 // styles.
 
+// Nothing renders below the app — the page must not scroll; the browser
+// panes scroll internally.
+body.appearance_page_pattern-builder {
+
+	#wpfooter {
+		display: none;
+	}
+
+	#wpbody-content {
+		padding-bottom: 0;
+	}
+}
+
 .pattern-builder-admin {
 	// Fill the admin content area edge to edge.
 	margin-left: -20px;
-	height: calc(100vh - 32px); // Below the admin bar.
+	// Fallback height; the boot script measures the real offset (admin
+	// bar, notices) and pins the bottom edge to the viewport.
+	height: calc(100vh - 32px);
 	background: #fff;
 	overflow: hidden;
 	display: flex;
