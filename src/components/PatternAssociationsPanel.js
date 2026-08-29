@@ -1,18 +1,47 @@
-import { __, _x } from '@wordpress/i18n';
+import { __ } from '@wordpress/i18n';
 import {
-	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
-	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
+	FormTokenField,
+	ToggleControl,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalText as Text,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalVStack as VStack,
 } from '@wordpress/components';
-
-import { FormTokenField, ToggleControl } from '@wordpress/components';
 import { useState } from '@wordpress/element';
 import { dispatch, useSelect } from '@wordpress/data';
 import { store as blocksStore } from '@wordpress/blocks';
+import { store as coreStore } from '@wordpress/core-data';
 
+const ALL_TEMPLATE_TYPES = [
+	'index',
+	'home',
+	'front-page',
+	'singular',
+	'single',
+	'page',
+	'archive',
+	'author',
+	'category',
+	'taxonomy',
+	'date',
+	'tag',
+	'attachment',
+	'search',
+	'privacy-policy',
+	'404',
+];
+
+/**
+ * Edits a theme pattern's contextual associations.
+ *
+ * These are the pattern-file headers WordPress reads to offer a pattern in
+ * specific contexts — block types, post types, template types — plus whether
+ * the pattern appears in the inserter at all. All of them stage edits on the
+ * pb_pattern entity and persist with the next save.
+ *
+ * @param {Object} root0             Component props.
+ * @param {Object} root0.patternPost The pattern's entity record.
+ */
 export const PatternAssociationsPanel = ( { patternPost } ) => {
 	const allBlockTypes = useSelect(
 		( select ) =>
@@ -22,85 +51,58 @@ export const PatternAssociationsPanel = ( { patternPost } ) => {
 		[]
 	);
 
-	const allPostTypes = [];
-
-	const allTemplateTypes = [
-		'index',
-		'home',
-		'front-page',
-		'singular',
-		'single',
-		'page',
-		'archive',
-		'author',
-		'category',
-		'taxonomy',
-		'date',
-		'tag',
-		'attachment',
-		'search',
-		'privacy-policy',
-		'404',
-	];
+	const allPostTypes = useSelect( ( select ) => {
+		const types = select( coreStore ).getPostTypes( { per_page: -1 } );
+		return ( types || [] )
+			.filter( ( type ) => type.viewable )
+			.map( ( type ) => type.slug );
+	}, [] );
 
 	const [ blockTypes, setBlockTypes ] = useState(
-		patternPost.wp_pattern_block_types || []
+		patternPost.blockTypes || []
 	);
-	const [ postTypes, setPostTypes ] = useState(
-		patternPost.wp_pattern_post_types || []
-	);
+	const [ postTypes, setPostTypes ] = useState( patternPost.postTypes || [] );
 	const [ templateTypes, setTemplateTypes ] = useState(
-		patternPost.wp_pattern_template_types || []
+		patternPost.templateTypes || []
 	);
 	const [ patternInserter, setPatternInserter ] = useState(
-		patternPost.wp_pattern_inserter !== 'no'
+		patternPost.inserter !== false
 	);
+
+	const stageEdit = ( edit ) => {
+		dispatch( 'core' ).editEntityRecord(
+			'postType',
+			'pb_pattern',
+			patternPost.id,
+			edit
+		);
+	};
 
 	const changeBlockTypes = ( value ) => {
 		setBlockTypes( value );
-		dispatch( 'core' ).editEntityRecord(
-			'postType',
-			'wp_block',
-			patternPost.id,
-			{ wp_pattern_block_types: value }
-		);
+		stageEdit( { blockTypes: value } );
 	};
 
 	const changePostTypes = ( value ) => {
 		setPostTypes( value );
-		dispatch( 'core' ).editEntityRecord(
-			'postType',
-			'wp_block',
-			patternPost.id,
-			{ wp_pattern_post_types: value }
-		);
+		stageEdit( { postTypes: value } );
 	};
 
 	const changeTemplateTypes = ( value ) => {
 		setTemplateTypes( value );
-		dispatch( 'core' ).editEntityRecord(
-			'postType',
-			'wp_block',
-			patternPost.id,
-			{ wp_pattern_template_types: value }
-		);
+		stageEdit( { templateTypes: value } );
 	};
 
 	const changePatternInserter = ( value ) => {
 		setPatternInserter( value );
-		dispatch( 'core' ).editEntityRecord(
-			'postType',
-			'wp_block',
-			patternPost.id,
-			{ wp_pattern_inserter: value ? 'yes' : 'no' }
-		);
+		stageEdit( { inserter: !! value } );
 	};
 
 	return (
 		<VStack spacing={ 4 }>
 			<Text>
 				{ __(
-					'These values are useful for building ',
+					'These values are useful for building',
 					'pattern-builder'
 				) }
 				<a
@@ -111,14 +113,14 @@ export const PatternAssociationsPanel = ( { patternPost } ) => {
 					{ __( 'Starter Patterns', 'pattern-builder' ) }
 				</a>
 				{ __(
-					' that can be used in specific contexts.',
+					'that can be used in specific contexts.',
 					'pattern-builder'
 				) }
 			</Text>
 			<VStack spacing={ 0 }>
 				<FormTokenField
 					__experimentalShowHowTo={ false }
-					label="Block Types"
+					label={ __( 'Block Types', 'pattern-builder' ) }
 					value={ blockTypes }
 					suggestions={ allBlockTypes }
 					tokenizeOnBlur
@@ -134,7 +136,7 @@ export const PatternAssociationsPanel = ( { patternPost } ) => {
 			<VStack spacing={ 0 }>
 				<FormTokenField
 					__experimentalShowHowTo={ false }
-					label="Post Types"
+					label={ __( 'Post Types', 'pattern-builder' ) }
 					value={ postTypes }
 					suggestions={ allPostTypes }
 					tokenizeOnBlur
@@ -150,9 +152,9 @@ export const PatternAssociationsPanel = ( { patternPost } ) => {
 			<VStack spacing={ 0 }>
 				<FormTokenField
 					__experimentalShowHowTo={ false }
-					label="Template Types"
+					label={ __( 'Template Types', 'pattern-builder' ) }
 					value={ templateTypes }
-					suggestions={ allTemplateTypes }
+					suggestions={ ALL_TEMPLATE_TYPES }
 					tokenizeOnBlur
 					onChange={ ( value ) => changeTemplateTypes( value ) }
 				/>
@@ -165,7 +167,7 @@ export const PatternAssociationsPanel = ( { patternPost } ) => {
 			</VStack>
 			<VStack spacing={ 0 }>
 				<ToggleControl
-					label={ 'Available in Inserter' }
+					label={ __( 'Available in Inserter', 'pattern-builder' ) }
 					checked={ patternInserter }
 					onChange={ ( value ) => {
 						changePatternInserter( value );

@@ -4,39 +4,31 @@ This file provides guidance to Claude Code and other AI coding agents when worki
 
 ## Project Overview
 
-**Pattern Builder** is a WordPress plugin developed by [Twenty Bellows](https://twentybellows.com). It allows WordPress users to create, edit, organize, and manage block patterns directly in the admin interface — unifying theme patterns (PHP files) and user-created patterns (custom post type) in a single, intuitive UI with visual editing, code editing, live preview, and export capabilities.
+**Pattern Builder** is a WordPress plugin developed by [Twenty Bellows](https://twentybellows.com). It allows WordPress users to create, edit, organize, and manage block patterns directly in the admin interface — unifying theme patterns (PHP files) and user-created patterns (`wp_block` posts) in a single, intuitive UI with visual editing, live preview, metadata management, and conversion between the two.
 
-- **Version:** 1.0.4
+- **Version:** 2.0.0
 - **Repository:** https://github.com/twenty-bellows/pattern-builder
 - **Issue Tracker:** GitHub Issues — https://github.com/twenty-bellows/pattern-builder/issues
 - **Plugin URI:** https://www.twentybellows.com/pattern-builder/
 - **License:** GPL-2.0-or-later
-- **WordPress Requires:** 6.6+
-- **PHP Requires:** 7.2+
-
-## Development Environment
+- **WordPress Requires:** 6.8+
+- **PHP Requires:** 7.4+
 
 ## Architecture (Key Design Decisions)
 
-A full architectural analysis is in [`docs/architecture.md`](docs/architecture.md). Key decisions to understand before working in this codebase:
+Version 2.0 removed the 1.x DB-mirror + REST-hijacking design entirely. Theme pattern files are the single source of truth; nothing is mirrored into the database and no core REST route is intercepted.
 
-**The core problem:** WordPress's block editor can only edit things with a post ID. File-based theme patterns (`.php` files in `/patterns/`) have no post ID. The plugin solves this with a **DB mirror + REST hijacking** strategy.
+**Theme patterns are file-backed REST entities.** A rowless post type `pb_pattern` (registered like core's `wp_template` — zero DB rows) hangs `Pattern_Builder_REST_Patterns_Controller` off core routing at `/pattern-builder/v1/patterns`. Theme patterns have string IDs (their namespaced name, e.g. `my-theme/hero`), templates-style. Reads come from the pattern files (child + parent theme); writes go back to the files (`Pattern_File_Store`). Because the type is `show_in_rest`, the block editor auto-creates a matching client-side entity from `/wp/v2/types`, which gives theme patterns entity-powered editing (undo, dirty tracking, save flow) for free.
 
-**DB Mirror (`tbell_pattern_block` CPT):** Each theme pattern file gets a corresponding `tbell_pattern_block` post that gives it a database identity. This post is the source of the post ID the editor needs. The file remains the source of truth; the DB record is kept in sync.
+**Editing surfaces:** the post editor can open a `pb_pattern` entity in place via `onNavigateToEntityRecord`; everywhere else (including the Site Editor, whose canvas routing is closed to plugins) the Appearance → Pattern Builder page hosts a full-screen editor built from public `@wordpress/editor` pieces (`EditorProvider` + `BlockCanvas`), bound to the same entity.
 
-**REST Hijacking:** The plugin intercepts `/wp/v2/blocks` requests at three filter points:
-- `rest_request_after_callbacks` (GET) — injects theme pattern posts into the blocks response so the editor sees them alongside user patterns
-- `rest_pre_dispatch` (PUT/DELETE) — intercepts saves and deletes before the real handler runs, writing changes to the PHP file on disk instead of (or in addition to) the DB
+**Synced patterns via the `core/pattern` content runtime.** Synced theme patterns (`Synced: yes` file header) work exactly like Synced Patterns for Themes 2.0: `core/pattern` gets a `content` attribute + `pattern/overrides` context and a render callback that attaches the pattern's blocks as inner blocks (`Pattern_Block`); `Pattern_Resolver` composes editor-facing content; a synthesized `--synced-instance` companion entry puts a reference in the inserter. Inserted copies are plain `<!-- wp:pattern {"slug":…,"content":{…}} /-->` — no post ID anywhere.
 
-**Pattern Registration (on `init`):** On every page load, the plugin globs the theme's `/patterns/` directory and upserts DB records for any new or changed patterns. This is a known performance issue (TWE-369) — no caching yet.
+**Companion plugin coexistence.** The runtime classes (`Pattern_Block`, `Pattern_Resolver`, `Block_Markup`, `Inner_HTML_Processor`, `Synced_Patterns`, `Editor_Support`, and the `src/runtime/` JS) are vendored from [`synced-patterns-for-themes`](https://github.com/Twenty-Bellows/synced-patterns-for-themes) and must stay logic-identical to it. Pattern Builder boots on `plugins_loaded` and registers its copy of the runtime ONLY when the companion is not active (`class_exists` gate in `Pattern_Builder`); when both plugins run, the companion owns the runtime and Pattern Builder adds the editing/management layer on top. Both read the same `Synced: yes` header, and Pattern Builder flushes the companion's caches after file writes.
 
-**Editor Integration:** Two things happen in the editor:
-- `syncedPatternFilter` intercepts `core/pattern` blocks to enable editing synced theme patterns in context
-- `PatternPanelAdditionsPlugin` adds sidebar panels (Source, Sync Status, Associations) when editing a `wp_block` post
+**Migration from 1.x.** `Pattern_Builder_Migration` runs once on upgrade: it rewrites `wp:block` refs pointing at the old `tbell_pattern_block` mirror posts to `wp:pattern` slugs (in post content and theme files), then deletes the mirror posts and the old capabilities.
 
-**Admin Page:** Plain PHP (Appearance → Pattern Builder). Links to documentation. No JS.
-
-**Companion Plugin:** [`synced-patterns-for-themes`](https://github.com/Twenty-Bellows/synced-patterns-for-themes) is a read-only subset of this plugin for production use. It uses the same REST hijacking approach but blocks edits. It self-deactivates when Pattern Builder is active.
+**Webpack entries:** `PatternBuilder_EditorTools.js` (management: sidebar, panels, save monitor — all block-editor screens), `PatternBuilder_Runtime.js` (the vendored content runtime — enqueued only when this plugin owns it), `PatternBuilder_Admin.js` (the full-screen editor app).
 
 ---
 
@@ -44,7 +36,7 @@ A full architectural analysis is in [`docs/architecture.md`](docs/architecture.m
 
 ### Prerequisites
 - Node.js (v18+ recommended)
-- PHP 7.2+ with Composer
+- PHP 7.4+ with Composer
 - Docker (for `wp-env` local WordPress environment and PHP integration tests)
 
 ### Environment Notes
@@ -88,31 +80,37 @@ The plugin follows a component-based OOP architecture with clear separation of c
 1. **Main Entry Point**: `pattern-builder.php` initializes the plugin
 2. **Core Class**: `Pattern_Builder` (singleton in `includes/class-pattern-builder.php`) bootstraps all plugin components
 3. **Component Classes** (`includes/`):
-   - `Pattern_Builder_API` - REST API endpoints under `/pattern-builder/v1/`
-   - `Pattern_Builder_Admin` - Admin UI under Appearance → Pattern Builder
-   - `Pattern_Builder_Editor` - Block editor integration
-   - `Pattern_Builder_Post_Type` - Custom post type for pattern storage
-   - `Pattern_Builder_Security` - Security/nonce helpers
+   - `Pattern_Builder_Entity` - Rowless `pb_pattern` post type registration
+   - `Pattern_Builder_REST_Patterns_Controller` - String-ID REST controller for theme patterns
+   - `Pattern_File_Store` - Reads/writes pattern files; image import/export; conversions
+   - `Pattern_Builder_API` - The `/pattern-builder/v1/process-theme` endpoint
+   - `Pattern_Builder_Admin` - Full-screen editor under Appearance → Pattern Builder
+   - `Pattern_Builder_Editor` - Block editor asset integration
+   - `Pattern_Builder_Migration` - One-time 1.x → 2.0 upgrade
+   - `Pattern_Builder_Security` - File-path validation and safe filesystem helpers
    - `Pattern_Builder_Localization` - i18n support
+   - Vendored runtime (kept identical to synced-patterns-for-themes): `Pattern_Block`, `Pattern_Resolver`, `Block_Markup`, `Inner_HTML_Processor`, `Synced_Patterns`, `Editor_Support`
 
 ### Frontend Architecture
-- **Build System**: Webpack via `@wordpress/scripts` with two entry points:
-  - `src/PatternBuilder_EditorTools.js` - Editor-specific functionality (Gutenberg sidebar panels)
-  - `src/PatternBuilder_Admin.js` - Admin interface (Appearance → Pattern Builder page)
+- **Build System**: Webpack via `@wordpress/scripts` with three entry points:
+  - `src/PatternBuilder_EditorTools.js` - Editor tools (sidebar, document panels, save monitor)
+  - `src/PatternBuilder_Runtime.js` - The vendored core/pattern content runtime
+  - `src/PatternBuilder_Admin.js` - The full-screen editor app (Appearance → Pattern Builder page)
 - **React Components** in `src/components/`:
   - `PatternBrowserPanel` - Main pattern browsing interface
   - `PatternCreatePanel` - Pattern creation flow
   - `PatternPreview` - Pattern preview rendering
   - `BlockBindingsPanel` - Block bindings configuration panel
-  - `PatternAssociationsPanel`, `PatternSyncedStatusPanel`, `PatternPanelAdditions`, `PatternSourcePanel` - Editor sidebar panels
+  - `PatternAssociationsPanel`, `PatternSyncedStatusPanel`, `PatternMetadataPanel`, `PatternPanelAdditions`, `PatternSourcePanel` - Editor sidebar panels
   - `EditorSidePanel` - Editor sidebar container
-  - `AdminLandingPage` - Main admin page component
   - `PatternList` - Pattern list/grid view
   - `PatternBuilderConfiguration` - Plugin settings UI
-- **State Management**: WordPress data stores via `src/utils/store.js`
+- **Admin app** in `src/admin/`: `App`, `PatternBrowser`, `PatternEditor`
+- **Vendored runtime** in `src/runtime/` (keep identical to synced-patterns-for-themes `src/`)
+- **State Management**: core data stores (`core`, `core/editor`, `core/block-editor`) — no custom store
 
 ### Pattern Handling
-- Supports both **theme patterns** (PHP files in `patterns/`) and **user patterns** (custom post type `pattern_builder`)
+- Supports both **theme patterns** (PHP files in `patterns/`, child and parent theme) and **user patterns** (core `wp_block` posts)
 - Abstract pattern class (`src/objects/AbstractPattern.js`) provides unified interface
 - Pattern syncing capabilities between theme files and database
 

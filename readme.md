@@ -7,7 +7,6 @@
 ### Pattern Management Made Easy
 - **Unified Interface** - Manage both theme patterns and user-created patterns in one place
 - **Visual Editor** - Create patterns using the familiar WordPress block editor
-- **Code Editor** - Edit pattern markup directly with syntax validation
 - **Live Preview** - See your patterns in action before saving
 
 ### Powerful Organization
@@ -23,8 +22,8 @@
 
 ## Requirements
 
-- WordPress 6.6 or higher
-- PHP 7.2 or higher
+- WordPress 6.8 or higher
+- PHP 7.4 or higher
 - Modern browser with JavaScript enabled
 
 ## Development

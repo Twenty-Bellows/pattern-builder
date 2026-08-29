@@ -1,4 +1,4 @@
-import { __, _x } from '@wordpress/i18n';
+import { __ } from '@wordpress/i18n';
 import {
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalToggleGroupControl as ToggleGroupControl,
@@ -8,39 +8,82 @@ import {
 	__experimentalText as Text,
 } from '@wordpress/components';
 import { dispatch } from '@wordpress/data';
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from '@wordpress/element';
 
-export const PatternSyncedStatusPanel = ( { patternPost } ) => {
+/**
+ * Toggles a pattern between synced and unsynced.
+ *
+ * For a theme pattern (pb_pattern) the choice is the `synced` entity field,
+ * persisted as the pattern file's `Synced: yes` header on the next save. For
+ * a user pattern (wp_block) it is core's `wp_pattern_sync_status` meta.
+ *
+ * @param {Object} root0             Component props.
+ * @param {Object} root0.patternPost The pattern's entity record.
+ * @param {string} root0.postType    The pattern's post type.
+ */
+export const PatternSyncedStatusPanel = ( { patternPost, postType } ) => {
+	const isThemePattern = postType === 'pb_pattern';
+
+	const getSyncedValue = () => {
+		if ( isThemePattern ) {
+			return patternPost.synced ? 'true' : 'false';
+		}
+
+		return patternPost.wp_pattern_sync_status === 'unsynced' ||
+			patternPost.meta?.wp_pattern_sync_status === 'unsynced'
+			? 'false'
+			: 'true';
+	};
+
+	const [ synced, setSynced ] = useState( getSyncedValue() );
+
+	useEffect( () => {
+		setSynced( getSyncedValue() );
+	}, [
+		patternPost.synced,
+		patternPost.wp_pattern_sync_status,
+		patternPost.meta?.wp_pattern_sync_status,
+	] );
+
 	if ( ! patternPost ) {
 		return null;
 	}
 
-	const [ synced, setSynced ] = useState(
-		patternPost.wp_pattern_sync_status === 'unsynced' ? 'false' : 'true'
-	);
-
-	useEffect( () => {
-		setSynced(
-			patternPost.wp_pattern_sync_status === 'unsynced' ? 'false' : 'true'
-		);
-	}, [ patternPost.synced ] );
-
 	const changeSyncedStatus = ( value ) => {
 		setSynced( value );
+
+		if ( isThemePattern ) {
+			dispatch( 'core' ).editEntityRecord(
+				'postType',
+				'pb_pattern',
+				patternPost.id,
+				{ synced: value === 'true' }
+			);
+			return;
+		}
+
 		dispatch( 'core' ).editEntityRecord(
 			'postType',
 			'wp_block',
 			patternPost.id,
-			{ wp_pattern_sync_status: value === 'true' ? '' : 'unsynced' }
+			{
+				meta: {
+					...( patternPost.meta || {} ),
+					wp_pattern_sync_status: value === 'true' ? '' : 'unsynced',
+				},
+			}
 		);
 	};
 
 	return (
 		<>
 			<div className="components-base-control">
-				<label className="components-base-control__label">
-					{ 'Should this pattern be synced?' }
-				</label>
+				<p className="components-base-control__label">
+					{ __(
+						'Should this pattern be synced?',
+						'pattern-builder'
+					) }
+				</p>
 				<ToggleGroupControl
 					value={ synced === 'true' ? 'true' : 'false' }
 					onChange={ ( value ) => {
@@ -48,8 +91,14 @@ export const PatternSyncedStatusPanel = ( { patternPost } ) => {
 					} }
 					__nextHasNoMarginBottom
 				>
-					<ToggleGroupControlOption value="true" label="Synced" />
-					<ToggleGroupControlOption value="false" label="Unsynced" />
+					<ToggleGroupControlOption
+						value="true"
+						label={ __( 'Synced', 'pattern-builder' ) }
+					/>
+					<ToggleGroupControlOption
+						value="false"
+						label={ __( 'Unsynced', 'pattern-builder' ) }
+					/>
 				</ToggleGroupControl>
 			</div>
 			<br />

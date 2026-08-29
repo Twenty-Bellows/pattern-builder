@@ -53,7 +53,7 @@ export const PatternPreview = ( { pattern, onClick, onEditClick } ) => {
 					>
 						<BlockPreview
 							blocks={ blocks }
-							viewportWidth={ 1200 }
+							viewportWidth={ pattern.viewportWidth || 1200 }
 						/>
 					</BlockPreview.Async>
 					<Text variant="muted" size="11px">

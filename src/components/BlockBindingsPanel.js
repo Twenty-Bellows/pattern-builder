@@ -1,13 +1,12 @@
-import { __ } from '@wordpress/i18n';
-import { store as blockEditorStore } from '@wordpress/block-editor';
+import { store as blockEditorStore, BlockIcon } from '@wordpress/block-editor';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { getBlockType } from '@wordpress/blocks';
-import { Card, CardBody, Panel, PanelBody } from '@wordpress/components';
-import { BlockIcon } from '@wordpress/block-editor';
 import {
+	Card,
+	CardBody,
 	ToggleControl,
 	TextControl,
-	__experimentalHStack as HStack,
+	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalText as Text,
 } from '@wordpress/components';
 import { useState } from '@wordpress/element';
@@ -44,11 +43,11 @@ const BindableBlockControls = ( { block } ) => {
 	const updateBlockName = ( newName ) => {
 		setBlockName( newName );
 
-		const blockCanBeBound = newName !== '';
+		const canBeBound = newName !== '';
 
-		setBlockCanBeBound( blockCanBeBound );
+		setBlockCanBeBound( canBeBound );
 
-		if ( blockBindable && ! blockCanBeBound ) {
+		if ( blockBindable && ! canBeBound ) {
 			setBlockBindable( false );
 		}
 
@@ -134,9 +133,9 @@ export const BlockBindingsPanel = () => {
 	const bindableBlocks = useSelect( ( select ) => {
 		const rootBlocks = select( blockEditorStore ).getBlocks();
 
-		// dig through the blocks to find anything in the tree that is bindable
-		const bindableBlocks = getBindableBlocks( rootBlocks );
-		return bindableBlocks;
+		// Dig through the blocks to find anything in the tree that is bindable.
+		return getBindableBlocks( rootBlocks );
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [] );
 
 	return (
@@ -146,7 +145,7 @@ export const BlockBindingsPanel = () => {
 					<p style={ { marginTop: 0 } }>
 						The following blocks can allow user changes throughout
 						instances of this pattern. This is only available to
-						'synced' patterns.
+						&ldquo;synced&rdquo; patterns.
 					</p>
 					<p>
 						Name the block to allow binding. This is the name a user

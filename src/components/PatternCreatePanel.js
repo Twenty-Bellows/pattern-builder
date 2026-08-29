@@ -1,12 +1,14 @@
 /**
  * WordPress dependencies
  */
-import { __, _x } from '@wordpress/i18n';
+import { __ } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
 import { useState } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
-import { TextControl, TextareaControl, Button } from '@wordpress/components';
 import {
+	TextControl,
+	TextareaControl,
+	Button,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalVStack as VStack,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
@@ -19,7 +21,9 @@ import {
 import { addTemplate } from '@wordpress/icons';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 
-export const PatternCreatePanel = () => {
+import { navigateToPattern } from '../utils/patternNavigation';
+
+export const PatternCreatePanel = ( { onCreated } ) => {
 	const { onNavigateToEntityRecord } = useSelect( ( select ) => {
 		const { getSettings } = select( blockEditorStore );
 		return {
@@ -30,12 +34,20 @@ export const PatternCreatePanel = () => {
 	const createPattern = () => {
 		createPatternCall( newPatternOptions )
 			.then( ( pattern ) => {
-				onNavigateToEntityRecord( {
-					postId: pattern.id,
-					postType: 'wp_block',
-				} );
+				if ( onCreated ) {
+					onCreated( pattern );
+				}
+				navigateToPattern(
+					{
+						id: pattern.id,
+						name: pattern.name,
+						source: pattern.source || 'user',
+					},
+					onNavigateToEntityRecord
+				);
 			} )
 			.catch( ( error ) => {
+				// eslint-disable-next-line no-console
 				console.error( 'Error creating pattern:', error );
 			} );
 	};
@@ -49,8 +61,27 @@ export const PatternCreatePanel = () => {
 	} );
 
 	const createPatternCall = ( pattern ) => {
+		if ( pattern.source === 'theme' ) {
+			// Theme patterns are file-backed pb_pattern entities.
+			return apiFetch( {
+				path: '/pattern-builder/v1/patterns',
+				method: 'POST',
+				data: {
+					title: pattern.title,
+					description: pattern.description,
+					synced: pattern.synced,
+				},
+			} );
+		}
+
+		const body = {
+			title: pattern.title,
+			excerpt: pattern.description,
+			status: 'publish',
+		};
+
 		if ( ! pattern.synced ) {
-			pattern.meta = {
+			body.meta = {
 				wp_pattern_sync_status: 'unsynced',
 			};
 		}
@@ -58,10 +89,7 @@ export const PatternCreatePanel = () => {
 		return apiFetch( {
 			path: '/wp/v2/blocks',
 			method: 'POST',
-			body: JSON.stringify( pattern ),
-			headers: {
-				'Content-Type': 'application/json',
-			},
+			data: body,
 		} );
 	};
 	return (
@@ -96,9 +124,9 @@ export const PatternCreatePanel = () => {
 			/>
 			<>
 				<div className="components-base-control">
-					<label className="components-base-control__label">
+					<p className="components-base-control__label">
 						{ 'Where should this pattern be stored?' }
-					</label>
+					</p>
 					<ToggleGroupControl
 						value={ newPatternOptions.source || 'theme' }
 						onChange={ ( value ) => {
@@ -132,9 +160,9 @@ export const PatternCreatePanel = () => {
 			</>
 			<>
 				<div className="components-base-control">
-					<label className="components-base-control__label">
+					<p className="components-base-control__label">
 						{ 'Should this pattern be synced?' }
-					</label>
+					</p>
 					<ToggleGroupControl
 						value={ newPatternOptions.synced ? 'true' : 'false' }
 						onChange={ ( value ) => {

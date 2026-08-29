@@ -12,9 +12,12 @@ namespace TwentyBellows\PatternBuilder;
 class Abstract_Pattern {
 
 	/**
-	 * Post ID (tbell_pattern_block or wp_block).
+	 * Pattern identity.
 	 *
-	 * @var int|null
+	 * Theme patterns are identified by their namespaced name (e.g.
+	 * "theme-slug/pattern-name"); user patterns by their wp_block post ID.
+	 *
+	 * @var string|int|null
 	 */
 	public $id;
 
@@ -103,6 +106,13 @@ class Abstract_Pattern {
 	public $inserter;
 
 	/**
+	 * Intended viewport width when previewing the pattern, in pixels.
+	 *
+	 * @var int|null
+	 */
+	public $viewportWidth; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.PropertyNotSnakeCase
+
+	/**
 	 * Absolute filesystem path to the pattern PHP file (theme patterns only).
 	 *
 	 * @var string|null
@@ -115,8 +125,6 @@ class Abstract_Pattern {
 	 * @param array $args Pattern arguments.
 	 */
 	public function __construct( $args = array() ) {
-		$this->id = $args['id'] ?? null;
-
 		$this->title = $args['title'];
 
 		$this->name = $args['name'] ?? sanitize_title( $args['title'] );
@@ -135,7 +143,11 @@ class Abstract_Pattern {
 		$this->templateTypes = $args['templateTypes'] ?? array(); // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 		$this->postTypes     = $args['postTypes'] ?? array(); // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 
+		$this->viewportWidth = isset( $args['viewportWidth'] ) && '' !== $args['viewportWidth'] ? (int) $args['viewportWidth'] : null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName
+
 		$this->filePath = $args['filePath'] ?? null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName
+
+		$this->id = $args['id'] ?? ( 'theme' === $this->source ? $this->name : null );
 	}
 
 	/**
@@ -148,6 +160,20 @@ class Abstract_Pattern {
 		ob_start();
 		include $pattern_file;
 		return ob_get_clean();
+	}
+
+	/**
+	 * Splits a comma-separated header value into a trimmed array.
+	 *
+	 * @param string $value Raw header value.
+	 * @return array List of trimmed, non-empty values.
+	 */
+	private static function split_header_list( $value ) {
+		if ( '' === trim( (string) $value ) ) {
+			return array();
+		}
+
+		return array_values( array_filter( array_map( 'trim', explode( ',', $value ) ), 'strlen' ) );
 	}
 
 	/**
@@ -174,55 +200,28 @@ class Abstract_Pattern {
 			)
 		);
 
-		$new = new self(
+		return new self(
 			array(
 				'name'          => $pattern_data['slug'],
 				'title'         => $pattern_data['title'],
 				'description'   => $pattern_data['description'],
 				'content'       => self::render_pattern( $pattern_file ),
 				'filePath'      => $pattern_file,
-				'categories'    => '' === $pattern_data['categories'] ? array() : explode( ',', $pattern_data['categories'] ),
-				'keywords'      => '' === $pattern_data['keywords'] ? array() : explode( ',', $pattern_data['keywords'] ),
-				'blockTypes'    => '' === $pattern_data['blockTypes'] ? array() : array_map( 'trim', explode( ',', $pattern_data['blockTypes'] ) ),
-				'postTypes'     => '' === $pattern_data['postTypes'] ? array() : explode( ',', $pattern_data['postTypes'] ),
-				'templateTypes' => '' === $pattern_data['templateTypes'] ? array() : explode( ',', $pattern_data['templateTypes'] ),
+				'categories'    => self::split_header_list( $pattern_data['categories'] ),
+				'keywords'      => self::split_header_list( $pattern_data['keywords'] ),
+				'blockTypes'    => self::split_header_list( $pattern_data['blockTypes'] ),
+				'postTypes'     => self::split_header_list( $pattern_data['postTypes'] ),
+				'templateTypes' => self::split_header_list( $pattern_data['templateTypes'] ),
+				'viewportWidth' => $pattern_data['viewportWidth'],
 				'source'        => 'theme',
-				'synced'        => 'yes' === $pattern_data['synced'],
-				'inserter'      => 'no' !== $pattern_data['inserter'],
-			)
-		);
-
-		return $new;
-	}
-
-	/**
-	 * Creates an Abstract_Pattern from a registered block pattern array.
-	 *
-	 * @param array $pattern The registered pattern array from WP_Block_Patterns_Registry.
-	 * @return self
-	 */
-	public static function from_registry( $pattern ) {
-		return new self(
-			array(
-				'name'          => $pattern['name'],
-				'title'         => $pattern['title'],
-				'description'   => $pattern['description'],
-				'content'       => $pattern['content'],
-				'categories'    => $pattern['categories'],
-				'keywords'      => $pattern['keywords'],
-				'source'        => 'theme',
-				'synced'        => false,
-				'blockTypes'    => $pattern['blockTypes'],
-				'templateTypes' => $pattern['templateTypes'],
-				'postTypes'     => $pattern['postTypes'],
-				'inserter'      => $pattern['inserter'],
-				'filePath'      => $pattern['filePath'],
+				'synced'        => in_array( strtolower( trim( $pattern_data['synced'] ) ), array( 'yes', 'true', '1', 'on' ), true ),
+				'inserter'      => 'no' !== strtolower( trim( $pattern_data['inserter'] ) ),
 			)
 		);
 	}
 
 	/**
-	 * Creates an Abstract_Pattern from a WP_Post object (wp_block or tbell_pattern_block).
+	 * Creates an Abstract_Pattern from a wp_block post.
 	 *
 	 * @param \WP_Post $post The post object.
 	 * @return self
@@ -234,28 +233,21 @@ class Abstract_Pattern {
 			function ( $category ) {
 				return $category->slug;
 			},
-			$categories
+			is_array( $categories ) ? $categories : array()
 		);
-
-		$slug = Pattern_Builder_Controller::format_pattern_slug_from_post( $post->post_name );
 
 		return new self(
 			array(
-				'id'            => $post->ID,
-				'name'          => $slug,
-				'title'         => $post->post_title,
-				'description'   => $post->post_excerpt,
-				'content'       => $post->post_content,
-				'source'        => ( 'tbell_pattern_block' === $post->post_type ) ? 'theme' : 'user',
-				'synced'        => ( $metadata['wp_pattern_sync_status'][0] ?? 'synced' ) !== 'unsynced',
-
-				'blockTypes'    => isset( $metadata['wp_pattern_block_types'][0] ) ? explode( ',', $metadata['wp_pattern_block_types'][0] ) : array(),
-				'templateTypes' => isset( $metadata['wp_pattern_template_types'][0] ) ? explode( ',', $metadata['wp_pattern_template_types'][0] ) : array(),
-				'postTypes'     => isset( $metadata['wp_pattern_post_types'][0] ) ? explode( ',', $metadata['wp_pattern_post_types'][0] ) : array(),
-
-				'keywords'      => isset( $metadata['wp_pattern_keywords'][0] ) ? explode( ',', $metadata['wp_pattern_keywords'][0] ) : array(),
-				'categories'    => $categories,
-				'inserter'      => isset( $metadata['wp_pattern_inserter'][0] ) ? ( 'no' !== $metadata['wp_pattern_inserter'][0] ) : true,
+				'id'          => $post->ID,
+				'name'        => $post->post_name,
+				'title'       => $post->post_title,
+				'description' => $post->post_excerpt,
+				'content'     => $post->post_content,
+				'source'      => 'user',
+				'synced'      => ( $metadata['wp_pattern_sync_status'][0] ?? 'synced' ) !== 'unsynced',
+				'keywords'    => isset( $metadata['wp_pattern_keywords'][0] ) ? array_map( 'trim', explode( ',', $metadata['wp_pattern_keywords'][0] ) ) : array(),
+				'categories'  => $categories,
+				'inserter'    => true,
 			)
 		);
 	}

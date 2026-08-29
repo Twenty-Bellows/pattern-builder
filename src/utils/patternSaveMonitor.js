@@ -1,92 +1,73 @@
 /**
  * WordPress dependencies
  */
-import { useSelect } from '@wordpress/data';
 import { useEffect } from '@wordpress/element';
+import { useSelect, useDispatch } from '@wordpress/data';
 import apiFetch from '@wordpress/api-fetch';
 
 /**
  * Internal dependencies
  */
-import { getLocalizePatternsSetting, getImportImagesSetting } from './localStorage';
+import {
+	getLocalizePatternsSetting,
+	getImportImagesSetting,
+} from './localStorage';
 
 /**
- * Component to monitor pattern saving and add localization flag when needed
+ * Decorates pattern saves with this plugin's save options.
+ *
+ * Theme pattern writes all travel through `/pattern-builder/v1/` (entity
+ * saves from any editor, and the bulk process-theme action). The middleware
+ * appends the localize / import-images flags the server-side file writer
+ * reads, based on the user's Configuration panel settings.
  */
 export const PatternSaveMonitor = () => {
-	const { isSavingPost, postType, currentPost } = useSelect( ( select ) => {
-		const { isSavingPost: _isSavingPost, getCurrentPostType, getCurrentPost } = select( 'core/editor' );
-		return {
-			isSavingPost: _isSavingPost(),
-			postType: getCurrentPostType(),
-			currentPost: getCurrentPost(),
-		};
-	}, [] );
+	const postType = useSelect(
+		( select ) => select( 'core/editor' )?.getCurrentPostType(),
+		[]
+	);
+	const { lockPostAutosaving } = useDispatch( 'core/editor' ) || {};
+
+	// Theme patterns are rowless entities with no autosaves endpoint.
+	useEffect( () => {
+		if ( postType === 'pb_pattern' && lockPostAutosaving ) {
+			lockPostAutosaving( 'pattern-builder' );
+		}
+	}, [ postType, lockPostAutosaving ] );
 
 	useEffect( () => {
-		// Set up API fetch middleware to add localization query parameter when needed
 		const middleware = ( options, next ) => {
-			// Check if this is a POST request to save/update posts
-			if ( options.method === 'POST' || options.method === 'PUT' ) {
-				// Check if the path matches post saving endpoints
-				if ( options.path && (
-					options.path.includes( '/wp/v2/blocks/' ) ||
-					options.path.includes( '/pattern-builder/v1/' ) ||
-					( options.path.includes( '/wp/v2/posts/' ) && options.data?.type === 'tbell_pattern_block' )
-				) ) {
-					// Check settings
-					const shouldLocalize = getLocalizePatternsSetting();
-					const shouldImportImages = getImportImagesSetting();
+			if (
+				( options.method === 'POST' || options.method === 'PUT' ) &&
+				options.path &&
+				options.path.includes( '/pattern-builder/v1/' )
+			) {
+				const params = [];
 
-					// Build query parameters
-					const params = [];
+				if ( getLocalizePatternsSetting() ) {
+					params.push( 'patternBuilderLocalize=true' );
+				}
 
-					if ( shouldLocalize ) {
-						params.push( 'patternBuilderLocalize=true' );
-					}
+				if ( ! getImportImagesSetting() ) {
+					// Only add parameter if disabled (since default is true).
+					params.push( 'patternBuilderImportImages=false' );
+				}
 
-					if ( ! shouldImportImages ) {
-						// Only add parameter if disabled (since default is true)
-						params.push( 'patternBuilderImportImages=false' );
-					}
-
-					// Add parameters to the path if any are needed
-					if ( params.length > 0 ) {
-						const separator = options.path.includes( '?' ) ? '&' : '?';
-						options.path = options.path + separator + params.join( '&' );
-					}
+				if ( params.length > 0 ) {
+					const separator = options.path.includes( '?' ) ? '&' : '?';
+					options.path =
+						options.path + separator + params.join( '&' );
 				}
 			}
 
 			return next( options );
 		};
 
-		// Add the middleware
 		apiFetch.use( middleware );
 
-		// Return cleanup function to remove middleware
-		return () => {
-			// Note: apiFetch doesn't have a direct way to remove middleware
-			// but since this effect only runs once, it's acceptable
-		};
+		// apiFetch has no way to remove middleware; this effect runs once.
 	}, [] );
 
-	// Also monitor the saving state for logging/debugging
-	useEffect( () => {
-		if ( isSavingPost && postType === 'tbell_pattern_block' ) {
-			const shouldLocalize = getLocalizePatternsSetting();
-			const shouldImportImages = getImportImagesSetting();
-
-			const settings = [];
-			if ( shouldLocalize ) settings.push( 'localize=true' );
-			if ( ! shouldImportImages ) settings.push( 'importImages=false' );
-
-			if ( settings.length > 0 ) {
-				console.log( `Saving theme pattern with settings (${settings.join(', ')}):`, currentPost?.title );
-			}
-		}
-	}, [ isSavingPost, postType, currentPost ] );
-
-	// This component doesn't render anything
+	// This component doesn't render anything.
 	return null;
 };

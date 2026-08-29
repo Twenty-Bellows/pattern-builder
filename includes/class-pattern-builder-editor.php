@@ -15,7 +15,13 @@ class Pattern_Builder_Editor {
 	 * Enqueues assets for the block editor.
 	 */
 	public function enqueue_block_editor_assets(): void {
-		$asset_file = include plugin_dir_path( __FILE__ ) . '../build/PatternBuilder_EditorTools.asset.php';
+		$asset_path = plugin_dir_path( __FILE__ ) . '../build/PatternBuilder_EditorTools.asset.php';
+
+		if ( ! file_exists( $asset_path ) ) {
+			return;
+		}
+
+		$asset_file = include $asset_path;
 
 		wp_enqueue_script(
 			'pattern-builder',
@@ -25,11 +31,30 @@ class Pattern_Builder_Editor {
 			true
 		);
 
-		wp_enqueue_style(
-			'pattern-builder-editor-style',
-			plugins_url( '../build/PatternBuilder_EditorTools.css', __FILE__ ),
-			array(),
-			$asset_file['version']
+		wp_set_script_translations( 'pattern-builder', 'pattern-builder' );
+
+		wp_add_inline_script(
+			'pattern-builder',
+			sprintf(
+				'window.patternBuilderSettings = %s;',
+				wp_json_encode(
+					array(
+						'adminEditorUrl' => admin_url( 'themes.php?page=pattern-builder' ),
+					)
+				)
+			),
+			'before'
 		);
+
+		$css_path = plugin_dir_path( __FILE__ ) . '../build/PatternBuilder_EditorTools.css';
+
+		if ( file_exists( $css_path ) ) {
+			wp_enqueue_style(
+				'pattern-builder-editor-style',
+				plugins_url( '../build/PatternBuilder_EditorTools.css', __FILE__ ),
+				array(),
+				$asset_file['version']
+			);
+		}
 	}
 }

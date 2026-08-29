@@ -4,9 +4,9 @@
  * Plugin Name:       Pattern Builder
  * Plugin URI:        https://www.twentybellows.com/pattern-builder/
  * Description:       Manage Patterns in the WordPress Editor.
- * Requires at least: 6.6
+ * Requires at least: 6.8
  * Requires PHP:      7.4
- * Version: 1.0.4
+ * Version: 2.0.0
  * Author:            Twenty Bellows
  * Author URI:        https://twentybellows.com
  * License:           GPL-2.0-or-later
@@ -18,14 +18,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
+define( 'PATTERN_BUILDER_VERSION', '2.0.0' );
+define( 'PATTERN_BUILDER_FILE', __FILE__ );
+
 require_once __DIR__ . '/includes/class-pattern-builder.php';
-require_once __DIR__ . '/includes/class-pattern-builder-post-type.php'; // Loaded via class-pattern-builder.php chain; explicit here for IDE clarity.
 
-use TwentyBellows\PatternBuilder\Pattern_Builder;
-use TwentyBellows\PatternBuilder\Pattern_Builder_Post_Type;
-
-// Assign role capabilities on activation (not on every init).
-register_activation_hook( __FILE__, array( Pattern_Builder_Post_Type::class, 'assign_capabilities' ) );
-
-// Initialize the plugin.
-Pattern_Builder::get_instance();
+/*
+ * Boot on plugins_loaded: plugin directories load alphabetically, so at this
+ * file's include time the companion Synced Patterns for Themes plugin — which
+ * provides the same core/pattern runtime — has not loaded yet. By
+ * plugins_loaded every plugin has, and Pattern_Builder can decide whether to
+ * provide the runtime itself or defer to the companion.
+ */
+add_action( 'plugins_loaded', array( 'TwentyBellows\PatternBuilder\Pattern_Builder', 'get_instance' ) );

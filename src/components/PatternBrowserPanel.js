@@ -1,7 +1,7 @@
-import { __, _x } from '@wordpress/i18n';
+import { __ } from '@wordpress/i18n';
 import { useNavigator } from '@wordpress/components';
 import { PatternList } from './PatternList';
-import { useMemo } from 'react';
+import { useMemo } from '@wordpress/element';
 
 export const PatternBrowserPanel = ( { allPatterns } ) => {
 	const navigator = useNavigator();
