@@ -22,12 +22,11 @@ require_once __DIR__ . '/class-pattern-builder-migration.php';
 /**
  * Main class for managing the Pattern Builder plugin.
  *
- * Boots on `plugins_loaded` so it can see whether the companion
- * Synced Patterns for Themes plugin is active. The pattern runtime — the
- * `core/pattern` content attribute, its render callback, and the editor-facing
- * pattern composition — is one shared surface: when the companion provides it,
- * Pattern Builder defers and only adds what the companion doesn't have
- * (editing, file writing, metadata management, conversions).
+ * Always registers the full stack — the pattern runtime (vendored from the
+ * companion Synced Patterns for Themes plugin, kept logic-identical) and the
+ * editing layer on top. When both plugins are installed, the companion
+ * detects Pattern Builder at `plugins_loaded` and stays entirely unloaded;
+ * this plugin never has to coordinate.
  */
 class Pattern_Builder {
 
@@ -39,40 +38,20 @@ class Pattern_Builder {
 	private static ?Pattern_Builder $instance = null;
 
 	/**
-	 * Whether this plugin provides the pattern runtime (vs. the companion).
-	 *
-	 * @var bool
-	 */
-	private bool $owns_runtime;
-
-	/**
 	 * Constructor to initialize the Pattern Builder components.
 	 */
 	private function __construct() {
-		$this->owns_runtime = ! class_exists( '\\TwentyBellows\\SyncedPatternsForThemes\\Pattern_Block' );
+		( new Pattern_Block() )->register();
+		( new Editor_Support( PATTERN_BUILDER_FILE ) )->register();
 
-		if ( $this->owns_runtime ) {
-			( new Pattern_Block() )->register();
-			( new Editor_Support( PATTERN_BUILDER_FILE ) )->register();
-
-			// A theme switch changes which pattern files the synced lookup reads.
-			add_action( 'switch_theme', array( Synced_Patterns::class, 'flush' ) );
-		}
+		// A theme switch changes which pattern files the synced lookup reads.
+		add_action( 'switch_theme', array( Synced_Patterns::class, 'flush' ) );
 
 		new Pattern_Builder_Entity();
 		new Pattern_Builder_API();
 		new Pattern_Builder_Admin();
 		new Pattern_Builder_Editor();
 		new Pattern_Builder_Migration();
-	}
-
-	/**
-	 * Whether this plugin registered the shared pattern runtime.
-	 *
-	 * @return bool
-	 */
-	public function owns_runtime(): bool {
-		return $this->owns_runtime;
 	}
 
 	/**

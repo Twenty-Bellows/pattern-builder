@@ -2,9 +2,9 @@
 /**
  * Teaches the `core/pattern` block to accept content.
  *
- * Vendored from the Synced Patterns for Themes plugin so Pattern Builder works
- * standalone. When that plugin is active it provides this same runtime and
- * Pattern Builder defers to it — see Pattern_Builder::owns_runtime().
+ * Vendored from the Synced Patterns for Themes plugin, which stands down
+ * entirely while Pattern Builder is active — this copy is always the one
+ * that runs, and must stay logic-identical to the companion's.
  *
  * @package Pattern_Builder
  */
@@ -60,17 +60,6 @@ class Pattern_Block {
 	 */
 	public function add_content_support( $args, $block_type ): array {
 		if ( 'core/pattern' !== $block_type || ! is_array( $args ) ) {
-			return $args;
-		}
-
-		/*
-		 * Another plugin may already have installed this same runtime — the
-		 * attribute and context shapes are core's, so any provider of both is
-		 * compatible by construction. Leaving its render callback in place
-		 * keeps ownership deterministic instead of last-filter-wins.
-		 */
-		if ( isset( $args['attributes'][ self::CONTENT_ATTRIBUTE ] )
-			&& isset( $args['provides_context'][ self::OVERRIDES_CONTEXT ] ) ) {
 			return $args;
 		}
 
