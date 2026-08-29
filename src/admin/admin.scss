@@ -111,9 +111,9 @@ body.appearance_page_pattern-builder {
 
 	&__grid {
 		display: grid;
-		// Cards stay between 200px and 250px wide — never stretching to
-		// fill a sparse row.
-		grid-template-columns: repeat(auto-fill, minmax(200px, 250px));
+		// Small base size so plenty of columns fit (three across even with
+		// the details sidebar open); cards stretch to fill the row.
+		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 		gap: 24px;
 		align-items: start;
 	}
