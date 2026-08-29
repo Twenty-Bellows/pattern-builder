@@ -96,7 +96,9 @@
 
 	&__grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		// Cards stay between 200px and 250px wide — never stretching to
+		// fill a sparse row.
+		grid-template-columns: repeat(auto-fill, minmax(200px, 250px));
 		gap: 24px;
 		align-items: start;
 	}
