@@ -56,7 +56,7 @@ function indentBlockMarkup( blockMarkup ) {
 	let indentLevel = 0;
 	const output = [];
 
-	for ( let line of lines ) {
+	for ( const line of lines ) {
 		// Detect closing tags/comments (should reduce indent before rendering)
 		const isClosingComment = /^<!--\s*\/[\w:-]+\s*-->$/.test( line );
 		const isClosingTag = /^<\/[\w:-]+>$/.test( line );
@@ -90,40 +90,4 @@ function indentBlockMarkup( blockMarkup ) {
 		}
 	}
 	return output.join( '\n' );
-}
-
-function formatBlockCommentJSON( blockMarkup ) {
-	return blockMarkup.replace( /<!--(.*?)-->/gs, ( _, rawContent ) => {
-		let content = rawContent.trim();
-
-		const isSelfClosing = content.endsWith( '/' );
-		if ( isSelfClosing ) {
-			content = content.slice( 0, -1 ).trim();
-		}
-
-		const match = content.match( /^([\w:-]+)\s+({.*})$/s );
-		if ( match ) {
-			const blockName = match[ 1 ];
-			const jsonPart = match[ 2 ];
-
-			try {
-				const parsed = JSON.parse( jsonPart );
-				const keys = Object.keys( parsed );
-
-				let formattedJson;
-				if ( keys.length === 1 ) {
-					formattedJson = JSON.stringify( parsed );
-				} else {
-					formattedJson = JSON.stringify( parsed, null, 2 );
-				}
-
-				const slash = isSelfClosing ? ' /' : '';
-				return `<!-- ${ blockName } ${ formattedJson }${ slash } -->`;
-			} catch ( e ) {
-				// Fail silently: keep comment as-is
-			}
-		}
-
-		return `<!-- ${ content } -->`;
-	} );
 }

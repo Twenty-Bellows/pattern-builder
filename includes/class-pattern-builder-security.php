@@ -7,6 +7,10 @@
  * @package Pattern_Builder
  */
 
+namespace TwentyBellows\PatternBuilder;
+
+use WP_Error;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }

@@ -1,10 +1,10 @@
 === Pattern Builder ===
 Contributors:      twentybellows, pbking
 Tags:              block-patterns, patterns, block-editor, gutenberg, design
-Requires at least: 6.6
+Requires at least: 6.8
 Tested up to:      6.9
-Stable tag:        1.0.4
-Requires PHP:      7.2
+Stable tag:        2.0.0
+Requires PHP:      7.4
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -19,7 +19,6 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 **Pattern Management Made Easy**
 * **Unified Interface** - Manage both theme patterns and user-created patterns in one place
 * **Visual Editor** - Create patterns using the familiar WordPress block editor
-* **Code Editor** - Edit pattern markup directly with syntax validation
 * **Live Preview** - See your patterns in action before saving
 
 **Powerful Organization**
@@ -91,6 +90,22 @@ Yes, Pattern Builder provides a unified interface to manage both theme patterns 
 == Screenshots ==
 
 == Changelog ==
+
+= 2.0.0 =
+* Complete architectural overhaul: theme pattern files are now the single source of truth — no more database mirror posts, no more custom post type rows, and no more interception of the /wp/v2/blocks REST API
+* New full-screen pattern editor under Appearance → Pattern Builder for browsing and editing every pattern
+* Theme patterns are now real REST entities (string IDs, like core templates) at /pattern-builder/v1/patterns, editable in the post editor in place
+* Synced theme patterns now work through the core/pattern block's content attribute (the same mechanism as the Synced Patterns for Themes plugin 2.0) — inserted copies stay linked to the pattern file with per-instance overrides, and no post ID is involved anywhere
+* Full pattern metadata management: title, description, categories, keywords, block types, post types, template types, viewport width, inserter visibility, and synced status all round-trip through the pattern file header
+* Viewport Width is now preserved when editing patterns (previously lost on save)
+* Parent theme patterns are now included (previously only the child theme was scanned)
+* The block inserter now respects each theme pattern's own Inserter header (previously all theme patterns were hidden)
+* Pattern Bindings panel for naming override slots directly in the editor
+* Works alongside Synced Patterns for Themes 2.0: when both are active the companion provides the pattern runtime and Pattern Builder adds the editing tools
+* Automatic one-time migration: wp:block references to the old mirror posts are rewritten to wp:pattern references, mirror posts are removed, and the old capabilities are cleaned up
+* Fixed unauthenticated pattern deletion and unauthenticated edit-context reads (the old REST interception layer is gone entirely)
+* Performance: no database writes on page load (the old per-request pattern mirroring is gone)
+* Requires WordPress 6.8 and PHP 7.4
 
 = 1.0.4 =
 * Fixed issue where it prevented Post Types with custom metadata from saving

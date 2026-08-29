@@ -1,8 +1,14 @@
-# Pattern Builder — Architecture Deep Dive
+# Pattern Builder — Architecture Deep Dive (1.x — HISTORICAL)
 
 > **Author:** Kedalion (architectural review)  
 > **Date:** 2026-03-25  
 > **Version reviewed:** 1.0.4
+
+> ⚠️ **This document describes Pattern Builder 1.x and is kept for historical
+> context only.** Version 2.0 removed the architecture analyzed here — the
+> `tbell_pattern_block` mirror CPT, the `/wp/v2/blocks` REST interception, and
+> the per-request registry rewriting no longer exist. The current architecture
+> is documented in [`architecture-2.0.md`](architecture-2.0.md).
 
 ---
 

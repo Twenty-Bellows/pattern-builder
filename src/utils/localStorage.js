@@ -6,15 +6,16 @@ const STORAGE_KEY_PREFIX = 'pattern-builder-';
 
 /**
  * Gets a value from localStorage with the pattern-builder prefix
- * @param {string} key - The key to retrieve
- * @param {*} defaultValue - Default value if key doesn't exist
- * @returns {*} The stored value or default
+ * @param {string} key          - The key to retrieve
+ * @param {*}      defaultValue - Default value if key doesn't exist
+ * @return {*} The stored value or default
  */
 export const getLocalStorageValue = ( key, defaultValue = null ) => {
 	try {
-		const item = localStorage.getItem( STORAGE_KEY_PREFIX + key );
+		const item = window.localStorage.getItem( STORAGE_KEY_PREFIX + key );
 		return item ? JSON.parse( item ) : defaultValue;
 	} catch ( error ) {
+		// eslint-disable-next-line no-console
 		console.error( 'Error reading from localStorage:', error );
 		return defaultValue;
 	}
@@ -22,13 +23,17 @@ export const getLocalStorageValue = ( key, defaultValue = null ) => {
 
 /**
  * Sets a value in localStorage with the pattern-builder prefix
- * @param {string} key - The key to store
- * @param {*} value - The value to store
+ * @param {string} key   - The key to store
+ * @param {*}      value - The value to store
  */
 export const setLocalStorageValue = ( key, value ) => {
 	try {
-		localStorage.setItem( STORAGE_KEY_PREFIX + key, JSON.stringify( value ) );
+		window.localStorage.setItem(
+			STORAGE_KEY_PREFIX + key,
+			JSON.stringify( value )
+		);
 	} catch ( error ) {
+		// eslint-disable-next-line no-console
 		console.error( 'Error writing to localStorage:', error );
 	}
 };
@@ -39,15 +44,16 @@ export const setLocalStorageValue = ( key, value ) => {
  */
 export const removeLocalStorageValue = ( key ) => {
 	try {
-		localStorage.removeItem( STORAGE_KEY_PREFIX + key );
+		window.localStorage.removeItem( STORAGE_KEY_PREFIX + key );
 	} catch ( error ) {
+		// eslint-disable-next-line no-console
 		console.error( 'Error removing from localStorage:', error );
 	}
 };
 
 /**
  * Gets the localize patterns setting from localStorage
- * @returns {boolean} Whether pattern localization is enabled
+ * @return {boolean} Whether pattern localization is enabled
  */
 export const getLocalizePatternsSetting = () => {
 	return getLocalStorageValue( 'localizePatterns', false );
@@ -63,7 +69,7 @@ export const setLocalizePatternsSetting = ( value ) => {
 
 /**
  * Gets the import images setting from localStorage
- * @returns {boolean} Whether image importing is enabled (defaults to true)
+ * @return {boolean} Whether image importing is enabled (defaults to true)
  */
 export const getImportImagesSetting = () => {
 	return getLocalStorageValue( 'importImages', true );

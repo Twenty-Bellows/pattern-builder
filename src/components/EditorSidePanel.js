@@ -2,11 +2,12 @@
  * WordPress dependencies
  */
 import { __, _x } from '@wordpress/i18n';
-import { useState } from '@wordpress/element';
+import { useState, useEffect, useMemo } from '@wordpress/element';
 import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
-import { PanelBody } from '@wordpress/components';
-import { Navigator, Icon } from '@wordpress/components';
 import {
+	PanelBody,
+	Navigator,
+	Icon,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalVStack as VStack,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
@@ -19,20 +20,15 @@ import {
 	__experimentalHeading as Heading,
 } from '@wordpress/components';
 import {
-	widget,
 	addTemplate,
 	category as categoryIcon,
-	download,
 	chevronLeft,
 	chevronRight,
-	addCard,
 	cog,
 } from '@wordpress/icons';
 
 import { fetchAllPatterns } from '../utils/resolvers';
 import { PatternCreatePanel } from './PatternCreatePanel';
-import { useEffect } from 'react';
-import { useMemo } from 'react';
 import { PatternBrowserPanel } from './PatternBrowserPanel';
 import { PatternBuilderConfiguration } from './PatternBuilderConfiguration';
 import { patternBuilderAppIcon } from '../assets/icons';
@@ -40,22 +36,27 @@ import { patternBuilderAppIcon } from '../assets/icons';
 export const EditorSidePanel = () => {
 	const [ allPatterns, setAllPatterns ] = useState( [] );
 
-	useEffect( () => {
+	const refreshPatterns = () => {
 		fetchAllPatterns()
 			.then( ( patterns ) => {
 				setAllPatterns( patterns );
 			} )
 			.catch( ( error ) => {
+				// eslint-disable-next-line no-console
 				console.error( 'Error fetching patterns:', error );
 			} );
+	};
+
+	useEffect( () => {
+		refreshPatterns();
 	}, [] );
 
 	const patternCategories = useMemo( () => {
 		const categories = Object.values(
 			allPatterns.reduce( ( acc, pattern ) => {
 				if ( pattern.inserter === false ) {
-					if ( ! acc[ 'hidden' ] ) {
-						acc[ 'hidden' ] = {
+					if ( ! acc.hidden ) {
+						acc.hidden = {
 							label: __( 'Hidden', 'pattern-builder' ),
 							value: 'hidden',
 						};
@@ -65,8 +66,8 @@ export const EditorSidePanel = () => {
 					pattern.inserter &&
 					( ! pattern.categories || pattern.categories.length === 0 )
 				) {
-					if ( ! acc[ 'uncategorized' ] ) {
-						acc[ 'uncategorized' ] = {
+					if ( ! acc.uncategorized ) {
+						acc.uncategorized = {
 							label: __( 'Uncategorized', 'pattern-builder' ),
 							value: 'uncategorized',
 						};
@@ -149,7 +150,7 @@ export const EditorSidePanel = () => {
 										<Icon icon={ chevronRight } />
 									</Navigator.Button>
 								) ) }
-								<Divider/>
+								<Divider />
 								<Navigator.Button
 									icon={ cog }
 									path="/configuration"
@@ -185,7 +186,7 @@ export const EditorSidePanel = () => {
 									) }
 								</Heading>
 							</HStack>
-							<PatternCreatePanel />
+							<PatternCreatePanel onCreated={ refreshPatterns } />
 						</PanelBody>
 					</Navigator.Screen>
 					<Navigator.Screen path="/browse/:category">
