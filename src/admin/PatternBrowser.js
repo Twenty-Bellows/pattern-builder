@@ -1,47 +1,159 @@
 import { __, _x } from '@wordpress/i18n';
-import { useState, useEffect, useMemo } from '@wordpress/element';
+import { useState, useEffect, useMemo, useCallback } from '@wordpress/element';
 import {
 	Button,
 	Modal,
 	SearchControl,
+	SnackbarList,
 	Spinner,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalHStack as HStack,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
-	__experimentalVStack as VStack,
-	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalHeading as Heading,
-	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
-	__experimentalToggleGroupControl as ToggleGroupControl,
-	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
-	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
 } from '@wordpress/components';
 import { addTemplate } from '@wordpress/icons';
 import { BlockEditorProvider } from '@wordpress/block-editor';
+import { useSelect, useDispatch } from '@wordpress/data';
+import { store as coreStore } from '@wordpress/core-data';
+import { store as noticesStore } from '@wordpress/notices';
 
 import { fetchAllPatterns } from '../utils/resolvers';
-import { PatternPreview } from '../components/PatternPreview';
+import { PatternCard } from '../components/PatternCard';
+import { PatternDetailsPanel } from '../components/PatternDetailsPanel';
 import { PatternCreatePanel } from '../components/PatternCreatePanel';
 
+const ALL = 'all';
+const MINE = 'mine';
+const UNCATEGORIZED = 'uncategorized';
+
 /**
- * The browse screen: every pattern the site has, theme and user, with
- * search, source filtering, and a create flow.
+ * The category rail: All patterns, My patterns (user-created), every
+ * category in use, and Uncategorized — each with a count, the way the Site
+ * Editor's Patterns screen lays them out.
+ *
+ * @param {Object}   props            Component props.
+ * @param {Array}    props.categories The category descriptors.
+ * @param {string}   props.active     The active category slug.
+ * @param {Function} props.onSelect   Called with a category slug.
+ */
+function CategoryRail( { categories, active, onSelect } ) {
+	return (
+		<ul
+			className="pattern-builder-browser__categories"
+			aria-label={ __( 'Pattern categories', 'pattern-builder' ) }
+		>
+			{ categories.map( ( category ) => (
+				<li key={ category.slug }>
+					<button
+						type="button"
+						className={
+							'pattern-builder-browser__category' +
+							( category.slug === active ? ' is-active' : '' )
+						}
+						onClick={ () => onSelect( category.slug ) }
+					>
+						<span className="pattern-builder-browser__category-label">
+							{ category.label }
+						</span>
+						<span className="pattern-builder-browser__category-count">
+							{ category.count }
+						</span>
+					</button>
+				</li>
+			) ) }
+		</ul>
+	);
+}
+
+/**
+ * The browse screen: a category rail, a grid of uniform pattern cards, and
+ * a details sidebar for the selected pattern.
  *
  * @param {Object}   props                Component props.
- * @param {Function} props.onEdit         Called with the pattern to open.
+ * @param {Function} props.onEdit         Called with the pattern to open its editor.
  * @param {Object}   props.editorSettings Block editor settings for previews.
  */
 export function PatternBrowser( { onEdit, editorSettings } ) {
 	const [ patterns, setPatterns ] = useState( null );
 	const [ search, setSearch ] = useState( '' );
-	const [ sourceFilter, setSourceFilter ] = useState( 'all' );
+	const [ category, setCategory ] = useState( ALL );
+	const [ selectedId, setSelectedId ] = useState( null );
 	const [ isCreateOpen, setIsCreateOpen ] = useState( false );
 
-	useEffect( () => {
+	const refresh = useCallback( () => {
 		fetchAllPatterns()
 			.then( setPatterns )
 			.catch( () => setPatterns( [] ) );
 	}, [] );
+
+	useEffect( refresh, [ refresh ] );
+
+	// Labels for registered pattern categories; raw slugs otherwise.
+	const registeredCategories = useSelect(
+		( select ) => select( coreStore ).getBlockPatternCategories(),
+		[]
+	);
+
+	const snackbarNotices = useSelect(
+		( select ) =>
+			select( noticesStore )
+				.getNotices()
+				.filter( ( notice ) => notice.type === 'snackbar' ),
+		[]
+	);
+	const { removeNotice } = useDispatch( noticesStore );
+
+	const categories = useMemo( () => {
+		const all = patterns || [];
+		const labelFor = ( slug ) =>
+			( registeredCategories || [] ).find( ( c ) => c.name === slug )
+				?.label || slug;
+
+		const counts = {};
+		let uncategorized = 0;
+
+		all.forEach( ( pattern ) => {
+			const slugs = pattern.categories || [];
+			if ( slugs.length === 0 ) {
+				uncategorized++;
+			}
+			slugs.forEach( ( slug ) => {
+				counts[ slug ] = ( counts[ slug ] || 0 ) + 1;
+			} );
+		} );
+
+		const rail = [
+			{
+				slug: ALL,
+				label: __( 'All patterns', 'pattern-builder' ),
+				count: all.length,
+			},
+			{
+				slug: MINE,
+				label: __( 'My patterns', 'pattern-builder' ),
+				count: all.filter( ( p ) => p.source === 'user' ).length,
+			},
+			...Object.keys( counts )
+				.sort( ( a, b ) =>
+					labelFor( a ).localeCompare( labelFor( b ) )
+				)
+				.map( ( slug ) => ( {
+					slug,
+					label: labelFor( slug ),
+					count: counts[ slug ],
+				} ) ),
+		];
+
+		if ( uncategorized > 0 ) {
+			rail.push( {
+				slug: UNCATEGORIZED,
+				label: __( 'Uncategorized', 'pattern-builder' ),
+				count: uncategorized,
+			} );
+		}
+
+		return rail;
+	}, [ patterns, registeredCategories ] );
 
 	const filteredPatterns = useMemo( () => {
 		if ( ! patterns ) {
@@ -51,7 +163,23 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 		const term = search.trim().toLowerCase();
 
 		return patterns.filter( ( pattern ) => {
-			if ( sourceFilter !== 'all' && pattern.source !== sourceFilter ) {
+			if ( category === MINE && pattern.source !== 'user' ) {
+				return false;
+			}
+
+			if (
+				category === UNCATEGORIZED &&
+				( pattern.categories || [] ).length > 0
+			) {
+				return false;
+			}
+
+			if (
+				category !== ALL &&
+				category !== MINE &&
+				category !== UNCATEGORIZED &&
+				! ( pattern.categories || [] ).includes( category )
+			) {
 				return false;
 			}
 
@@ -71,7 +199,15 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 
 			return haystack.includes( term );
 		} );
-	}, [ patterns, search, sourceFilter ] );
+	}, [ patterns, search, category ] );
+
+	const selectedPattern = useMemo(
+		() =>
+			( patterns || [] ).find(
+				( pattern ) => pattern.id === selectedId
+			) || null,
+		[ patterns, selectedId ]
+	);
 
 	if ( null === patterns ) {
 		return (
@@ -89,15 +225,42 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 		 */
 		<BlockEditorProvider settings={ editorSettings }>
 			<div className="pattern-builder-browser">
-				<VStack spacing={ 4 }>
-					<HStack alignment="edge">
-						<Heading level={ 1 } size={ 20 }>
-							{ _x(
-								'Pattern Builder',
-								'UI String',
-								'pattern-builder'
-							) }
-						</Heading>
+				<aside className="pattern-builder-browser__sidebar">
+					<Heading
+						level={ 1 }
+						size={ 16 }
+						className="pattern-builder-browser__title"
+					>
+						{ _x(
+							'Pattern Builder',
+							'UI String',
+							'pattern-builder'
+						) }
+					</Heading>
+					<CategoryRail
+						categories={ categories }
+						active={ category }
+						onSelect={ ( slug ) => {
+							setCategory( slug );
+							setSelectedId( null );
+						} }
+					/>
+				</aside>
+
+				<main className="pattern-builder-browser__main">
+					<HStack
+						alignment="left"
+						spacing={ 4 }
+						wrap
+						className="pattern-builder-browser__toolbar"
+					>
+						<SearchControl
+							__nextHasNoMarginBottom
+							className="pattern-builder-browser__search"
+							value={ search }
+							onChange={ setSearch }
+							label={ __( 'Search patterns', 'pattern-builder' ) }
+						/>
 						<Button
 							variant="primary"
 							icon={ addTemplate }
@@ -107,51 +270,38 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 						</Button>
 					</HStack>
 
-					<HStack alignment="left" spacing={ 4 } wrap>
-						<SearchControl
-							__nextHasNoMarginBottom
-							className="pattern-builder-browser__search"
-							value={ search }
-							onChange={ setSearch }
-							label={ __( 'Search patterns', 'pattern-builder' ) }
-						/>
-						<ToggleGroupControl
-							__nextHasNoMarginBottom
-							hideLabelFromVision
-							label={ __( 'Pattern source', 'pattern-builder' ) }
-							value={ sourceFilter }
-							onChange={ setSourceFilter }
-						>
-							<ToggleGroupControlOption
-								value="all"
-								label={ __( 'All', 'pattern-builder' ) }
-							/>
-							<ToggleGroupControlOption
-								value="theme"
-								label={ __( 'Theme', 'pattern-builder' ) }
-							/>
-							<ToggleGroupControlOption
-								value="user"
-								label={ __( 'User', 'pattern-builder' ) }
-							/>
-						</ToggleGroupControl>
-					</HStack>
-
 					{ filteredPatterns.length === 0 && (
 						<p>{ __( 'No patterns found.', 'pattern-builder' ) }</p>
 					) }
 
 					<div className="pattern-builder-browser__grid">
 						{ filteredPatterns.map( ( pattern ) => (
-							<PatternPreview
+							<PatternCard
 								key={ pattern.id || pattern.name }
 								pattern={ pattern }
-								onClick={ onEdit }
-								onEditClick={ onEdit }
+								isSelected={ pattern.id === selectedId }
+								onSelect={ ( selected ) =>
+									setSelectedId(
+										selected.id === selectedId
+											? null
+											: selected.id
+									)
+								}
 							/>
 						) ) }
 					</div>
-				</VStack>
+				</main>
+
+				{ selectedPattern && (
+					<aside className="pattern-builder-browser__details">
+						<PatternDetailsPanel
+							key={ selectedPattern.id }
+							pattern={ selectedPattern }
+							onEdit={ onEdit }
+							onSaved={ refresh }
+						/>
+					</aside>
+				) }
 
 				{ isCreateOpen && (
 					<Modal
@@ -162,6 +312,12 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 						<PatternCreatePanel />
 					</Modal>
 				) }
+
+				<SnackbarList
+					className="pattern-builder-browser__snackbars"
+					notices={ snackbarNotices }
+					onRemove={ removeNotice }
+				/>
 			</div>
 		</BlockEditorProvider>
 	);
