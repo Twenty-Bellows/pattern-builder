@@ -75,13 +75,10 @@
 	aspect-ratio: 3 / 2;
 	overflow: hidden;
 	background: #f6f7f7;
-	container-type: inline-size;
 
 	iframe {
 		width: 1400px;
-		height: 934px;
 		border: 0;
-		transform: scale(calc(100cqw / 1400));
 		transform-origin: 0 0;
 		pointer-events: none;
 	}

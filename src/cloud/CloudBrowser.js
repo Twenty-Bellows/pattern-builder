@@ -1,6 +1,6 @@
 import apiFetch from '@wordpress/api-fetch';
 import { __, sprintf } from '@wordpress/i18n';
-import { useState, useEffect, useCallback } from '@wordpress/element';
+import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import {
 	Button,
 	Modal,
@@ -59,7 +59,29 @@ function cleanConnectCallbackUrl() {
  * @param {boolean}  props.isSelected Whether the card is selected.
  * @param {Function} props.onSelect   Selection callback.
  */
+const PREVIEW_WIDTH = 1400;
+
 function CloudCard( { pattern, isSelected, onSelect } ) {
+	// Scale the fixed-width preview iframe to the card (measured — CSS
+	// alone can't feed a container-relative number into transform:scale).
+	const previewRef = useRef( null );
+	const [ scale, setScale ] = useState( 0.2 );
+
+	useEffect( () => {
+		const node = previewRef.current;
+		if ( ! node || typeof window.ResizeObserver === 'undefined' ) {
+			return;
+		}
+		const observer = new window.ResizeObserver( ( entries ) => {
+			const width = entries[ 0 ]?.contentRect?.width;
+			if ( width ) {
+				setScale( width / PREVIEW_WIDTH );
+			}
+		} );
+		observer.observe( node );
+		return () => observer.disconnect();
+	}, [] );
+
 	return (
 		<button
 			type="button"
@@ -69,13 +91,20 @@ function CloudCard( { pattern, isSelected, onSelect } ) {
 			}
 			onClick={ () => onSelect( pattern ) }
 		>
-			<span className="pattern-builder-cloud__card-preview">
+			<span
+				className="pattern-builder-cloud__card-preview"
+				ref={ previewRef }
+			>
 				<iframe
 					title={ pattern.title }
 					src={ pattern.previewUrl }
 					loading="lazy"
 					scrolling="no"
 					tabIndex={ -1 }
+					style={ {
+						transform: `scale(${ scale })`,
+						height: `${ Math.ceil( ( 2 / 3 ) * PREVIEW_WIDTH ) }px`,
+					} }
 				/>
 			</span>
 			<span className="pattern-builder-cloud__card-title">

@@ -25,6 +25,9 @@ class Pattern_Builder_Cloud_Porter {
 	 */
 	private $store;
 
+	/**
+	 * Set up the file store the porter reads and writes through.
+	 */
 	public function __construct() {
 		$this->store = new Pattern_File_Store();
 	}

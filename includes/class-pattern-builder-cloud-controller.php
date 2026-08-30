@@ -223,7 +223,8 @@ class Pattern_Builder_Cloud_Controller {
 		$as_new   = (bool) $request->get_param( 'asNew' );
 
 		if ( $existing && ! $as_new ) {
-			$result = Pattern_Builder_Cloud::upload( 'PUT', '/library/patterns/' . $existing, $exported['pbp'], $exported['files'] );
+			// POST, not PUT: PHP only parses multipart bodies on POST.
+			$result = Pattern_Builder_Cloud::upload( 'POST', '/library/patterns/' . $existing, $exported['pbp'], $exported['files'] );
 			// The cloud copy may have been deleted remotely; fall through to create.
 			if ( is_wp_error( $result ) && 404 === (int) ( $result->get_error_data()['status'] ?? 0 ) ) {
 				$existing = 0;

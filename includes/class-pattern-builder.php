@@ -55,6 +55,7 @@ class Pattern_Builder {
 		new Pattern_Builder_Admin();
 		new Pattern_Builder_Editor();
 		new Pattern_Builder_Migration();
+		Pattern_Builder_Cloud::register();
 		new Pattern_Builder_Cloud_Controller();
 	}
 
