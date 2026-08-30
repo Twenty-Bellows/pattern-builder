@@ -30,6 +30,8 @@ Version 2.0 removed the 1.x DB-mirror + REST-hijacking design entirely. Theme pa
 
 **Webpack entries:** `PatternBuilder_EditorTools.js` (management: sidebar, panels, save monitor — all block-editor screens), `PatternBuilder_Runtime.js` (the vendored content runtime — enqueued only when this plugin owns it), `PatternBuilder_Admin.js` (the browse grid, plus the edit-mode boot of core's edit-post editor).
 
+**The cloud module (2.1) — patternbuilderwp.com integration.** Users connect their personal [patternbuilderwp.com](https://github.com/Twenty-Bellows/patternbuilderwp.com) account per WP user via OAuth 2.0 + PKCE (`Pattern_Builder_Cloud` holds the token in user meta; the service URL is the `pattern_builder_cloud_url` option, filterable for dev). The browser never talks to the service: all cloud traffic flows through nonce+capability-gated proxy routes (`/pattern-builder/v1/cloud/*`, `Pattern_Builder_Cloud_Controller`). `Pattern_Builder_Cloud_Porter` converts local patterns ↔ the service's Portable Pattern Package (`pbp/1`): exports bundle local images as `pbp-asset://` placeholders + files; imports fetch service-hosted assets into the media library, re-sanitize the markup (KSES + scheme checks — never trust the wire), then land as a `wp_block` or flow through `Pattern_File_Store::update_theme_pattern()` for theme destinations. A site option (`pattern_builder_cloud_links`) maps local patterns to cloud IDs so re-uploads offer Update-vs-New. UI lives in `src/cloud/CloudBrowser.js`, mounted from the browse app's rail (My Cloud Library / Pattern Directory) with iframe previews scaled via ResizeObserver. The plugin remains fully functional disconnected.
+
 ---
 
 ## Development Environment

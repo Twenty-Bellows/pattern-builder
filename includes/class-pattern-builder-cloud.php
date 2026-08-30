@@ -25,6 +25,64 @@ class Pattern_Builder_Cloud {
 	const PKCE_TTL = 10 * MINUTE_IN_SECONDS;
 
 	/**
+	 * Register global hooks (called once at plugin boot).
+	 */
+	public static function register() {
+		add_filter( 'http_request_host_is_external', array( __CLASS__, 'allow_service_host' ), 10, 3 );
+		add_filter( 'http_allowed_safe_ports', array( __CLASS__, 'allow_service_port' ), 10, 3 );
+	}
+
+	/**
+	 * Add the service's port to core's safe-port list when the service runs
+	 * on a nonstandard one (development instances).
+	 *
+	 * @param int[]  $ports Allowed ports.
+	 * @param string $host  Host being validated.
+	 * @param string $url   Full URL being validated.
+	 * @return int[]
+	 */
+	public static function allow_service_port( $ports, $host, $url ) {
+		$service = wp_parse_url( self::service_url() );
+
+		if ( ! empty( $service['port'] ) && ! empty( $service['host'] )
+			&& strtolower( (string) $host ) === strtolower( $service['host'] )
+			&& ! in_array( (int) $service['port'], $ports, true ) ) {
+			$ports[] = (int) $service['port'];
+		}
+
+		return $ports;
+	}
+
+	/**
+	 * Let core's hardened URL validation (which rejects loopback/private
+	 * hosts) through for the admin-configured service origin — required for
+	 * asset downloads from development service instances on localhost.
+	 *
+	 * @param bool   $external Whether the host is already considered external.
+	 * @param string $host     Host being validated.
+	 * @param string $url      Full URL being validated.
+	 * @return bool
+	 */
+	public static function allow_service_host( $external, $host, $url ) {
+		if ( $external ) {
+			return $external;
+		}
+
+		$service = wp_parse_url( self::service_url() );
+		$target  = wp_parse_url( $url );
+
+		if ( empty( $service['host'] ) || empty( $target['host'] ) ) {
+			return $external;
+		}
+
+		$same_host   = strtolower( $target['host'] ) === strtolower( $service['host'] );
+		$same_port   = ( $target['port'] ?? null ) === ( $service['port'] ?? null );
+		$same_scheme = ( $target['scheme'] ?? '' ) === ( $service['scheme'] ?? '' );
+
+		return ( $same_host && $same_port && $same_scheme ) ? true : $external;
+	}
+
+	/**
 	 * Base URL of the patternbuilderwp.com service.
 	 *
 	 * @return string
