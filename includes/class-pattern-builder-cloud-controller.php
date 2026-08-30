@@ -36,19 +36,20 @@ class Pattern_Builder_Cloud_Controller {
 		};
 
 		$routes = array(
-			'/cloud/status'       => array( 'GET', 'status' ),
-			'/cloud/login'        => array( 'POST', 'login' ),
-			'/cloud/signup'       => array( 'POST', 'signup' ),
-			'/cloud/disconnect'   => array( 'POST', 'disconnect' ),
-			'/cloud/library'      => array( 'GET', 'library' ),
-			'/cloud/categories'   => array( 'GET', 'categories' ),
-			'/cloud/directory'    => array( 'GET', 'directory' ),
-			'/cloud/collections'  => array( 'GET', 'collections' ),
-			'/cloud/links'        => array( 'GET', 'links' ),
-			'/cloud/upload'       => array( 'POST', 'upload' ),
-			'/cloud/download'     => array( 'POST', 'download' ),
-			'/cloud/generate'     => array( 'POST', 'generate' ),
-			'/cloud/tokens/check' => array( 'POST', 'tokens_check' ),
+			'/cloud/status'        => array( 'GET', 'status' ),
+			'/cloud/login'         => array( 'POST', 'login' ),
+			'/cloud/signup'        => array( 'POST', 'signup' ),
+			'/cloud/disconnect'    => array( 'POST', 'disconnect' ),
+			'/cloud/library'       => array( 'GET', 'library' ),
+			'/cloud/categories'    => array( 'GET', 'categories' ),
+			'/cloud/directory'     => array( 'GET', 'directory' ),
+			'/cloud/collections'   => array( 'GET', 'collections' ),
+			'/cloud/links'         => array( 'GET', 'links' ),
+			'/cloud/pattern-state' => array( 'GET', 'pattern_state' ),
+			'/cloud/upload'        => array( 'POST', 'upload' ),
+			'/cloud/download'      => array( 'POST', 'download' ),
+			'/cloud/generate'      => array( 'POST', 'generate' ),
+			'/cloud/tokens/check'  => array( 'POST', 'tokens_check' ),
 		);
 
 		foreach ( $routes as $route => $handler ) {
@@ -217,6 +218,57 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
+	 * GET /cloud/pattern-state — one pattern's cloud standing, for the
+	 * sidebar Cloud panel. Entirely local (link map + content hash): no
+	 * service round trip, so it's cheap enough to call per selection.
+	 *
+	 * Params: patternType (theme|user), patternId.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function pattern_state( $request ) {
+		if ( ! Pattern_Builder_Cloud::is_connected() ) {
+			return rest_ensure_response( array( 'connected' => false ) );
+		}
+
+		$type = 'user' === $request->get_param( 'patternType' ) ? 'user' : 'theme';
+		$id   = 'user' === $type ? (int) $request->get_param( 'patternId' ) : (string) $request->get_param( 'patternId' );
+
+		$porter = new Pattern_Builder_Cloud_Porter();
+		$hash   = $porter->content_hash( $type, $id );
+		if ( is_wp_error( $hash ) ) {
+			return $hash;
+		}
+
+		$links = Pattern_Builder_Cloud::links();
+		$key   = Pattern_Builder_Cloud_Porter::local_key( $type, $id );
+
+		if ( empty( $links[ $key ] ) ) {
+			return rest_ensure_response(
+				array(
+					'connected' => true,
+					'linked'    => false,
+				)
+			);
+		}
+
+		$link = $links[ $key ];
+
+		return rest_ensure_response(
+			array(
+				'connected'  => true,
+				'linked'     => true,
+				'cloudId'    => (int) $link['cloudId'],
+				// A link with no stored hash predates change tracking; treat
+				// it as changed so the panel offers an update.
+				'changed'    => empty( $link['hash'] ) || $link['hash'] !== $hash,
+				'uploadedAt' => isset( $link['uploadedAt'] ) ? (int) $link['uploadedAt'] : 0,
+			)
+		);
+	}
+
+	/**
 	 * POST /cloud/upload — send a local pattern to the account's library.
 	 *
 	 * Params: patternType (theme|user), patternId, categories (string[]),
@@ -267,7 +319,7 @@ class Pattern_Builder_Cloud_Controller {
 		}
 
 		if ( ! empty( $result['id'] ) ) {
-			Pattern_Builder_Cloud::set_link( $exported['localKey'], (int) $result['id'] );
+			Pattern_Builder_Cloud::set_link( $exported['localKey'], (int) $result['id'], $exported['contentHash'] );
 		}
 
 		return rest_ensure_response(
@@ -324,8 +376,15 @@ class Pattern_Builder_Cloud_Controller {
 			return $result;
 		}
 
-		// Remember the linkage so re-uploads offer "update".
-		Pattern_Builder_Cloud::set_link( Pattern_Builder_Cloud_Porter::local_key( $result['type'], $result['id'] ), $cloud_id );
+		// Remember the linkage so re-uploads offer "update". The imported
+		// content IS the cloud content right now, so its hash marks the
+		// pattern as up to date in the sidebar's Cloud panel.
+		$hash = $porter->content_hash( $result['type'], $result['id'] );
+		Pattern_Builder_Cloud::set_link(
+			Pattern_Builder_Cloud_Porter::local_key( $result['type'], $result['id'] ),
+			$cloud_id,
+			is_wp_error( $hash ) ? '' : $hash
+		);
 
 		$result['tokensWritten'] = $tokens_written;
 		return rest_ensure_response( $result );

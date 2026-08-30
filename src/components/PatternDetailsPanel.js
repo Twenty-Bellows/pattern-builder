@@ -18,6 +18,7 @@ import { PatternSourcePanel } from './PatternSourcePanel';
 import { PatternSyncedStatusPanel } from './PatternSyncedStatusPanel';
 import { PatternMetadataPanel } from './PatternMetadataPanel';
 import { PatternAssociationsPanel } from './PatternAssociationsPanel';
+import { PatternCloudPanelBody } from './PatternCloudPanel';
 
 /**
  * The browse screen's details sidebar for the selected pattern — the same
@@ -142,6 +143,12 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 								postType={ postType }
 							/>
 						</PanelBody>
+
+						<PatternCloudPanelBody
+							patternType={ isThemePattern ? 'theme' : 'user' }
+							patternId={ pattern.id }
+							refreshKey={ record?.modified }
+						/>
 
 						{ isThemePattern && (
 							<PanelBody

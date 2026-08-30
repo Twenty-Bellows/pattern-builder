@@ -37,7 +37,7 @@ class Pattern_Builder_Cloud_Porter {
 	 *
 	 * @param string     $type 'theme' or 'user'.
 	 * @param string|int $id   Theme pattern name or wp_block post ID.
-	 * @return array|WP_Error { pbp: array, files: array (key => path), localKey: string }
+	 * @return array|WP_Error { pbp: array, files: array (key => path), localKey: string, contentHash: string }
 	 */
 	public function export_local( $type, $id ) {
 		$pattern = $this->load_local( $type, $id );
@@ -46,6 +46,7 @@ class Pattern_Builder_Cloud_Porter {
 		}
 
 		$content = (string) $pattern->content;
+		$raw_md5 = md5( $content );
 		$files   = array();
 		$assets  = array();
 
@@ -89,10 +90,27 @@ class Pattern_Builder_Cloud_Porter {
 		);
 
 		return array(
-			'pbp'      => $pbp,
-			'files'    => $files,
-			'localKey' => self::local_key( $type, $id ),
+			'pbp'         => $pbp,
+			'files'       => $files,
+			'localKey'    => self::local_key( $type, $id ),
+			'contentHash' => $raw_md5,
 		);
+	}
+
+	/**
+	 * Hash of a local pattern's raw content — the "has it changed since
+	 * upload?" fingerprint stored in the cloud-link map.
+	 *
+	 * @param string     $type 'theme' or 'user'.
+	 * @param string|int $id   Local identifier.
+	 * @return string|WP_Error
+	 */
+	public function content_hash( $type, $id ) {
+		$pattern = $this->load_local( $type, $id );
+		if ( is_wp_error( $pattern ) ) {
+			return $pattern;
+		}
+		return md5( (string) $pattern->content );
 	}
 
 	/**
