@@ -3,11 +3,13 @@ import { __, sprintf } from '@wordpress/i18n';
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import {
 	Button,
+	FormFileUpload,
 	Modal,
 	SearchControl,
 	SelectControl,
 	Spinner,
 	TextControl,
+	TextareaControl,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalHStack as HStack,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
@@ -26,6 +28,7 @@ const BASE = '/pattern-builder/v1/cloud';
 
 export const CLOUD_LIBRARY = 'cloud-library';
 export const CLOUD_DIRECTORY = 'cloud-directory';
+export const CLOUD_GENERATE = 'cloud-generate';
 
 /**
  * Whether the current page load is the OAuth callback from the service.
@@ -190,6 +193,257 @@ function CloudDetails( { pattern, source, onDownload, onDelete, busy } ) {
 }
 
 /**
+ * The AI generation panel: prompt and/or screenshot in, a cloud library
+ * pattern out. Entitlements are enforced server-side; this mirrors them.
+ *
+ * @param {Object}   props                  Component props.
+ * @param {Object}   props.status           Connection status (tier, usage, ai).
+ * @param {boolean}  props.busy             Whether a download is in flight.
+ * @param {Function} props.onDownload       Called with (pattern, destination).
+ * @param {Function} props.onDelete         Called with the pattern.
+ * @param {Function} props.onCreditsChanged Refresh the status meters.
+ */
+function GeneratePanel( {
+	status,
+	busy,
+	onDownload,
+	onDelete,
+	onCreditsChanged,
+} ) {
+	const [ prompt, setPrompt ] = useState( '' );
+	const [ imageFile, setImageFile ] = useState( null );
+	const [ phase, setPhase ] = useState( 'idle' );
+	const [ error, setError ] = useState( '' );
+	const [ result, setResult ] = useState( null );
+	const pollRef = useRef( null );
+
+	useEffect( () => () => window.clearInterval( pollRef.current ), [] );
+
+	const serviceBase = ( status.serviceUrl || '' ).replace( /\/+$/, '' );
+	const upgradeUrl = status.upgradeUrl || `${ serviceBase }/pricing/`;
+	const credits = status.usage?.ai_credits;
+
+	if ( status.tier !== 'pro' ) {
+		return (
+			<VStack
+				spacing={ 4 }
+				className="pattern-builder-cloud__connect"
+				alignment="center"
+			>
+				<Heading level={ 2 } size={ 18 }>
+					{ __( 'Generate patterns with AI', 'pattern-builder' ) }
+				</Heading>
+				<p>
+					{ __(
+						'Describe a section — or drop in a screenshot — and get a ready-to-use block pattern in your cloud library. AI generation is part of Pattern Builder Pro.',
+						'pattern-builder'
+					) }
+				</p>
+				<Button variant="primary" href={ upgradeUrl } target="_blank">
+					{ __(
+						'Upgrade to Pattern Builder Pro',
+						'pattern-builder'
+					) }
+				</Button>
+			</VStack>
+		);
+	}
+
+	if ( ! status.ai?.enabled ) {
+		return (
+			<p className="pattern-builder-cloud__meta">
+				{ __(
+					'AI generation is currently switched off on patternbuilderwp.com.',
+					'pattern-builder'
+				) }
+			</p>
+		);
+	}
+
+	const working = phase === 'working';
+
+	const stopPolling = () => {
+		window.clearInterval( pollRef.current );
+		pollRef.current = null;
+	};
+
+	const finish = ( update ) => {
+		stopPolling();
+		onCreditsChanged();
+		if ( update.status === 'succeeded' && update.pattern ) {
+			setResult( update.pattern );
+			setPhase( 'done' );
+		} else {
+			setError(
+				update.error ||
+					__( 'The generation failed.', 'pattern-builder' )
+			);
+			setPhase( 'failed' );
+		}
+	};
+
+	const submit = () => {
+		setPhase( 'working' );
+		setError( '' );
+		setResult( null );
+
+		const form = new window.FormData();
+		form.append( 'prompt', prompt );
+		if ( imageFile ) {
+			form.append( 'image', imageFile );
+		}
+
+		apiFetch( { path: `${ BASE }/generate`, method: 'POST', body: form } )
+			.then( ( job ) => {
+				pollRef.current = window.setInterval( () => {
+					apiFetch( { path: `${ BASE }/generate/${ job.id }` } )
+						.then( ( update ) => {
+							if (
+								update.status === 'succeeded' ||
+								update.status === 'failed'
+							) {
+								finish( update );
+							}
+						} )
+						.catch( ( pollError ) => {
+							stopPolling();
+							setError(
+								pollError.message ||
+									__(
+										'The generation failed.',
+										'pattern-builder'
+									)
+							);
+							setPhase( 'failed' );
+						} );
+				}, 2500 );
+			} )
+			.catch( ( submitError ) => {
+				setError(
+					submitError.message ||
+						__(
+							'The generation could not be started.',
+							'pattern-builder'
+						)
+				);
+				setPhase( 'failed' );
+			} );
+	};
+
+	return (
+		<VStack spacing={ 4 } className="pattern-builder-cloud__generate">
+			<Heading level={ 2 } size={ 18 }>
+				{ __( 'Generate a pattern', 'pattern-builder' ) }
+			</Heading>
+			<p className="pattern-builder-cloud__meta">
+				{ __(
+					'Describe the section you need, or attach a screenshot to recreate. The result lands in your cloud library, images included — download it into this site with one click.',
+					'pattern-builder'
+				) }
+			</p>
+			<TextareaControl
+				__nextHasNoMarginBottom
+				label={ __( 'Describe the pattern', 'pattern-builder' ) }
+				placeholder={ __(
+					'A pricing section with two plans and a highlighted “most popular” column…',
+					'pattern-builder'
+				) }
+				value={ prompt }
+				onChange={ setPrompt }
+				rows={ 3 }
+				disabled={ working }
+			/>
+			<HStack alignment="left" spacing={ 2 } wrap>
+				<FormFileUpload
+					accept="image/*"
+					variant="secondary"
+					disabled={ working }
+					onChange={ ( event ) =>
+						setImageFile( event.target.files?.[ 0 ] || null )
+					}
+				>
+					{ imageFile
+						? imageFile.name
+						: __( 'Attach a screenshot', 'pattern-builder' ) }
+				</FormFileUpload>
+				{ imageFile && (
+					<Button
+						variant="tertiary"
+						icon={ closeSmall }
+						label={ __( 'Remove screenshot', 'pattern-builder' ) }
+						disabled={ working }
+						onClick={ () => setImageFile( null ) }
+					/>
+				) }
+				<Button
+					variant="primary"
+					isBusy={ working }
+					disabled={ working || ( ! prompt.trim() && ! imageFile ) }
+					onClick={ submit }
+				>
+					{ working
+						? __( 'Generating…', 'pattern-builder' )
+						: __( 'Generate', 'pattern-builder' ) }
+				</Button>
+			</HStack>
+			<p className="pattern-builder-cloud__meta">
+				{ typeof credits === 'number' &&
+					sprintf(
+						/* translators: %d: remaining credit count. */
+						__(
+							'%d AI credits left this month.',
+							'pattern-builder'
+						),
+						credits
+					) }{ ' ' }
+				{ status.ai?.provider === 'mock' &&
+					__(
+						'The service is running its built-in mock provider (no AI key configured yet), so generations come from templates.',
+						'pattern-builder'
+					) }
+			</p>
+			{ phase === 'failed' && (
+				<p className="pattern-builder-cloud__generate-error">
+					{ error }{ ' ' }
+					{ __( 'Your credit was not spent.', 'pattern-builder' ) }
+				</p>
+			) }
+			{ phase === 'done' && result && (
+				<div className="pattern-builder-cloud__content">
+					<div className="pattern-builder-cloud__grid-column">
+						<div className="pattern-builder-cloud__grid">
+							<CloudCard
+								pattern={ result }
+								isSelected
+								onSelect={ () => {} }
+							/>
+						</div>
+						<Button
+							variant="tertiary"
+							onClick={ () => {
+								setPhase( 'idle' );
+								setResult( null );
+								setPrompt( '' );
+								setImageFile( null );
+							} }
+						>
+							{ __( 'Generate another', 'pattern-builder' ) }
+						</Button>
+					</div>
+					<CloudDetails
+						pattern={ result }
+						source="library"
+						onDownload={ onDownload }
+						onDelete={ onDelete }
+						busy={ busy }
+					/>
+				</div>
+			) }
+		</VStack>
+	);
+}
+
+/**
  * The "Upload a pattern" modal: pick any local pattern, optionally set
  * cloud collections, and upload (or update its existing cloud copy).
  *
@@ -336,6 +590,7 @@ export function CloudBrowser( { view, onDownloaded } ) {
 		useDispatch( noticesStore );
 
 	const isLibrary = view === CLOUD_LIBRARY;
+	const isGenerate = view === CLOUD_GENERATE;
 
 	const refreshStatus = useCallback( () => {
 		return apiFetch( { path: `${ BASE }/status` } )
@@ -383,7 +638,7 @@ export function CloudBrowser( { view, onDownloaded } ) {
 	}, [ refreshStatus, createSuccessNotice, createErrorNotice ] );
 
 	const loadItems = useCallback( () => {
-		if ( ! status?.connected && isLibrary ) {
+		if ( isGenerate || ( ! status?.connected && isLibrary ) ) {
 			return;
 		}
 		setItems( null );
@@ -411,13 +666,21 @@ export function CloudBrowser( { view, onDownloaded } ) {
 					{ type: 'snackbar' }
 				);
 			} );
-	}, [ status, isLibrary, page, search, collection, createErrorNotice ] );
+	}, [
+		status,
+		isLibrary,
+		isGenerate,
+		page,
+		search,
+		collection,
+		createErrorNotice,
+	] );
 
 	useEffect( loadItems, [ loadItems ] );
 
 	// Directory view: load the collection filter options once.
 	useEffect( () => {
-		if ( isLibrary ) {
+		if ( isLibrary || isGenerate ) {
 			return;
 		}
 		apiFetch( { path: `${ BASE }/collections` } )
@@ -425,7 +688,7 @@ export function CloudBrowser( { view, onDownloaded } ) {
 				setCollections( Array.isArray( data ) ? data : [] )
 			)
 			.catch( () => setCollections( [] ) );
-	}, [ isLibrary ] );
+	}, [ isLibrary, isGenerate ] );
 
 	// Library view: load local link map for the upload modal.
 	useEffect( () => {
@@ -478,7 +741,7 @@ export function CloudBrowser( { view, onDownloaded } ) {
 			path: `${ BASE }/download`,
 			method: 'POST',
 			data: {
-				source: isLibrary ? 'library' : 'directory',
+				source: view === CLOUD_DIRECTORY ? 'directory' : 'library',
 				cloudId: pattern.id,
 				destination,
 			},
@@ -621,8 +884,9 @@ export function CloudBrowser( { view, onDownloaded } ) {
 		);
 	}
 
-	// Disconnected: the library needs an account; the directory browses anonymously.
-	if ( ! status.connected && isLibrary ) {
+	// Disconnected: the library and generator need an account; the
+	// directory browses anonymously.
+	if ( ! status.connected && ( isLibrary || isGenerate ) ) {
 		return (
 			<VStack
 				spacing={ 4 }
@@ -655,6 +919,20 @@ export function CloudBrowser( { view, onDownloaded } ) {
 					</p>
 				) }
 			</VStack>
+		);
+	}
+
+	if ( isGenerate ) {
+		return (
+			<div className="pattern-builder-cloud">
+				<GeneratePanel
+					status={ status }
+					busy={ busy }
+					onDownload={ download }
+					onDelete={ deleteCloudPattern }
+					onCreditsChanged={ refreshStatus }
+				/>
+			</div>
 		);
 	}
 

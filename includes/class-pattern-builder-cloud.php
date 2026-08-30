@@ -29,7 +29,7 @@ class Pattern_Builder_Cloud {
 	 */
 	public static function register() {
 		add_filter( 'http_request_host_is_external', array( __CLASS__, 'allow_service_host' ), 10, 3 );
-		add_filter( 'http_allowed_safe_ports', array( __CLASS__, 'allow_service_port' ), 10, 3 );
+		add_filter( 'http_allowed_safe_ports', array( __CLASS__, 'allow_service_port' ), 10, 2 );
 	}
 
 	/**
@@ -38,10 +38,9 @@ class Pattern_Builder_Cloud {
 	 *
 	 * @param int[]  $ports Allowed ports.
 	 * @param string $host  Host being validated.
-	 * @param string $url   Full URL being validated.
 	 * @return int[]
 	 */
-	public static function allow_service_port( $ports, $host, $url ) {
+	public static function allow_service_port( $ports, $host ) {
 		$service = wp_parse_url( self::service_url() );
 
 		if ( ! empty( $service['port'] ) && ! empty( $service['host'] )
@@ -247,7 +246,7 @@ class Pattern_Builder_Cloud {
 	 *
 	 * @param string $method HTTP method.
 	 * @param string $path   Route path within pbwp/v1.
-	 * @param array  $args   { query?: array, body?: array (JSON) }
+	 * @param array  $args   { query?: array, body?: array (JSON) }.
 	 * @return array|WP_Error Decoded response.
 	 */
 	public static function request( $method, $path, $args = array() ) {
@@ -289,7 +288,7 @@ class Pattern_Builder_Cloud {
 		$body .= wp_json_encode( $pbp ) . "\r\n";
 
 		foreach ( $files as $key => $file_path ) {
-			$contents = file_get_contents( $file_path ); // phpcs:ignore WordPressVIPMinimum.Performance.FetchingRemoteData.FileGetContentsUnknown -- Local file.
+			$contents = file_get_contents( $file_path ); // phpcs:ignore WordPressVIPMinimum.Performance.FetchingRemoteData.FileGetContentsUnknown, WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local file.
 			if ( false === $contents ) {
 				continue;
 			}
@@ -298,6 +297,56 @@ class Pattern_Builder_Cloud {
 			$body    .= "--{$boundary}\r\n";
 			$body    .= "Content-Disposition: form-data; name=\"asset_{$key}\"; filename=\"{$filename}\"\r\n";
 			$body    .= 'Content-Type: ' . ( $mime ? $mime : 'application/octet-stream' ) . "\r\n\r\n";
+			$body    .= $contents . "\r\n";
+		}
+
+		$body .= "--{$boundary}--\r\n";
+
+		$headers                 = self::auth_headers();
+		$headers['Content-Type'] = 'multipart/form-data; boundary=' . $boundary;
+
+		$response = wp_remote_request(
+			self::endpoint( $path ),
+			array(
+				'method'  => $method,
+				'timeout' => 60,
+				'headers' => $headers,
+				'body'    => $body,
+			)
+		);
+
+		return self::parse_response( $response );
+	}
+
+	/**
+	 * Generic multipart form request (plain fields plus named file fields).
+	 *
+	 * @param string $method HTTP method.
+	 * @param string $path   Route path within pbwp/v1.
+	 * @param array  $fields field => string value.
+	 * @param array  $files  field => { path, name, type }.
+	 * @return array|WP_Error Decoded response.
+	 */
+	public static function form_request( $method, $path, $fields, $files = array() ) {
+		$boundary = 'pbcloud' . bin2hex( random_bytes( 12 ) );
+		$body     = '';
+
+		foreach ( $fields as $name => $value ) {
+			$body .= "--{$boundary}\r\n";
+			$body .= "Content-Disposition: form-data; name=\"{$name}\"\r\n\r\n";
+			$body .= $value . "\r\n";
+		}
+
+		foreach ( $files as $name => $file ) {
+			$contents = file_get_contents( $file['path'] ); // phpcs:ignore WordPressVIPMinimum.Performance.FetchingRemoteData.FileGetContentsUnknown, WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local file.
+			if ( false === $contents ) {
+				continue;
+			}
+			$filename = sanitize_file_name( $file['name'] );
+			$mime     = ! empty( $file['type'] ) ? $file['type'] : 'application/octet-stream';
+			$body    .= "--{$boundary}\r\n";
+			$body    .= "Content-Disposition: form-data; name=\"{$name}\"; filename=\"{$filename}\"\r\n";
+			$body    .= "Content-Type: {$mime}\r\n\r\n";
 			$body    .= $contents . "\r\n";
 		}
 
@@ -387,7 +436,7 @@ class Pattern_Builder_Cloud {
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( $code >= 400 ) {
-			$message = is_array( $data ) && ! empty( $data['message'] )
+			$message    = is_array( $data ) && ! empty( $data['message'] )
 				? $data['message']
 				: __( 'The pattern service returned an error.', 'pattern-builder' );
 			$error_code = is_array( $data ) && ! empty( $data['code'] ) ? $data['code'] : 'pb_cloud_error';
@@ -398,7 +447,12 @@ class Pattern_Builder_Cloud {
 				delete_user_meta( get_current_user_id(), self::META_ACCOUNT );
 			}
 
-			return new WP_Error( $error_code, $message, array( 'status' => $code ) );
+			$error_data = array( 'status' => $code );
+			if ( is_array( $data ) && ! empty( $data['data']['upgrade_url'] ) ) {
+				$error_data['upgrade_url'] = $data['data']['upgrade_url'];
+			}
+
+			return new WP_Error( $error_code, $message, $error_data );
 		}
 
 		return is_array( $data ) ? $data : array();
