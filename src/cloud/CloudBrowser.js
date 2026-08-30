@@ -5,6 +5,7 @@ import {
 	Button,
 	FormFileUpload,
 	Modal,
+	Notice,
 	SearchControl,
 	SelectControl,
 	Spinner,
@@ -31,27 +32,134 @@ export const CLOUD_DIRECTORY = 'cloud-directory';
 export const CLOUD_GENERATE = 'cloud-generate';
 
 /**
- * Whether the current page load is the OAuth callback from the service.
+ * Sign in / create an account without leaving wp-admin. Credentials post
+ * to this site's proxy, which relays them to the service server-side and
+ * stores the returned token; the browser never visits the service.
  *
- * @return {Object|null} { code, state } or null.
+ * @param {Object}   props             Component props.
+ * @param {Function} props.onConnected Receives the fresh status payload.
  */
-export function readConnectCallback() {
-	const params = new URLSearchParams( window.location.search );
-	if ( params.get( 'pbcloud-callback' ) && params.get( 'code' ) ) {
-		return {
-			code: params.get( 'code' ),
-			state: params.get( 'state' ) || '',
-		};
-	}
-	return null;
-}
+function ConnectPanel( { onConnected } ) {
+	const [ mode, setMode ] = useState( 'login' );
+	const [ email, setEmail ] = useState( '' );
+	const [ password, setPassword ] = useState( '' );
+	const [ name, setName ] = useState( '' );
+	const [ busy, setBusy ] = useState( false );
+	const [ error, setError ] = useState( '' );
 
-function cleanConnectCallbackUrl() {
-	const url = new URL( window.location.href );
-	[ 'pbcloud-callback', 'code', 'state', 'error' ].forEach( ( key ) =>
-		url.searchParams.delete( key )
+	const isSignup = mode === 'signup';
+
+	const submit = ( event ) => {
+		event.preventDefault();
+		if ( busy || ! email || ! password ) {
+			return;
+		}
+		setBusy( true );
+		setError( '' );
+		apiFetch( {
+			path: `${ BASE }/${ isSignup ? 'signup' : 'login' }`,
+			method: 'POST',
+			data: isSignup ? { email, password, name } : { email, password },
+		} )
+			.then( ( data ) => onConnected( data ) )
+			.catch( ( err ) => {
+				setBusy( false );
+				setError(
+					err.message ||
+						__(
+							'The connection failed. Try again.',
+							'pattern-builder'
+						)
+				);
+			} );
+	};
+
+	return (
+		<form className="pattern-builder-cloud__connect" onSubmit={ submit }>
+			<VStack spacing={ 4 }>
+				<Heading
+					level={ 2 }
+					size={ 18 }
+					className="pattern-builder-cloud__connect-title"
+				>
+					{ __( 'Your patterns, on every site.', 'pattern-builder' ) }
+				</Heading>
+				<p className="pattern-builder-cloud__connect-intro">
+					{ __(
+						'Keep a pattern library on patternbuilderwp.com: upload patterns from this site, download them anywhere, and share collections with the community.',
+						'pattern-builder'
+					) }
+				</p>
+				{ isSignup && (
+					<TextControl
+						__nextHasNoMarginBottom
+						label={ __( 'Display name', 'pattern-builder' ) }
+						value={ name }
+						onChange={ setName }
+						autoComplete="name"
+					/>
+				) }
+				<TextControl
+					__nextHasNoMarginBottom
+					label={ __( 'Email', 'pattern-builder' ) }
+					type="email"
+					value={ email }
+					onChange={ setEmail }
+					autoComplete="email"
+					required
+				/>
+				<TextControl
+					__nextHasNoMarginBottom
+					label={ __( 'Password', 'pattern-builder' ) }
+					type="password"
+					value={ password }
+					onChange={ setPassword }
+					autoComplete={
+						isSignup ? 'new-password' : 'current-password'
+					}
+					help={
+						isSignup
+							? __( 'At least 8 characters.', 'pattern-builder' )
+							: undefined
+					}
+					required
+				/>
+				{ error && (
+					<Notice status="error" isDismissible={ false }>
+						{ error }
+					</Notice>
+				) }
+				<Button
+					variant="primary"
+					type="submit"
+					icon={ cloudUpload }
+					isBusy={ busy }
+					disabled={ busy || ! email || ! password }
+				>
+					{ isSignup
+						? __( 'Create account & connect', 'pattern-builder' )
+						: __( 'Sign in & connect', 'pattern-builder' ) }
+				</Button>
+				<Button
+					variant="link"
+					onClick={ () => {
+						setMode( isSignup ? 'login' : 'signup' );
+						setError( '' );
+					} }
+				>
+					{ isSignup
+						? __(
+								'Already have an account? Sign in',
+								'pattern-builder'
+						  )
+						: __(
+								'New here? Create a free account',
+								'pattern-builder'
+						  ) }
+				</Button>
+			</VStack>
+		</form>
 	);
-	window.history.replaceState( {}, '', url.toString() );
 }
 
 /**
@@ -708,41 +816,9 @@ export function CloudBrowser( { view, onDownloaded } ) {
 			.catch( () => setStatus( { connected: false } ) );
 	}, [] );
 
-	// Complete the OAuth callback if this page load carries one.
 	useEffect( () => {
-		const callback = readConnectCallback();
-		if ( ! callback ) {
-			refreshStatus();
-			return;
-		}
-		cleanConnectCallbackUrl();
-		apiFetch( {
-			path: `${ BASE }/connect/complete`,
-			method: 'POST',
-			data: callback,
-		} )
-			.then( ( data ) => {
-				setStatus( data );
-				createSuccessNotice(
-					__(
-						'Connected to patternbuilderwp.com.',
-						'pattern-builder'
-					),
-					{ type: 'snackbar' }
-				);
-			} )
-			.catch( ( error ) => {
-				createErrorNotice(
-					error.message ||
-						__(
-							'The connection could not be completed.',
-							'pattern-builder'
-						),
-					{ type: 'snackbar' }
-				);
-				refreshStatus();
-			} );
-	}, [ refreshStatus, createSuccessNotice, createErrorNotice ] );
+		refreshStatus();
+	}, [ refreshStatus ] );
 
 	const loadItems = useCallback( () => {
 		if ( isGenerate || ( ! status?.connected && isLibrary ) ) {
@@ -806,25 +882,6 @@ export function CloudBrowser( { view, onDownloaded } ) {
 			.then( ( data ) => setLinks( data || {} ) )
 			.catch( () => setLinks( {} ) );
 	}, [ isLibrary, status ] );
-
-	const connect = () => {
-		setBusy( true );
-		apiFetch( { path: `${ BASE }/connect`, method: 'POST' } )
-			.then( ( data ) => {
-				window.location.assign( data.authorizeUrl );
-			} )
-			.catch( ( error ) => {
-				setBusy( false );
-				createErrorNotice(
-					error.message ||
-						__(
-							'Could not start the connection.',
-							'pattern-builder'
-						),
-					{ type: 'snackbar' }
-				);
-			} );
-	};
 
 	const disconnect = () => {
 		apiFetch( { path: `${ BASE }/disconnect`, method: 'POST' } ).then(
@@ -1046,37 +1103,18 @@ export function CloudBrowser( { view, onDownloaded } ) {
 	// directory browses anonymously.
 	if ( ! status.connected && ( isLibrary || isGenerate ) ) {
 		return (
-			<VStack
-				spacing={ 4 }
-				className="pattern-builder-cloud__connect"
-				alignment="center"
-			>
-				<Heading level={ 2 } size={ 18 }>
-					{ __( 'Your patterns, on every site.', 'pattern-builder' ) }
-				</Heading>
-				<p>
-					{ __(
-						'Connect to patternbuilderwp.com to keep a pattern library in the cloud: upload patterns from this site, download them anywhere, and share collections with the community.',
-						'pattern-builder'
-					) }
-				</p>
-				<Button
-					variant="primary"
-					icon={ cloudUpload }
-					isBusy={ busy }
-					onClick={ connect }
-				>
-					{ __(
-						'Connect to patternbuilderwp.com',
-						'pattern-builder'
-					) }
-				</Button>
-				{ status.error && (
-					<p className="pattern-builder-cloud__meta">
-						{ status.error }
-					</p>
-				) }
-			</VStack>
+			<ConnectPanel
+				onConnected={ ( data ) => {
+					setStatus( data );
+					createSuccessNotice(
+						__(
+							'Connected to patternbuilderwp.com.',
+							'pattern-builder'
+						),
+						{ type: 'snackbar' }
+					);
+				} }
+			/>
 		);
 	}
 

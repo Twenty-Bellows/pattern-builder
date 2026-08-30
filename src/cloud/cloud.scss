@@ -5,14 +5,24 @@
 	min-width: 0;
 }
 
-.pattern-builder-cloud__loading,
-.pattern-builder-cloud__connect {
+.pattern-builder-cloud__loading {
 	display: grid;
 	place-items: center;
 	min-height: 320px;
 	text-align: center;
 	max-width: 480px;
 	margin: 0 auto;
+}
+
+.pattern-builder-cloud__connect {
+	max-width: 380px;
+	margin: 48px auto 0;
+}
+
+.pattern-builder-cloud__connect-title,
+.pattern-builder-cloud__connect-intro {
+	text-align: center;
+	margin: 0;
 }
 
 .pattern-builder-cloud__toolbar {

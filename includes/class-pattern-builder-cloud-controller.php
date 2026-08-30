@@ -36,19 +36,19 @@ class Pattern_Builder_Cloud_Controller {
 		};
 
 		$routes = array(
-			'/cloud/status'           => array( 'GET', 'status' ),
-			'/cloud/connect'          => array( 'POST', 'connect' ),
-			'/cloud/connect/complete' => array( 'POST', 'connect_complete' ),
-			'/cloud/disconnect'       => array( 'POST', 'disconnect' ),
-			'/cloud/library'          => array( 'GET', 'library' ),
-			'/cloud/categories'       => array( 'GET', 'categories' ),
-			'/cloud/directory'        => array( 'GET', 'directory' ),
-			'/cloud/collections'      => array( 'GET', 'collections' ),
-			'/cloud/links'            => array( 'GET', 'links' ),
-			'/cloud/upload'           => array( 'POST', 'upload' ),
-			'/cloud/download'         => array( 'POST', 'download' ),
-			'/cloud/generate'         => array( 'POST', 'generate' ),
-			'/cloud/tokens/check'     => array( 'POST', 'tokens_check' ),
+			'/cloud/status'       => array( 'GET', 'status' ),
+			'/cloud/login'        => array( 'POST', 'login' ),
+			'/cloud/signup'       => array( 'POST', 'signup' ),
+			'/cloud/disconnect'   => array( 'POST', 'disconnect' ),
+			'/cloud/library'      => array( 'GET', 'library' ),
+			'/cloud/categories'   => array( 'GET', 'categories' ),
+			'/cloud/directory'    => array( 'GET', 'directory' ),
+			'/cloud/collections'  => array( 'GET', 'collections' ),
+			'/cloud/links'        => array( 'GET', 'links' ),
+			'/cloud/upload'       => array( 'POST', 'upload' ),
+			'/cloud/download'     => array( 'POST', 'download' ),
+			'/cloud/generate'     => array( 'POST', 'generate' ),
+			'/cloud/tokens/check' => array( 'POST', 'tokens_check' ),
 		);
 
 		foreach ( $routes as $route => $handler ) {
@@ -125,24 +125,33 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * POST /cloud/connect — begin the PKCE flow.
-	 *
-	 * @return WP_REST_Response
-	 */
-	public function connect() {
-		return rest_ensure_response( Pattern_Builder_Cloud::start_connect() );
-	}
-
-	/**
-	 * POST /cloud/connect/complete — exchange the returned code.
+	 * POST /cloud/login — sign in to the service without leaving wp-admin.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
 	 */
-	public function connect_complete( $request ) {
-		$result = Pattern_Builder_Cloud::complete_connect(
-			(string) $request->get_param( 'code' ),
-			(string) $request->get_param( 'state' )
+	public function login( $request ) {
+		$result = Pattern_Builder_Cloud::login(
+			(string) $request->get_param( 'email' ),
+			(string) $request->get_param( 'password' )
+		);
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return $this->status();
+	}
+
+	/**
+	 * POST /cloud/signup — create a service account without leaving wp-admin.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function signup( $request ) {
+		$result = Pattern_Builder_Cloud::signup(
+			(string) $request->get_param( 'email' ),
+			(string) $request->get_param( 'password' ),
+			(string) $request->get_param( 'name' )
 		);
 		if ( is_wp_error( $result ) ) {
 			return $result;
