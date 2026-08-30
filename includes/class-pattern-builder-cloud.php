@@ -362,7 +362,7 @@ class Pattern_Builder_Cloud {
 	/**
 	 * The cloud-link map: which local patterns are linked to cloud copies.
 	 *
-	 * @return array localKey => { cloudId: int, account: int }
+	 * @return array localKey => { cloudId: int, account: int, hash: string, uploadedAt: int }
 	 */
 	public static function links() {
 		$links = get_option( self::OPTION_LINKS );
@@ -372,17 +372,23 @@ class Pattern_Builder_Cloud {
 	/**
 	 * Remember (or forget) a local pattern's cloud copy.
 	 *
-	 * @param string   $local_key "theme:{name}" or "user:{postId}".
-	 * @param int|null $cloud_id  Cloud pattern ID, or null to forget.
+	 * @param string   $local_key    "theme:{name}" or "user:{postId}".
+	 * @param int|null $cloud_id     Cloud pattern ID, or null to forget.
+	 * @param string   $content_hash md5 of the local pattern's raw content at
+	 *                               upload time — the sidebar's "changed since
+	 *                               upload" fingerprint. Empty means unknown,
+	 *                               which reads as changed.
 	 */
-	public static function set_link( $local_key, $cloud_id ) {
+	public static function set_link( $local_key, $cloud_id, $content_hash = '' ) {
 		$links = self::links();
 		if ( null === $cloud_id ) {
 			unset( $links[ $local_key ] );
 		} else {
 			$links[ $local_key ] = array(
-				'cloudId' => (int) $cloud_id,
-				'account' => (int) ( self::account()['id'] ?? 0 ),
+				'cloudId'    => (int) $cloud_id,
+				'account'    => (int) ( self::account()['id'] ?? 0 ),
+				'hash'       => (string) $content_hash,
+				'uploadedAt' => time(),
 			);
 		}
 		update_option( self::OPTION_LINKS, $links, false );
