@@ -20,9 +20,6 @@ class Pattern_Builder_Cloud {
 
 	const META_TOKEN   = '_pattern_builder_cloud_token';
 	const META_ACCOUNT = '_pattern_builder_cloud_account';
-	const META_PKCE    = '_pattern_builder_cloud_pkce';
-
-	const PKCE_TTL = 10 * MINUTE_IN_SECONDS;
 
 	/**
 	 * Register global hooks (called once at plugin boot).
@@ -152,77 +149,61 @@ class Pattern_Builder_Cloud {
 	}
 
 	/**
-	 * Begin the connect flow: mint PKCE state and build the authorize URL.
+	 * Sign in to an existing service account with credentials.
 	 *
-	 * @return array { authorizeUrl: string }
-	 */
-	public static function start_connect() {
-		$verifier = rtrim( strtr( base64_encode( random_bytes( 48 ) ), '+/', '-_' ), '=' ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
-		$state    = rtrim( strtr( base64_encode( random_bytes( 24 ) ), '+/', '-_' ), '=' ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
-
-		update_user_meta(
-			get_current_user_id(),
-			self::META_PKCE,
-			array(
-				'verifier' => $verifier,
-				'state'    => $state,
-				'created'  => time(),
-			)
-		);
-
-		$challenge = rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
-
-		$authorize_url = add_query_arg(
-			array(
-				'pbwp_authorize'        => 1,
-				'client'                => rawurlencode( home_url() ),
-				'site_user'             => rawurlencode( wp_get_current_user()->user_login ),
-				'redirect_uri'          => rawurlencode( self::callback_url() ),
-				'state'                 => $state,
-				'code_challenge'        => $challenge,
-				'code_challenge_method' => 'S256',
-			),
-			self::service_url() . '/'
-		);
-
-		return array( 'authorizeUrl' => $authorize_url );
-	}
-
-	/**
-	 * The wp-admin URL the service redirects back to with the code.
-	 *
-	 * @return string
-	 */
-	public static function callback_url() {
-		return admin_url( 'admin.php?page=pattern-builder&pbcloud-callback=1' );
-	}
-
-	/**
-	 * Complete the connect flow: verify state, exchange the code, store the token.
-	 *
-	 * @param string $code  Authorization code from the service.
-	 * @param string $state State returned by the service.
+	 * @param string $email    Email (or username) on the service.
+	 * @param string $password Password.
 	 * @return array|WP_Error Account info.
 	 */
-	public static function complete_connect( $code, $state ) {
-		$pkce = get_user_meta( get_current_user_id(), self::META_PKCE, true );
-		delete_user_meta( get_current_user_id(), self::META_PKCE );
+	public static function login( $email, $password ) {
+		return self::credential_connect(
+			'/auth/login',
+			array(
+				'email'    => $email,
+				'password' => $password,
+			)
+		);
+	}
 
-		if ( ! is_array( $pkce ) || empty( $pkce['verifier'] ) || empty( $pkce['state'] ) ) {
-			return new WP_Error( 'pb_cloud_no_pkce', __( 'The connection attempt expired. Start the connection again.', 'pattern-builder' ), array( 'status' => 400 ) );
-		}
-		if ( ( time() - (int) $pkce['created'] ) > self::PKCE_TTL || ! hash_equals( $pkce['state'], (string) $state ) ) {
-			return new WP_Error( 'pb_cloud_bad_state', __( 'The connection attempt could not be verified. Start the connection again.', 'pattern-builder' ), array( 'status' => 400 ) );
-		}
+	/**
+	 * Create a service account and connect as it.
+	 *
+	 * @param string $email    Email address.
+	 * @param string $password Password.
+	 * @param string $name     Display name (optional).
+	 * @return array|WP_Error Account info.
+	 */
+	public static function signup( $email, $password, $name = '' ) {
+		return self::credential_connect(
+			'/auth/signup',
+			array(
+				'email'    => $email,
+				'password' => $password,
+				'name'     => $name,
+			)
+		);
+	}
+
+	/**
+	 * Relay credentials to the service and store the returned grant.
+	 *
+	 * The browser never leaves wp-admin: the connect form posts to this
+	 * site, which calls the service server-side. Credentials pass through
+	 * unlogged and unsaved; only the issued token is kept (user meta).
+	 *
+	 * @param string $path   Service auth route.
+	 * @param array  $fields Credential fields.
+	 * @return array|WP_Error Account info.
+	 */
+	private static function credential_connect( $path, $fields ) {
+		$fields['site']      = home_url();
+		$fields['site_user'] = wp_get_current_user()->user_login;
 
 		$response = wp_remote_post(
-			self::endpoint( '/connect/token' ),
+			self::endpoint( $path ),
 			array(
 				'timeout' => 30,
-				'body'    => array(
-					'code'          => $code,
-					'code_verifier' => $pkce['verifier'],
-				),
+				'body'    => $fields,
 			)
 		);
 

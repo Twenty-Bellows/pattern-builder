@@ -26,7 +26,6 @@ import {
 	CLOUD_LIBRARY,
 	CLOUD_DIRECTORY,
 	CLOUD_GENERATE,
-	readConnectCallback,
 } from '../cloud/CloudBrowser';
 
 const CLOUD_VIEWS = [ CLOUD_LIBRARY, CLOUD_DIRECTORY, CLOUD_GENERATE ];
@@ -85,11 +84,7 @@ function CategoryRail( { categories, active, onSelect } ) {
 export function PatternBrowser( { onEdit, editorSettings } ) {
 	const [ patterns, setPatterns ] = useState( null );
 	const [ search, setSearch ] = useState( '' );
-	// Landing back from the patternbuilderwp.com connect flow opens the
-	// cloud library, where CloudBrowser completes the code exchange.
-	const [ category, setCategory ] = useState(
-		readConnectCallback() ? CLOUD_LIBRARY : ALL
-	);
+	const [ category, setCategory ] = useState( ALL );
 	const [ selectedId, setSelectedId ] = useState( null );
 	const [ isCreateOpen, setIsCreateOpen ] = useState( false );
 
