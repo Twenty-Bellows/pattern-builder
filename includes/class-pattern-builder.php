@@ -18,6 +18,9 @@ require_once __DIR__ . '/class-pattern-builder-api.php';
 require_once __DIR__ . '/class-pattern-builder-admin.php';
 require_once __DIR__ . '/class-pattern-builder-editor.php';
 require_once __DIR__ . '/class-pattern-builder-migration.php';
+require_once __DIR__ . '/class-pattern-builder-cloud.php';
+require_once __DIR__ . '/class-pattern-builder-cloud-porter.php';
+require_once __DIR__ . '/class-pattern-builder-cloud-controller.php';
 
 /**
  * Main class for managing the Pattern Builder plugin.
@@ -52,6 +55,7 @@ class Pattern_Builder {
 		new Pattern_Builder_Admin();
 		new Pattern_Builder_Editor();
 		new Pattern_Builder_Migration();
+		new Pattern_Builder_Cloud_Controller();
 	}
 
 	/**
