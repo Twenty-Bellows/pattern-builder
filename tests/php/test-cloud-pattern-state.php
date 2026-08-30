@@ -131,6 +131,35 @@ class Test_Cloud_Pattern_State extends WP_UnitTestCase {
 		$this->assertSame( 0, $data['uploadedAt'] );
 	}
 
+	public function test_cloud_id_lookup_reports_installed_local_copy() {
+		$this->upload();
+
+		// The link map is site truth — the lookup works even disconnected.
+		delete_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_TOKEN );
+
+		$request = new WP_REST_Request( 'GET', '/pattern-builder/v1/cloud/pattern-state' );
+		$request->set_param( 'cloudId', 42 );
+		$data = rest_do_request( $request )->get_data();
+
+		$this->assertSame( 'user', $data['installed']['type'] );
+		$this->assertSame( $this->post_id, $data['installed']['id'] );
+		$this->assertSame( 'Sidebar Pattern', $data['installed']['title'] );
+	}
+
+	public function test_cloud_id_lookup_ignores_unknown_ids_and_dangling_links() {
+		$this->upload();
+
+		$request = new WP_REST_Request( 'GET', '/pattern-builder/v1/cloud/pattern-state' );
+		$request->set_param( 'cloudId', 777 );
+		$this->assertNull( rest_do_request( $request )->get_data()['installed'] );
+
+		// A deleted local copy reads as not installed.
+		wp_delete_post( $this->post_id, true );
+		$request = new WP_REST_Request( 'GET', '/pattern-builder/v1/cloud/pattern-state' );
+		$request->set_param( 'cloudId', 42 );
+		$this->assertNull( rest_do_request( $request )->get_data()['installed'] );
+	}
+
 	public function test_missing_pattern_is_a_404() {
 		$request = new WP_REST_Request( 'GET', '/pattern-builder/v1/cloud/pattern-state' );
 		$request->set_param( 'patternType', 'user' );

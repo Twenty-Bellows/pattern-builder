@@ -114,6 +114,27 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
+	 * A local pattern's identity, or null when it no longer exists — the
+	 * liveness check behind "installed on this site".
+	 *
+	 * @param string     $type 'theme' or 'user'.
+	 * @param string|int $id   Local identifier.
+	 * @return array|null { type: string, id: string|int, title: string }
+	 */
+	public function describe_local( $type, $id ) {
+		$pattern = $this->load_local( $type, $id );
+		if ( is_wp_error( $pattern ) ) {
+			return null;
+		}
+
+		return array(
+			'type'  => $type,
+			'id'    => $id,
+			'title' => (string) $pattern->title,
+		);
+	}
+
+	/**
 	 * Import a PBP as a local pattern.
 	 *
 	 * @param array  $pbp         Package from the service.
@@ -296,14 +317,29 @@ class Pattern_Builder_Cloud_Porter {
 		$pre = apply_filters( 'pattern_builder_cloud_pre_fetch_asset', null, $asset );
 
 		if ( null === $pre ) {
-			$service_host = wp_parse_url( Pattern_Builder_Cloud::service_url(), PHP_URL_HOST );
-			$asset_host   = wp_parse_url( $url, PHP_URL_HOST );
-			if ( ! $asset_host || strtolower( $asset_host ) !== strtolower( (string) $service_host ) ) {
+			/*
+			 * Fetch from the configured service origin regardless of the host
+			 * the package names: the service builds asset URLs on the origin
+			 * it self-identifies as, which can legitimately differ from the
+			 * URL this site reaches it by (dev setups, proxies, alternate
+			 * hostnames). Re-rooting keeps the guarantee absolute — this
+			 * client only ever fetches from the one configured origin, so a
+			 * package pointing anywhere else 404s there instead of being
+			 * followed.
+			 */
+			$service = wp_parse_url( Pattern_Builder_Cloud::service_url() );
+			$parts   = wp_parse_url( $url );
+			if ( empty( $service['host'] ) || empty( $parts['path'] ) || 0 !== strpos( $parts['path'], '/' ) ) {
 				return new WP_Error( 'pb_cloud_foreign_asset', __( 'The pattern package referenced an asset outside the pattern service.', 'pattern-builder' ), array( 'status' => 502 ) );
 			}
 
+			$fetch = ( isset( $service['scheme'] ) ? $service['scheme'] : 'http' ) . '://' . $service['host']
+				. ( isset( $service['port'] ) ? ':' . $service['port'] : '' )
+				. $parts['path']
+				. ( isset( $parts['query'] ) ? '?' . $parts['query'] : '' );
+
 			require_once ABSPATH . 'wp-admin/includes/file.php';
-			$temp = download_url( $url, 60 );
+			$temp = download_url( $fetch, 60 );
 			if ( is_wp_error( $temp ) ) {
 				return new WP_Error( 'pb_cloud_asset_failed', __( 'Could not download a pattern image from the service.', 'pattern-builder' ), array( 'status' => 502 ) );
 			}
