@@ -81,6 +81,7 @@ class Pattern_Builder_Cloud_Porter {
 			'templateTypes' => array_values( (array) $pattern->templateTypes ), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 			'content'       => $content,
 			'assets'        => array_values( $assets ),
+			'tokens'        => Pattern_Builder_Cloud_Tokens::collect( (string) $pattern->content ),
 			'origin'        => array(
 				'site' => home_url(),
 				'kind' => $type,

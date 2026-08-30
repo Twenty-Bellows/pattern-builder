@@ -1,5 +1,5 @@
 import apiFetch from '@wordpress/api-fetch';
-import { __, sprintf } from '@wordpress/i18n';
+import { __, _n, sprintf } from '@wordpress/i18n';
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import {
 	Button,
@@ -189,6 +189,112 @@ function CloudDetails( { pattern, source, onDownload, onDelete, busy } ) {
 				</Button>
 			) }
 		</VStack>
+	);
+}
+
+/**
+ * The missing-tokens step of a download: the pattern references design
+ * tokens this site doesn't define, so ask where to put them (the
+ * destination's own definitions always win and are never listed here).
+ *
+ * @param {Object}   props           Component props.
+ * @param {Array}    props.missing   Tokens the site lacks.
+ * @param {boolean}  props.busy      Whether the download is in flight.
+ * @param {Function} props.onConfirm Called with 'user' or 'theme'.
+ * @param {Function} props.onClose   Close/cancel callback.
+ */
+function TokensModal( { missing, busy, onConfirm, onClose } ) {
+	const [ destination, setDestination ] = useState( 'user' );
+
+	const typeLabels = {
+		color: __( 'Color', 'pattern-builder' ),
+		gradient: __( 'Gradient', 'pattern-builder' ),
+		spacing: __( 'Spacing', 'pattern-builder' ),
+		fontSize: __( 'Font size', 'pattern-builder' ),
+		fontFamily: __( 'Font family', 'pattern-builder' ),
+	};
+
+	return (
+		<Modal
+			title={ __(
+				'This pattern brings new design tokens',
+				'pattern-builder'
+			) }
+			onRequestClose={ onClose }
+			className="pattern-builder-cloud__tokens-modal"
+		>
+			<p className="pattern-builder-cloud__meta">
+				{ __(
+					'The pattern references design tokens this site doesn’t define yet. They’ll be added with the values from the pattern’s source site; tokens your site already defines keep your values.',
+					'pattern-builder'
+				) }
+			</p>
+			<ul className="pattern-builder-cloud__tokens-list">
+				{ missing.map( ( token ) => (
+					<li key={ `${ token.type }:${ token.slug }` }>
+						{ ( token.type === 'color' ||
+							token.type === 'gradient' ) && (
+							<span
+								className="pattern-builder-cloud__token-swatch"
+								style={ { background: token.value } }
+							/>
+						) }
+						<span className="pattern-builder-cloud__token-name">
+							{ token.name || token.slug }
+						</span>
+						<span className="pattern-builder-cloud__token-meta">
+							{ typeLabels[ token.type ] || token.type }
+						</span>
+						<code className="pattern-builder-cloud__token-value">
+							{ token.value }
+						</code>
+					</li>
+				) ) }
+			</ul>
+			<SelectControl
+				__nextHasNoMarginBottom
+				label={ __( 'Add them to', 'pattern-builder' ) }
+				value={ destination }
+				options={ [
+					{
+						label: __(
+							'Site styles (Global Styles) — recommended, revertable in the editor',
+							'pattern-builder'
+						),
+						value: 'user',
+					},
+					{
+						label: __(
+							'The active theme’s theme.json file — ships with the theme',
+							'pattern-builder'
+						),
+						value: 'theme',
+					},
+				] }
+				onChange={ setDestination }
+			/>
+			<HStack
+				alignment="right"
+				spacing={ 2 }
+				className="pattern-builder-cloud__tokens-actions"
+			>
+				<Button
+					variant="tertiary"
+					onClick={ onClose }
+					disabled={ busy }
+				>
+					{ __( 'Cancel', 'pattern-builder' ) }
+				</Button>
+				<Button
+					variant="primary"
+					isBusy={ busy }
+					disabled={ busy }
+					onClick={ () => onConfirm( destination ) }
+				>
+					{ __( 'Add tokens & download', 'pattern-builder' ) }
+				</Button>
+			</HStack>
+		</Modal>
 	);
 }
 
@@ -585,6 +691,7 @@ export function CloudBrowser( { view, onDownloaded } ) {
 	const [ isUploadOpen, setIsUploadOpen ] = useState( false );
 	const [ links, setLinks ] = useState( {} );
 	const [ uploadBusyKey, setUploadBusyKey ] = useState( '' );
+	const [ pendingDownload, setPendingDownload ] = useState( null );
 
 	const { createSuccessNotice, createErrorNotice } =
 		useDispatch( noticesStore );
@@ -735,7 +842,35 @@ export function CloudBrowser( { view, onDownloaded } ) {
 		);
 	};
 
+	// Gate the download on the pattern's design tokens: when it references
+	// tokens this site lacks, ask where to define them first (§4a).
 	const download = ( pattern, destination ) => {
+		if ( ! pattern.tokens?.length ) {
+			performDownload( pattern, destination );
+			return;
+		}
+		setBusy( true );
+		apiFetch( {
+			path: `${ BASE }/tokens/check`,
+			method: 'POST',
+			data: { tokens: pattern.tokens },
+		} )
+			.then( ( check ) => {
+				if ( check.missing?.length ) {
+					setBusy( false );
+					setPendingDownload( {
+						pattern,
+						destination,
+						missing: check.missing,
+					} );
+				} else {
+					performDownload( pattern, destination );
+				}
+			} )
+			.catch( () => performDownload( pattern, destination ) );
+	};
+
+	const performDownload = ( pattern, destination, tokenDestination ) => {
 		setBusy( true );
 		apiFetch( {
 			path: `${ BASE }/download`,
@@ -744,9 +879,11 @@ export function CloudBrowser( { view, onDownloaded } ) {
 				source: view === CLOUD_DIRECTORY ? 'directory' : 'library',
 				cloudId: pattern.id,
 				destination,
+				tokenDestination,
 			},
 		} )
 			.then( ( result ) => {
+				setPendingDownload( null );
 				const message =
 					destination === 'theme'
 						? sprintf(
@@ -766,6 +903,27 @@ export function CloudBrowser( { view, onDownloaded } ) {
 								result.title
 						  );
 				createSuccessNotice( message, { type: 'snackbar' } );
+				const writtenCount = Object.values(
+					result.tokensWritten || {}
+				).reduce( ( sum, slugs ) => sum + slugs.length, 0 );
+				if ( writtenCount > 0 ) {
+					createSuccessNotice(
+						sprintf(
+							/* translators: 1: token count, 2: where they were added. */
+							_n(
+								'%1$d design token added to %2$s.',
+								'%1$d design tokens added to %2$s.',
+								writtenCount,
+								'pattern-builder'
+							),
+							writtenCount,
+							tokenDestination === 'theme'
+								? __( 'theme.json', 'pattern-builder' )
+								: __( 'Site styles', 'pattern-builder' )
+						),
+						{ type: 'snackbar' }
+					);
+				}
 				onDownloaded?.();
 			} )
 			.catch( ( error ) => {
@@ -922,6 +1080,21 @@ export function CloudBrowser( { view, onDownloaded } ) {
 		);
 	}
 
+	const tokensModal = pendingDownload && (
+		<TokensModal
+			missing={ pendingDownload.missing }
+			busy={ busy }
+			onConfirm={ ( tokenDestination ) =>
+				performDownload(
+					pendingDownload.pattern,
+					pendingDownload.destination,
+					tokenDestination
+				)
+			}
+			onClose={ () => setPendingDownload( null ) }
+		/>
+	);
+
 	if ( isGenerate ) {
 		return (
 			<div className="pattern-builder-cloud">
@@ -932,6 +1105,7 @@ export function CloudBrowser( { view, onDownloaded } ) {
 					onDelete={ deleteCloudPattern }
 					onCreditsChanged={ refreshStatus }
 				/>
+				{ tokensModal }
 			</div>
 		);
 	}
@@ -1126,6 +1300,8 @@ export function CloudBrowser( { view, onDownloaded } ) {
 					onClose={ () => setIsUploadOpen( false ) }
 				/>
 			) }
+
+			{ tokensModal }
 		</div>
 	);
 }

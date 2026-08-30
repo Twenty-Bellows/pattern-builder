@@ -172,3 +172,51 @@
 	color: #b32d2e;
 	font-size: 13px;
 }
+
+.pattern-builder-cloud__tokens-modal {
+	max-width: 520px;
+}
+
+.pattern-builder-cloud__tokens-list {
+	margin: 12px 0 16px;
+	padding: 0;
+	list-style: none;
+
+	li {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 7px 0;
+		border-bottom: 1px solid #f0f0f1;
+		font-size: 13px;
+	}
+}
+
+.pattern-builder-cloud__token-swatch {
+	flex: none;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.pattern-builder-cloud__token-name {
+	font-weight: 500;
+}
+
+.pattern-builder-cloud__token-meta {
+	color: #50575e;
+}
+
+.pattern-builder-cloud__token-value {
+	margin-left: auto;
+	max-width: 45%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 11px;
+}
+
+.pattern-builder-cloud__tokens-actions {
+	margin-top: 16px;
+}
