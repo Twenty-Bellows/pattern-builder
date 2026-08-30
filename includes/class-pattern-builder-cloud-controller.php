@@ -48,6 +48,7 @@ class Pattern_Builder_Cloud_Controller {
 			'/cloud/upload'           => array( 'POST', 'upload' ),
 			'/cloud/download'         => array( 'POST', 'download' ),
 			'/cloud/generate'         => array( 'POST', 'generate' ),
+			'/cloud/tokens/check'     => array( 'POST', 'tokens_check' ),
 		);
 
 		foreach ( $routes as $route => $handler ) {
@@ -294,6 +295,20 @@ class Pattern_Builder_Cloud_Controller {
 			return $pbp;
 		}
 
+		/*
+		 * Design tokens the pattern references but this site doesn't define
+		 * get written to the home the user chose (§4a). Definitions this
+		 * site already has always win — those tokens are never touched.
+		 */
+		$tokens_written    = array();
+		$token_destination = $request->get_param( 'tokenDestination' );
+		if ( ! empty( $pbp['tokens'] ) && in_array( $token_destination, array( 'user', 'theme' ), true ) ) {
+			$tokens_written = Pattern_Builder_Cloud_Tokens::apply( $pbp['tokens'], $token_destination );
+			if ( is_wp_error( $tokens_written ) ) {
+				return $tokens_written;
+			}
+		}
+
 		$porter = new Pattern_Builder_Cloud_Porter();
 		$result = $porter->import_pbp( $pbp, $destination );
 		if ( is_wp_error( $result ) ) {
@@ -303,7 +318,24 @@ class Pattern_Builder_Cloud_Controller {
 		// Remember the linkage so re-uploads offer "update".
 		Pattern_Builder_Cloud::set_link( Pattern_Builder_Cloud_Porter::local_key( $result['type'], $result['id'] ), $cloud_id );
 
+		$result['tokensWritten'] = $tokens_written;
 		return rest_ensure_response( $result );
+	}
+
+	/**
+	 * POST /cloud/tokens/check — which of a pattern's tokens this site
+	 * lacks, so the download flow knows whether to ask where to put them.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function tokens_check( $request ) {
+		$tokens = $request->get_param( 'tokens' );
+		return rest_ensure_response(
+			array(
+				'missing' => Pattern_Builder_Cloud_Tokens::missing( is_array( $tokens ) ? $tokens : array() ),
+			)
+		);
 	}
 
 	/**
