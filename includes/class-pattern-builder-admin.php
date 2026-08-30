@@ -146,11 +146,6 @@ class Pattern_Builder_Admin {
 
 		$browse_url = admin_url( 'themes.php?page=' . self::PAGE_SLUG );
 
-		/*
-		 * Where the editor's back button returns to: the screen the user
-		 * came from (the Site Editor, the browse screen, …), validated the
-		 * way core validates redirect targets, falling back to browse.
-		 */
 		$back_url = isset( $_GET['back'] ) ? wp_validate_redirect( sanitize_url( wp_unslash( $_GET['back'] ) ), '' ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
 		wp_add_inline_script(
@@ -169,11 +164,7 @@ class Pattern_Builder_Admin {
 			'before'
 		);
 
-		/*
-		 * Let every block-editor integration load — this plugin's own editor
-		 * tools and pattern runtime included, along with any third-party
-		 * blocks' editor assets.
-		 */
+		// Fire the core action so editor integrations (ours and third-party) load.
 		do_action( 'enqueue_block_editor_assets' );
 	}
 

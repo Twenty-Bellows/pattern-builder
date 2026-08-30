@@ -148,7 +148,6 @@ class Pattern_Builder_Cloud_Porter {
 
 		$content = (string) $pbp['content'];
 
-		// 1. Fetch the package's assets into the media library.
 		if ( ! empty( $pbp['assets'] ) && is_array( $pbp['assets'] ) ) {
 			foreach ( $pbp['assets'] as $asset ) {
 				if ( empty( $asset['key'] ) || empty( $asset['url'] ) ) {
@@ -170,7 +169,7 @@ class Pattern_Builder_Cloud_Porter {
 			return new WP_Error( 'pb_cloud_missing_asset', __( 'The downloaded pattern references an asset that was not delivered.', 'pattern-builder' ), array( 'status' => 502 ) );
 		}
 
-		// 2. Re-sanitize: never trust the wire, even our own service.
+		// Never trust the wire, even our own service.
 		$content = $this->sanitize_content( $content );
 		if ( is_wp_error( $content ) ) {
 			return $content;
@@ -182,7 +181,6 @@ class Pattern_Builder_Cloud_Porter {
 		$categories  = array_map( 'sanitize_text_field', isset( $pbp['categories'] ) && is_array( $pbp['categories'] ) ? $pbp['categories'] : array() );
 		$synced      = ! empty( $pbp['synced'] );
 
-		// 3. Land it as the requested local kind.
 		if ( 'theme' === $destination ) {
 			return $this->import_as_theme_pattern( $pbp, $title, $slug, $description, $categories, $synced, $content );
 		}
@@ -318,14 +316,10 @@ class Pattern_Builder_Cloud_Porter {
 
 		if ( null === $pre ) {
 			/*
-			 * Fetch from the configured service origin regardless of the host
-			 * the package names: the service builds asset URLs on the origin
-			 * it self-identifies as, which can legitimately differ from the
-			 * URL this site reaches it by (dev setups, proxies, alternate
-			 * hostnames). Re-rooting keeps the guarantee absolute — this
-			 * client only ever fetches from the one configured origin, so a
-			 * package pointing anywhere else 404s there instead of being
-			 * followed.
+			 * Always fetch from the configured service origin: packages name
+			 * the origin the service self-identifies as, which can differ
+			 * (dev setups, proxies). A foreign URL 404s at the service
+			 * instead of being followed.
 			 */
 			$service = wp_parse_url( Pattern_Builder_Cloud::service_url() );
 			$parts   = wp_parse_url( $url );

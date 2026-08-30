@@ -146,11 +146,8 @@ class Pattern_Builder_Cloud_Tokens {
 			}
 		}
 
-		/*
-		 * Derived classes. Generic support classes (has-text-color,
-		 * has-link-color, has-border-color, has-background) are not preset
-		 * references — exclude their pseudo-slugs.
-		 */
+		// Derived classes; generic support classes (has-text-color et al.) are
+		// not preset references, so their pseudo-slugs are excluded.
 		$class_types = array(
 			'/\bhas-([a-z0-9-]+)-color\b/'               => array( 'color', array( 'text', 'link', 'border', 'icon', 'heading', 'caption', 'button' ) ),
 			'/\bhas-([a-z0-9-]+)-background-color\b/'    => array( 'color', array() ),
@@ -162,9 +159,8 @@ class Pattern_Builder_Cloud_Tokens {
 		foreach ( $class_types as $regex => $spec ) {
 			if ( preg_match_all( $regex, $content, $matches ) ) {
 				foreach ( $matches[1] as $slug ) {
-					// The greedy -color match also swallows the longer
-					// -background-color / -border-color classes, which the
-					// specific regexes already captured with the right slug.
+					// The specific -background-color / -border-color regexes
+					// already captured these with the right slug.
 					if ( preg_match( '/-(background|border)$/', $slug ) ) {
 						continue;
 					}

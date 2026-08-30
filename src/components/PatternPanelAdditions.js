@@ -13,10 +13,8 @@ import {
 } from './PatternCloudPanel';
 
 /**
- * The editor's Cloud document panel: registered only while this WP user is
- * connected to patternbuilderwp.com. The record's modified date is the
- * refresh key, so saving the pattern re-checks its changed-since-upload
- * state.
+ * The editor's Cloud document panel; rendered only while connected, and
+ * re-checked on save via the record's modified date.
  *
  * @param {Object} props             Component props.
  * @param {Object} props.patternPost The edited pattern record.

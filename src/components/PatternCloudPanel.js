@@ -21,13 +21,11 @@ const BASE = '/pattern-builder/v1/cloud';
 
 /**
  * One pattern's cloud standing: null while loading, then the
- * /cloud/pattern-state payload — { connected } and, when connected,
- * { linked, changed, cloudId, uploadedAt }.
+ * /cloud/pattern-state payload.
  *
  * @param {string}        patternType 'theme' or 'user'.
  * @param {string|number} patternId   Local pattern identifier.
- * @param {*}             refreshKey  Changing this value re-fetches (pass the
- *                                    record's modified date so saves refresh).
+ * @param {*}             refreshKey  Changing this value re-fetches.
  * @return {Object} { state, refresh }
  */
 export function usePatternCloudState( patternType, patternId, refreshKey ) {
@@ -56,10 +54,7 @@ export function usePatternCloudState( patternType, patternId, refreshKey ) {
 }
 
 /**
- * The Cloud panel's controls: upload when the pattern has no cloud copy,
- * update when the local pattern changed since its upload, and a quiet
- * up-to-date line otherwise. Rendered only when connected — the wrappers
- * hide the whole panel when not.
+ * The Cloud panel's controls: upload, update, or an up-to-date line.
  *
  * @param {Object}        props             Component props.
  * @param {Object}        props.state       State from usePatternCloudState.
@@ -190,8 +185,7 @@ export function PatternCloudControls( {
 }
 
 /**
- * The browse sidebar's Cloud section: a PanelBody that exists only while
- * this WP user is connected to patternbuilderwp.com.
+ * The browse sidebar's Cloud section; rendered only while connected.
  *
  * @param {Object}        props             Component props.
  * @param {string}        props.patternType 'theme' or 'user'.

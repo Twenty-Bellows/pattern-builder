@@ -33,9 +33,8 @@ export const CLOUD_DIRECTORY = 'cloud-directory';
 export const CLOUD_GENERATE = 'cloud-generate';
 
 /**
- * Sign in / create an account without leaving wp-admin. Credentials post
- * to this site's proxy, which relays them to the service server-side and
- * stores the returned token; the browser never visits the service.
+ * Sign in / create an account without leaving wp-admin; credentials relay
+ * through this site's proxy, which stores only the returned token.
  *
  * @param {Object}   props             Component props.
  * @param {Function} props.onConnected Receives the fresh status payload.
@@ -174,10 +173,8 @@ function ConnectPanel( { onConnected } ) {
 const PREVIEW_WIDTH = 1400;
 
 function CloudCard( { pattern, isSelected, onSelect } ) {
-	// Scale the fixed-width preview iframe so the WHOLE pattern fits the
-	// card, centered — the card must show the same thing the local grid
-	// shows, not a top crop. The preview document is cross-origin, so it
-	// reports its own height via postMessage (pbwp-preview-size).
+	// Contain-fit the fixed-width preview so the whole pattern shows; the
+	// cross-origin preview document reports its height via postMessage.
 	const previewRef = useRef( null );
 	const iframeRef = useRef( null );
 	const [ box, setBox ] = useState( { width: 0, height: 0 } );
@@ -268,10 +265,8 @@ function CloudCard( { pattern, isSelected, onSelect } ) {
 }
 
 /**
- * The details/actions column for a selected cloud pattern. When the cloud
- * pattern is already installed on this site (the link map knows its local
- * copy and that copy still exists), the download actions give way to an
- * Edit button for the local pattern.
+ * The details/actions column for a selected cloud pattern; an installed
+ * pattern offers Edit instead of the download actions.
  *
  * @param {Object}   props             Component props.
  * @param {Object}   props.pattern     Cloud pattern summary.
@@ -289,15 +284,12 @@ function CloudDetails( {
 	onEditLocal,
 	busy,
 } ) {
-	// undefined while looking it up, null when not installed, else the
-	// local copy's { type, id, title }.
+	// undefined = looking it up, null = not installed, else { type, id, title }.
 	const [ installed, setInstalled ] = useState( undefined );
 
 	useEffect( () => {
 		if ( busy ) {
-			// An action is in flight; re-check once it lands (a download
-			// installs the pattern, so the card flips to Edit).
-			return;
+			return; // Re-check once the in-flight action (e.g. a download) lands.
 		}
 		setInstalled( undefined );
 		apiFetch( {
@@ -965,7 +957,6 @@ export function CloudBrowser( { view, onDownloaded, onEditLocal } ) {
 
 	useEffect( loadItems, [ loadItems ] );
 
-	// Directory view: load the collection filter options once.
 	useEffect( () => {
 		if ( isLibrary || isGenerate ) {
 			return;
@@ -977,7 +968,6 @@ export function CloudBrowser( { view, onDownloaded, onEditLocal } ) {
 			.catch( () => setCollections( [] ) );
 	}, [ isLibrary, isGenerate ] );
 
-	// Library view: load local link map for the upload modal.
 	useEffect( () => {
 		if ( ! isLibrary || ! status?.connected ) {
 			return;
@@ -1003,8 +993,7 @@ export function CloudBrowser( { view, onDownloaded, onEditLocal } ) {
 		);
 	};
 
-	// Gate the download on the pattern's design tokens: when it references
-	// tokens this site lacks, ask where to define them first (§4a).
+	// Tokens this site lacks need a destination before the download (§4a).
 	const download = ( pattern, destination ) => {
 		if ( ! pattern.tokens?.length ) {
 			performDownload( pattern, destination );
@@ -1203,8 +1192,7 @@ export function CloudBrowser( { view, onDownloaded, onEditLocal } ) {
 		);
 	}
 
-	// Disconnected: the library and generator need an account; the
-	// directory browses anonymously.
+	// The directory browses anonymously; the library and generator need an account.
 	if ( ! status.connected && ( isLibrary || isGenerate ) ) {
 		return (
 			<ConnectPanel

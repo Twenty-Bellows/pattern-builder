@@ -5,13 +5,9 @@ namespace TwentyBellows\PatternBuilder;
 use WP_Error;
 
 /**
- * The patternbuilderwp.com connection: token storage, the PKCE connect
- * flow, and HTTP to the service.
- *
- * The connection is per WordPress user: each user links their own
- * patternbuilderwp.com account, and their bearer token lives in their user
- * meta — it is only ever used server-side (the browser talks to this site's
- * proxy endpoints, never to the service directly).
+ * The patternbuilderwp.com connection: per-WP-user token storage, the
+ * in-admin credential connect, and HTTP to the service. Tokens are only
+ * ever used server-side; the browser never talks to the service.
  */
 class Pattern_Builder_Cloud {
 
@@ -86,11 +82,7 @@ class Pattern_Builder_Cloud {
 	public static function service_url() {
 		$url = get_option( self::OPTION_URL );
 
-		/*
-		 * A wp-config constant outranks the stored option: declarative dev
-		 * setups (e.g. a .wp-env.json "config" block) survive database
-		 * resets, where an option would be silently wiped.
-		 */
+		// The constant outranks the option so declarative dev setups survive DB resets.
 		if ( defined( 'PATTERN_BUILDER_CLOUD_URL' ) && PATTERN_BUILDER_CLOUD_URL ) {
 			$url = PATTERN_BUILDER_CLOUD_URL;
 		}
@@ -186,10 +178,7 @@ class Pattern_Builder_Cloud {
 
 	/**
 	 * Relay credentials to the service and store the returned grant.
-	 *
-	 * The browser never leaves wp-admin: the connect form posts to this
-	 * site, which calls the service server-side. Credentials pass through
-	 * unlogged and unsaved; only the issued token is kept (user meta).
+	 * Credentials pass through unlogged and unstored; only the token is kept.
 	 *
 	 * @param string $path   Service auth route.
 	 * @param array  $fields Credential fields.
@@ -374,10 +363,8 @@ class Pattern_Builder_Cloud {
 	 *
 	 * @param string   $local_key    "theme:{name}" or "user:{postId}".
 	 * @param int|null $cloud_id     Cloud pattern ID, or null to forget.
-	 * @param string   $content_hash md5 of the local pattern's raw content at
-	 *                               upload time — the sidebar's "changed since
-	 *                               upload" fingerprint. Empty means unknown,
-	 *                               which reads as changed.
+	 * @param string   $content_hash md5 of the raw content at upload time;
+	 *                               empty reads as changed.
 	 */
 	public static function set_link( $local_key, $cloud_id, $content_hash = '' ) {
 		$links = self::links();
