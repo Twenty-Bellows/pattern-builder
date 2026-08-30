@@ -201,12 +201,55 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		$this->assertSame( 'pb_cloud_missing_asset', $result->get_error_code() );
 	}
 
-	public function test_import_rejects_foreign_asset_hosts() {
+	public function test_import_fetches_assets_from_the_configured_origin_only() {
 		remove_all_filters( 'pattern_builder_cloud_pre_fetch_asset' );
 
 		$pbp = $this->make_downloaded_pbp();
 		remove_all_filters( 'pattern_builder_cloud_pre_fetch_asset' );
-		$pbp['assets'][0]['url'] = 'https://evil.example/steal.jpg';
+		// The package names a foreign host; the path must be re-rooted onto
+		// the configured service origin, never fetched where it points.
+		$pbp['assets'][0]['url'] = 'https://evil.example/steal.jpg?sig=abc';
+
+		$fetched = array();
+		add_filter(
+			'pre_http_request',
+			function ( $pre, $args, $url ) use ( &$fetched ) {
+				$fetched[] = $url;
+				return array(
+					'headers'  => array(),
+					'response' => array(
+						'code'    => 404,
+						'message' => 'Not Found',
+					),
+					'body'     => '',
+				);
+			},
+			10,
+			3
+		);
+
+		$porter = new Pattern_Builder_Cloud_Porter();
+		$result = $porter->import_pbp( $pbp, 'user' );
+		remove_all_filters( 'pre_http_request' );
+
+		// The 404 on the service surfaces as a failed asset download…
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_cloud_asset_failed', $result->get_error_code() );
+
+		// …and the one request went to the service origin with the
+		// package's path, not to the foreign host.
+		$this->assertCount( 1, $fetched );
+		$service_host = wp_parse_url( \TwentyBellows\PatternBuilder\Pattern_Builder_Cloud::service_url(), PHP_URL_HOST );
+		$this->assertSame( $service_host, wp_parse_url( $fetched[0], PHP_URL_HOST ) );
+		$this->assertSame( '/steal.jpg', wp_parse_url( $fetched[0], PHP_URL_PATH ) );
+	}
+
+	public function test_import_rejects_unfetchable_asset_urls() {
+		remove_all_filters( 'pattern_builder_cloud_pre_fetch_asset' );
+
+		$pbp = $this->make_downloaded_pbp();
+		remove_all_filters( 'pattern_builder_cloud_pre_fetch_asset' );
+		$pbp['assets'][0]['url'] = 'data:image/png;base64,AAAA';
 
 		$porter = new Pattern_Builder_Cloud_Porter();
 		$result = $porter->import_pbp( $pbp, 'user' );

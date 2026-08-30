@@ -21,6 +21,7 @@ import {
 import { cloudUpload, closeSmall } from '@wordpress/icons';
 import { useDispatch } from '@wordpress/data';
 import { store as noticesStore } from '@wordpress/notices';
+import { addQueryArgs } from '@wordpress/url';
 
 import { fetchAllPatterns } from '../utils/resolvers';
 import './cloud.scss';
@@ -231,16 +232,47 @@ function CloudCard( { pattern, isSelected, onSelect } ) {
 }
 
 /**
- * The details/actions column for a selected cloud pattern.
+ * The details/actions column for a selected cloud pattern. When the cloud
+ * pattern is already installed on this site (the link map knows its local
+ * copy and that copy still exists), the download actions give way to an
+ * Edit button for the local pattern.
  *
- * @param {Object}   props            Component props.
- * @param {Object}   props.pattern    Cloud pattern summary.
- * @param {string}   props.source     'library' or 'directory'.
- * @param {Function} props.onDownload Called with (pattern, destination).
- * @param {Function} props.onDelete   Called with the pattern (library only).
- * @param {boolean}  props.busy       Whether an action is in flight.
+ * @param {Object}   props             Component props.
+ * @param {Object}   props.pattern     Cloud pattern summary.
+ * @param {string}   props.source      'library' or 'directory'.
+ * @param {Function} props.onDownload  Called with (pattern, destination).
+ * @param {Function} props.onDelete    Called with the pattern (library only).
+ * @param {Function} props.onEditLocal Called with { source, id } of the local copy.
+ * @param {boolean}  props.busy        Whether an action is in flight.
  */
-function CloudDetails( { pattern, source, onDownload, onDelete, busy } ) {
+function CloudDetails( {
+	pattern,
+	source,
+	onDownload,
+	onDelete,
+	onEditLocal,
+	busy,
+} ) {
+	// undefined while looking it up, null when not installed, else the
+	// local copy's { type, id, title }.
+	const [ installed, setInstalled ] = useState( undefined );
+
+	useEffect( () => {
+		if ( busy ) {
+			// An action is in flight; re-check once it lands (a download
+			// installs the pattern, so the card flips to Edit).
+			return;
+		}
+		setInstalled( undefined );
+		apiFetch( {
+			path: addQueryArgs( `${ BASE }/pattern-state`, {
+				cloudId: pattern.id,
+			} ),
+		} )
+			.then( ( data ) => setInstalled( data.installed || null ) )
+			.catch( () => setInstalled( null ) );
+	}, [ pattern.id, busy ] );
+
 	return (
 		<VStack
 			spacing={ 3 }
@@ -268,24 +300,56 @@ function CloudDetails( { pattern, source, onDownload, onDelete, busy } ) {
 					) }
 				</p>
 			) }
-			<HStack spacing={ 2 } alignment="left" wrap>
-				<Button
-					variant="primary"
-					isBusy={ busy }
-					disabled={ busy }
-					onClick={ () => onDownload( pattern, 'user' ) }
-				>
-					{ __( 'Add as user pattern', 'pattern-builder' ) }
-				</Button>
-				<Button
-					variant="secondary"
-					isBusy={ busy }
-					disabled={ busy }
-					onClick={ () => onDownload( pattern, 'theme' ) }
-				>
-					{ __( 'Add as theme pattern', 'pattern-builder' ) }
-				</Button>
-			</HStack>
+			{ installed === undefined && <Spinner /> }
+			{ !! installed && (
+				<>
+					<p className="pattern-builder-cloud__meta pattern-builder-cloud__installed">
+						{ installed.type === 'user'
+							? __(
+									'Installed on this site as a user pattern.',
+									'pattern-builder'
+							  )
+							: __(
+									'Installed on this site as a theme pattern.',
+									'pattern-builder'
+							  ) }
+					</p>
+					<HStack spacing={ 2 } alignment="left" wrap>
+						<Button
+							variant="primary"
+							disabled={ busy }
+							onClick={ () =>
+								onEditLocal( {
+									source: installed.type,
+									id: installed.id,
+								} )
+							}
+						>
+							{ __( 'Edit pattern', 'pattern-builder' ) }
+						</Button>
+					</HStack>
+				</>
+			) }
+			{ installed === null && (
+				<HStack spacing={ 2 } alignment="left" wrap>
+					<Button
+						variant="primary"
+						isBusy={ busy }
+						disabled={ busy }
+						onClick={ () => onDownload( pattern, 'user' ) }
+					>
+						{ __( 'Add as user pattern', 'pattern-builder' ) }
+					</Button>
+					<Button
+						variant="secondary"
+						isBusy={ busy }
+						disabled={ busy }
+						onClick={ () => onDownload( pattern, 'theme' ) }
+					>
+						{ __( 'Add as theme pattern', 'pattern-builder' ) }
+					</Button>
+				</HStack>
+			) }
 			{ source === 'library' && (
 				<Button
 					variant="tertiary"
@@ -416,12 +480,14 @@ function TokensModal( { missing, busy, onConfirm, onClose } ) {
  * @param {Function} props.onDownload       Called with (pattern, destination).
  * @param {Function} props.onDelete         Called with the pattern.
  * @param {Function} props.onCreditsChanged Refresh the status meters.
+ * @param {Function} props.onEditLocal      Opens an installed local copy's editor.
  */
 function GeneratePanel( {
 	status,
 	busy,
 	onDownload,
 	onDelete,
+	onEditLocal,
 	onCreditsChanged,
 } ) {
 	const [ prompt, setPrompt ] = useState( '' );
@@ -649,6 +715,7 @@ function GeneratePanel( {
 						source="library"
 						onDownload={ onDownload }
 						onDelete={ onDelete }
+						onEditLocal={ onEditLocal }
 						busy={ busy }
 					/>
 				</div>
@@ -785,8 +852,9 @@ function UploadModal( { links, onUpload, onClose, busyKey } ) {
  * @param {Object}   props              Component props.
  * @param {string}   props.view         CLOUD_LIBRARY or CLOUD_DIRECTORY.
  * @param {Function} props.onDownloaded Called after a pattern lands locally.
+ * @param {Function} props.onEditLocal  Opens an installed local copy's editor.
  */
-export function CloudBrowser( { view, onDownloaded } ) {
+export function CloudBrowser( { view, onDownloaded, onEditLocal } ) {
 	const [ status, setStatus ] = useState( null );
 	const [ items, setItems ] = useState( null );
 	const [ search, setSearch ] = useState( '' );
@@ -1141,6 +1209,7 @@ export function CloudBrowser( { view, onDownloaded } ) {
 					busy={ busy }
 					onDownload={ download }
 					onDelete={ deleteCloudPattern }
+					onEditLocal={ onEditLocal }
 					onCreditsChanged={ refreshStatus }
 				/>
 				{ tokensModal }
@@ -1325,6 +1394,7 @@ export function CloudBrowser( { view, onDownloaded } ) {
 						source={ isLibrary ? 'library' : 'directory' }
 						onDownload={ download }
 						onDelete={ deleteCloudPattern }
+						onEditLocal={ onEditLocal }
 						busy={ busy }
 					/>
 				) }

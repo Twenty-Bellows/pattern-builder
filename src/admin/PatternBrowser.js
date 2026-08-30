@@ -278,6 +278,7 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 						<CloudBrowser
 							view={ category }
 							onDownloaded={ refresh }
+							onEditLocal={ onEdit }
 						/>
 					</main>
 				) }

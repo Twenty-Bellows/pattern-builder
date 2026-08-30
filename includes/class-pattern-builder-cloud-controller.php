@@ -222,12 +222,20 @@ class Pattern_Builder_Cloud_Controller {
 	 * sidebar Cloud panel. Entirely local (link map + content hash): no
 	 * service round trip, so it's cheap enough to call per selection.
 	 *
-	 * Params: patternType (theme|user), patternId.
+	 * Params: patternType (theme|user) + patternId — or, addressed from the
+	 * cloud side, cloudId: which local pattern (if any) is that cloud
+	 * pattern installed as. The reverse lookup ignores connection state:
+	 * the link map is site truth either way.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function pattern_state( $request ) {
+		$cloud_id = (int) $request->get_param( 'cloudId' );
+		if ( $cloud_id ) {
+			return rest_ensure_response( array( 'installed' => $this->find_installed( $cloud_id ) ) );
+		}
+
 		if ( ! Pattern_Builder_Cloud::is_connected() ) {
 			return rest_ensure_response( array( 'connected' => false ) );
 		}
@@ -266,6 +274,38 @@ class Pattern_Builder_Cloud_Controller {
 				'uploadedAt' => isset( $link['uploadedAt'] ) ? (int) $link['uploadedAt'] : 0,
 			)
 		);
+	}
+
+	/**
+	 * Which local pattern (if any) a cloud pattern is installed as: the
+	 * first link-map entry for the cloud ID whose local pattern still
+	 * exists (a deleted local copy reads as not installed).
+	 *
+	 * @param int $cloud_id Cloud pattern ID.
+	 * @return array|null { type: string, id: string|int, title: string }
+	 */
+	private function find_installed( $cloud_id ) {
+		$porter = new Pattern_Builder_Cloud_Porter();
+
+		foreach ( Pattern_Builder_Cloud::links() as $key => $link ) {
+			if ( (int) $link['cloudId'] !== $cloud_id ) {
+				continue;
+			}
+
+			$parts = explode( ':', (string) $key, 2 );
+			if ( 2 !== count( $parts ) ) {
+				continue;
+			}
+
+			$type  = 'user' === $parts[0] ? 'user' : 'theme';
+			$id    = 'user' === $type ? (int) $parts[1] : $parts[1];
+			$local = $porter->describe_local( $type, $id );
+			if ( $local ) {
+				return $local;
+			}
+		}
+
+		return null;
 	}
 
 	/**
