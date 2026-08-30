@@ -88,6 +88,16 @@ class Pattern_Builder_Cloud {
 	 */
 	public static function service_url() {
 		$url = get_option( self::OPTION_URL );
+
+		/*
+		 * A wp-config constant outranks the stored option: declarative dev
+		 * setups (e.g. a .wp-env.json "config" block) survive database
+		 * resets, where an option would be silently wiped.
+		 */
+		if ( defined( 'PATTERN_BUILDER_CLOUD_URL' ) && PATTERN_BUILDER_CLOUD_URL ) {
+			$url = PATTERN_BUILDER_CLOUD_URL;
+		}
+
 		if ( ! $url ) {
 			$url = 'https://patternbuilderwp.com';
 		}
