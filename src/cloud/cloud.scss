@@ -159,3 +159,16 @@
 		font-weight: 400;
 	}
 }
+
+.pattern-builder-cloud__generate {
+	max-width: 860px;
+
+	.components-textarea-control__input {
+		max-width: 640px;
+	}
+}
+
+.pattern-builder-cloud__generate-error {
+	color: #b32d2e;
+	font-size: 13px;
+}
