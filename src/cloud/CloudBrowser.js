@@ -174,10 +174,14 @@ function ConnectPanel( { onConnected } ) {
 const PREVIEW_WIDTH = 1400;
 
 function CloudCard( { pattern, isSelected, onSelect } ) {
-	// Scale the fixed-width preview iframe to the card (measured — CSS
-	// alone can't feed a container-relative number into transform:scale).
+	// Scale the fixed-width preview iframe so the WHOLE pattern fits the
+	// card, centered — the card must show the same thing the local grid
+	// shows, not a top crop. The preview document is cross-origin, so it
+	// reports its own height via postMessage (pbwp-preview-size).
 	const previewRef = useRef( null );
-	const [ scale, setScale ] = useState( 0.2 );
+	const iframeRef = useRef( null );
+	const [ box, setBox ] = useState( { width: 0, height: 0 } );
+	const [ contentHeight, setContentHeight ] = useState( 0 );
 
 	useEffect( () => {
 		const node = previewRef.current;
@@ -185,14 +189,37 @@ function CloudCard( { pattern, isSelected, onSelect } ) {
 			return;
 		}
 		const observer = new window.ResizeObserver( ( entries ) => {
-			const width = entries[ 0 ]?.contentRect?.width;
-			if ( width ) {
-				setScale( width / PREVIEW_WIDTH );
+			const rect = entries[ 0 ]?.contentRect;
+			if ( rect?.width ) {
+				setBox( { width: rect.width, height: rect.height } );
 			}
 		} );
 		observer.observe( node );
 		return () => observer.disconnect();
 	}, [] );
+
+	useEffect( () => {
+		const onMessage = ( event ) => {
+			if (
+				event.source !== iframeRef.current?.contentWindow ||
+				event.data?.type !== 'pbwp-preview-size' ||
+				! event.data.height
+			) {
+				return;
+			}
+			setContentHeight(
+				Math.min( 4000, Math.max( 200, Number( event.data.height ) ) )
+			);
+		};
+		window.addEventListener( 'message', onMessage );
+		return () => window.removeEventListener( 'message', onMessage );
+	}, [] );
+
+	const docHeight = contentHeight || Math.ceil( ( 2 / 3 ) * PREVIEW_WIDTH );
+	const widthFit = box.width ? box.width / PREVIEW_WIDTH : 0.2;
+	const scale = box.height
+		? Math.min( widthFit, box.height / docHeight )
+		: widthFit;
 
 	return (
 		<button
@@ -208,6 +235,7 @@ function CloudCard( { pattern, isSelected, onSelect } ) {
 				ref={ previewRef }
 			>
 				<iframe
+					ref={ iframeRef }
 					title={ pattern.title }
 					src={ pattern.previewUrl }
 					loading="lazy"
@@ -215,7 +243,15 @@ function CloudCard( { pattern, isSelected, onSelect } ) {
 					tabIndex={ -1 }
 					style={ {
 						transform: `scale(${ scale })`,
-						height: `${ Math.ceil( ( 2 / 3 ) * PREVIEW_WIDTH ) }px`,
+						height: `${ docHeight }px`,
+						marginLeft: `${ Math.max(
+							0,
+							( box.width - PREVIEW_WIDTH * scale ) / 2
+						) }px`,
+						marginTop: `${ Math.max(
+							0,
+							( box.height - docHeight * scale ) / 2
+						) }px`,
 					} }
 				/>
 			</span>
