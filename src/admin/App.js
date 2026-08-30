@@ -18,8 +18,6 @@ export function PatternBuilderAdminApp( { settings } ) {
 	const openPattern = useCallback(
 		( pattern ) => {
 			if ( pattern.source === 'user' ) {
-				// User patterns are wp_block posts; the Site Editor edits
-				// them natively.
 				window.location.href = getSiteEditorUrl( pattern );
 				return;
 			}

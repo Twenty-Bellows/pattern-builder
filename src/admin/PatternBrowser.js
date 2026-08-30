@@ -244,11 +244,8 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 	}
 
 	return (
-		/*
-		 * The provider gives the preview iframes real editor settings — theme
-		 * styles, and the block-bindings attribute map the preview needs to
-		 * render blocks with `__default` bindings.
-		 */
+		// Real editor settings: previews need theme styles and the
+		// block-bindings map to render `__default` bindings.
 		<BlockEditorProvider settings={ editorSettings }>
 			<div className="pattern-builder-browser">
 				<aside className="pattern-builder-browser__sidebar">

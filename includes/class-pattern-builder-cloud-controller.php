@@ -218,14 +218,9 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * GET /cloud/pattern-state — one pattern's cloud standing, for the
-	 * sidebar Cloud panel. Entirely local (link map + content hash): no
-	 * service round trip, so it's cheap enough to call per selection.
-	 *
-	 * Params: patternType (theme|user) + patternId — or, addressed from the
-	 * cloud side, cloudId: which local pattern (if any) is that cloud
-	 * pattern installed as. The reverse lookup ignores connection state:
-	 * the link map is site truth either way.
+	 * GET /cloud/pattern-state — one pattern's cloud standing, answered
+	 * from the link map and a local content hash (no service round trip).
+	 * Params: patternType + patternId, or cloudId for the reverse lookup.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -277,9 +272,8 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * Which local pattern (if any) a cloud pattern is installed as: the
-	 * first link-map entry for the cloud ID whose local pattern still
-	 * exists (a deleted local copy reads as not installed).
+	 * Which local pattern (if any) a cloud pattern is installed as; a
+	 * deleted local copy reads as not installed.
 	 *
 	 * @param int $cloud_id Cloud pattern ID.
 	 * @return array|null { type: string, id: string|int, title: string }
@@ -396,11 +390,7 @@ class Pattern_Builder_Cloud_Controller {
 			return $pbp;
 		}
 
-		/*
-		 * Design tokens the pattern references but this site doesn't define
-		 * get written to the home the user chose (§4a). Definitions this
-		 * site already has always win — those tokens are never touched.
-		 */
+		// Missing design tokens land where the user chose; existing definitions win (§4a).
 		$tokens_written    = array();
 		$token_destination = $request->get_param( 'tokenDestination' );
 		if ( ! empty( $pbp['tokens'] ) && in_array( $token_destination, array( 'user', 'theme' ), true ) ) {
@@ -416,9 +406,7 @@ class Pattern_Builder_Cloud_Controller {
 			return $result;
 		}
 
-		// Remember the linkage so re-uploads offer "update". The imported
-		// content IS the cloud content right now, so its hash marks the
-		// pattern as up to date in the sidebar's Cloud panel.
+		// The imported content matches its cloud copy, so the stored hash reads as up to date.
 		$hash = $porter->content_hash( $result['type'], $result['id'] );
 		Pattern_Builder_Cloud::set_link(
 			Pattern_Builder_Cloud_Porter::local_key( $result['type'], $result['id'] ),
@@ -458,7 +446,6 @@ class Pattern_Builder_Cloud_Controller {
 			return $result;
 		}
 
-		// Forget any local links pointing at it.
 		foreach ( Pattern_Builder_Cloud::links() as $key => $link ) {
 			if ( (int) $link['cloudId'] === (int) $request['id'] ) {
 				Pattern_Builder_Cloud::set_link( $key, null );
