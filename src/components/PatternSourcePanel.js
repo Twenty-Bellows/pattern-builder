@@ -58,6 +58,13 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 		return null;
 	}
 
+	// The panel is rendered from both an entity record (content is
+	// { raw, ... }) and an edited one (content is already the raw string).
+	const content =
+		typeof patternPost.content === 'string'
+			? patternPost.content
+			: patternPost.content?.raw || '';
+
 	const convert = async () => {
 		setIsConverting( true );
 
@@ -156,6 +163,7 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 						onRefresh={ refreshCloud }
 						patternType={ patternType }
 						patternId={ patternPost?.id }
+						content={ content }
 					/>
 				</div>
 			) }
