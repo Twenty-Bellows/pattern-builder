@@ -1,16 +1,15 @@
 /**
- * Opens a pattern for editing from wherever the user is. Every path leads to
- * the WordPress editor.
+ * Opens a pattern for editing from wherever the user is. Every pattern —
+ * theme (`pb_pattern`, string IDs, file-backed) or user (`wp_block`) — is
+ * edited in the post editor, because the Site Editor's canvas routing is
+ * hard-coded to core's entities and so can never host a theme pattern.
+ * Editing both kinds in the same editor is worth more than the Site Editor's
+ * nicer canvas for the half of them that could use it.
  *
- * Theme patterns are `pb_pattern` entities (string IDs, file-backed). The post
- * editor can swap any entity into its canvas via `onNavigateToEntityRecord`,
- * but the Site Editor's canvas routing is hard-coded to core's entities — from
- * there (or anywhere else) theme patterns open under Appearance → Pattern
- * Builder, whose edit mode hosts core's edit-post editor bound to the entity.
- *
- * User patterns are plain `wp_block` posts, so an editor already showing one
- * swaps them in-context; from anywhere else they open under Appearance →
- * Pattern Builder too, so every pattern is edited in the same editor.
+ * A post editor already on screen swaps the pattern into its canvas in place;
+ * everywhere else — the Site Editor included — the pattern opens under
+ * Appearance → Pattern Builder, whose edit mode hosts that same editor bound
+ * to the pattern's entity.
  */
 
 import { resolveSelect } from '@wordpress/data';
@@ -42,20 +41,6 @@ export function getAdminEditorUrl( pattern ) {
 }
 
 /**
- * The Site Editor URL that edits a user pattern in its canvas.
- *
- * @param {Object} pattern The pattern.
- * @return {string} Site Editor URL.
- */
-export function getSiteEditorUrl( pattern ) {
-	return (
-		'site-editor.php?p=' +
-		encodeURIComponent( '/wp_block/' + pattern.id ) +
-		'&canvas=edit'
-	);
-}
-
-/**
  * Whether this screen is the Site Editor.
  *
  * @return {boolean} Whether the Site Editor is running.
@@ -71,23 +56,11 @@ function isSiteEditorScreen() {
  * @param {Function?} onNavigateToEntityRecord The block editor's navigation callback, if any.
  */
 export function navigateToPattern( pattern, onNavigateToEntityRecord ) {
-	const isTheme = pattern.source === 'theme';
+	const postType = pattern.source === 'theme' ? 'pb_pattern' : 'wp_block';
 
-	if ( ! isTheme ) {
-		if ( onNavigateToEntityRecord ) {
-			// In the post editor this swaps the entity in-context; in the
-			// Site Editor it navigates to the /wp_block route in place.
-			onNavigateToEntityRecord( {
-				postId: pattern.id,
-				postType: 'wp_block',
-			} );
-			return;
-		}
-
-		window.location.href = getAdminEditorUrl( pattern );
-		return;
-	}
-
+	// The Site Editor supplies this callback too, but there it navigates its
+	// own canvas — which theme patterns can't enter — so it is only used
+	// where it swaps the entity in place: a post editor.
 	if ( onNavigateToEntityRecord && ! isSiteEditorScreen() ) {
 		/*
 		 * Resolve the entity before the editor swaps to it. Swapping to a
@@ -95,11 +68,11 @@ export function navigateToPattern( pattern, onNavigateToEntityRecord ) {
 		 * commit an empty-content edit that then shadows the real content.
 		 */
 		resolveSelect( coreStore )
-			.getEntityRecord( 'postType', 'pb_pattern', pattern.id )
+			.getEntityRecord( 'postType', postType, pattern.id )
 			.finally( () => {
 				onNavigateToEntityRecord( {
 					postId: pattern.id,
-					postType: 'pb_pattern',
+					postType,
 				} );
 			} );
 		return;

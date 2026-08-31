@@ -368,22 +368,14 @@ body.appearance_page_pattern-builder {
 	border-top: 1px solid #e0e0e0;
 }
 
-// ---- Edit mode: the page hosts core's editor for one pattern. A pattern's
-// name is edited in the Pattern Metadata panel, so the canvas title field and
-// the editor's own summary block would only duplicate it. Scoped to this
-// admin page's body class — the editor renders outside the app's own markup.
-
-.appearance_page_pattern-builder {
-
-	.editor-visual-editor__post-title-wrapper,
-	.edit-post-visual-editor__post-title-wrapper {
-		display: none;
-	}
-
-	// The summary block (title, excerpt, content info, last edited) is the
-	// first non-panel child of the sidebar's document tab; its own classes
-	// are generated, so it is addressed by position.
-	.editor-sidebar__panel > div > div:first-child:not(.components-panel__body) {
-		display: none;
-	}
+// ---- Edit mode: the page hosts core's editor for one pattern.
+// The document tab opens with core's post card — the post's title, its
+// description, word count and read time. A pattern's name and description
+// are edited in the Pattern Metadata panel, so the card only duplicates
+// them. Its own wrapper is emotion-classed, so the rule anchors on the one
+// stable class inside it; that keeps the Block tab, whose first child is
+// the block inspector, untouched.
+body.appearance_page_pattern-builder
+.editor-sidebar__panel > div > div:first-child:has(.editor-post-card-panel__title) {
+	display: none;
 }
