@@ -8,7 +8,6 @@ import {
 	Modal,
 	Notice,
 	PanelBody,
-	SelectControl,
 	Spinner,
 	TextControl,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
@@ -403,18 +402,18 @@ function DestinationModal( { pattern, busy, onConfirm, onClose } ) {
 
 /**
  * The missing-tokens step of a download: the pattern references design
- * tokens this site doesn't define, so ask where to put them (the
- * destination's own definitions always win and are never listed here).
+ * tokens this site doesn't define. Where they go isn't a question — they
+ * follow the pattern to the destination already chosen — so this lists what
+ * will be added and says where.
  *
- * @param {Object}   props           Component props.
- * @param {Array}    props.missing   Tokens the site lacks.
- * @param {boolean}  props.busy      Whether the download is in flight.
- * @param {Function} props.onConfirm Called with 'user' or 'theme'.
- * @param {Function} props.onClose   Close/cancel callback.
+ * @param {Object}   props             Component props.
+ * @param {Array}    props.missing     Tokens the site lacks.
+ * @param {string}   props.destination 'user' or 'theme' — where the pattern is going.
+ * @param {boolean}  props.busy        Whether the download is in flight.
+ * @param {Function} props.onConfirm   Proceed with the download.
+ * @param {Function} props.onClose     Close/cancel callback.
  */
-function TokensModal( { missing, busy, onConfirm, onClose } ) {
-	const [ destination, setDestination ] = useState( 'user' );
-
+function TokensModal( { missing, destination, busy, onConfirm, onClose } ) {
 	const typeLabels = {
 		color: __( 'Color', 'pattern-builder' ),
 		gradient: __( 'Gradient', 'pattern-builder' ),
@@ -433,10 +432,15 @@ function TokensModal( { missing, busy, onConfirm, onClose } ) {
 			className="pattern-builder-cloud__tokens-modal"
 		>
 			<p className="pattern-builder-cloud__meta">
-				{ __(
-					'The pattern references design tokens this site doesn’t define yet. They’ll be added with the values from the pattern’s source site; tokens your site already defines keep your values.',
-					'pattern-builder'
-				) }
+				{ destination === 'theme'
+					? __(
+							'The tokens below are the ones this site doesn’t define yet. They’ll be added to the active theme’s theme.json, where the pattern itself is going, with the values from the pattern’s source site. Tokens your site already defines keep your values.',
+							'pattern-builder'
+					  )
+					: __(
+							'The tokens below are the ones this site doesn’t define yet. They’ll be added to your site styles (Global Styles), where the pattern itself is going, with the values from the pattern’s source site — revertable in the editor. Tokens your site already defines keep your values.',
+							'pattern-builder'
+					  ) }
 			</p>
 			<ul className="pattern-builder-cloud__tokens-list">
 				{ missing.map( ( token ) => (
@@ -460,28 +464,6 @@ function TokensModal( { missing, busy, onConfirm, onClose } ) {
 					</li>
 				) ) }
 			</ul>
-			<SelectControl
-				__nextHasNoMarginBottom
-				label={ __( 'Add them to', 'pattern-builder' ) }
-				value={ destination }
-				options={ [
-					{
-						label: __(
-							'Site styles (Global Styles) — recommended, revertable in the editor',
-							'pattern-builder'
-						),
-						value: 'user',
-					},
-					{
-						label: __(
-							'The active theme’s theme.json file — ships with the theme',
-							'pattern-builder'
-						),
-						value: 'theme',
-					},
-				] }
-				onChange={ setDestination }
-			/>
 			<HStack
 				alignment="right"
 				spacing={ 2 }
@@ -498,7 +480,7 @@ function TokensModal( { missing, busy, onConfirm, onClose } ) {
 					variant="primary"
 					isBusy={ busy }
 					disabled={ busy }
-					onClick={ () => onConfirm( destination ) }
+					onClick={ onConfirm }
 				>
 					{ __( 'Add tokens & download', 'pattern-builder' ) }
 				</Button>
@@ -654,7 +636,9 @@ export function CloudBrowser( {
 			.catch( () => performDownload( pattern, destination ) );
 	};
 
-	const performDownload = ( pattern, destination, tokenDestination ) => {
+	// `addTokens` carries the answer to the tokens modal; the tokens follow
+	// the pattern to `destination`, which the server decides for itself.
+	const performDownload = ( pattern, destination, addTokens = false ) => {
 		setBusy( true );
 		apiFetch( {
 			path: `${ BASE }/download`,
@@ -663,7 +647,7 @@ export function CloudBrowser( {
 				source: view === CLOUD_DIRECTORY ? 'directory' : 'library',
 				cloudId: pattern.id,
 				destination,
-				tokenDestination,
+				addTokens,
 			},
 		} )
 			.then( ( result ) => {
@@ -701,7 +685,7 @@ export function CloudBrowser( {
 								'pattern-builder'
 							),
 							writtenCount,
-							tokenDestination === 'theme'
+							destination === 'theme'
 								? __( 'theme.json', 'pattern-builder' )
 								: __( 'Site styles', 'pattern-builder' )
 						),
@@ -798,12 +782,13 @@ export function CloudBrowser( {
 	const tokensModal = pendingDownload && (
 		<TokensModal
 			missing={ pendingDownload.missing }
+			destination={ pendingDownload.destination }
 			busy={ busy }
-			onConfirm={ ( tokenDestination ) =>
+			onConfirm={ () =>
 				performDownload(
 					pendingDownload.pattern,
 					pendingDownload.destination,
-					tokenDestination
+					true
 				)
 			}
 			onClose={ () => setPendingDownload( null ) }

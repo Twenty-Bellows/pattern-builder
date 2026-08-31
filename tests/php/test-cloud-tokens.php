@@ -6,6 +6,7 @@
  * @package PatternBuilder
  */
 
+use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud;
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Tokens;
 
 class Test_Cloud_Tokens extends WP_UnitTestCase {
@@ -18,6 +19,8 @@ class Test_Cloud_Tokens extends WP_UnitTestCase {
 	}
 
 	public function tear_down() {
+		remove_all_filters( 'pre_http_request' );
+		delete_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_TOKEN );
 		remove_filter( 'wp_theme_json_data_theme', array( $this, 'inject_theme_presets' ) );
 		wp_clean_theme_json_cache();
 		$theme_json = get_stylesheet_directory() . '/theme.json';
@@ -224,6 +227,127 @@ class Test_Cloud_Tokens extends WP_UnitTestCase {
 
 		$this->assertWPError( $result );
 		$this->assertSame( 'pb_cloud_bad_token', $result->get_error_code() );
+	}
+
+	/**
+	 * The download endpoint asks no second question: whatever destination the
+	 * user picked for the pattern is where its missing tokens go, and only
+	 * the missing ones are written.
+	 */
+	public function test_download_adds_missing_tokens_where_the_pattern_goes() {
+		update_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_TOKEN, 'pbwp_test-token' );
+
+		$this->mock_download(
+			array(
+				array(
+					'type'  => 'color',
+					'slug'  => 'brand',
+					'name'  => 'Brand',
+					'value' => '#000000',
+				),
+				array(
+					'type'  => 'color',
+					'slug'  => 'imported-accent',
+					'name'  => 'Imported Accent',
+					'value' => '#aa5500',
+				),
+			)
+		);
+
+		$request = new WP_REST_Request( 'POST', '/pattern-builder/v1/cloud/download' );
+		$request->set_param( 'source', 'library' );
+		$request->set_param( 'cloudId', 12 );
+		$request->set_param( 'destination', 'user' );
+		$request->set_param( 'addTokens', true );
+		$response = rest_do_request( $request );
+
+		$this->assertSame( 200, $response->get_status() );
+
+		// Only the token the site lacks; "brand" keeps the theme's value.
+		$this->assertSame(
+			array( 'color' => array( 'imported-accent' ) ),
+			$response->get_data()['tokensWritten']
+		);
+
+		$user_styles = json_decode(
+			get_post( WP_Theme_JSON_Resolver::get_user_global_styles_post_id() )->post_content,
+			true
+		);
+		$this->assertSame(
+			array( 'imported-accent' ),
+			wp_list_pluck( $user_styles['settings']['color']['palette'], 'slug' )
+		);
+		$this->assertFileDoesNotExist( get_stylesheet_directory() . '/theme.json' );
+	}
+
+	public function test_download_writes_no_tokens_unless_asked() {
+		update_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_TOKEN, 'pbwp_test-token' );
+
+		$this->mock_download(
+			array(
+				array(
+					'type'  => 'color',
+					'slug'  => 'imported-accent',
+					'name'  => 'Imported Accent',
+					'value' => '#aa5500',
+				),
+			)
+		);
+
+		$request = new WP_REST_Request( 'POST', '/pattern-builder/v1/cloud/download' );
+		$request->set_param( 'source', 'library' );
+		$request->set_param( 'cloudId', 12 );
+		$request->set_param( 'destination', 'user' );
+		$response = rest_do_request( $request );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( array(), $response->get_data()['tokensWritten'] );
+		$this->assertSame(
+			array(),
+			Pattern_Builder_Cloud_Tokens::missing(
+				array(
+					array(
+						'type'  => 'color',
+						'slug'  => 'brand',
+						'value' => '#4f46e5',
+					),
+				)
+			)
+		);
+	}
+
+	/**
+	 * Answer the service's download call with a package carrying $tokens.
+	 *
+	 * @param array $tokens PBP token list.
+	 */
+	private function mock_download( $tokens ) {
+		add_filter(
+			'pre_http_request',
+			static function ( $pre, $args, $url ) use ( $tokens ) {
+				if ( false === strpos( $url, rawurlencode( '/download' ) ) ) {
+					return $pre;
+				}
+
+				return array(
+					'headers'  => array(),
+					'response' => array( 'code' => 200 ),
+					'body'     => wp_json_encode(
+						array(
+							'pbp'     => '1',
+							'title'   => 'Tokened Pattern',
+							'slug'    => 'tokened-pattern',
+							'content' => '<!-- wp:paragraph --><p>Hello</p><!-- /wp:paragraph -->',
+							'tokens'  => $tokens,
+						)
+					),
+					'cookies'  => array(),
+					'filename' => null,
+				);
+			},
+			10,
+			3
+		);
 	}
 
 	public function test_porter_export_bundles_tokens() {
