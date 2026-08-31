@@ -41,10 +41,14 @@ export const PatternBuilderPanel = ( { patternPost, postType } ) => {
 	return (
 		<>
 			<PluginDocumentSettingPanel
-				name={ 'pattern-panel-additions-source' }
-				title={ _x( 'Pattern Source', 'UI String', 'pattern-builder' ) }
+				name={ 'pattern-panel-additions-metadata' }
+				title={ _x(
+					'Pattern Metadata',
+					'UI String',
+					'pattern-builder'
+				) }
 			>
-				<PatternSourcePanel
+				<PatternMetadataPanel
 					patternPost={ patternPost }
 					postType={ postType }
 				/>
@@ -65,18 +69,15 @@ export const PatternBuilderPanel = ( { patternPost, postType } ) => {
 			</PluginDocumentSettingPanel>
 
 			<PluginDocumentSettingPanel
-				name={ 'pattern-panel-additions-metadata' }
-				title={ _x(
-					'Pattern Metadata',
-					'UI String',
-					'pattern-builder'
-				) }
+				name={ 'pattern-panel-additions-source' }
+				title={ _x( 'Pattern Source', 'UI String', 'pattern-builder' ) }
 			>
-				<PatternMetadataPanel
+				<PatternSourcePanel
 					patternPost={ patternPost }
 					postType={ postType }
 				/>
 			</PluginDocumentSettingPanel>
+
 
 			{ isThemePattern && (
 				<PluginDocumentSettingPanel
@@ -92,6 +93,17 @@ export const PatternBuilderPanel = ( { patternPost, postType } ) => {
 			) }
 
 			<PluginDocumentSettingPanel
+				name={ 'pattern-panel-additions-bindings' }
+				title={ _x(
+					'Pattern Bindings',
+					'UI String',
+					'pattern-builder'
+				) }
+			>
+				<BlockBindingsPanel />
+			</PluginDocumentSettingPanel>
+
+			<PluginDocumentSettingPanel
 				name={ 'pattern-panel-additions-actions' }
 				title={ _x(
 					'Pattern Actions',
@@ -105,16 +117,6 @@ export const PatternBuilderPanel = ( { patternPost, postType } ) => {
 				/>
 			</PluginDocumentSettingPanel>
 
-			<PluginDocumentSettingPanel
-				name={ 'pattern-panel-additions-bindings' }
-				title={ _x(
-					'Pattern Bindings',
-					'UI String',
-					'pattern-builder'
-				) }
-			>
-				<BlockBindingsPanel />
-			</PluginDocumentSettingPanel>
 		</>
 	);
 };
