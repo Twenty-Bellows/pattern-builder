@@ -365,8 +365,11 @@ class Pattern_Builder_Cloud {
 	 * @param int|null $cloud_id     Cloud pattern ID, or null to forget.
 	 * @param string   $content_hash md5 of the raw content at upload time;
 	 *                               empty reads as changed.
+	 * @param bool     $owned        Whether the cloud copy is this account's
+	 *                               to update. False for a pattern downloaded
+	 *                               from somebody else's.
 	 */
-	public static function set_link( $local_key, $cloud_id, $content_hash = '' ) {
+	public static function set_link( $local_key, $cloud_id, $content_hash = '', $owned = true ) {
 		$links = self::links();
 		if ( null === $cloud_id ) {
 			unset( $links[ $local_key ] );
@@ -376,8 +379,28 @@ class Pattern_Builder_Cloud {
 				'account'    => (int) ( self::account()['id'] ?? 0 ),
 				'hash'       => (string) $content_hash,
 				'uploadedAt' => time(),
+				'owned'      => (bool) $owned,
 			);
 		}
+		update_option( self::OPTION_LINKS, $links, false );
+	}
+
+	/**
+	 * Record that a linked cloud pattern is not this account's to update.
+	 *
+	 * The link itself stays: it is what recognizes the pattern as already
+	 * installed. Only the offer to update it goes away.
+	 *
+	 * @param string $local_key "theme:{name}" or "user:{postId}".
+	 */
+	public static function disown_link( $local_key ) {
+		$links = self::links();
+
+		if ( ! isset( $links[ $local_key ] ) ) {
+			return;
+		}
+
+		$links[ $local_key ]['owned'] = false;
 		update_option( self::OPTION_LINKS, $links, false );
 	}
 
