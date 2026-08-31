@@ -116,6 +116,39 @@ class Pattern_Builder_Admin {
 			'after'
 		);
 
+		/*
+		 * The server-registered block bindings sources, which every core editor
+		 * screen preloads the same way.
+		 *
+		 * This one is easy to miss and fails quietly. The client half of a
+		 * source carries no label, and `registerBlockBindingsSource()` refuses
+		 * a source that has neither its own label nor one on an already
+		 * registered stub — so without these stubs the editor's own
+		 * `core/pattern-overrides` registration bails with a console warning
+		 * and nothing else. Everything renders; a pattern that fills another
+		 * pattern's slots just shows that pattern's placeholder copy, in the
+		 * browse grid's previews and in the pattern editor alike.
+		 */
+		$binding_sources = array();
+		foreach ( get_all_registered_block_bindings_sources() as $source ) {
+			$binding_sources[] = array(
+				'name'        => $source->name,
+				'label'       => $source->label,
+				'usesContext' => $source->uses_context,
+			);
+		}
+
+		if ( $binding_sources ) {
+			wp_add_inline_script(
+				'wp-blocks',
+				sprintf(
+					'for ( const source of %s ) { wp.blocks.registerBlockBindingsSource( source ); }',
+					wp_json_encode( $binding_sources, JSON_HEX_TAG | JSON_UNESCAPED_SLASHES )
+				),
+				'after'
+			);
+		}
+
 		wp_enqueue_script(
 			'pattern-builder-admin',
 			plugins_url( '../build/PatternBuilder_Admin.js', __FILE__ ),

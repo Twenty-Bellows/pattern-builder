@@ -150,6 +150,36 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 		[]
 	);
 
+	/*
+	 * A preview resolves a `wp:pattern` reference against the block editor's
+	 * own pattern list, which reaches it through the settings. The settings
+	 * this page prints carry none — core stopped putting patterns in editor
+	 * settings, and every editor fetches them itself — so a pattern that
+	 * references another rendered "not available" in its tile while opening
+	 * perfectly in the editor next door.
+	 *
+	 * The screen waits for the fetch rather than rendering a grid of
+	 * warnings and correcting it a moment later; it waits on the resolution
+	 * finishing, not on the value, so a request that fails still lets the
+	 * browser through.
+	 */
+	const { blockPatterns, hasBlockPatterns } = useSelect( ( select ) => {
+		const { getBlockPatterns, hasFinishedResolution } = select( coreStore );
+
+		return {
+			blockPatterns: getBlockPatterns(),
+			hasBlockPatterns: hasFinishedResolution( 'getBlockPatterns' ),
+		};
+	}, [] );
+
+	const previewSettings = useMemo(
+		() => ( {
+			...editorSettings,
+			__experimentalBlockPatterns: blockPatterns || [],
+		} ),
+		[ editorSettings, blockPatterns ]
+	);
+
 	const snackbarNotices = useSelect(
 		( select ) =>
 			select( noticesStore )
@@ -287,7 +317,7 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 		[ patterns, selectedId ]
 	);
 
-	if ( null === patterns ) {
+	if ( null === patterns || ! hasBlockPatterns ) {
 		return (
 			<div className="pattern-builder-browser__loading">
 				<Spinner />
@@ -296,9 +326,10 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 	}
 
 	return (
-		// Real editor settings: previews need theme styles and the
-		// block-bindings map to render `__default` bindings.
-		<BlockEditorProvider settings={ editorSettings }>
+		// Real editor settings: previews need theme styles, the
+		// block-bindings map to render `__default` bindings, and the
+		// registered patterns to resolve a reference to another pattern.
+		<BlockEditorProvider settings={ previewSettings }>
 			<div className="pattern-builder-browser">
 				<header className="pattern-builder-browser__header">
 					<div className="pattern-builder-browser__brand">
