@@ -66,6 +66,8 @@ class Pattern_Builder_Cloud_Porter {
 			);
 		}
 
+		$content = $this->strip_attachment_identity( $content );
+
 		$slug = $pattern->name ? basename( (string) $pattern->name ) : sanitize_title( $pattern->title );
 
 		$pbp = array(
@@ -314,6 +316,67 @@ class Pattern_Builder_Cloud_Porter {
 		}
 
 		return $assets;
+	}
+
+	/**
+	 * Media blocks and the attributes that name a local attachment.
+	 *
+	 * @return array Block name => attribute keys.
+	 */
+	private function attachment_attributes() {
+		return array(
+			'core/image'      => array( 'id' ),
+			'core/cover'      => array( 'id' ),
+			'core/media-text' => array( 'mediaId' ),
+			'core/video'      => array( 'id' ),
+			'core/audio'      => array( 'id' ),
+			'core/gallery'    => array( 'ids' ),
+		);
+	}
+
+	/**
+	 * Forget which attachment an image was here.
+	 *
+	 * An attachment id means nothing on another site: id 57 is this site's
+	 * avatar and somebody else's letterhead. The image itself travels in the
+	 * package, so the ids and the `wp-image-57` classes that name it are
+	 * dropped on the way out, leaving blocks that render from their src —
+	 * which is how a theme's own pattern files are written anyway.
+	 *
+	 * @param string $content Block markup.
+	 * @return string
+	 */
+	private function strip_attachment_identity( $content ) {
+		$blocks = implode( '|', array_map( 'preg_quote', array_keys( $this->attachment_attributes() ) ) );
+		$blocks = str_replace( 'core/', '', $blocks );
+
+		$content = preg_replace_callback(
+			'/<!--\s+wp:(' . $blocks . ')\s+(\{.*?\})\s+(\/?)-->/s',
+			function ( $matches ) {
+				$attributes = json_decode( $matches[2], true );
+				if ( ! is_array( $attributes ) ) {
+					return $matches[0];
+				}
+
+				foreach ( $this->attachment_attributes()[ 'core/' . $matches[1] ] as $key ) {
+					unset( $attributes[ $key ] );
+				}
+
+				// Core's own serializer: the escaping rules that keep a block
+				// comment a block comment are its business, not ours.
+				return $attributes
+					? '<!-- wp:' . $matches[1] . ' ' . serialize_block_attributes( $attributes ) . ' ' . $matches[3] . '-->'
+					: '<!-- wp:' . $matches[1] . ' ' . $matches[3] . '-->';
+			},
+			$content
+		);
+
+		// The same id, spelled as a class or a data attribute in the markup.
+		$content = preg_replace( '/\s*\bwp-image-\d+\b/', '', $content );
+		$content = preg_replace( '/\s+class="\s*"/', '', $content );
+		$content = preg_replace( '/\s+data-id="\d+"/', '', $content );
+
+		return $content;
 	}
 
 	/**
