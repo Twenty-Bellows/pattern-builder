@@ -123,6 +123,68 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 	 * href, or a social link's `url` attribute. Neither is the exporter's
 	 * business, and neither may block an upload.
 	 */
+	/**
+	 * An attachment id means nothing on another site, so the ids and the
+	 * `wp-image-N` classes naming them are dropped on the way out; the image
+	 * itself travels in the package.
+	 */
+	public function test_export_forgets_which_attachment_an_image_was() {
+		$attachment_id = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
+		$url           = wp_get_attachment_url( $attachment_id );
+
+		$content = '<!-- wp:image {"id":' . $attachment_id . ',"sizeSlug":"full","linkDestination":"none"} -->'
+			. '<figure class="wp-block-image size-full"><img src="' . $url . '" alt="" class="wp-image-' . $attachment_id . '"/></figure>'
+			. '<!-- /wp:image -->'
+			. '<!-- wp:cover {"url":"' . $url . '","id":' . $attachment_id . ',"dimRatio":50} --><div class="wp-block-cover"></div><!-- /wp:cover -->'
+			. '<!-- wp:media-text {"mediaId":' . $attachment_id . ',"mediaType":"image"} --><div class="wp-block-media-text"><figure><img src="' . $url . '" alt="" class="wp-image-' . $attachment_id . '"/></figure></div><!-- /wp:media-text -->';
+
+		$exported = $this->export_content( $content );
+
+		$this->assertIsArray( $exported );
+		$package = $exported['pbp']['content'];
+
+		$this->assertStringNotContainsString( '"id":' . $attachment_id, $package );
+		$this->assertStringNotContainsString( '"mediaId":' . $attachment_id, $package );
+		$this->assertStringNotContainsString( 'wp-image-' . $attachment_id, $package );
+		$this->assertStringNotContainsString( 'class=""', $package );
+
+		// Everything else about the blocks survives.
+		$this->assertStringContainsString( '"sizeSlug":"full"', $package );
+		$this->assertStringContainsString( '"dimRatio":50', $package );
+		$this->assertStringContainsString( '"mediaType":"image"', $package );
+		$this->assertStringContainsString( 'class="wp-block-image size-full"', $package );
+		$this->assertStringContainsString( 'pbp-asset://', $package );
+	}
+
+	public function test_export_keeps_a_block_valid_when_only_the_id_was_there() {
+		$attachment_id = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
+		$url           = wp_get_attachment_url( $attachment_id );
+
+		$exported = $this->export_content(
+			'<!-- wp:image {"id":' . $attachment_id . '} --><figure class="wp-block-image"><img src="' . $url . '" alt=""/></figure><!-- /wp:image -->'
+			. '<!-- wp:gallery {"ids":[' . $attachment_id . ']} --><figure class="wp-block-gallery"></figure><!-- /wp:gallery -->'
+		);
+
+		$this->assertIsArray( $exported );
+		$package = $exported['pbp']['content'];
+
+		$this->assertStringContainsString( '<!-- wp:image -->', $package );
+		$this->assertStringContainsString( '<!-- wp:gallery -->', $package );
+		$this->assertSame( 2, substr_count( $package, '<!-- /wp:' ) );
+
+		// It still parses back to the same blocks.
+		$blocks = array_values(
+			array_filter(
+				parse_blocks( $package ),
+				static function ( $block ) {
+					return ! empty( $block['blockName'] );
+				}
+			)
+		);
+		$this->assertSame( array( 'core/image', 'core/gallery' ), wp_list_pluck( $blocks, 'blockName' ) );
+		$this->assertSame( array(), $blocks[0]['attrs'] );
+	}
+
 	public function test_export_leaves_links_alone() {
 		$content = '<!-- wp:paragraph --><p><a href="https://wordpress.org">View on WordPress.org</a></p><!-- /wp:paragraph -->'
 			. '<!-- wp:social-links --><ul class="wp-block-social-links"><!-- wp:social-link {"url":"https://wordpress.org","service":"wordpress"} /--></ul><!-- /wp:social-links -->';
