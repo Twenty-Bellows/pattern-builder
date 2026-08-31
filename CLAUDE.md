@@ -66,6 +66,7 @@ Version 2.0 removed the 1.x DB-mirror + REST-hijacking design entirely. Theme pa
 - `npm run test:php` - Run PHP unit tests in wp-env environment (**requires Docker**)
 - `npm run test:php:watch` - Run PHP tests in watch mode (**requires Docker**)
 - `composer test` - Run PHP tests directly via PHPUnit (requires WP test bootstrap)
+- `wp eval-file tests/e2e/cloud-roundtrip.php <token> [pattern-id]` - The cloud round trip over the wire (upload → update path → download), against a live patternbuilderwp.com. Manual, because it needs a second WordPress: every automated test of this path mocks `pre_http_request`, so nothing else exercises the real multipart upload, the service's sanitization and asset rehosting, or the download that fetches those assets back. Run it after touching the porter, the cloud controller, or the service's store.
 
 ### Development Environment (Docker required)
 - `npm run start` - Start wp-env with xdebug enabled
