@@ -250,8 +250,23 @@ class Pattern_Builder_Cloud_Porter {
 	private function collect_local_assets( $content ) {
 		$images = '(?:jpg|jpeg|png|gif|webp)';
 
-		// References the service will reject unless they travel with the package.
-		preg_match_all( '/(?:src="|"url"\s*:\s*"|url\(\s*[\'"]?)(https?:(?:\\?\/|\/)[^"\')]+)/i', $content, $required );
+		// Media the browser fetches to render the pattern: the service refuses
+		// any of it that it can't reach, so it has to travel along.
+		preg_match_all( '/(?:src="|url\(\s*[\'"]?)(https?:(?:\\?\/|\/)[^"\')]+)/i', $content, $required );
+
+		/*
+		 * A block attribute named `url` only sometimes holds media: a social
+		 * link, an embed and a button keep their destination there, and a
+		 * pattern that links to wordpress.org references no image at all.
+		 * Only an attribute naming a media file counts — whatever really
+		 * renders as media appears in the markup's src or url() as well.
+		 */
+		preg_match_all( '/"url"\s*:\s*"(https?:(?:\\?\/|\/)[^"]+)"/i', $content, $attributes );
+		foreach ( $attributes[1] as $attribute_url ) {
+			if ( $this->is_media_url( str_replace( '\\/', '/', $attribute_url ) ) ) {
+				$required[1][] = $attribute_url;
+			}
+		}
 
 		// Links to a local image (a lightbox, say): bundled when resolvable.
 		preg_match_all( '/href="(https?:\/\/[^"]+\.' . $images . '(?:\?[^"]*)?)"/i', $content, $links );
@@ -299,6 +314,19 @@ class Pattern_Builder_Cloud_Porter {
 		}
 
 		return $assets;
+	}
+
+	/**
+	 * Whether a URL names a media file, by its extension. Mirrors the rule
+	 * the service applies, so the two agree on what counts as an image.
+	 *
+	 * @param string $url The URL.
+	 * @return bool
+	 */
+	private function is_media_url( $url ) {
+		$path = (string) wp_parse_url( strtok( $url, '?' ), PHP_URL_PATH );
+
+		return (bool) preg_match( '/\.(?:jpe?g|png|gif|webp|avif|svg|bmp|ico|tiff?|mp4|m4v|webm|ogv|ogg|mp3|wav|m4a|mov)$/i', $path );
 	}
 
 	/**
