@@ -368,7 +368,9 @@ class Pattern_Builder_Cloud_Controller {
 	/**
 	 * POST /cloud/download — bring a cloud pattern onto this site.
 	 *
-	 * Params: source (library|directory), cloudId, destination (user|theme).
+	 * Params: source (library|directory), cloudId, destination (user|theme),
+	 * addTokens (whether to add the design tokens the site is missing, which
+	 * go to the same destination as the pattern).
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -390,11 +392,15 @@ class Pattern_Builder_Cloud_Controller {
 			return $pbp;
 		}
 
-		// Missing design tokens land where the user chose; existing definitions win (§4a).
-		$tokens_written    = array();
-		$token_destination = $request->get_param( 'tokenDestination' );
-		if ( ! empty( $pbp['tokens'] ) && in_array( $token_destination, array( 'user', 'theme' ), true ) ) {
-			$tokens_written = Pattern_Builder_Cloud_Tokens::apply( $pbp['tokens'], $token_destination );
+		/*
+		 * Missing design tokens land wherever the pattern lands — the
+		 * destination is the one the user already chose, never a second
+		 * question — and only the missing ones: apply() re-checks, so a
+		 * token this site already defines keeps its own value (§4a).
+		 */
+		$tokens_written = array();
+		if ( ! empty( $pbp['tokens'] ) && $request->get_param( 'addTokens' ) ) {
+			$tokens_written = Pattern_Builder_Cloud_Tokens::apply( $pbp['tokens'], $destination );
 			if ( is_wp_error( $tokens_written ) ) {
 				return $tokens_written;
 			}
