@@ -150,16 +150,20 @@ class Pattern_Builder_Cloud_Porter {
 
 		$content = (string) $pbp['content'];
 
+		$attachments = array();
+
 		if ( ! empty( $pbp['assets'] ) && is_array( $pbp['assets'] ) ) {
 			foreach ( $pbp['assets'] as $asset ) {
 				if ( empty( $asset['key'] ) || empty( $asset['url'] ) ) {
 					continue;
 				}
-				$local_url = $this->import_asset( $asset );
-				if ( is_wp_error( $local_url ) ) {
-					return $local_url;
+				$imported = $this->import_asset( $asset );
+				if ( is_wp_error( $imported ) ) {
+					return $imported;
 				}
-				$content = str_replace(
+				$local_url                 = $imported['url'];
+				$attachments[ $local_url ] = $imported['id'];
+				$content                   = str_replace(
 					array( 'pbp-asset://' . $asset['key'], 'pbp-asset:\/\/' . $asset['key'] ),
 					array( $local_url, str_replace( '/', '\/', $local_url ) ),
 					$content
@@ -184,8 +188,18 @@ class Pattern_Builder_Cloud_Porter {
 		$synced      = ! empty( $pbp['synced'] );
 
 		if ( 'theme' === $destination ) {
+			/*
+			 * No attachments to name: a theme pattern's images are moved into
+			 * the theme's own assets directory and referenced from there
+			 * (Pattern_File_Store::update_theme_pattern), so the package's
+			 * blocks stay as they arrived — an id would name nothing.
+			 */
 			return $this->import_as_theme_pattern( $pbp, $title, $slug, $description, $categories, $synced, $content );
 		}
+
+		// A user pattern's images did land in the media library, so its blocks
+		// can name them — the identity the export dropped, in local terms.
+		$content = $this->attach_media_library_ids( $content, $attachments );
 
 		return $this->import_as_user_pattern( $title, $slug, $description, $categories, $synced, $content );
 	}
@@ -380,6 +394,106 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
+	 * Name the attachments a downloaded pattern's images just became.
+	 *
+	 * The mirror of strip_attachment_identity(): the package carries no ids,
+	 * because the sender's ids meant nothing here — but the images have now
+	 * been sideloaded, so the blocks can point at the local attachments and
+	 * the editor sees an image it knows rather than a bare URL.
+	 *
+	 * @param string $content     Block markup, placeholders already resolved.
+	 * @param array  $attachments Local URL => attachment id.
+	 * @return string
+	 */
+	private function attach_media_library_ids( $content, $attachments ) {
+		if ( ! $attachments ) {
+			return $content;
+		}
+
+		$blocks  = $this->name_attachments_in_blocks( parse_blocks( $content ), $attachments );
+		$content = serialize_blocks( $blocks );
+
+		// The same id, as the class core writes on the image itself.
+		$images = new \WP_HTML_Tag_Processor( $content );
+		while ( $images->next_tag( 'img' ) ) {
+			$src = $images->get_attribute( 'src' );
+			if ( is_string( $src ) && isset( $attachments[ $src ] ) ) {
+				$images->add_class( 'wp-image-' . $attachments[ $src ] );
+			}
+		}
+
+		return $images->get_updated_html();
+	}
+
+	/**
+	 * Set the attachment attribute on every media block that shows one of
+	 * these images, innermost blocks included.
+	 *
+	 * @param array $blocks      Parsed blocks.
+	 * @param array $attachments Local URL => attachment id.
+	 * @return array
+	 */
+	private function name_attachments_in_blocks( $blocks, $attachments ) {
+		foreach ( $blocks as &$block ) {
+			$keys = isset( $this->attachment_attributes()[ $block['blockName'] ] )
+				? $this->attachment_attributes()[ $block['blockName'] ]
+				: array();
+
+			foreach ( $keys as $key ) {
+				// `ids` is the legacy gallery's list, not one image's identity.
+				if ( 'ids' === $key ) {
+					continue;
+				}
+
+				$id = $this->attachment_shown_by( $block, $attachments );
+				if ( $id ) {
+					$block['attrs'][ $key ] = $id;
+				}
+			}
+
+			if ( ! empty( $block['innerBlocks'] ) ) {
+				$block['innerBlocks'] = $this->name_attachments_in_blocks( $block['innerBlocks'], $attachments );
+			}
+		}
+
+		return $blocks;
+	}
+
+	/**
+	 * The attachment a media block shows, by the URL in its own markup or
+	 * in its `url` attribute — never one an inner block brought with it.
+	 *
+	 * @param array $block       One parsed block.
+	 * @param array $attachments Local URL => attachment id.
+	 * @return int 0 when the block shows none of them.
+	 */
+	private function attachment_shown_by( $block, $attachments ) {
+		if ( ! empty( $block['attrs']['url'] ) && isset( $attachments[ $block['attrs']['url'] ] ) ) {
+			return $attachments[ $block['attrs']['url'] ];
+		}
+
+		$own_markup = implode(
+			'',
+			array_filter(
+				$block['innerContent'],
+				static function ( $chunk ) {
+					return is_string( $chunk );
+				}
+			)
+		);
+
+		$images = new \WP_HTML_Tag_Processor( $own_markup );
+		while ( $images->next_tag( 'img' ) ) {
+			$src = $images->get_attribute( 'src' );
+			if ( is_string( $src ) && isset( $attachments[ $src ] ) ) {
+				return $attachments[ $src ];
+			}
+		}
+
+		return 0;
+	}
+
+	/**
 	 * Whether a URL names a media file, by its extension. Mirrors the rule
 	 * the service applies, so the two agree on what counts as an image.
 	 *
@@ -565,7 +679,10 @@ class Pattern_Builder_Cloud_Porter {
 			return $attachment_id;
 		}
 
-		return wp_get_attachment_url( $attachment_id );
+		return array(
+			'id'  => (int) $attachment_id,
+			'url' => wp_get_attachment_url( $attachment_id ),
+		);
 	}
 
 	/**
