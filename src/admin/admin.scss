@@ -239,10 +239,19 @@ body.appearance_page_pattern-builder {
 		overflow: hidden;
 		background: #f6f7f7;
 
-		// Local previews render inline and scale by viewport width; cloud
-		// previews are iframes positioned by the card's fit calculation.
-		> div {
+		// Both kinds are contain-fitted by the card: local previews through
+		// this wrapper, cloud previews through the iframe below.
+		.pattern-builder-card__fit {
+			display: block;
+			position: absolute;
+			top: 0;
+			left: 0;
 			width: 100%;
+			transform-origin: top left;
+
+			> div {
+				width: 100%;
+			}
 		}
 
 		iframe {
