@@ -1,0 +1,8 @@
+// The pattern grids' tile geometry, shared by the local and cloud grids.
+// Every preview — a local BlockPreview, a cloud preview document — renders
+// at $preview-width and is scaled into a tile of $tile pixels. The scale is
+// therefore a constant the stylesheet can compute, which is what lets both
+// grids match without any JavaScript measuring tiles or previews.
+$tile: 200;
+$preview-width: 1400;
+$gap: 20;

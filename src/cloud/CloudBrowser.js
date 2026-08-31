@@ -1,6 +1,6 @@
 import apiFetch from '@wordpress/api-fetch';
 import { __, _n, sprintf } from '@wordpress/i18n';
-import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
+import { useState, useEffect, useCallback } from '@wordpress/element';
 import {
 	Button,
 	Flex,
@@ -163,61 +163,18 @@ function ConnectPanel( { onConnected } ) {
 }
 
 /**
- * A cloud pattern card: live iframe preview, title, premium badge.
+ * A cloud pattern card: the service's preview document rendered at the
+ * grid's design width and scaled into the same fixed square tile the local
+ * cards use. The tile and the scale are fixed in CSS, and the preview
+ * document centers its own content — nothing measures anything, so the two
+ * grids cannot drift apart.
  *
  * @param {Object}   props            Component props.
  * @param {Object}   props.pattern    Cloud pattern summary.
  * @param {boolean}  props.isSelected Whether the card is selected.
  * @param {Function} props.onSelect   Selection callback.
  */
-const PREVIEW_WIDTH = 1400;
-
 function CloudCard( { pattern, isSelected, onSelect } ) {
-	// Contain-fit the fixed-width preview so the whole pattern shows; the
-	// cross-origin preview document reports its height via postMessage.
-	const previewRef = useRef( null );
-	const iframeRef = useRef( null );
-	const [ box, setBox ] = useState( { width: 0, height: 0 } );
-	const [ contentHeight, setContentHeight ] = useState( 0 );
-
-	useEffect( () => {
-		const node = previewRef.current;
-		if ( ! node || typeof window.ResizeObserver === 'undefined' ) {
-			return;
-		}
-		const observer = new window.ResizeObserver( ( entries ) => {
-			const rect = entries[ 0 ]?.contentRect;
-			if ( rect?.width ) {
-				setBox( { width: rect.width, height: rect.height } );
-			}
-		} );
-		observer.observe( node );
-		return () => observer.disconnect();
-	}, [] );
-
-	useEffect( () => {
-		const onMessage = ( event ) => {
-			if (
-				event.source !== iframeRef.current?.contentWindow ||
-				event.data?.type !== 'pbwp-preview-size' ||
-				! event.data.height
-			) {
-				return;
-			}
-			setContentHeight(
-				Math.min( 4000, Math.max( 200, Number( event.data.height ) ) )
-			);
-		};
-		window.addEventListener( 'message', onMessage );
-		return () => window.removeEventListener( 'message', onMessage );
-	}, [] );
-
-	const docHeight = contentHeight || Math.ceil( ( 2 / 3 ) * PREVIEW_WIDTH );
-	const widthFit = box.width ? box.width / PREVIEW_WIDTH : 0.2;
-	const scale = box.height
-		? Math.min( widthFit, box.height / docHeight )
-		: widthFit;
-
 	return (
 		<button
 			type="button"
@@ -225,28 +182,16 @@ function CloudCard( { pattern, isSelected, onSelect } ) {
 				'pattern-builder-card pattern-builder-card--cloud' +
 				( isSelected ? ' is-selected' : '' )
 			}
+			aria-pressed={ isSelected }
 			onClick={ () => onSelect( pattern ) }
 		>
-			<span className="pattern-builder-card__preview" ref={ previewRef }>
+			<span className="pattern-builder-card__preview">
 				<iframe
-					ref={ iframeRef }
 					title={ pattern.title }
 					src={ pattern.previewUrl }
 					loading="lazy"
 					scrolling="no"
 					tabIndex={ -1 }
-					style={ {
-						transform: `scale(${ scale })`,
-						height: `${ docHeight }px`,
-						marginLeft: `${ Math.max(
-							0,
-							( box.width - PREVIEW_WIDTH * scale ) / 2
-						) }px`,
-						marginTop: `${ Math.max(
-							0,
-							( box.height - docHeight * scale ) / 2
-						) }px`,
-					} }
 				/>
 			</span>
 			<span className="pattern-builder-card__title">
