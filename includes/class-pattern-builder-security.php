@@ -50,13 +50,25 @@ class Pattern_Builder_Security {
 		// Default to theme directory if no allowed directories specified.
 		if ( empty( $allowed_dirs ) ) {
 			$allowed_dirs = array(
-				wp_normalize_path( get_stylesheet_directory() ),
-				wp_normalize_path( get_template_directory() ),
+				get_stylesheet_directory(),
+				get_template_directory(),
 			);
-		} else {
-			// Normalize all allowed directories.
-			$allowed_dirs = array_map( 'wp_normalize_path', $allowed_dirs );
 		}
+
+		/*
+		 * Resolve the allowed directories the same way the path above was
+		 * resolved. A theme (or wp-content) reached through a symlink — the
+		 * usual shape of a local dev setup — otherwise resolves to a real
+		 * path that no unresolved allowed directory can ever match, and a
+		 * legitimate write or delete looks like a traversal attempt.
+		 */
+		$allowed_dirs = array_map(
+			static function ( $dir ) {
+				$real = realpath( $dir );
+				return wp_normalize_path( false === $real ? $dir : $real );
+			},
+			$allowed_dirs
+		);
 
 		// Check if the path starts with any of the allowed directories.
 		$is_valid = false;

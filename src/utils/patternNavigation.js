@@ -16,6 +16,19 @@ import { resolveSelect } from '@wordpress/data';
 import { store as coreStore } from '@wordpress/core-data';
 
 /**
+ * The Appearance → Pattern Builder browse screen.
+ *
+ * @return {string} Admin URL.
+ */
+export function getBrowseUrl() {
+	return (
+		window.patternBuilderSettings?.adminEditorUrl ||
+		window.patternBuilderAdmin?.adminUrl ||
+		'themes.php?page=pattern-builder'
+	);
+}
+
+/**
  * The Appearance → Pattern Builder edit-mode URL for a theme pattern — the
  * page hosts the WordPress editor (edit-post) bound to the pattern's entity.
  *
@@ -23,13 +36,8 @@ import { store as coreStore } from '@wordpress/core-data';
  * @return {string} Admin URL.
  */
 export function getAdminEditorUrl( pattern ) {
-	const base =
-		window.patternBuilderSettings?.adminEditorUrl ||
-		window.patternBuilderAdmin?.adminUrl ||
-		'themes.php?page=pattern-builder';
-
 	return (
-		base +
+		getBrowseUrl() +
 		'&pattern=' +
 		encodeURIComponent( pattern.id ?? pattern.name ?? '' ) +
 		( pattern.source === 'theme' ? '' : '&type=user' ) +

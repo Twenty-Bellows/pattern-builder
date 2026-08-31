@@ -6,10 +6,12 @@ import {
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalVStack as VStack,
 } from '@wordpress/components';
-import { useDispatch } from '@wordpress/data';
+import { useDispatch, useSelect } from '@wordpress/data';
+import { store as coreStore } from '@wordpress/core-data';
+import { store as editorStore } from '@wordpress/editor';
 import { store as noticesStore } from '@wordpress/notices';
 
-import { navigateToPattern } from '../utils/patternNavigation';
+import { getBrowseUrl, navigateToPattern } from '../utils/patternNavigation';
 
 /**
  * Hand the browser a file without a round trip to the server.
@@ -43,6 +45,15 @@ export const PatternActionsPanel = ( { patternPost, postType, onChanged } ) => {
 	const [ busy, setBusy ] = useState( '' );
 	const { createSuccessNotice, createErrorNotice } =
 		useDispatch( noticesStore );
+	const { deleteEntityRecord } = useDispatch( coreStore );
+
+	// Whether an editor on this screen is showing the pattern itself, in
+	// which case deleting it leaves nothing here to edit.
+	const isEditingThisPattern = useSelect(
+		( select ) =>
+			select( editorStore )?.getCurrentPostId() === patternPost.id,
+		[ patternPost.id ]
+	);
 
 	const isThemePattern = postType === 'pb_pattern';
 	const title =
@@ -142,20 +153,33 @@ export const PatternActionsPanel = ( { patternPost, postType, onChanged } ) => {
 		}
 
 		setBusy( 'delete' );
-		apiFetch( {
-			path: isThemePattern
-				? `/pattern-builder/v1/patterns/${ encodeURIComponent(
-						patternPost.id
-				  ) }`
-				: `/wp/v2/blocks/${ patternPost.id }?force=true`,
-			method: 'DELETE',
-		} )
+
+		/*
+		 * Through the entity layer, not a hand-built path: it addresses the
+		 * record the way core's own save does — a theme pattern's id carries
+		 * a slash, and encoding that slash gets the request rejected before
+		 * it reaches WordPress on the servers that refuse encoded slashes —
+		 * and it drops the deleted record, and its edits, from the store.
+		 */
+		deleteEntityRecord(
+			'postType',
+			postType,
+			patternPost.id,
+			{ force: true },
+			{ throwOnError: true }
+		)
 			.then( () => {
 				setBusy( '' );
 				createSuccessNotice(
 					__( 'Pattern deleted.', 'pattern-builder' ),
 					{ type: 'snackbar' }
 				);
+
+				if ( isEditingThisPattern ) {
+					window.location.href = getBrowseUrl();
+					return;
+				}
+
 				if ( onChanged ) {
 					onChanged();
 				}

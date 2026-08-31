@@ -424,6 +424,43 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		$this->assertFileDoesNotExist( $this->test_dir . '/patterns/theme_unsynced_pattern.php' );
 	}
 
+	/**
+	 * A theme reached through a symlink — the usual shape of a local dev
+	 * setup — resolves to a real path outside the directory the theme
+	 * functions report, which used to read as a traversal attempt and made
+	 * deleting (or writing) a pattern impossible.
+	 */
+	public function test_delete_theme_pattern_in_a_symlinked_theme() {
+		$link = sys_get_temp_dir() . '/pattern-builder-test-link';
+
+		if ( file_exists( $link ) ) {
+			unlink( $link );
+		}
+
+		if ( ! @symlink( $this->test_dir, $link ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- Filesystems without symlink support skip this test.
+			$this->markTestSkipped( 'This filesystem does not support symlinks.' );
+		}
+
+		$this->copy_test_pattern( 'theme_unsynced_pattern.php' );
+
+		$through_link = static function () use ( $link ) {
+			return $link;
+		};
+		add_filter( 'stylesheet_directory', $through_link, 20 );
+		add_filter( 'template_directory', $through_link, 20 );
+
+		$request  = $this->create_rest_request( 'DELETE', '/pattern-builder/v1/patterns/simple-theme/theme-unsynced-pattern' );
+		$response = rest_get_server()->dispatch( $request );
+
+		remove_filter( 'stylesheet_directory', $through_link, 20 );
+		remove_filter( 'template_directory', $through_link, 20 );
+		unlink( $link );
+
+		$this->assertEquals( 200, $response->get_status() );
+		$this->assertTrue( $response->get_data()['deleted'] );
+		$this->assertFileDoesNotExist( $this->test_dir . '/patterns/theme_unsynced_pattern.php' );
+	}
+
 	public function test_unauthenticated_requests_are_rejected() {
 		$this->copy_test_pattern( 'theme_synced_pattern.php' );
 		wp_set_current_user( 0 );
