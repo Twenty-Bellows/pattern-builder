@@ -1,6 +1,6 @@
 import apiFetch from '@wordpress/api-fetch';
 import { __, sprintf } from '@wordpress/i18n';
-import { useState, useEffect, useCallback } from '@wordpress/element';
+import { useState, useEffect, useCallback, useMemo } from '@wordpress/element';
 import {
 	Button,
 	Notice,
@@ -15,6 +15,11 @@ import { useDispatch } from '@wordpress/data';
 import { store as noticesStore } from '@wordpress/notices';
 import { addQueryArgs } from '@wordpress/url';
 import { humanTimeDiff } from '@wordpress/date';
+
+import {
+	findInvalidBlocks,
+	describeInvalidBlocks,
+} from '../utils/blockValidity';
 
 const BASE = '/pattern-builder/v1/cloud';
 
@@ -55,21 +60,34 @@ export function usePatternCloudState( patternType, patternId, refreshKey ) {
 /**
  * The Cloud panel's controls: upload, update, or an up-to-date line.
  *
+ * Uploading is gated on the editor's own block validation. Markup a block
+ * type would not have written itself renders correctly here — it is only
+ * when an editor opens it that it reads as "unexpected or invalid content",
+ * and by then it is on somebody else's site. That check can only happen in
+ * a browser (a block's `save()` is JavaScript, so no server can run it), and
+ * this panel is already in one with the block types loaded.
+ *
  * @param {Object}        props             Component props.
  * @param {Object}        props.state       State from usePatternCloudState.
  * @param {Function}      props.onRefresh   Re-fetches the state after upload.
  * @param {string}        props.patternType 'theme' or 'user'.
  * @param {string|number} props.patternId   Local pattern identifier.
+ * @param {string}        props.content     The pattern's saved block markup.
  */
 export function PatternCloudControls( {
 	state,
 	onRefresh,
 	patternType,
 	patternId,
+	content,
 } ) {
 	const [ busy, setBusy ] = useState( false );
 	const [ error, setError ] = useState( '' );
 	const { createSuccessNotice } = useDispatch( noticesStore );
+
+	// The saved markup is what the server uploads, so that is what gets
+	// checked — not whatever is unsaved in the canvas.
+	const invalid = useMemo( () => findInvalidBlocks( content ), [ content ] );
 
 	if ( ! state ) {
 		return <Spinner />;
@@ -78,7 +96,7 @@ export function PatternCloudControls( {
 	const isUpdate = state.linked;
 
 	const upload = () => {
-		if ( busy ) {
+		if ( busy || invalid.length ) {
 			return;
 		}
 		setBusy( true );
@@ -127,6 +145,8 @@ export function PatternCloudControls( {
 			  )
 			: '';
 
+	const blockedByInvalidBlocks = invalid.length > 0;
+
 	return (
 		<VStack spacing={ 3 }>
 			{ ! state.linked && (
@@ -141,7 +161,7 @@ export function PatternCloudControls( {
 						variant="primary"
 						icon={ cloudUpload }
 						isBusy={ busy }
-						disabled={ busy }
+						disabled={ busy || blockedByInvalidBlocks }
 						onClick={ upload }
 					>
 						{ __( 'Upload to the cloud', 'pattern-builder' ) }
@@ -161,7 +181,7 @@ export function PatternCloudControls( {
 						variant="primary"
 						icon={ cloudUpload }
 						isBusy={ busy }
-						disabled={ busy }
+						disabled={ busy || blockedByInvalidBlocks }
 						onClick={ upload }
 					>
 						{ __(
@@ -180,6 +200,19 @@ export function PatternCloudControls( {
 					) }
 					{ uploadedAgo ? ` ${ uploadedAgo }` : '' }
 				</Text>
+			) }
+
+			{ blockedByInvalidBlocks && (
+				<Notice status="warning" isDismissible={ false }>
+					{ sprintf(
+						/* translators: %s: comma separated block names, e.g. "heading (2), list". */
+						__(
+							'This pattern cannot be uploaded: %s would open as "unexpected or invalid content" in the editor. Edit the pattern and use Attempt Block Recovery on the blocks marked in red, then save.',
+							'pattern-builder'
+						),
+						describeInvalidBlocks( invalid )
+					) }
+				</Notice>
 			) }
 
 			{ error && (
