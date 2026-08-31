@@ -294,6 +294,62 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		$this->assertEqualSets( array( 'Heroes', 'Featured' ), $terms );
 	}
 
+	/**
+	 * The export drops attachment ids because they mean nothing elsewhere;
+	 * a user pattern's images do land in this site's media library, so the
+	 * blocks are pointed back at them in local terms.
+	 */
+	public function test_import_names_the_attachments_it_created_for_a_user_pattern() {
+		$porter = new Pattern_Builder_Cloud_Porter();
+		$result = $porter->import_pbp( $this->make_downloaded_pbp(), 'user' );
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$content = get_post( $result['id'] )->post_content;
+
+		$this->assertMatchesRegularExpression( '/<!-- wp:image \{[^}]*"id":\d+/', $content );
+
+		preg_match( '/"id":(\d+)/', $content, $id );
+		$this->assertSame( 'attachment', get_post_type( (int) $id[1] ) );
+		$this->assertStringContainsString( 'wp-image-' . $id[1], $content );
+
+		// And it names the attachment the image actually shows.
+		$this->assertStringContainsString( wp_get_attachment_url( (int) $id[1] ), $content );
+	}
+
+	/**
+	 * A theme pattern's images are moved into the theme's own assets
+	 * directory and referenced from there, so there is no attachment for a
+	 * block to name.
+	 */
+	public function test_import_leaves_a_theme_pattern_without_attachment_ids() {
+		// A writable theme directory, as test_import_as_theme_pattern_writes_file does.
+		$test_dir = sys_get_temp_dir() . '/pattern-builder-cloud-test';
+		if ( ! is_dir( $test_dir . '/patterns' ) ) {
+			mkdir( $test_dir, 0777, true );
+			mkdir( $test_dir . '/patterns' );
+		}
+		$dir_filter = static function () use ( $test_dir ) {
+			return $test_dir;
+		};
+		add_filter( 'stylesheet_directory', $dir_filter );
+
+		$porter = new Pattern_Builder_Cloud_Porter();
+		$result = $porter->import_pbp( $this->make_downloaded_pbp(), 'theme' );
+
+		remove_filter( 'stylesheet_directory', $dir_filter );
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+
+		$file = $test_dir . '/patterns/downloaded-hero.php';
+		$this->assertFileExists( $file );
+
+		$written = file_get_contents( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+		$this->assertDoesNotMatchRegularExpression( '/"id":\d+/', $written );
+		$this->assertStringNotContainsString( 'wp-image-', $written );
+
+		unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+	}
+
 	public function test_import_as_theme_pattern_writes_file() {
 		// Stand in a writable theme directory, the way the REST API tests do.
 		$test_dir = sys_get_temp_dir() . '/pattern-builder-cloud-test';

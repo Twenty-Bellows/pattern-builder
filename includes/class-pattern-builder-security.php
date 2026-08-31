@@ -31,21 +31,16 @@ class Pattern_Builder_Security {
 		// First normalize the path without realpath to handle non-existing files.
 		$normalized_path = wp_normalize_path( $path );
 
-		// If the file exists, use realpath for stronger validation.
-		if ( file_exists( $path ) ) {
-			$real_path = wp_normalize_path( realpath( $path ) );
-			if ( false === $real_path ) {
-				return new WP_Error(
-					'invalid_path',
-					__( 'Invalid file path provided.', 'pattern-builder' ),
-					array( 'status' => 400 )
-				);
-			}
-			$path = $real_path;
-		} else {
-			// For non-existing files, validate the normalized path.
-			$path = $normalized_path;
-		}
+		/*
+		 * Resolve the path as far as it goes, so it can be compared with
+		 * directories resolved the same way below. A file that isn't there
+		 * yet — the destination of a write or a move — resolves through the
+		 * directory it will live in, which collapses any `..` just the same.
+		 */
+		$real_path = realpath( $path );
+		$path      = false !== $real_path
+			? wp_normalize_path( $real_path )
+			: self::resolve_as_far_as_it_exists( $normalized_path );
 
 		// Default to theme directory if no allowed directories specified.
 		if ( empty( $allowed_dirs ) ) {
@@ -64,8 +59,7 @@ class Pattern_Builder_Security {
 		 */
 		$allowed_dirs = array_map(
 			static function ( $dir ) {
-				$real = realpath( $dir );
-				return wp_normalize_path( false === $real ? $dir : $real );
+				return self::resolve_as_far_as_it_exists( wp_normalize_path( $dir ) );
 			},
 			$allowed_dirs
 		);
@@ -99,6 +93,41 @@ class Pattern_Builder_Security {
 		return true;
 	}
 
+
+	/**
+	 * Resolve the deepest part of a path that exists, keeping the rest.
+	 *
+	 * A file being written doesn't exist yet, and neither does the directory
+	 * it goes in, on the first write — but everything above them does, and
+	 * resolving that much is what collapses `..` and follows the symlinks
+	 * that make a checkout look like a theme directory.
+	 *
+	 * @param string $path Normalized path.
+	 * @return string
+	 */
+	private static function resolve_as_far_as_it_exists( $path ) {
+		$missing   = array();
+		$candidate = $path;
+
+		while ( true ) {
+			$real = realpath( $candidate );
+
+			if ( false !== $real ) {
+				$resolved = wp_normalize_path( $real );
+				return $missing
+					? trailingslashit( $resolved ) . implode( '/', array_reverse( $missing ) )
+					: $resolved;
+			}
+
+			$parent = dirname( $candidate );
+			if ( $parent === $candidate ) {
+				return $path; // Nothing along the way exists.
+			}
+
+			$missing[] = basename( $candidate );
+			$candidate = $parent;
+		}
+	}
 
 	/**
 	 * Initialize WordPress Filesystem.

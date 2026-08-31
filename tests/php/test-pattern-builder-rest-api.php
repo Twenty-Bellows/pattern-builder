@@ -461,6 +461,41 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		$this->assertFileDoesNotExist( $this->test_dir . '/patterns/theme_unsynced_pattern.php' );
 	}
 
+	/**
+	 * The same symlinked theme, writing a pattern that isn't there yet: a
+	 * file being created can't be resolved, and comparing it unresolved
+	 * against resolved theme directories read as a traversal attempt.
+	 */
+	public function test_create_theme_pattern_in_a_symlinked_theme() {
+		$link = sys_get_temp_dir() . '/pattern-builder-test-link';
+
+		if ( file_exists( $link ) ) {
+			unlink( $link );
+		}
+
+		if ( ! @symlink( $this->test_dir, $link ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- Filesystems without symlink support skip this test.
+			$this->markTestSkipped( 'This filesystem does not support symlinks.' );
+		}
+
+		$through_link = static function () use ( $link ) {
+			return $link;
+		};
+		add_filter( 'stylesheet_directory', $through_link, 20 );
+		add_filter( 'template_directory', $through_link, 20 );
+
+		$request = $this->create_rest_request( 'POST', '/pattern-builder/v1/patterns' );
+		$request->set_param( 'title', 'Brand New Pattern' );
+		$request->set_param( 'content', '<!-- wp:paragraph --><p>New.</p><!-- /wp:paragraph -->' );
+		$response = rest_get_server()->dispatch( $request );
+
+		remove_filter( 'stylesheet_directory', $through_link, 20 );
+		remove_filter( 'template_directory', $through_link, 20 );
+		unlink( $link );
+
+		$this->assertEquals( 201, $response->get_status() );
+		$this->assertFileExists( $this->test_dir . '/patterns/brand-new-pattern.php' );
+	}
+
 	public function test_unauthenticated_requests_are_rejected() {
 		$this->copy_test_pattern( 'theme_synced_pattern.php' );
 		wp_set_current_user( 0 );
