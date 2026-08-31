@@ -6,6 +6,8 @@
  */
 
 import domReady from '@wordpress/dom-ready';
+import { dispatch } from '@wordpress/data';
+import { store as editorStore } from '@wordpress/editor';
 import { registerPlugin } from '@wordpress/plugins';
 import { Button } from '@wordpress/components';
 import { __, isRTL } from '@wordpress/i18n';
@@ -82,5 +84,12 @@ export function bootPatternEditor( settings ) {
 			settings.editorSettings || {},
 			null
 		);
+
+		/*
+		 * The Summary panel is about a post's publication — status, date,
+		 * slug, author — none of which a pattern has. Removing it leaves the
+		 * document tab showing the pattern's own panels.
+		 */
+		dispatch( editorStore ).removeEditorPanel( 'post-status' );
 	} );
 }

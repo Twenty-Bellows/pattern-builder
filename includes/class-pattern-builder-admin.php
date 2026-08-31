@@ -154,6 +154,18 @@ class Pattern_Builder_Admin {
 			$editor_context
 		);
 
+		/*
+		 * A pattern has no post title of its own — its name is edited in the
+		 * Pattern Metadata panel — so core's title field is hidden in the
+		 * canvas. It lives inside the canvas iframe, which page styles never
+		 * reach; an editor style is the way in.
+		 */
+		if ( $pattern ) {
+			$settings['styles'][] = array(
+				'css' => '.editor-visual-editor__post-title-wrapper { display: none; }',
+			);
+		}
+
 		$browse_url = admin_url( 'themes.php?page=' . self::PAGE_SLUG );
 
 		$back_url = isset( $_GET['back'] ) ? wp_validate_redirect( sanitize_url( wp_unslash( $_GET['back'] ) ), '' ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
