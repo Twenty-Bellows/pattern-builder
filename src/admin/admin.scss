@@ -1,3 +1,6 @@
+@use "sass:math";
+@use "../pattern-tiles" as tiles;
+
 // The Appearance → Pattern Builder screen — browse mode only. Edit mode
 // hands the whole page to core's edit-post editor, which brings its own
 // styles.
@@ -168,7 +171,7 @@ body.appearance_page_pattern-builder {
 		flex: 1;
 		min-width: 0;
 		overflow-y: auto;
-		padding: 24px 32px;
+		padding: 24px;
 	}
 
 	&__search {
@@ -179,10 +182,11 @@ body.appearance_page_pattern-builder {
 
 	&__grid {
 		display: grid;
-		// Small base size so plenty of columns fit (three across even with
-		// the details sidebar open); cards stretch to fill the row.
-		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-		gap: 24px;
+		// Fixed tracks, not fluid ones: the cloud tiles scale their preview
+		// by a constant declared in CSS, which is only possible when the
+		// tile's width is known here rather than measured in the browser.
+		grid-template-columns: repeat(auto-fill, tiles.$tile * 1px);
+		gap: tiles.$gap * 1px;
 		align-items: start;
 	}
 
@@ -213,53 +217,69 @@ body.appearance_page_pattern-builder {
 // ---- Pattern cards: uniform 1:1 previews. ----
 
 .pattern-builder-card {
-	display: block;
-	width: 100%;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	width: tiles.$tile * 1px;
 	padding: 0;
-	border: 1px solid #dcdcde;
-	border-radius: 8px;
-	overflow: hidden;
-	background: #fff;
+	border: 0;
+	background: none;
 	cursor: pointer;
 	text-align: start;
 
-	&.is-selected {
-		border-color: var(--wp-admin-theme-color, #3858e9);
-		box-shadow: 0 0 0 1px var(--wp-admin-theme-color, #3858e9);
-	}
-
-	&:hover {
-		border-color: var(--wp-admin-theme-color, #3858e9);
-	}
-
 	&__preview {
-		display: block;
+		// Grid, not flex: the preview mounts more than one element and flex
+		// would shrink them against each other. Short patterns sit in the
+		// middle of the tile; taller ones start at the top and lose their
+		// tail to the crop (`safe` is what keeps an overflowing pattern from
+		// being centred out through the top edge).
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		align-content: safe center;
 		position: relative;
-		aspect-ratio: 3 / 2;
+		width: 100%;
+		aspect-ratio: 1 / 1;
 		overflow: hidden;
-		background: #f6f7f7;
+		border-radius: 4px;
+		background: #fff;
 
-		// Both kinds are contain-fitted by the card: local previews through
-		// this wrapper, cloud previews through the iframe below.
-		.pattern-builder-card__fit {
-			display: block;
+		// The hairline the Site Editor's grid draws over its media tiles.
+		&::after {
+			content: "";
 			position: absolute;
-			top: 0;
-			left: 0;
-			width: 100%;
-			transform-origin: top left;
-
-			> div {
-				width: 100%;
-			}
-		}
-
-		iframe {
-			width: 1400px;
-			border: 0;
-			transform-origin: 0 0;
+			inset: 0;
+			border-radius: 4px;
+			box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
 			pointer-events: none;
 		}
+
+	}
+
+	// A local preview scales itself to the tile width — BlockPreview's own
+	// iframe must be left alone — while a cloud preview renders the service's
+	// document at the design width and is scaled by the fixed ratio between
+	// the two. Same ratio either way, so a pattern is cropped at the same
+	// point in both grids.
+	&--cloud &__preview iframe {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: tiles.$preview-width * 1px;
+		height: tiles.$preview-width * 1px;
+		border: 0;
+		transform-origin: 0 0;
+		transform: scale(math.div(tiles.$tile, tiles.$preview-width));
+		pointer-events: none;
+	}
+
+	&:hover &__preview::after {
+		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+	}
+
+	&.is-selected &__preview::after {
+		box-shadow:
+			inset 0 0 0 1px var(--wp-admin-theme-color, #3858e9),
+			inset 0 0 0 2px #fff;
 	}
 
 	&__placeholder {
@@ -274,10 +294,8 @@ body.appearance_page_pattern-builder {
 		align-items: center;
 		justify-content: space-between;
 		gap: 8px;
-		padding: 8px 12px;
 		font-size: 12px;
-		font-weight: 500;
-		border-top: 1px solid #f0f0f1;
+		line-height: 16px;
 		min-width: 0;
 
 		> span:first-child {
