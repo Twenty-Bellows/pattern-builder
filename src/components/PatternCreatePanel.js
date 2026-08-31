@@ -1,14 +1,17 @@
 /**
  * WordPress dependencies
  */
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
-import { useState } from '@wordpress/element';
+import { useState, useEffect } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import {
 	TextControl,
 	TextareaControl,
 	Button,
+	FormFileUpload,
+	Notice,
+	Spinner,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalVStack as VStack,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
@@ -22,6 +25,7 @@ import { addTemplate } from '@wordpress/icons';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 
 import { navigateToPattern } from '../utils/patternNavigation';
+import { generatePattern, downloadCloudPattern } from '../cloud/generate';
 
 export const PatternCreatePanel = ( { onCreated } ) => {
 	const { onNavigateToEntityRecord } = useSelect( ( select ) => {
@@ -31,24 +35,85 @@ export const PatternCreatePanel = ( { onCreated } ) => {
 		};
 	}, [] );
 
-	const createPattern = () => {
-		createPatternCall( newPatternOptions )
-			.then( ( pattern ) => {
-				if ( onCreated ) {
-					onCreated( pattern );
-				}
-				navigateToPattern(
-					{
-						id: pattern.id,
-						name: pattern.name,
-						source: pattern.source || 'user',
-					},
-					onNavigateToEntityRecord
+	const [ prompt, setPrompt ] = useState( '' );
+	const [ imageFile, setImageFile ] = useState( null );
+	const [ busy, setBusy ] = useState( false );
+	const [ error, setError ] = useState( '' );
+	const [ cloud, setCloud ] = useState( null );
+
+	useEffect( () => {
+		apiFetch( { path: '/pattern-builder/v1/cloud/status' } )
+			.then( setCloud )
+			.catch( () => setCloud( { connected: false } ) );
+	}, [] );
+
+	const canGenerate =
+		!! cloud?.connected && cloud.tier === 'pro' && !! cloud.ai?.enabled;
+	const wantsGeneration = canGenerate && prompt.trim() !== '';
+
+	const open = ( pattern ) => {
+		if ( onCreated ) {
+			onCreated( pattern );
+		}
+		navigateToPattern( pattern, onNavigateToEntityRecord );
+	};
+
+	/**
+	 * Generate on the service, bring the result onto this site, and open it
+	 * in the editor — the AI path through the same Create button.
+	 */
+	const createGeneratedPattern = () => {
+		setBusy( true );
+		setError( '' );
+
+		generatePattern( { prompt, imageFile } )
+			.then( ( cloudPattern ) =>
+				downloadCloudPattern(
+					cloudPattern.id,
+					newPatternOptions.source
+				)
+			)
+			.then( ( imported ) =>
+				open( {
+					id: imported.id,
+					name: imported.id,
+					source: imported.type,
+				} )
+			)
+			.catch( ( generationError ) => {
+				setBusy( false );
+				setError(
+					generationError.message ||
+						__(
+							'The pattern could not be generated.',
+							'pattern-builder'
+						)
 				);
-			} )
-			.catch( ( error ) => {
-				// eslint-disable-next-line no-console
-				console.error( 'Error creating pattern:', error );
+			} );
+	};
+
+	const createPattern = () => {
+		if ( wantsGeneration ) {
+			createGeneratedPattern();
+			return;
+		}
+
+		createPatternCall( newPatternOptions )
+			.then( ( pattern ) =>
+				open( {
+					id: pattern.id,
+					name: pattern.name,
+					source: pattern.source || 'user',
+				} )
+			)
+			.catch( ( createError ) => {
+				setError(
+					createError.message ||
+						__(
+							'The pattern could not be created.',
+							'pattern-builder'
+						)
+				);
 			} );
 	};
 
@@ -197,14 +262,125 @@ export const PatternCreatePanel = ( { onCreated } ) => {
 					</Text>
 				) }
 			</>
+			{ cloud?.connected && (
+				<div className="pattern-builder-create__ai">
+					<Text weight="600">
+						{ __( 'Create with AI', 'pattern-builder' ) }
+					</Text>
+
+					{ ! canGenerate && cloud.tier !== 'pro' && (
+						<Text variant="muted" size="12px">
+							{ __(
+								'Describe a pattern and have it built for you with Pattern Builder Pro.',
+								'pattern-builder'
+							) }{ ' ' }
+							<a
+								href={
+									cloud.upgradeUrl ||
+									`${ ( cloud.serviceUrl || '' ).replace(
+										/\/+$/,
+										''
+									) }/pricing/`
+								}
+								target="_blank"
+								rel="noreferrer"
+							>
+								{ __( 'Upgrade', 'pattern-builder' ) }
+							</a>
+						</Text>
+					) }
+
+					{ ! canGenerate && cloud.tier === 'pro' && (
+						<Text variant="muted" size="12px">
+							{ __(
+								'AI generation is currently switched off on patternbuilderwp.com.',
+								'pattern-builder'
+							) }
+						</Text>
+					) }
+
+					{ canGenerate && (
+						<>
+							<TextareaControl
+								__nextHasNoMarginBottom
+								label={ __(
+									'Describe the pattern (optional)',
+									'pattern-builder'
+								) }
+								help={ __(
+									'Leave this empty to start from a blank pattern. A generated pattern arrives with its own title and content.',
+									'pattern-builder'
+								) }
+								placeholder={ __(
+									'A pricing section with two plans and a highlighted “most popular” column…',
+									'pattern-builder'
+								) }
+								rows={ 3 }
+								value={ prompt }
+								onChange={ setPrompt }
+							/>
+							<FormFileUpload
+								accept="image/png,image/jpeg,image/webp,image/gif"
+								onChange={ ( event ) =>
+									setImageFile(
+										event.target.files?.[ 0 ] || null
+									)
+								}
+								variant="secondary"
+							>
+								{ imageFile
+									? imageFile.name
+									: __(
+											'Attach a screenshot',
+											'pattern-builder'
+									  ) }
+							</FormFileUpload>
+							{ typeof cloud.usage?.ai_credits === 'number' && (
+								<Text variant="muted" size="11px">
+									{ sprintf(
+										/* translators: %d: remaining credit count. */
+										__(
+											'%d generations left this month.',
+											'pattern-builder'
+										),
+										cloud.usage.ai_credits
+									) }
+								</Text>
+							) }
+						</>
+					) }
+				</div>
+			) }
+
+			{ error && (
+				<Notice status="error" isDismissible={ false }>
+					{ error }
+				</Notice>
+			) }
+
 			<Button
 				icon={ addTemplate }
-				disabled={ ! newPatternOptions.title }
+				disabled={
+					busy || ( ! newPatternOptions.title && ! wantsGeneration )
+				}
+				isBusy={ busy }
 				variant="primary"
 				onClick={ () => createPattern() }
 			>
-				{ __( 'Create Pattern', 'pattern-builder' ) }
+				{ busy
+					? __( 'Generating…', 'pattern-builder' )
+					: __( 'Create Pattern', 'pattern-builder' ) }
 			</Button>
+
+			{ busy && (
+				<Text variant="muted" size="11px">
+					<Spinner />
+					{ __(
+						'Building your pattern — this usually takes under a minute.',
+						'pattern-builder'
+					) }
+				</Text>
+			) }
 		</VStack>
 	);
 };

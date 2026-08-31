@@ -18,7 +18,6 @@ import { PatternSourcePanel } from './PatternSourcePanel';
 import { PatternSyncedStatusPanel } from './PatternSyncedStatusPanel';
 import { PatternMetadataPanel } from './PatternMetadataPanel';
 import { PatternAssociationsPanel } from './PatternAssociationsPanel';
-import { PatternCloudPanelBody } from './PatternCloudPanel';
 
 /**
  * The browse screen's details sidebar for the selected pattern — the same
@@ -30,12 +29,12 @@ import { PatternCloudPanelBody } from './PatternCloudPanel';
  * state seeded from the record.
  *
  * @param {Object}   props         Component props.
- * @param {Object}   props.pattern The selected pattern (AbstractPattern).
+ * @param {Object}   props.pattern The selected pattern, or null for the empty state.
  * @param {Function} props.onEdit  Called with the pattern to open its editor.
  * @param {Function} props.onSaved Called after a successful save.
  */
 export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
-	const postType = pattern.source === 'theme' ? 'pb_pattern' : 'wp_block';
+	const postType = pattern?.source === 'theme' ? 'pb_pattern' : 'wp_block';
 	const isThemePattern = postType === 'pb_pattern';
 
 	const { record, hasEdits, isSaving } = useSelect(
@@ -46,25 +45,29 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 				isSavingEntityRecord,
 			} = select( coreStore );
 
+			if ( ! pattern?.id ) {
+				return { record: null, hasEdits: false, isSaving: false };
+			}
+
 			return {
 				record: getEditedEntityRecord(
 					'postType',
 					postType,
-					pattern.id
+					pattern?.id
 				),
 				hasEdits: hasEditsForEntityRecord(
 					'postType',
 					postType,
-					pattern.id
+					pattern?.id
 				),
 				isSaving: isSavingEntityRecord(
 					'postType',
 					postType,
-					pattern.id
+					pattern?.id
 				),
 			};
 		},
-		[ postType, pattern.id ]
+		[ postType, pattern?.id ]
 	);
 
 	const { saveEditedEntityRecord } = useDispatch( coreStore );
@@ -94,6 +97,16 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 		}
 	};
 
+	if ( ! pattern ) {
+		return (
+			<div className="pattern-builder-details is-empty">
+				<Text variant="muted">
+					{ __( 'No pattern selected.', 'pattern-builder' ) }
+				</Text>
+			</div>
+		);
+	}
+
 	return (
 		<div className="pattern-builder-details">
 			<div className="pattern-builder-details__header">
@@ -105,6 +118,31 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 						? _x( 'Theme Pattern', 'UI String', 'pattern-builder' )
 						: _x( 'User Pattern', 'UI String', 'pattern-builder' ) }
 				</Text>
+
+				<Flex className="pattern-builder-details__actions" gap={ 2 }>
+					<FlexItem isBlock>
+						<Button
+							__next40pxDefaultSize
+							variant="primary"
+							disabled={ ! hasEdits || isSaving }
+							isBusy={ isSaving }
+							onClick={ save }
+							className="pattern-builder-details__action-button"
+						>
+							{ __( 'Save', 'pattern-builder' ) }
+						</Button>
+					</FlexItem>
+					<FlexItem isBlock>
+						<Button
+							__next40pxDefaultSize
+							variant="secondary"
+							onClick={ () => onEdit( pattern ) }
+							className="pattern-builder-details__action-button"
+						>
+							{ __( 'Edit', 'pattern-builder' ) }
+						</Button>
+					</FlexItem>
+				</Flex>
 			</div>
 
 			<div className="pattern-builder-details__panels">
@@ -144,12 +182,6 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 							/>
 						</PanelBody>
 
-						<PatternCloudPanelBody
-							patternType={ isThemePattern ? 'theme' : 'user' }
-							patternId={ pattern.id }
-							refreshKey={ record?.modified }
-						/>
-
 						{ isThemePattern && (
 							<PanelBody
 								title={ _x(
@@ -180,31 +212,6 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 					</>
 				) }
 			</div>
-
-			<Flex className="pattern-builder-details__actions" gap={ 2 }>
-				<FlexItem isBlock>
-					<Button
-						__next40pxDefaultSize
-						variant="primary"
-						disabled={ ! hasEdits || isSaving }
-						isBusy={ isSaving }
-						onClick={ save }
-						className="pattern-builder-details__action-button"
-					>
-						{ __( 'Save', 'pattern-builder' ) }
-					</Button>
-				</FlexItem>
-				<FlexItem isBlock>
-					<Button
-						__next40pxDefaultSize
-						variant="secondary"
-						onClick={ () => onEdit( pattern ) }
-						className="pattern-builder-details__action-button"
-					>
-						{ __( 'Edit', 'pattern-builder' ) }
-					</Button>
-				</FlexItem>
-			</Flex>
 		</div>
 	);
 };
