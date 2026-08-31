@@ -1,6 +1,7 @@
 import { __ } from '@wordpress/i18n';
 import {
 	FormTokenField,
+	TextControl,
 	TextareaControl,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalNumberControl as NumberControl,
@@ -13,16 +14,38 @@ import { useState } from '@wordpress/element';
 import { dispatch } from '@wordpress/data';
 
 /**
- * Edits a theme pattern's descriptive metadata.
+ * Edits a pattern's name, slug, and descriptive metadata.
  *
- * Description, categories, keywords, and viewport width all round-trip
- * through the pattern file's header. Edits stage on the pb_pattern entity and
- * persist with the next save.
+ * For theme patterns these round-trip through the pattern file's header —
+ * renaming the slug rewrites the file. Edits stage on the entity and persist
+ * with the next save.
  *
  * @param {Object} root0             Component props.
  * @param {Object} root0.patternPost The pattern's entity record.
+ * @param {string} root0.postType    'pb_pattern' or 'wp_block'.
  */
-export const PatternMetadataPanel = ( { patternPost } ) => {
+export const PatternMetadataPanel = ( {
+	patternPost,
+	postType = 'pb_pattern',
+} ) => {
+	const isThemePattern = postType === 'pb_pattern';
+	const rawTitle =
+		typeof patternPost.title === 'object'
+			? patternPost.title?.raw || ''
+			: patternPost.title || '';
+	// Theme patterns carry a namespaced name; only the slug half is editable.
+	const namespace = isThemePattern
+		? String( patternPost.name || '' ).split( '/' )[ 0 ]
+		: '';
+	const currentSlug = isThemePattern
+		? String( patternPost.name || '' )
+				.split( '/' )
+				.slice( 1 )
+				.join( '/' )
+		: patternPost.slug || '';
+
+	const [ title, setTitle ] = useState( rawTitle );
+	const [ slug, setSlug ] = useState( currentSlug );
 	const [ description, setDescription ] = useState(
 		patternPost.description || ''
 	);
@@ -37,7 +60,7 @@ export const PatternMetadataPanel = ( { patternPost } ) => {
 	const stageEdit = ( edit ) => {
 		dispatch( 'core' ).editEntityRecord(
 			'postType',
-			'pb_pattern',
+			postType,
 			patternPost.id,
 			edit
 		);
@@ -45,6 +68,44 @@ export const PatternMetadataPanel = ( { patternPost } ) => {
 
 	return (
 		<VStack spacing={ 4 }>
+			<TextControl
+				__nextHasNoMarginBottom
+				label={ __( 'Name', 'pattern-builder' ) }
+				value={ title }
+				onChange={ ( value ) => {
+					setTitle( value );
+					stageEdit( { title: value } );
+				} }
+			/>
+			<VStack spacing={ 0 }>
+				<TextControl
+					__nextHasNoMarginBottom
+					label={ __( 'Slug', 'pattern-builder' ) }
+					value={ slug }
+					onChange={ ( value ) => {
+						const clean = value
+							.toLowerCase()
+							.replace( /[^a-z0-9-]+/g, '-' );
+						setSlug( clean );
+						stageEdit(
+							isThemePattern
+								? { name: `${ namespace }/${ clean }` }
+								: { slug: clean }
+						);
+					} }
+				/>
+				<Text variant="muted">
+					{ isThemePattern
+						? __(
+								'The pattern’s identifier in the theme; renaming it rewrites the pattern file.',
+								'pattern-builder'
+						  )
+						: __(
+								'The pattern’s identifier on this site.',
+								'pattern-builder'
+						  ) }
+				</Text>
+			</VStack>
 			<VStack spacing={ 0 }>
 				<TextareaControl
 					__nextHasNoMarginBottom

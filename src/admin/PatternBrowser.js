@@ -187,7 +187,7 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 					count: '',
 				},
 				...cloudCollections.map( ( item ) => ( {
-					slug: String( item.id ),
+					slug: item.id ? String( item.id ) : UNCATEGORIZED,
 					label: item.name,
 					count: item.count ?? '',
 				} ) ),
@@ -348,20 +348,18 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 					</aside>
 
 					{ isCloud && (
-						<main className="pattern-builder-browser__main">
-							<CloudBrowser
-								view={
-									collection === UPLOADED
-										? CLOUD_LIBRARY
-										: CLOUD_DIRECTORY
-								}
-								search={ search }
-								collection={ category === ALL ? '' : category }
-								onCollections={ setCloudCollections }
-								onDownloaded={ refresh }
-								onEditLocal={ onEdit }
-							/>
-						</main>
+						<CloudBrowser
+							view={
+								collection === UPLOADED
+									? CLOUD_LIBRARY
+									: CLOUD_DIRECTORY
+							}
+							search={ search }
+							collection={ category === ALL ? '' : category }
+							onCollections={ setCloudCollections }
+							onDownloaded={ refresh }
+							onEditLocal={ onEdit }
+						/>
 					) }
 
 					{ ! isCloud && (

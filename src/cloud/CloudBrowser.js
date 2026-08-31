@@ -3,8 +3,11 @@ import { __, _n, sprintf } from '@wordpress/i18n';
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import {
 	Button,
+	Flex,
+	FlexItem,
 	Modal,
 	Notice,
+	PanelBody,
 	SelectControl,
 	Spinner,
 	TextControl,
@@ -14,13 +17,14 @@ import {
 	__experimentalVStack as VStack,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalHeading as Heading,
+	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
+	__experimentalText as Text,
 } from '@wordpress/components';
 import { cloudUpload, closeSmall } from '@wordpress/icons';
 import { useDispatch } from '@wordpress/data';
 import { store as noticesStore } from '@wordpress/notices';
 import { addQueryArgs } from '@wordpress/url';
 
-import { fetchAllPatterns } from '../utils/resolvers';
 import './cloud.scss';
 
 const BASE = '/pattern-builder/v1/cloud';
@@ -218,15 +222,12 @@ function CloudCard( { pattern, isSelected, onSelect } ) {
 		<button
 			type="button"
 			className={
-				'pattern-builder-cloud__card' +
+				'pattern-builder-card pattern-builder-card--cloud' +
 				( isSelected ? ' is-selected' : '' )
 			}
 			onClick={ () => onSelect( pattern ) }
 		>
-			<span
-				className="pattern-builder-cloud__card-preview"
-				ref={ previewRef }
-			>
+			<span className="pattern-builder-card__preview" ref={ previewRef }>
 				<iframe
 					ref={ iframeRef }
 					title={ pattern.title }
@@ -248,7 +249,7 @@ function CloudCard( { pattern, isSelected, onSelect } ) {
 					} }
 				/>
 			</span>
-			<span className="pattern-builder-cloud__card-title">
+			<span className="pattern-builder-card__title">
 				<span>{ pattern.title }</span>
 				{ pattern.premium && (
 					<span className="pattern-builder-cloud__badge">
@@ -261,13 +262,14 @@ function CloudCard( { pattern, isSelected, onSelect } ) {
 }
 
 /**
- * The details/actions column for a selected cloud pattern; an installed
- * pattern offers Edit instead of the download actions.
+ * The details sidebar for a selected cloud pattern — the same shell the
+ * local sidebar uses: title, kind, and the actions on top. Save picks a
+ * destination; Edit appears once the pattern is installed here.
  *
  * @param {Object}   props             Component props.
  * @param {Object}   props.pattern     Cloud pattern summary.
  * @param {string}   props.source      'library' or 'directory'.
- * @param {Function} props.onDownload  Called with (pattern, destination).
+ * @param {Function} props.onDownload  Called with the pattern to save.
  * @param {Function} props.onDelete    Called with the pattern (library only).
  * @param {Function} props.onEditLocal Called with { source, id } of the local copy.
  * @param {boolean}  props.busy        Whether an action is in flight.
@@ -298,93 +300,159 @@ function CloudDetails( {
 	}, [ pattern.id, busy ] );
 
 	return (
-		<VStack
-			spacing={ 3 }
-			className="pattern-builder-cloud__details"
-			as="aside"
-		>
-			<Heading level={ 2 } size={ 15 }>
-				{ pattern.title }
-			</Heading>
-			{ pattern.description && <p>{ pattern.description }</p> }
-			{ pattern.categories?.length > 0 && (
-				<p className="pattern-builder-cloud__meta">
-					{ __( 'Collections:', 'pattern-builder' ) }{ ' ' }
-					{ pattern.categories
-						.map( ( category ) => category.name )
-						.join( ', ' ) }
-				</p>
-			) }
-			{ source === 'directory' && pattern.author && (
-				<p className="pattern-builder-cloud__meta">
-					{ sprintf(
-						/* translators: %s: author display name. */
-						__( 'Shared by %s', 'pattern-builder' ),
-						pattern.author
-					) }
-				</p>
-			) }
-			{ installed === undefined && <Spinner /> }
-			{ !! installed && (
-				<>
-					<p className="pattern-builder-cloud__meta pattern-builder-cloud__installed">
-						{ installed.type === 'user'
-							? __(
-									'Installed on this site as a user pattern.',
-									'pattern-builder'
-							  )
-							: __(
-									'Installed on this site as a theme pattern.',
-									'pattern-builder'
-							  ) }
-					</p>
-					<HStack spacing={ 2 } alignment="left" wrap>
+		<div className="pattern-builder-details">
+			<div className="pattern-builder-details__header">
+				<Heading level={ 2 } size={ 16 } truncate>
+					{ pattern.title }
+				</Heading>
+				<Text variant="muted" size="12px">
+					{ source === 'library'
+						? __( 'Cloud pattern', 'pattern-builder' )
+						: __( 'Community pattern', 'pattern-builder' ) }
+				</Text>
+
+				<Flex className="pattern-builder-details__actions" gap={ 2 }>
+					<FlexItem isBlock>
 						<Button
+							__next40pxDefaultSize
 							variant="primary"
+							isBusy={ busy }
 							disabled={ busy }
-							onClick={ () =>
-								onEditLocal( {
-									source: installed.type,
-									id: installed.id,
-								} )
-							}
+							onClick={ () => onDownload( pattern ) }
+							className="pattern-builder-details__action-button"
 						>
-							{ __( 'Edit pattern', 'pattern-builder' ) }
+							{ __( 'Save', 'pattern-builder' ) }
 						</Button>
-					</HStack>
-				</>
-			) }
-			{ installed === null && (
-				<HStack spacing={ 2 } alignment="left" wrap>
-					<Button
-						variant="primary"
-						isBusy={ busy }
-						disabled={ busy }
-						onClick={ () => onDownload( pattern, 'user' ) }
-					>
-						{ __( 'Add as user pattern', 'pattern-builder' ) }
-					</Button>
-					<Button
-						variant="secondary"
-						isBusy={ busy }
-						disabled={ busy }
-						onClick={ () => onDownload( pattern, 'theme' ) }
-					>
-						{ __( 'Add as theme pattern', 'pattern-builder' ) }
-					</Button>
-				</HStack>
-			) }
-			{ source === 'library' && (
-				<Button
-					variant="tertiary"
-					isDestructive
-					disabled={ busy }
-					onClick={ () => onDelete( pattern ) }
+					</FlexItem>
+					{ !! installed && (
+						<FlexItem isBlock>
+							<Button
+								__next40pxDefaultSize
+								variant="secondary"
+								disabled={ busy }
+								onClick={ () =>
+									onEditLocal( {
+										source: installed.type,
+										id: installed.id,
+									} )
+								}
+								className="pattern-builder-details__action-button"
+							>
+								{ __( 'Edit', 'pattern-builder' ) }
+							</Button>
+						</FlexItem>
+					) }
+				</Flex>
+			</div>
+
+			<div className="pattern-builder-details__panels">
+				<PanelBody
+					title={ __( 'Pattern Details', 'pattern-builder' ) }
+					initialOpen
 				>
-					{ __( 'Delete from cloud', 'pattern-builder' ) }
-				</Button>
+					<VStack spacing={ 3 }>
+						{ pattern.description && (
+							<Text variant="muted">{ pattern.description }</Text>
+						) }
+						{ pattern.categories?.length > 0 && (
+							<Text variant="muted" size="12px">
+								{ __( 'Collections:', 'pattern-builder' ) }{ ' ' }
+								{ pattern.categories
+									.map( ( category ) => category.name )
+									.join( ', ' ) }
+							</Text>
+						) }
+						{ source === 'directory' && pattern.author && (
+							<Text variant="muted" size="12px">
+								{ sprintf(
+									/* translators: %s: author display name. */
+									__( 'Shared by %s', 'pattern-builder' ),
+									pattern.author
+								) }
+							</Text>
+						) }
+						{ installed === undefined && <Spinner /> }
+						{ !! installed && (
+							<Text variant="muted" size="12px">
+								{ installed.type === 'user'
+									? __(
+											'Installed on this site as a user pattern.',
+											'pattern-builder'
+									  )
+									: __(
+											'Installed on this site as a theme pattern.',
+											'pattern-builder'
+									  ) }
+							</Text>
+						) }
+					</VStack>
+				</PanelBody>
+
+				{ source === 'library' && (
+					<PanelBody
+						title={ __( 'Cloud Actions', 'pattern-builder' ) }
+						initialOpen
+					>
+						<Button
+							variant="tertiary"
+							isDestructive
+							disabled={ busy }
+							onClick={ () => onDelete( pattern ) }
+						>
+							{ __( 'Delete from cloud', 'pattern-builder' ) }
+						</Button>
+					</PanelBody>
+				) }
+			</div>
+		</div>
+	);
+}
+
+/**
+ * Where a saved cloud pattern should land on this site.
+ *
+ * @param {Object}   props           Component props.
+ * @param {Object}   props.pattern   The pattern being saved.
+ * @param {boolean}  props.busy      Whether the download is in flight.
+ * @param {Function} props.onConfirm Called with 'user' or 'theme'.
+ * @param {Function} props.onClose   Close/cancel callback.
+ */
+function DestinationModal( { pattern, busy, onConfirm, onClose } ) {
+	return (
+		<Modal
+			title={ sprintf(
+				/* translators: %s: pattern title. */
+				__( 'Save “%s” to this site', 'pattern-builder' ),
+				pattern.title
 			) }
-		</VStack>
+			onRequestClose={ onClose }
+			className="pattern-builder-cloud__destination-modal"
+		>
+			<p className="pattern-builder-cloud__meta">
+				{ __(
+					'User patterns live in this site’s database; theme patterns are written into the active theme as files.',
+					'pattern-builder'
+				) }
+			</p>
+			<HStack spacing={ 3 } alignment="left" wrap>
+				<Button
+					variant="primary"
+					isBusy={ busy }
+					disabled={ busy }
+					onClick={ () => onConfirm( 'user' ) }
+				>
+					{ __( 'User', 'pattern-builder' ) }
+				</Button>
+				<Button
+					variant="secondary"
+					isBusy={ busy }
+					disabled={ busy }
+					onClick={ () => onConfirm( 'theme' ) }
+				>
+					{ __( 'Theme', 'pattern-builder' ) }
+				</Button>
+			</HStack>
+		</Modal>
 	);
 }
 
@@ -495,126 +563,6 @@ function TokensModal( { missing, busy, onConfirm, onClose } ) {
 }
 
 /**
- * The "Upload a pattern" modal: pick any local pattern, optionally set
- * cloud collections, and upload (or update its existing cloud copy).
- *
- * @param {Object}   props          Component props.
- * @param {Object}   props.links    Local-key → cloud link map.
- * @param {Function} props.onUpload Called with (pattern, categories, asNew).
- * @param {Function} props.onClose  Close callback.
- * @param {string}   props.busyKey  Local key of an in-flight upload.
- */
-function UploadModal( { links, onUpload, onClose, busyKey } ) {
-	const [ localPatterns, setLocalPatterns ] = useState( null );
-	const [ categories, setCategories ] = useState( '' );
-
-	useEffect( () => {
-		fetchAllPatterns()
-			.then( setLocalPatterns )
-			.catch( () => setLocalPatterns( [] ) );
-	}, [] );
-
-	const categoryList = categories
-		.split( ',' )
-		.map( ( name ) => name.trim() )
-		.filter( Boolean );
-
-	return (
-		<Modal
-			title={ __(
-				'Upload a pattern to your library',
-				'pattern-builder'
-			) }
-			onRequestClose={ onClose }
-			className="pattern-builder-cloud__upload-modal"
-		>
-			<TextControl
-				__nextHasNoMarginBottom
-				label={ __(
-					'Cloud collections (comma-separated, optional)',
-					'pattern-builder'
-				) }
-				help={ __(
-					'Patterns are private until you make a collection public on patternbuilderwp.com.',
-					'pattern-builder'
-				) }
-				value={ categories }
-				onChange={ setCategories }
-			/>
-			{ localPatterns === null && <Spinner /> }
-			{ localPatterns !== null && localPatterns.length === 0 && (
-				<p>
-					{ __( 'No local patterns to upload.', 'pattern-builder' ) }
-				</p>
-			) }
-			<ul className="pattern-builder-cloud__upload-list">
-				{ ( localPatterns || [] ).map( ( pattern ) => {
-					const localKey =
-						( pattern.source === 'user' ? 'user:' : 'theme:' ) +
-						pattern.id;
-					const linked = !! links[ localKey ];
-					return (
-						<li key={ localKey }>
-							<span className="pattern-builder-cloud__upload-title">
-								{ pattern.title }
-								<small>
-									{ pattern.source === 'user'
-										? __(
-												'User pattern',
-												'pattern-builder'
-										  )
-										: __(
-												'Theme pattern',
-												'pattern-builder'
-										  ) }
-								</small>
-							</span>
-							<HStack spacing={ 2 } expanded={ false }>
-								<Button
-									variant="secondary"
-									size="small"
-									isBusy={ busyKey === localKey }
-									disabled={ !! busyKey }
-									onClick={ () =>
-										onUpload( pattern, categoryList, false )
-									}
-								>
-									{ linked
-										? __(
-												'Update cloud copy',
-												'pattern-builder'
-										  )
-										: __( 'Upload', 'pattern-builder' ) }
-								</Button>
-								{ linked && (
-									<Button
-										variant="tertiary"
-										size="small"
-										disabled={ !! busyKey }
-										onClick={ () =>
-											onUpload(
-												pattern,
-												categoryList,
-												true
-											)
-										}
-									>
-										{ __(
-											'Upload as new',
-											'pattern-builder'
-										) }
-									</Button>
-								) }
-							</HStack>
-						</li>
-					);
-				} ) }
-			</ul>
-		</Modal>
-	);
-}
-
-/**
  * The cloud browsing surface: connect state, My Cloud Library, and the
  * Public Directory — rendered in place of the local grid when a cloud rail
  * item is active.
@@ -641,10 +589,8 @@ export function CloudBrowser( {
 	const [ pages, setPages ] = useState( 1 );
 	const [ selected, setSelected ] = useState( null );
 	const [ busy, setBusy ] = useState( false );
-	const [ isUploadOpen, setIsUploadOpen ] = useState( false );
-	const [ links, setLinks ] = useState( {} );
-	const [ uploadBusyKey, setUploadBusyKey ] = useState( '' );
 	const [ pendingDownload, setPendingDownload ] = useState( null );
+	const [ pendingDestination, setPendingDestination ] = useState( null );
 
 	const { createSuccessNotice, createErrorNotice } =
 		useDispatch( noticesStore );
@@ -673,7 +619,7 @@ export function CloudBrowser( {
 		if ( search ) {
 			query.set( 'search', search );
 		}
-		if ( ! isLibrary && collection ) {
+		if ( collection ) {
 			query.set( 'category', collection );
 		}
 		apiFetch( {
@@ -717,15 +663,6 @@ export function CloudBrowser( {
 			.catch( () => onCollections( [] ) );
 	}, [ isLibrary, status, onCollections ] );
 
-	useEffect( () => {
-		if ( ! isLibrary || ! status?.connected ) {
-			return;
-		}
-		apiFetch( { path: `${ BASE }/links` } )
-			.then( ( data ) => setLinks( data || {} ) )
-			.catch( () => setLinks( {} ) );
-	}, [ isLibrary, status ] );
-
 	const disconnect = () => {
 		apiFetch( { path: `${ BASE }/disconnect`, method: 'POST' } ).then(
 			() => {
@@ -741,6 +678,9 @@ export function CloudBrowser( {
 			}
 		);
 	};
+
+	// Save asks for a destination first; the rest of the flow is unchanged.
+	const requestDownload = ( pattern ) => setPendingDestination( pattern );
 
 	// Tokens this site lacks need a destination before the download (§4a).
 	const download = ( pattern, destination ) => {
@@ -880,82 +820,33 @@ export function CloudBrowser( {
 			.finally( () => setBusy( false ) );
 	};
 
-	const uploadLocal = ( pattern, categories, asNew ) => {
-		const localKey =
-			( pattern.source === 'user' ? 'user:' : 'theme:' ) + pattern.id;
-		setUploadBusyKey( localKey );
-		apiFetch( {
-			path: `${ BASE }/upload`,
-			method: 'POST',
-			data: {
-				patternType: pattern.source === 'user' ? 'user' : 'theme',
-				patternId: pattern.id,
-				categories,
-				asNew,
-			},
-		} )
-			.then( ( result ) => {
-				const message = result.updated
-					? sprintf(
-							/* translators: %s: pattern title. */
-							__(
-								'“%s” updated in your cloud library.',
-								'pattern-builder'
-							),
-							pattern.title
-					  )
-					: sprintf(
-							/* translators: %s: pattern title. */
-							__(
-								'“%s” uploaded to your cloud library.',
-								'pattern-builder'
-							),
-							pattern.title
-					  );
-				createSuccessNotice( message, { type: 'snackbar' } );
-				setLinks( ( previous ) => ( {
-					...previous,
-					[ localKey ]: { cloudId: result.pattern?.id },
-				} ) );
-				refreshStatus();
-				loadItems();
-			} )
-			.catch( ( error ) => {
-				createErrorNotice(
-					error.message ||
-						__(
-							'The pattern could not be uploaded.',
-							'pattern-builder'
-						),
-					{ type: 'snackbar' }
-				);
-			} )
-			.finally( () => setUploadBusyKey( '' ) );
-	};
-
-	if ( status === null ) {
+	if ( ! status ) {
 		return (
-			<div className="pattern-builder-cloud__loading">
-				<Spinner />
-			</div>
+			<main className="pattern-builder-browser__main">
+				<div className="pattern-builder-cloud__loading">
+					<Spinner />
+				</div>
+			</main>
 		);
 	}
 
 	// The directory browses anonymously; the library needs an account.
 	if ( ! status.connected && isLibrary ) {
 		return (
-			<ConnectPanel
-				onConnected={ ( data ) => {
-					setStatus( data );
-					createSuccessNotice(
-						__(
-							'Connected to patternbuilderwp.com.',
-							'pattern-builder'
-						),
-						{ type: 'snackbar' }
-					);
-				} }
-			/>
+			<main className="pattern-builder-browser__main">
+				<ConnectPanel
+					onConnected={ ( data ) => {
+						setStatus( data );
+						createSuccessNotice(
+							__(
+								'Connected to patternbuilderwp.com.',
+								'pattern-builder'
+							),
+							{ type: 'snackbar' }
+						);
+					} }
+				/>
+			</main>
 		);
 	}
 
@@ -977,157 +868,156 @@ export function CloudBrowser( {
 	const usage = status.usage;
 
 	return (
-		<div className="pattern-builder-cloud">
-			<HStack
-				alignment="left"
-				spacing={ 4 }
-				wrap
-				className="pattern-builder-cloud__toolbar"
-			>
+		<>
+			<main className="pattern-builder-browser__main pattern-builder-cloud">
 				{ isLibrary && status.connected && (
-					<Button
-						variant="primary"
-						icon={ cloudUpload }
-						onClick={ () => setIsUploadOpen( true ) }
+					<HStack
+						alignment="left"
+						spacing={ 2 }
+						className="pattern-builder-cloud__account"
 					>
-						{ __( 'Upload a pattern', 'pattern-builder' ) }
-					</Button>
-				) }
-			</HStack>
-
-			{ isLibrary && status.connected && (
-				<HStack
-					alignment="left"
-					spacing={ 2 }
-					className="pattern-builder-cloud__account"
-				>
-					<span>
-						{ sprintf(
-							/* translators: 1: account name, 2: tier. */
-							__( 'Connected as %1$s (%2$s)', 'pattern-builder' ),
-							status.account?.name || '',
-							status.tier === 'pro'
-								? __( 'Pro', 'pattern-builder' )
-								: __( 'Free', 'pattern-builder' )
-						) }
-					</span>
-					{ usage && usage.cap > 0 && (
-						<span className="pattern-builder-cloud__meta">
+						<span>
 							{ sprintf(
-								/* translators: 1: stored count, 2: cap. */
+								/* translators: 1: account name, 2: tier. */
 								__(
-									'%1$d of %2$d patterns stored',
+									'Connected as %1$s (%2$s)',
 									'pattern-builder'
 								),
-								usage.stored,
-								usage.cap
+								status.account?.name || '',
+								status.tier === 'pro'
+									? __( 'Pro', 'pattern-builder' )
+									: __( 'Free', 'pattern-builder' )
 							) }
 						</span>
-					) }
-					<Button
-						variant="tertiary"
-						icon={ closeSmall }
-						onClick={ disconnect }
-					>
-						{ __( 'Disconnect', 'pattern-builder' ) }
-					</Button>
-				</HStack>
-			) }
-
-			{ ! status.connected && ! isLibrary && (
-				<p className="pattern-builder-cloud__meta">
-					{ __(
-						'Browsing the public directory. Connect from My Cloud Library to upload and manage your own patterns.',
-						'pattern-builder'
-					) }
-				</p>
-			) }
-
-			<div className="pattern-builder-cloud__content">
-				<div className="pattern-builder-cloud__grid-column">
-					{ items === null && <Spinner /> }
-					{ items !== null && items.length === 0 && (
-						<p>{ __( 'No patterns found.', 'pattern-builder' ) }</p>
-					) }
-					<div className="pattern-builder-cloud__grid">
-						{ ( items || [] ).map( ( pattern ) => (
-							<CloudCard
-								key={ pattern.id }
-								pattern={ pattern }
-								isSelected={ selected?.id === pattern.id }
-								onSelect={ ( picked ) =>
-									setSelected(
-										selected?.id === picked.id
-											? null
-											: picked
-									)
-								}
-							/>
-						) ) }
-					</div>
-					{ pages > 1 && (
-						<HStack
-							alignment="center"
-							spacing={ 2 }
-							className="pattern-builder-cloud__pagination"
-						>
-							<Button
-								variant="tertiary"
-								disabled={ page <= 1 }
-								onClick={ () => setPage( page - 1 ) }
-							>
-								{ __( 'Previous', 'pattern-builder' ) }
-							</Button>
-							<span>
+						{ usage && usage.cap > 0 && (
+							<span className="pattern-builder-cloud__meta">
 								{ sprintf(
-									/* translators: 1: current page, 2: total pages. */
+									/* translators: 1: stored count, 2: cap. */
 									__(
-										'Page %1$d of %2$d',
+										'%1$d of %2$d patterns stored',
 										'pattern-builder'
 									),
-									page,
-									pages
+									usage.stored,
+									usage.cap
 								) }
 							</span>
-							<Button
-								variant="tertiary"
-								disabled={ page >= pages }
-								onClick={ () => setPage( page + 1 ) }
+						) }
+						<Button
+							variant="tertiary"
+							icon={ closeSmall }
+							onClick={ disconnect }
+						>
+							{ __( 'Disconnect', 'pattern-builder' ) }
+						</Button>
+					</HStack>
+				) }
+
+				{ ! status.connected && ! isLibrary && (
+					<p className="pattern-builder-cloud__meta">
+						{ __(
+							'Browsing the public directory. Connect from My Cloud Library to upload and manage your own patterns.',
+							'pattern-builder'
+						) }
+					</p>
+				) }
+
+				<div className="pattern-builder-cloud__content">
+					<div className="pattern-builder-cloud__grid-column">
+						{ items === null && <Spinner /> }
+						{ items !== null && items.length === 0 && (
+							<p>
+								{ __(
+									'No patterns found.',
+									'pattern-builder'
+								) }
+							</p>
+						) }
+						<div className="pattern-builder-cloud__grid">
+							{ ( items || [] ).map( ( pattern ) => (
+								<CloudCard
+									key={ pattern.id }
+									pattern={ pattern }
+									isSelected={ selected?.id === pattern.id }
+									onSelect={ ( picked ) =>
+										setSelected(
+											selected?.id === picked.id
+												? null
+												: picked
+										)
+									}
+								/>
+							) ) }
+						</div>
+						{ pages > 1 && (
+							<HStack
+								alignment="center"
+								spacing={ 2 }
+								className="pattern-builder-cloud__pagination"
 							>
-								{ __( 'Next', 'pattern-builder' ) }
-							</Button>
-						</HStack>
-					) }
+								<Button
+									variant="tertiary"
+									disabled={ page <= 1 }
+									onClick={ () => setPage( page - 1 ) }
+								>
+									{ __( 'Previous', 'pattern-builder' ) }
+								</Button>
+								<span>
+									{ sprintf(
+										/* translators: 1: current page, 2: total pages. */
+										__(
+											'Page %1$d of %2$d',
+											'pattern-builder'
+										),
+										page,
+										pages
+									) }
+								</span>
+								<Button
+									variant="tertiary"
+									disabled={ page >= pages }
+									onClick={ () => setPage( page + 1 ) }
+								>
+									{ __( 'Next', 'pattern-builder' ) }
+								</Button>
+							</HStack>
+						) }
+					</div>
 				</div>
 
+				{ pendingDestination && (
+					<DestinationModal
+						pattern={ pendingDestination }
+						busy={ busy }
+						onConfirm={ ( destination ) => {
+							const pattern = pendingDestination;
+							setPendingDestination( null );
+							download( pattern, destination );
+						} }
+						onClose={ () => setPendingDestination( null ) }
+					/>
+				) }
+
+				{ tokensModal }
+			</main>
+
+			<aside className="pattern-builder-browser__details">
 				{ selected ? (
 					<CloudDetails
 						pattern={ selected }
 						source={ isLibrary ? 'library' : 'directory' }
-						onDownload={ download }
+						onDownload={ requestDownload }
 						onDelete={ deleteCloudPattern }
 						onEditLocal={ onEditLocal }
 						busy={ busy }
 					/>
 				) : (
-					<div className="pattern-builder-cloud__details is-empty">
-						<p className="pattern-builder-cloud__meta">
+					<div className="pattern-builder-details is-empty">
+						<Text variant="muted">
 							{ __( 'No pattern selected.', 'pattern-builder' ) }
-						</p>
+						</Text>
 					</div>
 				) }
-			</div>
-
-			{ isUploadOpen && (
-				<UploadModal
-					links={ links }
-					busyKey={ uploadBusyKey }
-					onUpload={ uploadLocal }
-					onClose={ () => setIsUploadOpen( false ) }
-				/>
-			) }
-
-			{ tokensModal }
-		</div>
+			</aside>
+		</>
 	);
 }

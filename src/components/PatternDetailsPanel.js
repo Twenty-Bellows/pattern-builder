@@ -18,6 +18,7 @@ import { PatternSourcePanel } from './PatternSourcePanel';
 import { PatternSyncedStatusPanel } from './PatternSyncedStatusPanel';
 import { PatternMetadataPanel } from './PatternMetadataPanel';
 import { PatternAssociationsPanel } from './PatternAssociationsPanel';
+import { PatternActionsPanel } from './PatternActionsPanel';
 
 /**
  * The browse screen's details sidebar for the selected pattern — the same
@@ -182,18 +183,19 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 							/>
 						</PanelBody>
 
-						{ isThemePattern && (
-							<PanelBody
-								title={ _x(
-									'Pattern Metadata',
-									'UI String',
-									'pattern-builder'
-								) }
-								initialOpen
-							>
-								<PatternMetadataPanel patternPost={ record } />
-							</PanelBody>
-						) }
+						<PanelBody
+							title={ _x(
+								'Pattern Metadata',
+								'UI String',
+								'pattern-builder'
+							) }
+							initialOpen
+						>
+							<PatternMetadataPanel
+								patternPost={ record }
+								postType={ postType }
+							/>
+						</PanelBody>
 
 						{ isThemePattern && (
 							<PanelBody
@@ -209,6 +211,21 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 								/>
 							</PanelBody>
 						) }
+
+						<PanelBody
+							title={ _x(
+								'Pattern Actions',
+								'UI String',
+								'pattern-builder'
+							) }
+							initialOpen={ false }
+						>
+							<PatternActionsPanel
+								patternPost={ record }
+								postType={ postType }
+								onChanged={ onSaved }
+							/>
+						</PanelBody>
 					</>
 				) }
 			</div>

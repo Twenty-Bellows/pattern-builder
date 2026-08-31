@@ -1,9 +1,8 @@
 /**
  * Boots the WordPress editor — core's `@wordpress/edit-post` package, the
- * same editor that powers post.php — bound to a `pb_pattern` entity, so a
- * theme pattern gets the full core editing experience (header, list view,
- * inspector, document panels, keyboard shortcuts) and its saves go straight
- * to the pattern file.
+ * same editor that powers post.php — bound to the pattern's entity, so
+ * every pattern (file-backed `pb_pattern` or `wp_block` post) is edited in
+ * one place with the full core editing experience.
  */
 
 import domReady from '@wordpress/dom-ready';
@@ -73,11 +72,13 @@ export function bootPatternEditor( settings ) {
 		),
 	} );
 
+	const isUserPattern = settings.patternType === 'user';
+
 	domReady( () => {
 		initializeEditor(
 			'pattern-builder-admin',
-			'pb_pattern',
-			settings.pattern,
+			isUserPattern ? 'wp_block' : 'pb_pattern',
+			isUserPattern ? Number( settings.pattern ) : settings.pattern,
 			settings.editorSettings || {},
 			null
 		);

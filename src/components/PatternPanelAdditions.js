@@ -7,6 +7,7 @@ import { PatternSyncedStatusPanel } from './PatternSyncedStatusPanel';
 import { PatternAssociationsPanel } from './PatternAssociationsPanel';
 import { PatternMetadataPanel } from './PatternMetadataPanel';
 import { BlockBindingsPanel } from './BlockBindingsPanel';
+import { PatternActionsPanel } from './PatternActionsPanel';
 /**
  * The post types whose editor gets the pattern panels: user patterns
  * (wp_block) and Pattern Builder's file-backed theme patterns (pb_pattern).
@@ -63,18 +64,19 @@ export const PatternBuilderPanel = ( { patternPost, postType } ) => {
 				/>
 			</PluginDocumentSettingPanel>
 
-			{ isThemePattern && (
-				<PluginDocumentSettingPanel
-					name={ 'pattern-panel-additions-metadata' }
-					title={ _x(
-						'Pattern Metadata',
-						'UI String',
-						'pattern-builder'
-					) }
-				>
-					<PatternMetadataPanel patternPost={ patternPost } />
-				</PluginDocumentSettingPanel>
-			) }
+			<PluginDocumentSettingPanel
+				name={ 'pattern-panel-additions-metadata' }
+				title={ _x(
+					'Pattern Metadata',
+					'UI String',
+					'pattern-builder'
+				) }
+			>
+				<PatternMetadataPanel
+					patternPost={ patternPost }
+					postType={ postType }
+				/>
+			</PluginDocumentSettingPanel>
 
 			{ isThemePattern && (
 				<PluginDocumentSettingPanel
@@ -88,6 +90,20 @@ export const PatternBuilderPanel = ( { patternPost, postType } ) => {
 					<PatternAssociationsPanel patternPost={ patternPost } />
 				</PluginDocumentSettingPanel>
 			) }
+
+			<PluginDocumentSettingPanel
+				name={ 'pattern-panel-additions-actions' }
+				title={ _x(
+					'Pattern Actions',
+					'UI String',
+					'pattern-builder'
+				) }
+			>
+				<PatternActionsPanel
+					patternPost={ patternPost }
+					postType={ postType }
+				/>
+			</PluginDocumentSettingPanel>
 
 			<PluginDocumentSettingPanel
 				name={ 'pattern-panel-additions-bindings' }

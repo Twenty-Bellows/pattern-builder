@@ -1,36 +1,22 @@
 import { useCallback } from '@wordpress/element';
 
 import { PatternBrowser } from './PatternBrowser';
-import { getSiteEditorUrl } from '../utils/patternNavigation';
+import { getAdminEditorUrl } from '../utils/patternNavigation';
 
 /**
  * The Pattern Builder admin app: the pattern browser.
  *
- * Editing always happens in the WordPress editor — user patterns open in
- * the Site Editor's pattern canvas, theme patterns in this same page's edit
- * mode (`&pattern={id}`), which hosts core's edit-post editor bound to the
- * `pb_pattern` entity.
+ * Editing always happens in this page's edit mode (`&pattern={id}`), which
+ * hosts core's edit-post editor bound to the pattern's entity — the same
+ * editor for theme and user patterns alike.
  *
  * @param {Object} props          Component props.
  * @param {Object} props.settings The settings the PHP side printed.
  */
 export function PatternBuilderAdminApp( { settings } ) {
-	const openPattern = useCallback(
-		( pattern ) => {
-			if ( pattern.source === 'user' ) {
-				window.location.href = getSiteEditorUrl( pattern );
-				return;
-			}
-
-			const url = new URL(
-				settings.adminUrl || window.location.href,
-				window.location.href
-			);
-			url.searchParams.set( 'pattern', pattern.id );
-			window.location.href = url.toString();
-		},
-		[ settings.adminUrl ]
-	);
+	const openPattern = useCallback( ( pattern ) => {
+		window.location.href = getAdminEditorUrl( pattern );
+	}, [] );
 
 	return (
 		<PatternBrowser

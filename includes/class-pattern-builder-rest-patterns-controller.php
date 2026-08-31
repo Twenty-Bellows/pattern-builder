@@ -272,7 +272,18 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 			return $this->not_found_error();
 		}
 
-		$pattern = $this->apply_request_to_pattern( $pattern, $request );
+		$original = clone $pattern;
+		$pattern  = $this->apply_request_to_pattern( $pattern, $request );
+
+		/*
+		 * A renamed pattern belongs in a file named after its new slug, so
+		 * write a fresh file and drop the old one once that succeeds.
+		 */
+		$renamed = $pattern->name !== $original->name;
+		if ( $renamed ) {
+			$pattern->filePath = null;
+			$pattern->id       = $pattern->name;
+		}
 
 		if ( 'user' === $request['source'] ) {
 			$converted = $this->store->convert_theme_pattern_to_user( $pattern );
@@ -288,6 +299,10 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 
 		if ( is_wp_error( $saved ) ) {
 			return $this->as_rest_error( $saved );
+		}
+
+		if ( $renamed ) {
+			$this->store->delete_theme_pattern( $original );
 		}
 
 		return rest_ensure_response( $this->prepare_pattern_for_response( $saved, $request ) );
