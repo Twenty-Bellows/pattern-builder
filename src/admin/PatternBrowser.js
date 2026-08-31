@@ -6,10 +6,6 @@ import {
 	SearchControl,
 	SnackbarList,
 	Spinner,
-	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
-	__experimentalHStack as HStack,
-	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
-	__experimentalHeading as Heading,
 } from '@wordpress/components';
 import { addTemplate } from '@wordpress/icons';
 import { BlockEditorProvider } from '@wordpress/block-editor';
@@ -21,23 +17,70 @@ import { fetchAllPatterns } from '../utils/resolvers';
 import { PatternCard } from '../components/PatternCard';
 import { PatternDetailsPanel } from '../components/PatternDetailsPanel';
 import { PatternCreatePanel } from '../components/PatternCreatePanel';
+import { PatternBuilderLogo } from '../assets/icons';
 import {
 	CloudBrowser,
 	CLOUD_LIBRARY,
 	CLOUD_DIRECTORY,
-	CLOUD_GENERATE,
 } from '../cloud/CloudBrowser';
 
-const CLOUD_VIEWS = [ CLOUD_LIBRARY, CLOUD_DIRECTORY, CLOUD_GENERATE ];
-
 const ALL = 'all';
-const MINE = 'mine';
 const UNCATEGORIZED = 'uncategorized';
 
 /**
- * The category rail: All patterns, My patterns (user-created), every
- * category in use, and Uncategorized — each with a count, the way the Site
- * Editor's Patterns screen lays them out.
+ * The four collections a pattern can come from. User and Theme are local;
+ * Uploaded and Community are served by the cloud browser.
+ */
+const USER = 'user';
+const THEME = 'theme';
+const UPLOADED = 'uploaded';
+const COMMUNITY = 'community';
+
+const COLLECTIONS = [
+	{ key: USER, label: __( 'User', 'pattern-builder' ) },
+	{ key: THEME, label: __( 'Theme', 'pattern-builder' ) },
+	{ key: UPLOADED, label: __( 'Uploaded', 'pattern-builder' ) },
+	{ key: COMMUNITY, label: __( 'Community', 'pattern-builder' ) },
+];
+
+const CLOUD_COLLECTIONS = [ UPLOADED, COMMUNITY ];
+
+/**
+ * The collection tabs: which library the grid is showing.
+ *
+ * @param {Object}   props          Component props.
+ * @param {string}   props.active   Active collection key.
+ * @param {Function} props.onSelect Called with a collection key.
+ */
+function CollectionTabs( { active, onSelect } ) {
+	return (
+		<div
+			className="pattern-builder-browser__tabs"
+			role="tablist"
+			aria-label={ __( 'Pattern collections', 'pattern-builder' ) }
+		>
+			{ COLLECTIONS.map( ( item ) => (
+				<button
+					key={ item.key }
+					type="button"
+					role="tab"
+					aria-selected={ item.key === active }
+					className={
+						'pattern-builder-browser__tab' +
+						( item.key === active ? ' is-active' : '' )
+					}
+					onClick={ () => onSelect( item.key ) }
+				>
+					{ item.label }
+				</button>
+			) ) }
+		</div>
+	);
+}
+
+/**
+ * The category rail: filters within the active collection — pattern
+ * categories for the local collections, cloud collections for the others.
  *
  * @param {Object}   props            Component props.
  * @param {Array}    props.categories The category descriptors.
@@ -74,8 +117,9 @@ function CategoryRail( { categories, active, onSelect } ) {
 }
 
 /**
- * The browse screen: a category rail, a grid of uniform pattern cards, and
- * a details sidebar for the selected pattern.
+ * The browse screen: a header with the four collection tabs, a category
+ * rail scoped to the active collection, a grid, and a details sidebar that
+ * is always present.
  *
  * @param {Object}   props                Component props.
  * @param {Function} props.onEdit         Called with the pattern to open its editor.
@@ -84,9 +128,13 @@ function CategoryRail( { categories, active, onSelect } ) {
 export function PatternBrowser( { onEdit, editorSettings } ) {
 	const [ patterns, setPatterns ] = useState( null );
 	const [ search, setSearch ] = useState( '' );
+	const [ collection, setCollection ] = useState( USER );
 	const [ category, setCategory ] = useState( ALL );
+	const [ cloudCollections, setCloudCollections ] = useState( [] );
 	const [ selectedId, setSelectedId ] = useState( null );
 	const [ isCreateOpen, setIsCreateOpen ] = useState( false );
+
+	const isCloud = CLOUD_COLLECTIONS.includes( collection );
 
 	const refresh = useCallback( () => {
 		fetchAllPatterns()
@@ -111,8 +159,41 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 	);
 	const { removeNotice } = useDispatch( noticesStore );
 
+	const selectCollection = ( key ) => {
+		setCollection( key );
+		setCategory( ALL );
+		setSearch( '' );
+		setSelectedId( null );
+		setCloudCollections( [] );
+	};
+
+	// Patterns in the active local collection, before the category filter.
+	const collectionPatterns = useMemo(
+		() =>
+			( patterns || [] ).filter( ( pattern ) =>
+				collection === USER
+					? pattern.source === 'user'
+					: pattern.source === 'theme'
+			),
+		[ patterns, collection ]
+	);
+
 	const categories = useMemo( () => {
-		const all = patterns || [];
+		if ( isCloud ) {
+			return [
+				{
+					slug: ALL,
+					label: __( 'All patterns', 'pattern-builder' ),
+					count: '',
+				},
+				...cloudCollections.map( ( item ) => ( {
+					slug: String( item.id ),
+					label: item.name,
+					count: item.count ?? '',
+				} ) ),
+			];
+		}
+
 		const labelFor = ( slug ) =>
 			( registeredCategories || [] ).find( ( c ) => c.name === slug )
 				?.label || slug;
@@ -120,7 +201,7 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 		const counts = {};
 		let uncategorized = 0;
 
-		all.forEach( ( pattern ) => {
+		collectionPatterns.forEach( ( pattern ) => {
 			const slugs = pattern.categories || [];
 			if ( slugs.length === 0 ) {
 				uncategorized++;
@@ -134,12 +215,7 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 			{
 				slug: ALL,
 				label: __( 'All patterns', 'pattern-builder' ),
-				count: all.length,
-			},
-			{
-				slug: MINE,
-				label: __( 'My patterns', 'pattern-builder' ),
-				count: all.filter( ( p ) => p.source === 'user' ).length,
+				count: collectionPatterns.length,
 			},
 			...Object.keys( counts )
 				.sort( ( a, b ) =>
@@ -160,51 +236,28 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 			} );
 		}
 
-		rail.push(
-			{
-				slug: CLOUD_LIBRARY,
-				label: __( 'My Cloud Library', 'pattern-builder' ),
-				count: '',
-			},
-			{
-				slug: CLOUD_DIRECTORY,
-				label: __( 'Pattern Directory', 'pattern-builder' ),
-				count: '',
-			},
-			{
-				slug: CLOUD_GENERATE,
-				label: __( 'Generate with AI', 'pattern-builder' ),
-				count: '',
-			}
-		);
-
 		return rail;
-	}, [ patterns, registeredCategories ] );
+	}, [
+		isCloud,
+		cloudCollections,
+		collectionPatterns,
+		registeredCategories,
+	] );
 
 	const filteredPatterns = useMemo( () => {
-		if ( ! patterns ) {
-			return [];
-		}
-
 		const term = search.trim().toLowerCase();
 
-		return patterns.filter( ( pattern ) => {
-			if ( category === MINE && pattern.source !== 'user' ) {
-				return false;
-			}
+		return collectionPatterns.filter( ( pattern ) => {
+			const slugs = pattern.categories || [];
 
-			if (
-				category === UNCATEGORIZED &&
-				( pattern.categories || [] ).length > 0
-			) {
+			if ( category === UNCATEGORIZED && slugs.length > 0 ) {
 				return false;
 			}
 
 			if (
 				category !== ALL &&
-				category !== MINE &&
 				category !== UNCATEGORIZED &&
-				! ( pattern.categories || [] ).includes( category )
+				! slugs.includes( category )
 			) {
 				return false;
 			}
@@ -213,19 +266,18 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 				return true;
 			}
 
-			const haystack = [
+			return [
 				pattern.title,
 				pattern.name,
 				pattern.description,
 				...( pattern.keywords || [] ),
-				...( pattern.categories || [] ),
+				...slugs,
 			]
 				.join( ' ' )
-				.toLowerCase();
-
-			return haystack.includes( term );
+				.toLowerCase()
+				.includes( term );
 		} );
-	}, [ patterns, search, category ] );
+	}, [ collectionPatterns, search, category ] );
 
 	const selectedPattern = useMemo(
 		() =>
@@ -248,103 +300,113 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 		// block-bindings map to render `__default` bindings.
 		<BlockEditorProvider settings={ editorSettings }>
 			<div className="pattern-builder-browser">
-				<aside className="pattern-builder-browser__sidebar">
-					<Heading
-						level={ 1 }
-						size={ 16 }
-						className="pattern-builder-browser__title"
-					>
-						{ _x(
-							'Pattern Builder',
-							'UI String',
-							'pattern-builder'
-						) }
-					</Heading>
-					<CategoryRail
-						categories={ categories }
-						active={ category }
-						onSelect={ ( slug ) => {
-							setCategory( slug );
-							setSelectedId( null );
-						} }
+				<header className="pattern-builder-browser__header">
+					<div className="pattern-builder-browser__brand">
+						<PatternBuilderLogo size={ 28 } />
+						<span className="pattern-builder-browser__brand-name">
+							{ _x(
+								'Pattern Builder',
+								'UI String',
+								'pattern-builder'
+							) }
+						</span>
+					</div>
+
+					<CollectionTabs
+						active={ collection }
+						onSelect={ selectCollection }
 					/>
-				</aside>
 
-				{ CLOUD_VIEWS.includes( category ) && (
-					<main className="pattern-builder-browser__main">
-						<CloudBrowser
-							view={ category }
-							onDownloaded={ refresh }
-							onEditLocal={ onEdit }
+					<div className="pattern-builder-browser__header-actions">
+						<SearchControl
+							__nextHasNoMarginBottom
+							className="pattern-builder-browser__search"
+							value={ search }
+							onChange={ setSearch }
+							label={ __( 'Search patterns', 'pattern-builder' ) }
 						/>
-					</main>
-				) }
-
-				{ ! CLOUD_VIEWS.includes( category ) && (
-					<main className="pattern-builder-browser__main">
-						<HStack
-							alignment="left"
-							spacing={ 4 }
-							wrap
-							className="pattern-builder-browser__toolbar"
+						<Button
+							variant="primary"
+							icon={ addTemplate }
+							onClick={ () => setIsCreateOpen( true ) }
 						>
-							<SearchControl
-								__nextHasNoMarginBottom
-								className="pattern-builder-browser__search"
-								value={ search }
-								onChange={ setSearch }
-								label={ __(
-									'Search patterns',
-									'pattern-builder'
-								) }
-							/>
-							<Button
-								variant="primary"
-								icon={ addTemplate }
-								onClick={ () => setIsCreateOpen( true ) }
-							>
-								{ __( 'Create Pattern', 'pattern-builder' ) }
-							</Button>
-						</HStack>
+							{ __( 'Create Pattern', 'pattern-builder' ) }
+						</Button>
+					</div>
+				</header>
 
-						{ filteredPatterns.length === 0 && (
-							<p>
-								{ __(
-									'No patterns found.',
-									'pattern-builder'
-								) }
-							</p>
-						) }
-
-						<div className="pattern-builder-browser__grid">
-							{ filteredPatterns.map( ( pattern ) => (
-								<PatternCard
-									key={ pattern.id || pattern.name }
-									pattern={ pattern }
-									isSelected={ pattern.id === selectedId }
-									onSelect={ ( selected ) =>
-										setSelectedId(
-											selected.id === selectedId
-												? null
-												: selected.id
-										)
-									}
-								/>
-							) ) }
-						</div>
-					</main>
-				) }
-
-				{ ! CLOUD_VIEWS.includes( category ) && selectedPattern && (
-					<aside className="pattern-builder-browser__details">
-						<PatternDetailsPanel
-							key={ selectedPattern.id }
-							pattern={ selectedPattern }
-							onEdit={ onEdit }
-							onSaved={ refresh }
+				<div className="pattern-builder-browser__body">
+					<aside className="pattern-builder-browser__sidebar">
+						<CategoryRail
+							categories={ categories }
+							active={ category }
+							onSelect={ ( slug ) => {
+								setCategory( slug );
+								setSelectedId( null );
+							} }
 						/>
 					</aside>
-				) }
+
+					{ isCloud && (
+						<main className="pattern-builder-browser__main">
+							<CloudBrowser
+								view={
+									collection === UPLOADED
+										? CLOUD_LIBRARY
+										: CLOUD_DIRECTORY
+								}
+								search={ search }
+								collection={ category === ALL ? '' : category }
+								onCollections={ setCloudCollections }
+								onDownloaded={ refresh }
+								onEditLocal={ onEdit }
+							/>
+						</main>
+					) }
+
+					{ ! isCloud && (
+						<>
+							<main className="pattern-builder-browser__main">
+								{ filteredPatterns.length === 0 && (
+									<p>
+										{ __(
+											'No patterns found.',
+											'pattern-builder'
+										) }
+									</p>
+								) }
+
+								<div className="pattern-builder-browser__grid">
+									{ filteredPatterns.map( ( pattern ) => (
+										<PatternCard
+											key={ pattern.id || pattern.name }
+											pattern={ pattern }
+											isSelected={
+												pattern.id === selectedId
+											}
+											onSelect={ ( selected ) =>
+												setSelectedId(
+													selected.id === selectedId
+														? null
+														: selected.id
+												)
+											}
+										/>
+									) ) }
+								</div>
+							</main>
+
+							<aside className="pattern-builder-browser__details">
+								<PatternDetailsPanel
+									key={ selectedPattern?.id || 'none' }
+									pattern={ selectedPattern }
+									onEdit={ onEdit }
+									onSaved={ refresh }
+								/>
+							</aside>
+						</>
+					) }
+				</div>
 
 				{ isCreateOpen && (
 					<Modal
@@ -352,7 +414,12 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 						onRequestClose={ () => setIsCreateOpen( false ) }
 						className="pattern-builder-browser__create-modal"
 					>
-						<PatternCreatePanel />
+						<PatternCreatePanel
+							onCreated={ () => {
+								setIsCreateOpen( false );
+								refresh();
+							} }
+						/>
 					</Modal>
 				) }
 

@@ -7,46 +7,6 @@ import { PatternSyncedStatusPanel } from './PatternSyncedStatusPanel';
 import { PatternAssociationsPanel } from './PatternAssociationsPanel';
 import { PatternMetadataPanel } from './PatternMetadataPanel';
 import { BlockBindingsPanel } from './BlockBindingsPanel';
-import {
-	usePatternCloudState,
-	PatternCloudControls,
-} from './PatternCloudPanel';
-
-/**
- * The editor's Cloud document panel; rendered only while connected, and
- * re-checked on save via the record's modified date.
- *
- * @param {Object} props             Component props.
- * @param {Object} props.patternPost The edited pattern record.
- * @param {string} props.postType    'wp_block' or 'pb_pattern'.
- */
-const PatternCloudDocumentPanel = ( { patternPost, postType } ) => {
-	const patternType = postType === 'pb_pattern' ? 'theme' : 'user';
-	const { state, refresh } = usePatternCloudState(
-		patternType,
-		patternPost.id,
-		patternPost.modified
-	);
-
-	if ( ! state?.connected ) {
-		return null;
-	}
-
-	return (
-		<PluginDocumentSettingPanel
-			name={ 'pattern-panel-additions-cloud' }
-			title={ _x( 'Cloud', 'UI String', 'pattern-builder' ) }
-		>
-			<PatternCloudControls
-				state={ state }
-				onRefresh={ refresh }
-				patternType={ patternType }
-				patternId={ patternPost.id }
-			/>
-		</PluginDocumentSettingPanel>
-	);
-};
-
 /**
  * The post types whose editor gets the pattern panels: user patterns
  * (wp_block) and Pattern Builder's file-backed theme patterns (pb_pattern).
@@ -102,11 +62,6 @@ export const PatternBuilderPanel = ( { patternPost, postType } ) => {
 					postType={ postType }
 				/>
 			</PluginDocumentSettingPanel>
-
-			<PatternCloudDocumentPanel
-				patternPost={ patternPost }
-				postType={ postType }
-			/>
 
 			{ isThemePattern && (
 				<PluginDocumentSettingPanel

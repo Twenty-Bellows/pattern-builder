@@ -1,10 +1,9 @@
 import apiFetch from '@wordpress/api-fetch';
-import { __, _x, sprintf } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import { useState, useEffect, useCallback } from '@wordpress/element';
 import {
 	Button,
 	Notice,
-	PanelBody,
 	Spinner,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalText as Text,
@@ -181,43 +180,5 @@ export function PatternCloudControls( {
 				</Notice>
 			) }
 		</VStack>
-	);
-}
-
-/**
- * The browse sidebar's Cloud section; rendered only while connected.
- *
- * @param {Object}        props             Component props.
- * @param {string}        props.patternType 'theme' or 'user'.
- * @param {string|number} props.patternId   Local pattern identifier.
- * @param {*}             props.refreshKey  Re-fetch trigger (record modified).
- */
-export function PatternCloudPanelBody( {
-	patternType,
-	patternId,
-	refreshKey,
-} ) {
-	const { state, refresh } = usePatternCloudState(
-		patternType,
-		patternId,
-		refreshKey
-	);
-
-	if ( ! state?.connected ) {
-		return null;
-	}
-
-	return (
-		<PanelBody
-			title={ _x( 'Cloud', 'UI String', 'pattern-builder' ) }
-			initialOpen
-		>
-			<PatternCloudControls
-				state={ state }
-				onRefresh={ refresh }
-				patternType={ patternType }
-				patternId={ patternId }
-			/>
-		</PanelBody>
 	);
 }

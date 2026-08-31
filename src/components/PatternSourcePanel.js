@@ -13,6 +13,10 @@ import { store as blockEditorStore } from '@wordpress/block-editor';
 import { useState } from '@wordpress/element';
 
 import { navigateToPattern } from '../utils/patternNavigation';
+import {
+	usePatternCloudState,
+	PatternCloudControls,
+} from './PatternCloudPanel';
 
 /**
  * Shows where a pattern is stored and converts it to the other storage.
@@ -23,6 +27,9 @@ import { navigateToPattern } from '../utils/patternNavigation';
  * converting it writes a pattern file (importing its images into the theme)
  * and deletes the post. Conversion changes the pattern's identity, so it acts
  * on the last saved version and then opens the converted pattern.
+ *
+ * Where a pattern lives also covers the cloud: connected users get the
+ * upload/update control for their patternbuilderwp.com library here.
  *
  * @param {Object} root0             Component props.
  * @param {Object} root0.patternPost The pattern's entity record.
@@ -39,11 +46,17 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 		};
 	}, [] );
 
+	const isThemePattern = postType === 'pb_pattern';
+	const patternType = isThemePattern ? 'theme' : 'user';
+	const { state: cloudState, refresh: refreshCloud } = usePatternCloudState(
+		patternType,
+		patternPost?.id,
+		patternPost?.modified
+	);
+
 	if ( ! patternPost ) {
 		return null;
 	}
-
-	const isThemePattern = postType === 'pb_pattern';
 
 	const convert = async () => {
 		setIsConverting( true );
@@ -134,6 +147,17 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 						) }
 					</Text>
 				</>
+			) }
+
+			{ cloudState?.connected && (
+				<div className="pattern-builder-source__cloud">
+					<PatternCloudControls
+						state={ cloudState }
+						onRefresh={ refreshCloud }
+						patternType={ patternType }
+						patternId={ patternPost?.id }
+					/>
+				</div>
 			) }
 		</VStack>
 	);
