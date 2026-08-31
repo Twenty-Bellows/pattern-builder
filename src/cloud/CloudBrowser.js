@@ -648,6 +648,10 @@ export function CloudBrowser( {
 				cloudId: pattern.id,
 				destination,
 				addTokens,
+				// Whose the cloud copy is, as the service reported it: what
+				// decides whether this site is later offered an update for
+				// it. The service checks again when one is attempted.
+				mine: !! pattern.mine,
 			},
 		} )
 			.then( ( result ) => {

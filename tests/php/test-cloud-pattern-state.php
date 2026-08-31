@@ -131,6 +131,125 @@ class Test_Cloud_Pattern_State extends WP_UnitTestCase {
 		$this->assertSame( 0, $data['uploadedAt'] );
 	}
 
+	/**
+	 * Downloading somebody else's pattern links it — that is what recognizes
+	 * it as already installed — but the cloud copy is not this account's to
+	 * update, and the panel reads `owned` to know not to offer one.
+	 */
+	private function download( $mine, $source = 'directory' ) {
+		add_filter(
+			'pre_http_request',
+			static function ( $pre, $args, $url ) {
+				if ( false === strpos( $url, rawurlencode( '/download' ) ) ) {
+					return $pre;
+				}
+				return array(
+					'headers'  => array(),
+					'response' => array( 'code' => 200 ),
+					'body'     => wp_json_encode(
+						array(
+							'pbp'     => '1',
+							'title'   => 'Another Account Pattern',
+							'slug'    => 'somebody-elses-pattern',
+							'content' => '<!-- wp:paragraph --><p>Theirs</p><!-- /wp:paragraph -->',
+						)
+					),
+					'cookies'  => array(),
+					'filename' => null,
+				);
+			},
+			10,
+			3
+		);
+
+		$request = new WP_REST_Request( 'POST', '/pattern-builder/v1/cloud/download' );
+		$request->set_param( 'source', $source );
+		$request->set_param( 'cloudId', 77 );
+		$request->set_param( 'destination', 'user' );
+		$request->set_param( 'mine', $mine );
+		return rest_do_request( $request );
+	}
+
+	private function state_of( $post_id ) {
+		$request = new WP_REST_Request( 'GET', '/pattern-builder/v1/cloud/pattern-state' );
+		$request->set_param( 'patternType', 'user' );
+		$request->set_param( 'patternId', $post_id );
+		return rest_do_request( $request )->get_data();
+	}
+
+	public function test_a_pattern_we_uploaded_is_ours_to_update() {
+		$this->upload();
+
+		$this->assertTrue( $this->state()->get_data()['owned'] );
+	}
+
+	public function test_a_download_of_somebody_elses_pattern_is_not_ours_to_update() {
+		$response = $this->download( false );
+		$this->assertSame( 200, $response->get_status() );
+
+		$state = $this->state_of( $response->get_data()['id'] );
+
+		$this->assertTrue( $state['linked'] );
+		$this->assertFalse( $state['owned'] );
+	}
+
+	public function test_a_download_from_our_own_library_stays_ours() {
+		// Nothing in the request says it is ours; the source does.
+		$response = $this->download( false, 'library' );
+
+		$this->assertTrue( $this->state_of( $response->get_data()['id'] )['owned'] );
+	}
+
+	public function test_a_refused_update_disowns_the_link() {
+		$key = Pattern_Builder_Cloud_Porter::local_key( 'user', $this->post_id );
+		Pattern_Builder_Cloud::set_link( $key, 42, 'stale-hash' );
+
+		$this->assertTrue( $this->state()->get_data()['owned'] );
+
+		add_filter(
+			'pre_http_request',
+			static function ( $pre, $args, $url ) {
+				if ( false === strpos( $url, rawurlencode( '/library/patterns' ) ) ) {
+					return $pre;
+				}
+				return array(
+					'headers'  => array(),
+					'response' => array( 'code' => 403 ),
+					'body'     => wp_json_encode(
+						array(
+							'code'    => 'pbwp_forbidden',
+							'message' => 'That pattern belongs to another account.',
+						)
+					),
+					'cookies'  => array(),
+					'filename' => null,
+				);
+			},
+			10,
+			3
+		);
+
+		$request = new WP_REST_Request( 'POST', '/pattern-builder/v1/cloud/upload' );
+		$request->set_param( 'patternType', 'user' );
+		$request->set_param( 'patternId', $this->post_id );
+		$this->assertSame( 403, rest_do_request( $request )->get_status() );
+
+		// A link made before ownership was recorded corrects itself the
+		// first time an update is refused.
+		$this->assertFalse( $this->state()->get_data()['owned'] );
+	}
+
+	public function test_a_link_from_before_ownership_was_recorded_reads_as_ours() {
+		$key = Pattern_Builder_Cloud_Porter::local_key( 'user', $this->post_id );
+		Pattern_Builder_Cloud::set_link( $key, 42 );
+
+		$links = get_option( Pattern_Builder_Cloud::OPTION_LINKS );
+		unset( $links[ $key ]['owned'] );
+		update_option( Pattern_Builder_Cloud::OPTION_LINKS, $links, false );
+
+		$this->assertTrue( $this->state()->get_data()['owned'] );
+	}
+
 	public function test_cloud_id_lookup_reports_installed_local_copy() {
 		$this->upload();
 

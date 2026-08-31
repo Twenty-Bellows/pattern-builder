@@ -266,6 +266,11 @@ class Pattern_Builder_Cloud_Controller {
 				// A link with no stored hash predates change tracking; treat
 				// it as changed so the panel offers an update.
 				'changed'    => empty( $link['hash'] ) || $link['hash'] !== $hash,
+				// Only the account that owns a cloud pattern can update it.
+				// A link made before this was recorded reads as ours, which
+				// is what one almost always was; a refused update corrects
+				// the record.
+				'owned'      => ! isset( $link['owned'] ) || (bool) $link['owned'],
 				'uploadedAt' => isset( $link['uploadedAt'] ) ? (int) $link['uploadedAt'] : 0,
 			)
 		);
@@ -341,6 +346,15 @@ class Pattern_Builder_Cloud_Controller {
 			if ( is_wp_error( $result ) && 404 === (int) ( $result->get_error_data()['status'] ?? 0 ) ) {
 				$existing = 0;
 			} elseif ( is_wp_error( $result ) ) {
+				/*
+				 * Somebody else's pattern: this link was made by downloading
+				 * it, not by uploading it. Remember that, so the panel stops
+				 * offering an update that can only ever be refused.
+				 */
+				if ( 'pbwp_forbidden' === $result->get_error_code() ) {
+					Pattern_Builder_Cloud::disown_link( $exported['localKey'] );
+				}
+
 				return $result;
 			}
 		}
@@ -414,10 +428,21 @@ class Pattern_Builder_Cloud_Controller {
 
 		// The imported content matches its cloud copy, so the stored hash reads as up to date.
 		$hash = $porter->content_hash( $result['type'], $result['id'] );
+
+		/*
+		 * Whether the cloud copy is this account's to update later. One from
+		 * the account's own library always is; one from the directory only if
+		 * the service said so when it listed it. The service is the authority
+		 * either way — this is what keeps an Update button off a pattern
+		 * somebody else published, rather than what enforces it.
+		 */
+		$owned = 'library' === $source || (bool) $request->get_param( 'mine' );
+
 		Pattern_Builder_Cloud::set_link(
 			Pattern_Builder_Cloud_Porter::local_key( $result['type'], $result['id'] ),
 			$cloud_id,
-			is_wp_error( $hash ) ? '' : $hash
+			is_wp_error( $hash ) ? '' : $hash,
+			$owned
 		);
 
 		$result['tokensWritten'] = $tokens_written;

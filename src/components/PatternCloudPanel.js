@@ -95,6 +95,10 @@ export function PatternCloudControls( {
 
 	const isUpdate = state.linked;
 
+	// Downloaded from somebody else's cloud pattern: only its owner can
+	// update it, so there is nothing here to offer.
+	const isTheirs = state.linked && ! state.owned;
+
 	const upload = () => {
 		if ( busy || invalid.length ) {
 			return;
@@ -149,6 +153,15 @@ export function PatternCloudControls( {
 
 	return (
 		<VStack spacing={ 3 }>
+			{ isTheirs && (
+				<Text variant="muted">
+					{ __(
+						'Downloaded from another account’s pattern. Changes stay on this site — the cloud copy is not yours to update.',
+						'pattern-builder'
+					) }
+				</Text>
+			) }
+
 			{ ! state.linked && (
 				<>
 					<Text variant="muted">
@@ -169,7 +182,7 @@ export function PatternCloudControls( {
 				</>
 			) }
 
-			{ state.linked && state.changed && (
+			{ state.linked && state.owned && state.changed && (
 				<>
 					<Text variant="muted">
 						{ __(
@@ -192,7 +205,7 @@ export function PatternCloudControls( {
 				</>
 			) }
 
-			{ state.linked && ! state.changed && (
+			{ state.linked && state.owned && ! state.changed && (
 				<Text variant="muted">
 					{ __(
 						'Up to date in your cloud library.',
