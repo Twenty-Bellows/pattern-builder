@@ -223,64 +223,153 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * Find every local image URL in content and resolve it to a file on disk.
+	 * The image types a package may carry — the service accepts these and
+	 * nothing else (mirrors PBP::allowed_asset_mimes on the service).
+	 *
+	 * @return string[]
+	 */
+	private function bundleable_mimes() {
+		return array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp' );
+	}
+
+	/**
+	 * Find every image the pattern points at and resolve it to a file on
+	 * disk, so it can travel with the package as a `pbp-asset://` placeholder.
+	 *
+	 * The scan matches what the service checks — `src`, a block attribute's
+	 * `"url"`, and CSS `url()` — because anything left pointing at this site
+	 * is refused there ("Patterns may only reference images uploaded with
+	 * them"), and refused without naming the culprit. A reference this site
+	 * cannot bundle therefore fails here instead, where the URL and the
+	 * reason can be named. Links (`href`) are not images: a local one is
+	 * bundled when it resolves, and anything else is left alone.
 	 *
 	 * @param string $content Block markup.
 	 * @return array|WP_Error url => { key, path, mime }
 	 */
 	private function collect_local_assets( $content ) {
-		$home = untrailingslashit( home_url() );
+		$images = '(?:jpg|jpeg|png|gif|webp)';
 
-		preg_match_all( '/(?:src|href)="(' . preg_quote( $home, '/' ) . '[^"]+\.(?:jpg|jpeg|png|gif|webp))"/i', $content, $attr_matches );
-		preg_match_all( '/"url"\s*:\s*"(' . preg_quote( $home, '/' ) . '[^"]+\.(?:jpg|jpeg|png|gif|webp))"/i', $content, $json_matches );
+		// References the service will reject unless they travel with the package.
+		preg_match_all( '/(?:src="|"url"\s*:\s*"|url\(\s*[\'"]?)(https?:(?:\\?\/|\/)[^"\')]+)/i', $content, $required );
 
-		$urls   = array_unique( array_merge( $attr_matches[1], $json_matches[1] ) );
+		// Links to a local image (a lightbox, say): bundled when resolvable.
+		preg_match_all( '/href="(https?:\/\/[^"]+\.' . $images . '(?:\?[^"]*)?)"/i', $content, $links );
+
 		$assets = array();
 
-		foreach ( $urls as $url ) {
+		foreach ( array_unique( $required[1] ) as $raw ) {
+			$url = str_replace( '\/', '/', $raw );
+
 			$path = $this->url_to_path( $url );
 			if ( is_wp_error( $path ) ) {
 				return $path;
 			}
 
-			$mime = wp_check_filetype( basename( $path ) )['type'];
-			$name = sanitize_key( preg_replace( '/\.[^.]+$/', '', basename( $path ) ) );
-			$name = preg_replace( '/[^a-z0-9_\-]/', '', str_replace( '.', '-', $name ) );
-			$key  = substr( $name, 0, 60 ) . '-' . substr( md5( $url ), 0, 6 );
+			$mime = wp_check_filetype( basename( strtok( $path, '?' ) ) )['type'];
+			if ( ! in_array( $mime, $this->bundleable_mimes(), true ) ) {
+				return new WP_Error(
+					'pb_cloud_unsupported_asset',
+					sprintf(
+						/* translators: %s: image URL. */
+						__( 'Patterns can only carry JPEG, PNG, GIF, and WebP images, and this one references something else: %s', 'pattern-builder' ),
+						$url
+					),
+					array( 'status' => 400 )
+				);
+			}
 
-			$assets[ $url ] = array(
-				'key'  => $key,
-				'path' => $path,
-				'mime' => $mime ? $mime : 'image/png',
-			);
+			$assets[ $url ] = $this->describe_asset( $url, $path, $mime );
+		}
+
+		foreach ( array_unique( $links[1] ) as $url ) {
+			if ( isset( $assets[ $url ] ) ) {
+				continue;
+			}
+
+			$path = $this->url_to_path( $url );
+			if ( is_wp_error( $path ) ) {
+				continue;
+			}
+
+			$mime = wp_check_filetype( basename( strtok( $path, '?' ) ) )['type'];
+			if ( in_array( $mime, $this->bundleable_mimes(), true ) ) {
+				$assets[ $url ] = $this->describe_asset( $url, $path, $mime );
+			}
 		}
 
 		return $assets;
 	}
 
 	/**
-	 * Map a local URL to its file on disk (uploads or theme directories).
+	 * The package entry for one resolved asset.
 	 *
-	 * @param string $url Local URL.
+	 * @param string $url  The URL as it appears in the markup.
+	 * @param string $path The file on disk.
+	 * @param string $mime The file's MIME type.
+	 * @return array
+	 */
+	private function describe_asset( $url, $path, $mime ) {
+		$name = sanitize_key( preg_replace( '/\.[^.]+$/', '', basename( strtok( $path, '?' ) ) ) );
+		$name = preg_replace( '/[^a-z0-9_\-]/', '', str_replace( '.', '-', $name ) );
+
+		return array(
+			'key'  => substr( $name, 0, 60 ) . '-' . substr( md5( $url ), 0, 6 ),
+			'path' => $path,
+			'mime' => $mime,
+		);
+	}
+
+	/**
+	 * Map a URL to the file it names on this site.
+	 *
+	 * Matching is by host and path, not by string prefix: the same image is
+	 * written http:// in one pattern and https:// in another, with or without
+	 * www, and a prefix comparison would call a perfectly local image
+	 * foreign. An image that really is on another site gets its own error —
+	 * it can't travel with the package, and saying so here is the only place
+	 * the URL can be named.
+	 *
+	 * @param string $url Image URL.
 	 * @return string|WP_Error
 	 */
 	private function url_to_path( $url ) {
-		$candidates = array();
+		$parts = wp_parse_url( strtok( $url, '?' ) );
+		$host  = isset( $parts['host'] ) ? strtolower( $parts['host'] ) : '';
+		$path  = isset( $parts['path'] ) ? rawurldecode( $parts['path'] ) : '';
+
+		if ( $host && ! in_array( $host, $this->local_hosts(), true ) ) {
+			return new WP_Error(
+				'pb_cloud_foreign_asset_source',
+				sprintf(
+					/* translators: %s: image URL. */
+					__( 'The pattern points at an image hosted on another site, which cannot be uploaded with it: %s. Add the image to this site’s media library and use it in the pattern.', 'pattern-builder' ),
+					$url
+				),
+				array( 'status' => 400 )
+			);
+		}
 
 		$uploads = wp_get_upload_dir();
-		if ( 0 === strpos( $url, $uploads['baseurl'] ) ) {
-			$candidates[] = str_replace( $uploads['baseurl'], $uploads['basedir'], $url );
-		}
-		if ( 0 === strpos( $url, get_stylesheet_directory_uri() ) ) {
-			$candidates[] = str_replace( get_stylesheet_directory_uri(), get_stylesheet_directory(), $url );
-		}
-		if ( 0 === strpos( $url, get_template_directory_uri() ) ) {
-			$candidates[] = str_replace( get_template_directory_uri(), get_template_directory(), $url );
-		}
+		$roots   = array(
+			$uploads['baseurl']            => $uploads['basedir'],
+			get_stylesheet_directory_uri() => get_stylesheet_directory(),
+			get_template_directory_uri()   => get_template_directory(),
+			content_url()                  => WP_CONTENT_DIR,
+		);
 
-		foreach ( $candidates as $candidate ) {
-			$candidate = strtok( $candidate, '?' );
-			if ( file_exists( $candidate ) ) {
+		foreach ( $roots as $base_url => $dir ) {
+			$base = untrailingslashit( (string) wp_parse_url( $base_url, PHP_URL_PATH ) );
+
+			if ( '' === $base || 0 !== strpos( $path, $base . '/' ) ) {
+				continue;
+			}
+
+			// realpath, and inside the root: a path is not a promise (../).
+			$candidate = realpath( untrailingslashit( $dir ) . substr( $path, strlen( $base ) ) );
+			$root      = realpath( $dir );
+
+			if ( $candidate && $root && 0 === strpos( $candidate, $root ) && is_file( $candidate ) ) {
 				return $candidate;
 			}
 		}
@@ -294,6 +383,29 @@ class Pattern_Builder_Cloud_Porter {
 			),
 			array( 'status' => 400 )
 		);
+	}
+
+	/**
+	 * The hostnames that mean "this site".
+	 *
+	 * @return string[]
+	 */
+	private function local_hosts() {
+		$hosts = array_map(
+			static function ( $base ) {
+				return strtolower( (string) wp_parse_url( $base, PHP_URL_HOST ) );
+			},
+			array(
+				home_url(),
+				site_url(),
+				content_url(),
+				get_stylesheet_directory_uri(),
+				get_template_directory_uri(),
+				wp_get_upload_dir()['baseurl'],
+			)
+		);
+
+		return array_values( array_unique( array_filter( $hosts ) ) );
 	}
 
 	/**

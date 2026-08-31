@@ -67,6 +67,92 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		$this->assertSame( 'user:' . $fixture['post_id'], $exported['localKey'] );
 	}
 
+	/**
+	 * Export one wp_block whose content is given, and hand back the package.
+	 *
+	 * @param string $content Block markup.
+	 * @return array|WP_Error
+	 */
+	private function export_content( $content ) {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'   => 'Asset Scan',
+				'post_content' => $content,
+				'post_type'    => 'wp_block',
+				'post_status'  => 'publish',
+			)
+		);
+
+		$porter = new Pattern_Builder_Cloud_Porter();
+		return $porter->export_local( 'user', $post_id );
+	}
+
+	/**
+	 * Anything the package leaves pointing at a URL is refused by the
+	 * service ("Patterns may only reference images uploaded with them"), so
+	 * every reference it checks — src, a block attribute's url, CSS url() —
+	 * has to be bundled, however the URL is written.
+	 */
+	public function test_export_bundles_every_reference_the_service_checks() {
+		$attachment_id = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
+		$url           = wp_get_attachment_url( $attachment_id );
+
+		$cases = array(
+			'query string' => '<!-- wp:image --><figure><img src="' . $url . '?ver=2" alt=""/></figure><!-- /wp:image -->',
+			'https for http' => '<!-- wp:image --><figure><img src="' . str_replace( 'http://', 'https://', $url ) . '" alt=""/></figure><!-- /wp:image -->',
+			'css url()' => '<!-- wp:group --><div class="wp-block-group" style="background-image:url(' . $url . ')"></div><!-- /wp:group -->',
+			'attribute url' => '<!-- wp:cover {"url":"' . $url . '"} --><div class="wp-block-cover"></div><!-- /wp:cover -->',
+		);
+
+		foreach ( $cases as $label => $content ) {
+			$exported = $this->export_content( $content );
+
+			$this->assertIsArray( $exported, $label );
+			$this->assertCount( 1, $exported['pbp']['assets'], $label );
+			$this->assertStringContainsString( 'pbp-asset://', $exported['pbp']['content'], $label );
+			$this->assertDoesNotMatchRegularExpression(
+				'/(?:src="|"url"\s*:\s*"|url\()https?:/i',
+				$exported['pbp']['content'],
+				$label
+			);
+		}
+	}
+
+	public function test_export_names_an_image_hosted_elsewhere() {
+		$exported = $this->export_content(
+			'<!-- wp:image --><figure><img src="https://images.example.com/photo.jpg" alt=""/></figure><!-- /wp:image -->'
+		);
+
+		$this->assertWPError( $exported );
+		$this->assertSame( 'pb_cloud_foreign_asset_source', $exported->get_error_code() );
+		$this->assertStringContainsString( 'images.example.com/photo.jpg', $exported->get_error_message() );
+	}
+
+	public function test_export_names_an_image_type_a_package_cannot_carry() {
+		$uploads = wp_get_upload_dir();
+		$svg     = $uploads['basedir'] . '/pattern-builder-test.svg';
+		file_put_contents( $svg, '<svg xmlns="http://www.w3.org/2000/svg"></svg>' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+
+		$exported = $this->export_content(
+			'<!-- wp:image --><figure><img src="' . $uploads['baseurl'] . '/pattern-builder-test.svg" alt=""/></figure><!-- /wp:image -->'
+		);
+
+		unlink( $svg ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+
+		$this->assertWPError( $exported );
+		$this->assertSame( 'pb_cloud_unsupported_asset', $exported->get_error_code() );
+		$this->assertStringContainsString( 'pattern-builder-test.svg', $exported->get_error_message() );
+	}
+
+	public function test_export_refuses_to_climb_out_of_the_uploads_directory() {
+		$exported = $this->export_content(
+			'<!-- wp:image --><figure><img src="' . wp_get_upload_dir()['baseurl'] . '/../../../wp-config.php" alt=""/></figure><!-- /wp:image -->'
+		);
+
+		$this->assertWPError( $exported );
+		$this->assertSame( 'pb_cloud_unresolvable_asset', $exported->get_error_code() );
+	}
+
 	public function test_export_missing_pattern_errors() {
 		$porter = new Pattern_Builder_Cloud_Porter();
 

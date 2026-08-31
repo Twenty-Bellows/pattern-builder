@@ -103,9 +103,17 @@ export function PatternCloudControls( {
 			} )
 			.catch( ( err ) => {
 				setBusy( false );
+				// The service names what it objected to (an image it can't
+				// reach, say); say it too, or the message can't be acted on.
+				const details = err.data?.violations?.length
+					? ' ' + err.data.violations.join( ' ' )
+					: '';
 				setError(
-					err.message ||
-						__( 'The upload failed. Try again.', 'pattern-builder' )
+					( err.message ||
+						__(
+							'The upload failed. Try again.',
+							'pattern-builder'
+						) ) + details
 				);
 			} );
 	};

@@ -435,6 +435,11 @@ class Pattern_Builder_Cloud {
 			if ( is_array( $data ) && ! empty( $data['data']['upgrade_url'] ) ) {
 				$error_data['upgrade_url'] = $data['data']['upgrade_url'];
 			}
+			// What exactly the service objected to — a rejection that names
+			// nothing is a rejection nobody can act on.
+			if ( is_array( $data ) && ! empty( $data['data']['violations'] ) ) {
+				$error_data['violations'] = array_map( 'sanitize_text_field', (array) $data['data']['violations'] );
+			}
 
 			return new WP_Error( $error_code, $message, $error_data );
 		}
