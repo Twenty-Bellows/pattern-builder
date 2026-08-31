@@ -118,6 +118,23 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		}
 	}
 
+	/**
+	 * A link is not an image, wherever the pattern keeps it: an anchor's
+	 * href, or a social link's `url` attribute. Neither is the exporter's
+	 * business, and neither may block an upload.
+	 */
+	public function test_export_leaves_links_alone() {
+		$content = '<!-- wp:paragraph --><p><a href="https://wordpress.org">View on WordPress.org</a></p><!-- /wp:paragraph -->'
+			. '<!-- wp:social-links --><ul class="wp-block-social-links"><!-- wp:social-link {"url":"https://wordpress.org","service":"wordpress"} /--></ul><!-- /wp:social-links -->';
+
+		$exported = $this->export_content( $content );
+
+		$this->assertIsArray( $exported );
+		$this->assertSame( array(), $exported['pbp']['assets'] );
+		$this->assertStringContainsString( 'href="https://wordpress.org"', $exported['pbp']['content'] );
+		$this->assertStringContainsString( '"url":"https://wordpress.org"', $exported['pbp']['content'] );
+	}
+
 	public function test_export_names_an_image_hosted_elsewhere() {
 		$exported = $this->export_content(
 			'<!-- wp:image --><figure><img src="https://images.example.com/photo.jpg" alt=""/></figure><!-- /wp:image -->'
