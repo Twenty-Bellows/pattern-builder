@@ -112,7 +112,7 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 				<>
 					<Text variant="muted">
 						{ __(
-							'This is a Theme Pattern. It is stored as a file in your theme, is tied to the current theme, and can be shipped with the theme to other environments.',
+							'This is a Theme Pattern, stored as a file in your current theme directory.',
 							'pattern-builder'
 						) }
 					</Text>
@@ -121,21 +121,19 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 						isBusy={ isConverting }
 						disabled={ isConverting }
 						onClick={ convert }
+						hoverTip={ __(
+							'Converting moves the pattern into the database (exporting its images to the media library) and deletes the theme file.',
+							'pattern-builder'
+						) }
 					>
 						{ __( 'Convert to User Pattern', 'pattern-builder' ) }
 					</Button>
-					<Text variant="muted">
-						{ __(
-							'Converting moves the pattern into the database (exporting its theme images to the media library) and deletes the theme file. The last saved version is converted.',
-							'pattern-builder'
-						) }
-					</Text>
 				</>
 			) : (
 				<>
 					<Text variant="muted">
 						{ __(
-							'This is a User Pattern. It is stored in the database, works across themes, but only exists in this environment.',
+							'This is a User Pattern, stored in the database, and works across themes.',
 							'pattern-builder'
 						) }
 					</Text>
@@ -144,15 +142,13 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 						isBusy={ isConverting }
 						disabled={ isConverting }
 						onClick={ convert }
-					>
-						{ __( 'Convert to Theme Pattern', 'pattern-builder' ) }
-					</Button>
-					<Text variant="muted">
-						{ __(
+						hoverTip={ __(
 							'Converting writes the pattern into a file in the active theme (importing its images as theme assets) and deletes the database copy. The last saved version is converted.',
 							'pattern-builder'
 						) }
-					</Text>
+					>
+						{ __( 'Convert to Theme Pattern', 'pattern-builder' ) }
+					</Button>
 				</>
 			) }
 

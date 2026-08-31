@@ -157,34 +157,6 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 					<>
 						<PanelBody
 							title={ _x(
-								'Pattern Source',
-								'UI String',
-								'pattern-builder'
-							) }
-							initialOpen
-						>
-							<PatternSourcePanel
-								patternPost={ record }
-								postType={ postType }
-							/>
-						</PanelBody>
-
-						<PanelBody
-							title={ _x(
-								'Pattern Synced Status',
-								'UI String',
-								'pattern-builder'
-							) }
-							initialOpen
-						>
-							<PatternSyncedStatusPanel
-								patternPost={ record }
-								postType={ postType }
-							/>
-						</PanelBody>
-
-						<PanelBody
-							title={ _x(
 								'Pattern Metadata',
 								'UI String',
 								'pattern-builder'
@@ -192,6 +164,33 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 							initialOpen
 						>
 							<PatternMetadataPanel
+								patternPost={ record }
+								postType={ postType }
+							/>
+						</PanelBody>
+
+						<PanelBody
+							title={_x(
+								'Pattern Synced Status',
+								'UI String',
+								'pattern-builder'
+							)}
+						>
+							<PatternSyncedStatusPanel
+								patternPost={record}
+								postType={postType}
+							/>
+						</PanelBody>
+
+						<PanelBody
+							title={ _x(
+								'Pattern Source',
+								'UI String',
+								'pattern-builder'
+							) }
+							initialOpen
+						>
+							<PatternSourcePanel
 								patternPost={ record }
 								postType={ postType }
 							/>

@@ -12,9 +12,6 @@ import {
 import { useState } from '@wordpress/element';
 
 // NOTE: this was retrieved from the packages/patterns/src/constants.js file in Gutenberg.
-// They are correct.  This should not be hardcoded.  Nor should it be inacessible...
-
-// TODO: This should not be hardcoded. Maybe there should be a config and/or an UI.
 export const PARTIAL_SYNCING_SUPPORTED_BLOCKS = {
 	'core/paragraph': [ 'content' ],
 	'core/heading': [ 'content' ],
@@ -144,12 +141,7 @@ export const BlockBindingsPanel = () => {
 				<div className="block-bindings-list">
 					<p style={ { marginTop: 0 } }>
 						The following blocks can allow user changes throughout
-						instances of this pattern. This is only available to
-						&ldquo;synced&rdquo; patterns.
-					</p>
-					<p>
-						Name the block to allow binding. This is the name a user
-						will see when they use the pattern.
+						instances of this pattern.
 					</p>
 
 					{ bindableBlocks.map( ( block ) => (
