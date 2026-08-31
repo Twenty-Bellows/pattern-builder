@@ -8,9 +8,9 @@
  * there (or anywhere else) theme patterns open under Appearance → Pattern
  * Builder, whose edit mode hosts core's edit-post editor bound to the entity.
  *
- * User patterns are plain `wp_block` posts and every editor knows them: the
- * post editor swaps them in-context, the Site Editor edits them in place via
- * its /wp_block route, and everywhere else links into that Site Editor canvas.
+ * User patterns are plain `wp_block` posts, so an editor already showing one
+ * swaps them in-context; from anywhere else they open under Appearance →
+ * Pattern Builder too, so every pattern is edited in the same editor.
  */
 
 import { resolveSelect } from '@wordpress/data';
@@ -33,6 +33,7 @@ export function getAdminEditorUrl( pattern ) {
 		base +
 		'&pattern=' +
 		encodeURIComponent( pattern.id ?? pattern.name ?? '' ) +
+		( pattern.source === 'theme' ? '' : '&type=user' ) +
 		// The editor's back button returns exactly here (validated
 		// server-side before use).
 		'&back=' +
@@ -83,7 +84,7 @@ export function navigateToPattern( pattern, onNavigateToEntityRecord ) {
 			return;
 		}
 
-		window.location.href = getSiteEditorUrl( pattern );
+		window.location.href = getAdminEditorUrl( pattern );
 		return;
 	}
 

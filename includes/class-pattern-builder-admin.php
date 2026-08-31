@@ -10,7 +10,7 @@ use WP_Block_Editor_Context;
  * Two modes, decided by the URL's `pattern` parameter:
  *
  * - Browse (no parameter): the pattern grid — search, filter, create.
- * - Edit (`&pattern={id}`): the WordPress editor itself. The page boots
+ * - Edit (`&pattern={id}`, `&type=user|theme`): the WordPress editor itself. The page boots
  *   core's `@wordpress/edit-post` editor (the one that powers post.php)
  *   bound to the `pb_pattern` entity, so theme pattern edits save straight
  *   to the pattern files with the full core editing experience.
@@ -59,6 +59,16 @@ class Pattern_Builder_Admin {
 		if ( $this->get_requested_pattern() ) {
 			get_current_screen()->is_block_editor( true );
 		}
+	}
+
+	/**
+	 * The pattern id the page was asked to edit, if any.
+	 *
+	 * @return string The pattern id, or an empty string on the browse screen.
+	 */
+	private function get_requested_pattern_type(): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return isset( $_GET['type'] ) && 'user' === $_GET['type'] ? 'user' : 'theme';
 	}
 
 	/**
@@ -156,6 +166,7 @@ class Pattern_Builder_Admin {
 					array(
 						'editorSettings' => $settings,
 						'pattern'        => $pattern ? $pattern : null,
+						'patternType'    => $this->get_requested_pattern_type(),
 						'adminUrl'       => $browse_url,
 						'backUrl'        => $back_url ? $back_url : $browse_url,
 					)

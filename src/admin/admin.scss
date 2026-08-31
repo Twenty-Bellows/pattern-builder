@@ -181,7 +181,7 @@ body.appearance_page_pattern-builder {
 		display: grid;
 		// Small base size so plenty of columns fit (three across even with
 		// the details sidebar open); cards stretch to fill the row.
-		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 		gap: 24px;
 		align-items: start;
 	}
@@ -213,38 +213,44 @@ body.appearance_page_pattern-builder {
 // ---- Pattern cards: uniform 1:1 previews. ----
 
 .pattern-builder-card {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
+	display: block;
+	width: 100%;
 	padding: 0;
-	border: 0;
-	background: transparent;
-	text-align: left;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	overflow: hidden;
+	background: #fff;
 	cursor: pointer;
+	text-align: start;
+
+	&.is-selected {
+		border-color: var(--wp-admin-theme-color, #3858e9);
+		box-shadow: 0 0 0 1px var(--wp-admin-theme-color, #3858e9);
+	}
+
+	&:hover {
+		border-color: var(--wp-admin-theme-color, #3858e9);
+	}
 
 	&__preview {
 		display: block;
-		aspect-ratio: 1 / 1;
-		border: 1px solid #ddd;
-		border-radius: 8px;
-		overflow: hidden;
-		background: #fff;
 		position: relative;
+		aspect-ratio: 3 / 2;
+		overflow: hidden;
+		background: #f6f7f7;
 
-		// The preview scales by viewport width and reports its own height;
-		// the square crops it.
+		// Local previews render inline and scale by viewport width; cloud
+		// previews are iframes positioned by the card's fit calculation.
 		> div {
 			width: 100%;
 		}
-	}
 
-	&:hover &__preview {
-		border-color: var(--wp-admin-theme-color, #3858e9);
-	}
-
-	&.is-selected &__preview {
-		border-color: var(--wp-admin-theme-color, #3858e9);
-		box-shadow: 0 0 0 1.5px var(--wp-admin-theme-color, #3858e9);
+		iframe {
+			width: 1400px;
+			border: 0;
+			transform-origin: 0 0;
+			pointer-events: none;
+		}
 	}
 
 	&__placeholder {
@@ -254,12 +260,22 @@ body.appearance_page_pattern-builder {
 		background: #f0f0f0;
 	}
 
-	&__footer {
+	&__title {
 		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		padding: 0 4px;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		padding: 8px 12px;
+		font-size: 12px;
+		font-weight: 500;
+		border-top: 1px solid #f0f0f1;
 		min-width: 0;
+
+		> span:first-child {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
 	}
 }
 
@@ -323,4 +339,24 @@ body.appearance_page_pattern-builder {
 	gap: 12px;
 	padding-top: 16px;
 	border-top: 1px solid #e0e0e0;
+}
+
+// ---- Edit mode: the page hosts core's editor for one pattern. A pattern's
+// name is edited in the Pattern Metadata panel, so the canvas title field and
+// the editor's own summary block would only duplicate it. Scoped to this
+// admin page's body class — the editor renders outside the app's own markup.
+
+.appearance_page_pattern-builder {
+
+	.editor-visual-editor__post-title-wrapper,
+	.edit-post-visual-editor__post-title-wrapper {
+		display: none;
+	}
+
+	// The summary block (title, excerpt, content info, last edited) is the
+	// first non-panel child of the sidebar's document tab; its own classes
+	// are generated, so it is addressed by position.
+	.editor-sidebar__panel > div > div:first-child:not(.components-panel__body) {
+		display: none;
+	}
 }
