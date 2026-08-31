@@ -11,6 +11,7 @@ import { registerCoreBlocks } from '@wordpress/block-library';
 
 import { PatternBuilderAdminApp } from './admin/App';
 import { bootPatternEditor } from './admin/editor-boot';
+import { registerPreviewBindings } from './admin/preview-bindings';
 import './admin/admin.scss';
 
 const settings = window.patternBuilderAdmin || {};
@@ -56,8 +57,10 @@ if ( settings.pattern ) {
 
 		// Core's editor screens do this during boot; the browse screen (which
 		// renders block previews) boots itself. The edit mode must NOT do
-		// this — initializeEditor registers core blocks on its own.
+		// this — initializeEditor registers core blocks and the binding
+		// sources on its own.
 		registerCoreBlocks();
+		registerPreviewBindings();
 
 		createRoot( mountPoint ).render(
 			<PatternBuilderAdminApp settings={ settings } />
