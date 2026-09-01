@@ -1,0 +1,230 @@
+<?php
+/**
+ * The Abilities API registrations: what an agent can read from this site and
+ * what it can ask this site to store.
+ *
+ * These run only where core has the Abilities API. The plugin's floor is
+ * older than the API, so the whole surface is conditional and a site without
+ * it must simply carry on — which is the first thing asserted here.
+ *
+ * @package PatternBuilder
+ */
+
+use TwentyBellows\PatternBuilder\Pattern_Builder_Abilities;
+
+class Test_Abilities extends WP_UnitTestCase {
+
+	/**
+	 * @var Pattern_Builder_Abilities
+	 */
+	private $abilities;
+
+	public function set_up() {
+		parent::set_up();
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		/*
+		 * The plugin already registered everything on core's hooks during
+		 * bootstrap. This instance exists only to call the execute_* methods
+		 * directly, so unhook it immediately — leaving it hooked would
+		 * register every ability a second time on the next init.
+		 */
+		$this->abilities = new Pattern_Builder_Abilities();
+		remove_action( 'wp_abilities_api_categories_init', array( $this->abilities, 'register_category' ) );
+		remove_action( 'wp_abilities_api_init', array( $this->abilities, 'register_abilities' ) );
+	}
+
+	/**
+	 * The guard is the whole compatibility story: on a site without the API
+	 * the constructor must do nothing rather than fatal.
+	 */
+	public function test_constructing_is_safe_without_the_abilities_api() {
+		$instance = new Pattern_Builder_Abilities();
+
+		$this->assertInstanceOf( Pattern_Builder_Abilities::class, $instance );
+	}
+
+	/**
+	 * Skip the rest where core has no Abilities API.
+	 */
+	private function require_abilities_api() {
+		if ( ! function_exists( 'wp_register_ability' ) ) {
+			$this->markTestSkipped( 'This WordPress has no Abilities API.' );
+		}
+	}
+
+	/**
+	 * Registration happens on core's hooks during the plugin's own boot —
+	 * core refuses a `wp_register_ability()` called anywhere else — so this
+	 * asserts the real path rather than re-running it.
+	 */
+	public function test_every_ability_registers() {
+		$this->require_abilities_api();
+
+		$expected = array(
+			'pattern-builder/get-design-system',
+			'pattern-builder/list-block-types',
+			'pattern-builder/list-patterns',
+			'pattern-builder/get-pattern',
+			'pattern-builder/render-pattern',
+			'pattern-builder/create-pattern',
+			'pattern-builder/update-pattern',
+		);
+
+		foreach ( $expected as $name ) {
+			$this->assertTrue( wp_has_ability( $name ), $name . ' did not register.' );
+		}
+	}
+
+	/**
+	 * Annotations are not documentation: core reads them to decide which HTTP
+	 * method a call must arrive on. `readonly` is GET, `destructive` *and*
+	 * `idempotent` together mean DELETE, and everything else is POST. An
+	 * update marked destructive would therefore be reachable only over
+	 * DELETE, which is why it is not marked so.
+	 */
+	public function test_annotations_map_to_the_methods_we_intend() {
+		$this->require_abilities_api();
+
+		foreach ( array( 'get-design-system', 'list-block-types', 'list-patterns', 'get-pattern', 'render-pattern' ) as $read ) {
+			$meta = wp_get_ability( 'pattern-builder/' . $read )->get_meta();
+			$this->assertTrue( $meta['annotations']['readonly'], $read . ' should be readonly (GET).' );
+			$this->assertTrue( $meta['show_in_rest'], $read . ' must be reachable over REST.' );
+		}
+
+		foreach ( array( 'create-pattern', 'update-pattern' ) as $write ) {
+			$meta = wp_get_ability( 'pattern-builder/' . $write )->get_meta();
+			$this->assertFalse( $meta['annotations']['readonly'], $write . ' is not a read.' );
+			$this->assertFalse(
+				$meta['annotations']['destructive'],
+				$write . ' must not be destructive, or core will only accept it over DELETE.'
+			);
+		}
+	}
+
+	public function test_design_system_reports_this_site_s_tokens() {
+		$result = $this->abilities->execute_design_system();
+
+		$this->assertArrayHasKey( 'palette', $result );
+		$this->assertArrayHasKey( 'spacing', $result );
+		$this->assertArrayHasKey( 'fontSizes', $result );
+		$this->assertArrayHasKey( 'layout', $result );
+
+		// Core's own presets are always there, so a palette is never empty.
+		$this->assertNotEmpty( $result['palette'] );
+		$slugs = wp_list_pluck( $result['palette'], 'slug' );
+		$this->assertContains( 'black', $slugs );
+	}
+
+	/**
+	 * Presets arrive keyed by origin and a later origin wins by slug, which
+	 * is what the editor shows — so a slug must appear once, not once per
+	 * origin that defines it.
+	 */
+	public function test_a_preset_slug_is_not_repeated_across_origins() {
+		$result = $this->abilities->execute_design_system();
+		$slugs  = wp_list_pluck( $result['palette'], 'slug' );
+
+		$this->assertSame( count( $slugs ), count( array_unique( $slugs ) ) );
+	}
+
+	public function test_block_types_are_the_ones_registered_here() {
+		$result = $this->abilities->execute_block_types( array( 'namespace' => 'core' ) );
+
+		$this->assertNotEmpty( $result['blocks'] );
+
+		$names = wp_list_pluck( $result['blocks'], 'name' );
+		$this->assertContains( 'core/paragraph', $names );
+
+		foreach ( $names as $name ) {
+			$this->assertStringStartsWith( 'core/', $name, 'The namespace filter let something else through.' );
+		}
+	}
+
+	public function test_a_user_pattern_round_trips() {
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Abilities User Pattern',
+				'content' => '<!-- wp:paragraph --><p>From an agent.</p><!-- /wp:paragraph -->',
+				'source'  => 'user',
+			)
+		);
+
+		$this->assertArrayHasKey( 'pattern', $created );
+		$id = $created['pattern']['id'];
+
+		$fetched = $this->abilities->execute_get_pattern( array( 'id' => (string) $id ) );
+		$this->assertSame( 'Abilities User Pattern', $fetched['pattern']['title'] );
+		$this->assertStringContainsString( 'From an agent.', $fetched['pattern']['content'] );
+
+		$this->abilities->execute_update_pattern(
+			array(
+				'id'      => (string) $id,
+				'content' => '<!-- wp:paragraph --><p>Replaced.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$again = $this->abilities->execute_get_pattern( array( 'id' => (string) $id ) );
+		$this->assertStringContainsString( 'Replaced.', $again['pattern']['content'] );
+		$this->assertStringNotContainsString( 'From an agent.', $again['pattern']['content'] );
+	}
+
+	/**
+	 * A listing is a catalogue, not a payload: an agent choosing between
+	 * patterns should not have to receive every one's markup to do it.
+	 */
+	public function test_listing_omits_markup() {
+		$this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Listed Pattern',
+				'content' => '<!-- wp:paragraph --><p>Body copy.</p><!-- /wp:paragraph -->',
+				'source'  => 'user',
+			)
+		);
+
+		$listed = $this->abilities->execute_list_patterns( array( 'source' => 'user' ) );
+
+		$this->assertNotEmpty( $listed['patterns'] );
+		foreach ( $listed['patterns'] as $pattern ) {
+			$this->assertArrayNotHasKey( 'content', $pattern );
+		}
+	}
+
+	public function test_rendering_resolves_blocks() {
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Rendered Pattern',
+				'content' => '<!-- wp:paragraph --><p>Rendered body.</p><!-- /wp:paragraph -->',
+				'source'  => 'user',
+			)
+		);
+
+		$rendered = $this->abilities->execute_render_pattern( array( 'id' => (string) $created['pattern']['id'] ) );
+
+		$this->assertStringContainsString( 'Rendered body.', $rendered['html'] );
+		$this->assertStringNotContainsString( '<!-- wp:paragraph -->', $rendered['html'] );
+	}
+
+	public function test_an_unknown_pattern_is_an_error_not_a_fatal() {
+		$result = $this->abilities->execute_get_pattern( array( 'id' => 'nothing/here' ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_pattern_not_found', $result->get_error_code() );
+	}
+
+	public function test_reads_and_writes_ask_for_different_authority() {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'author' ) ) );
+
+		// An author may edit posts, so may read patterns.
+		$this->assertTrue( $this->abilities->can_read() );
+
+		// Writing a theme pattern writes a file into the theme.
+		$this->assertFalse( $this->abilities->can_write() );
+	}
+
+	public function test_a_subscriber_can_do_neither() {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'subscriber' ) ) );
+
+		$this->assertFalse( $this->abilities->can_read() );
+		$this->assertFalse( $this->abilities->can_write() );
+	}
+}
