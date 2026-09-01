@@ -28,6 +28,10 @@ import './cloud.scss';
 
 const BASE = '/pattern-builder/v1/cloud';
 
+// How long to keep asking whether a purchase has landed, and how often.
+const UPGRADE_POLL_INTERVAL = 5000;
+const UPGRADE_POLL_TIMEOUT = 3 * 60 * 1000;
+
 export const CLOUD_LIBRARY = 'cloud-library';
 export const CLOUD_DIRECTORY = 'cloud-directory';
 
@@ -518,6 +522,7 @@ export function CloudBrowser( {
 	const [ busy, setBusy ] = useState( false );
 	const [ pendingDownload, setPendingDownload ] = useState( null );
 	const [ pendingDestination, setPendingDestination ] = useState( null );
+	const [ awaitingUpgrade, setAwaitingUpgrade ] = useState( false );
 
 	const { createSuccessNotice, createErrorNotice } =
 		useDispatch( noticesStore );
@@ -536,6 +541,59 @@ export function CloudBrowser( {
 	useEffect( () => {
 		refreshStatus();
 	}, [ refreshStatus ] );
+
+	/*
+	 * Checkout happens on Freemius, in another tab, and the licence reaches
+	 * this account by a webhook to the service — so nothing about paying
+	 * passes through this screen, and without watching for it the panel
+	 * still says "Free" until the page is reloaded.
+	 *
+	 * Two watchers, because the timing is not ours: a bounded poll after the
+	 * upgrade link is opened (the webhook lands a moment after the payment,
+	 * not with it), and a re-check whenever this tab is looked at again,
+	 * which is what catches somebody who took their time.
+	 */
+	useEffect( () => {
+		if ( ! awaitingUpgrade ) {
+			return undefined;
+		}
+
+		let elapsed = 0;
+
+		const timer = setInterval( async () => {
+			elapsed += UPGRADE_POLL_INTERVAL;
+
+			const data = await refreshStatus();
+
+			if ( data?.tier === 'pro' ) {
+				setAwaitingUpgrade( false );
+				createSuccessNotice(
+					__( 'Pattern Builder Pro is active.', 'pattern-builder' ),
+					{ type: 'snackbar' }
+				);
+			} else if ( elapsed >= UPGRADE_POLL_TIMEOUT ) {
+				// Stop guessing. The tab-focus check below still catches it,
+				// and so does the next visit.
+				setAwaitingUpgrade( false );
+			}
+		}, UPGRADE_POLL_INTERVAL );
+
+		return () => clearInterval( timer );
+	}, [ awaitingUpgrade, refreshStatus, createSuccessNotice ] );
+
+	useEffect( () => {
+		const recheck = () => {
+			if ( ! document.hidden ) {
+				refreshStatus();
+			}
+		};
+
+		document.addEventListener( 'visibilitychange', recheck );
+		return () =>
+			document.removeEventListener( 'visibilitychange', recheck );
+	}, [ refreshStatus ] );
+
+	const awaitUpgrade = useCallback( () => setAwaitingUpgrade( true ), [] );
 
 	const loadItems = useCallback( () => {
 		if ( ! status?.connected && isLibrary ) {
@@ -836,6 +894,55 @@ export function CloudBrowser( {
 								) }
 							</span>
 						) }
+						{ usage && usage.cap === -1 && (
+							<span className="pattern-builder-cloud__meta">
+								{ sprintf(
+									/* translators: 1: stored count, 2: AI credits left. */
+									__(
+										'%1$d patterns stored · %2$d AI credits left',
+										'pattern-builder'
+									),
+									usage.stored,
+									usage.ai_credits ?? 0
+								) }
+							</span>
+						) }
+
+						{ status.tier !== 'pro' && status.upgradeUrl && (
+							<Button
+								variant="primary"
+								size="small"
+								href={ status.upgradeUrl }
+								target="_blank"
+								rel="noreferrer"
+								onClick={ awaitUpgrade }
+							>
+								{ __( 'Go Pro', 'pattern-builder' ) }
+							</Button>
+						) }
+
+						{ status.tier === 'pro' && status.portalUrl && (
+							<Button
+								variant="tertiary"
+								size="small"
+								href={ status.portalUrl }
+								target="_blank"
+								rel="noreferrer"
+							>
+								{ __( 'Manage billing', 'pattern-builder' ) }
+							</Button>
+						) }
+
+						{ awaitingUpgrade && (
+							<span className="pattern-builder-cloud__meta">
+								<Spinner />
+								{ __(
+									'Waiting for your purchase to land…',
+									'pattern-builder'
+								) }
+							</span>
+						) }
+
 						<Button
 							variant="tertiary"
 							icon={ closeSmall }

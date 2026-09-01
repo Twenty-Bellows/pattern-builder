@@ -120,6 +120,7 @@ class Pattern_Builder_Cloud_Controller {
 				'tier'       => $me['tier'],
 				'usage'      => $me['usage'],
 				'upgradeUrl' => isset( $me['upgrade_url'] ) ? $me['upgrade_url'] : '',
+				'portalUrl'  => isset( $me['portal_url'] ) ? $me['portal_url'] : '',
 				'ai'         => isset( $me['ai'] ) ? $me['ai'] : array( 'enabled' => false ),
 			)
 		);
