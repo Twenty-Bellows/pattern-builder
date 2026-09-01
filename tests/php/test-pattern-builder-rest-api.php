@@ -282,6 +282,32 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		$this->assertFileExists( $this->test_dir . '/patterns/brand-new-pattern.php' );
 	}
 
+	public function test_create_records_the_contexts_a_starter_pattern_is_offered_in() {
+		$request = $this->create_rest_request( 'POST', '/pattern-builder/v1/patterns' );
+		$request->set_body_params(
+			array(
+				'title'      => 'Landing Starter',
+				'synced'     => false,
+				'blockTypes' => array( 'core/post-content' ),
+				'postTypes'  => array( 'page', 'post' ),
+			)
+		);
+
+		$response = rest_get_server()->dispatch( $request );
+
+		$this->assertEquals( 201, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertEquals( array( 'core/post-content' ), $data['blockTypes'] );
+		$this->assertEquals( array( 'page', 'post' ), $data['postTypes'] );
+		$this->assertFalse( $data['synced'] );
+
+		$file_contents = file_get_contents( $this->test_dir . '/patterns/landing-starter.php' );
+		$this->assertStringContainsString( 'Block Types: core/post-content', $file_contents );
+		$this->assertStringContainsString( 'Post Types: page, post', $file_contents );
+		$this->assertStringNotContainsString( 'Synced:', $file_contents );
+	}
+
 	public function test_create_requires_a_title() {
 		$request = $this->create_rest_request( 'POST', '/pattern-builder/v1/patterns' );
 		$request->set_body_params( array( 'content' => '<!-- wp:paragraph --><p>No title</p><!-- /wp:paragraph -->' ) );
