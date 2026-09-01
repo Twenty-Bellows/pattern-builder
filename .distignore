@@ -34,3 +34,4 @@
 /vendor
 /webpack.config.js
 *.zip
+/guides/pattern-author/evals

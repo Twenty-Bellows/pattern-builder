@@ -73,6 +73,7 @@ class Pattern_Builder_Abilities {
 		$this->register_list_patterns();
 		$this->register_get_pattern();
 		$this->register_render_pattern();
+		$this->register_authoring_guide();
 		$this->register_create_pattern();
 		$this->register_update_pattern();
 	}
@@ -487,6 +488,205 @@ class Pattern_Builder_Abilities {
 		}
 
 		return array( 'html' => do_blocks( $pattern->content ) );
+	}
+
+	/**
+	 * Hand an agent the knowledge, not just the mechanism.
+	 *
+	 * The other abilities say what is true about this site and take finished
+	 * markup; none of them says how to write a good pattern. That knowledge is
+	 * prose, and prose is the most portable thing there is — so rather than
+	 * shipping it only as a Claude skill, this serves the same documents over
+	 * the same interface everything else uses. Whatever is calling can put
+	 * them wherever its own harness expects: a SKILL.md, a rules file, a
+	 * system prompt, an AGENTS.md.
+	 *
+	 * It answers with an index by default. The full set runs to tens of
+	 * thousands of words, and an ability that dumped all of it into a caller's
+	 * context uninvited would be a poor guest.
+	 */
+	private function register_authoring_guide() {
+		wp_register_ability(
+			'pattern-builder/get-authoring-guide',
+			array(
+				'label'               => __( 'Get the pattern authoring guide', 'pattern-builder' ),
+				'description'         => __( 'Returns documentation on how to write good block patterns — what makes one good, the kinds of pattern and the headers each needs, which blocks are allowed where, the attribute-to-markup contract, and the design/content split with Pattern Overrides. Call it with no input for the index of available guides, then request one by name. The text is agent-facing instructions in Markdown: install it wherever your harness reads instructions from. Read this before writing pattern markup by hand.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'guide' => array(
+							'type'        => 'string',
+							'description' => 'Which guide to return. Omit for the index; "all" for every guide concatenated.',
+						),
+					),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'guides'  => array(
+							'type'        => 'array',
+							'description' => 'The index: name, title and size of each available guide.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'name'    => array( 'type' => 'string' ),
+						'format'  => array( 'type' => 'string' ),
+						'content' => array(
+							'type'        => 'string',
+							'description' => 'Markdown. Agent-facing instructions, not user documentation.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_authoring_guide' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * Where the guides live.
+	 *
+	 * Under the plugin rather than beside the Claude skill, because the skill
+	 * directory is development tooling and does not ship. The skill is a
+	 * symlink to this directory, so there is one copy of every document and
+	 * both ways of consuming it read the same file.
+	 *
+	 * @return string
+	 */
+	private function guide_dir() {
+		return plugin_dir_path( PATTERN_BUILDER_FILE ) . 'guides/pattern-author/';
+	}
+
+	/**
+	 * The guides this plugin carries, by name.
+	 *
+	 * @return array name => relative path.
+	 */
+	private function guide_files() {
+		return array(
+			'authoring'            => 'SKILL.md',
+			'pattern-kinds'        => 'references/pattern-kinds.md',
+			'block-vocabulary'     => 'references/block-vocabulary.md',
+			'block-markup'         => 'references/block-markup.md',
+			'design-content-split' => 'references/design-content-split.md',
+			'abilities'            => 'references/abilities.md',
+		);
+	}
+
+	/**
+	 * Serve the index, one guide, or all of them.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_authoring_guide( $input = array() ) {
+		$files  = $this->guide_files();
+		$wanted = isset( $input['guide'] ) ? sanitize_key( (string) $input['guide'] ) : '';
+
+		if ( '' === $wanted ) {
+			$index = array();
+			foreach ( $files as $name => $relative ) {
+				$text = $this->read_guide( $relative );
+				if ( null === $text ) {
+					continue;
+				}
+				$index[] = array(
+					'name'  => $name,
+					'title' => $this->guide_title( $text, $name ),
+					'words' => str_word_count( wp_strip_all_tags( $text ) ),
+				);
+			}
+
+			return array(
+				'guides'  => $index,
+				'format'  => 'markdown',
+				'name'    => 'index',
+				// Say what this is for, since an index alone does not.
+				'content' => __( 'Agent-facing instructions for writing WordPress block patterns. Request one by name with input[guide], or "all" for everything. Install the Markdown wherever your harness reads instructions from.', 'pattern-builder' ),
+			);
+		}
+
+		if ( 'all' === $wanted ) {
+			$parts = array();
+			foreach ( $files as $name => $relative ) {
+				$text = $this->read_guide( $relative );
+				if ( null !== $text ) {
+					$parts[] = "<!-- guide: {$name} -->\n\n" . $text;
+				}
+			}
+
+			return array(
+				'name'    => 'all',
+				'format'  => 'markdown',
+				'content' => implode( "\n\n---\n\n", $parts ),
+			);
+		}
+
+		if ( ! isset( $files[ $wanted ] ) ) {
+			return new \WP_Error(
+				'pb_guide_not_found',
+				/* translators: %s: comma separated guide names. */
+				sprintf( __( 'No guide by that name. Available: %s.', 'pattern-builder' ), implode( ', ', array_keys( $files ) ) ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$text = $this->read_guide( $files[ $wanted ] );
+		if ( null === $text ) {
+			return new \WP_Error( 'pb_guide_missing', __( 'That guide is not present in this installation.', 'pattern-builder' ), array( 'status' => 404 ) );
+		}
+
+		return array(
+			'name'    => $wanted,
+			'format'  => 'markdown',
+			'content' => $text,
+		);
+	}
+
+	/**
+	 * Read one guide, with its YAML front matter stripped.
+	 *
+	 * The main guide doubles as a Claude skill, so it carries front matter
+	 * that means nothing to anybody else. The prose underneath is the part
+	 * worth handing over.
+	 *
+	 * @param string $relative Path under the guide directory.
+	 * @return string|null Null when the file is absent or unreadable.
+	 */
+	private function read_guide( $relative ) {
+		$path = $this->guide_dir() . $relative;
+
+		// Nothing here takes a path from a caller, but keep the read inside
+		// the plugin regardless.
+		$real = realpath( $path );
+		$root = realpath( $this->guide_dir() );
+		if ( ! $real || ! $root || 0 !== strpos( $real, $root ) || ! is_readable( $real ) ) {
+			return null;
+		}
+
+		$text = file_get_contents( $real ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading a file this plugin ships.
+		if ( false === $text ) {
+			return null;
+		}
+
+		return trim( preg_replace( '/\A---\r?\n.*?\r?\n---\r?\n/s', '', $text ) );
+	}
+
+	/**
+	 * A guide's title, from its first heading.
+	 *
+	 * @param string $text     Guide text.
+	 * @param string $fallback Name to use when there is no heading.
+	 * @return string
+	 */
+	private function guide_title( $text, $fallback ) {
+		if ( preg_match( '/^#\s+(.+)$/m', $text, $m ) ) {
+			return trim( $m[1] );
+		}
+		return $fallback;
 	}
 
 	/**
