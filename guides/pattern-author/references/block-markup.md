@@ -1,45 +1,67 @@
 # Block markup: the contract between attributes and HTML
 
 Every block is an HTML comment carrying JSON attributes, wrapping the HTML
-that block's `save()` would produce. Validity means those two agree. What
-follows separates the parts a validator will catch from the parts it will not,
-because the two need different care.
+that block's `save()` would produce. Validity means those two agree — and when
+they disagree, WordPress usually does not say so. It has three different ways
+of not saying so, which is what the first section is about.
 
-## What the validator catches, and what it doesn't
+## Three ways a pattern is wrong
 
-Tested directly against `@wordpress/blocks` `parse()` with the core library
-registered — the same code the editor runs.
+Tested directly against `@wordpress/blocks` with the core library registered —
+the same code the editor runs. `scripts/validate-pattern.mjs` reports all
+three, and only the first is the one people know about.
 
-| Mistake | Result |
-|---|---|
-| `heading` with `"level":2` but an `<h3>` tag | **invalid** — caught |
-| `group` missing `class="wp-block-group"` | **invalid** — caught |
-| `button` with no `<a>` inside | **invalid** — caught |
-| `image` missing `class="wp-block-image"` on the figure | **invalid** — caught |
-| `column` missing `class="wp-block-column"` | **invalid** — caught |
-| A block comment never closed | **invalid** — caught |
-| Attribute JSON that doesn't parse | caught (as an unparsed block) |
-| A block the site doesn't have | reported as `core/missing` |
-| `"backgroundColor":"primary"` with no `has-primary-background-color` | **valid** — missed |
-| `"align":"center"` with no `has-text-align-center` | **valid** — missed |
-| `"fontSize":"large"` with no `has-large-font-size` | **valid** — missed |
-| `heading` missing `class="wp-block-heading"` | **valid** — missed |
-| `<li>` written directly instead of a `list-item` block | **valid** — missed |
+**INVALID** — no version of this block ever wrote markup like this. The editor
+says "unexpected or invalid content" the moment it opens the pattern.
 
-The dividing line is worth internalising: **structure that a block's own
-`save()` writes is checked; classes contributed by block *supports* are not.**
-Supports classes (color, typography, spacing, text alignment) are added by
-filters that only run inside a real editor, so Node-based validation is blind
-to them.
+- heading with `"level":2` but an `<h3>` tag
+- `group` missing `class="wp-block-group"`
+- `button` with no `<a>` inside
+- `column` missing `class="wp-block-column"`, or a width with no `flex-basis`
+- `"align":"full"` with no `alignfull`
+- a block comment never closed, or attribute JSON that does not parse
+- a block this site does not have (reported as `core/missing`)
 
-That blindness has a silver lining and a trap. The silver lining: a missing
-supports class does not make the block invalid, so nobody gets the "unexpected
-or invalid content" dialog. The trap: **the style silently does not apply.**
-`"backgroundColor":"primary"` with no class renders with no background at all.
-It looks like a design mistake, not a bug, so it survives review.
+**OLD FORM** — this matches a *deprecated* version of the block. Blocks carry
+their old `save()` implementations for backward compatibility (`core/paragraph`
+has six), and the parser tries every one. When an old version matches, the
+editor opens the pattern without a murmur and quietly migrates it — so it never
+looks broken *there*. But the front end renders the file, and the file is
+missing what the block writes today:
 
-So: run the validator for structure, and check supports classes by eye against
-the table below.
+- `"backgroundColor":"primary"` with no `has-primary-background-color`
+- `"textColor":"accent"` with no `has-accent-color has-text-color`
+- `"fontSize":"large"` with no `has-large-font-size`
+- `"align":"center"` with no `has-text-align-center`
+- `heading` with no `wp-block-heading`
+- `<li>` written directly instead of a `list-item` block
+
+Every one of those renders unstyled. It reads as a design mistake rather than a
+bug, which is why it survives review.
+
+**DROPPED ATTRIBUTE** — the same migration, one step worse. `migrate()` treats
+the *markup* as authoritative, so it can throw away an attribute you wrote.
+A heading with `{"level":2,"fontSize":"xx-large"}` whose tag carries no
+`has-xx-large-font-size` comes back with no `fontSize` at all — the size is
+simply gone, the block is perfectly self-consistent afterwards, and nothing
+reports it. Custom values go the same way: `{"style":{"color":{"background":
+"#eeeeee"}}}` with no inline `style` attribute loses the whole `style` object.
+
+The common cause of all three is the same: **the attribute JSON and the HTML
+have to agree.** The table below is that correspondence.
+
+Two things the validator deliberately stays quiet about, because in both the
+markup is fine and only the check would be wrong:
+
+- **An attribute core relocated.** Block library 10.5 moved text alignment out
+  of a paragraph's `align` and a heading's `textAlign` and into a typography
+  support, migrating the value to `style.typography.textAlign`. The key is gone
+  and the setting is intact, so that is not a dropped attribute.
+- **A block with Pattern Overrides bindings.** A bound block takes its content
+  from the binding source at render rather than from the file, and core
+  reserves room in the saved markup for that value — so the file and a save
+  computed from the file's own attributes are not comparable. Slots are checked
+  by rendering them instead; see `design-content-split.md`.
 
 ## Attribute to class
 
