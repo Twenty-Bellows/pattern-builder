@@ -197,32 +197,21 @@ function TemplateTypesField( { value, onChange } ) {
  */
 function TemplatePartAreaField( { value, onChange } ) {
 	return (
-		<div className="pattern-builder-create__field">
-			<ToggleGroupControl
-				__next40pxDefaultSize
-				__nextHasNoMarginBottom
-				label={ __(
-					'Which part is this pattern for?',
-					'pattern-builder'
-				) }
-				value={ value }
-				onChange={ onChange }
-			>
-				{ TEMPLATE_PART_AREAS.map( ( area ) => (
-					<ToggleGroupControlOption
-						key={ area.key }
-						value={ area.key }
-						label={ area.label }
-					/>
-				) ) }
-			</ToggleGroupControl>
-			<Text variant="muted">
-				{ __(
-					'WordPress offers template part patterns for headers and footers only; a pattern for any other area is never shown.',
-					'pattern-builder'
-				) }
-			</Text>
-		</div>
+		<ToggleGroupControl
+			__next40pxDefaultSize
+			__nextHasNoMarginBottom
+			label={ __( 'Which part is this pattern for?', 'pattern-builder' ) }
+			value={ value }
+			onChange={ onChange }
+		>
+			{ TEMPLATE_PART_AREAS.map( ( area ) => (
+				<ToggleGroupControlOption
+					key={ area.key }
+					value={ area.key }
+					label={ area.label }
+				/>
+			) ) }
+		</ToggleGroupControl>
 	);
 }
 
@@ -433,14 +422,6 @@ export const PatternCreatePanel = ( { onCreated, layout = 'columns' } ) => {
 									setValue( { blockTypes: value } )
 								}
 							/>
-						) }
-						{ ! kindHasField( kind, STORAGE_FIELD ) && (
-							<Text variant="muted">
-								{ __(
-									'Stored in your theme: the contexts a pattern is offered in are pattern-file headers.',
-									'pattern-builder'
-								) }
-							</Text>
 						) }
 					</div>
 				</div>
