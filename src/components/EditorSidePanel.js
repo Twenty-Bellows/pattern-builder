@@ -186,7 +186,10 @@ export const EditorSidePanel = () => {
 									) }
 								</Heading>
 							</HStack>
-							<PatternCreatePanel onCreated={ refreshPatterns } />
+							<PatternCreatePanel
+								layout="stacked"
+								onCreated={ refreshPatterns }
+							/>
 						</PanelBody>
 					</Navigator.Screen>
 					<Navigator.Screen path="/browse/:category">

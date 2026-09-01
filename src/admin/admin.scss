@@ -201,8 +201,41 @@ body.appearance_page_pattern-builder {
 		background: #fff;
 	}
 
-	&__create-modal .components-modal__content {
-		min-width: 360px;
+	// The create modal hands its whole body to the two-pane create panel,
+	// which draws its own edges — so the modal's own padding comes off.
+	&__create-modal {
+		// A fixed frame, so the two panes scroll inside it rather than
+		// growing the modal past the viewport.
+		width: min(880px, calc(100vw - 32px));
+		height: min(640px, calc(100vh - 64px));
+
+		.components-modal__header {
+			margin-bottom: 0;
+			padding-right: 16px;
+			padding-left: 24px;
+			border-bottom: 1px solid #e0e0e0;
+		}
+
+		.components-modal__content {
+			display: flex;
+			flex-direction: column;
+			padding: 0;
+			overflow: hidden;
+
+			// Core wraps the modal's children in a div of its own; without
+			// this the panel would sit at its content height rather than
+			// filling the frame, and the rail would stop short of the
+			// bottom edge. The header is positioned absolutely, so it is
+			// not a flex item here — excluded in case that ever changes.
+			> :not(.components-modal__header) {
+				flex: 1;
+				min-height: 0;
+			}
+		}
+
+		.pattern-builder-create {
+			height: 100%;
+		}
 	}
 
 	&__snackbars {
