@@ -249,6 +249,29 @@ anywhere, `--npm` uses `@wordpress/blocks` and `@wordpress/block-library` from
 `node_modules` instead, which is the same check against whichever version npm
 resolved.
 
+**If you reached this site over HTTP and have no copy of any of it**, the site
+will hand you both halves. Two abilities, then the same command:
+
+```bash
+# The tool itself — write each file it returns into one directory.
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-validator/run"
+
+# Where this site's own block code lives, in the order it loads.
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-editor-scripts/run" \
+  > scripts.json
+
+npm i --no-save jsdom
+node validate-pattern.mjs --scripts scripts.json pattern.html
+```
+
+The first run downloads that site's editor scripts (about 4MB) and caches
+them, so later runs are immediate. The URLs carry version strings, so an
+upgraded site fetches afresh rather than trusting a stale cache. You are
+checking against the WordPress the pattern is destined for, which is the
+whole point.
+
 If the project has its own validator (`npm run validate:blocks`), prefer it —
 it may carry project-specific lints as well.
 

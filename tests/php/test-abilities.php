@@ -67,6 +67,8 @@ class Test_Abilities extends WP_UnitTestCase {
 			'pattern-builder/get-pattern',
 			'pattern-builder/render-pattern',
 			'pattern-builder/get-authoring-guide',
+			'pattern-builder/get-validator',
+			'pattern-builder/get-editor-scripts',
 			'pattern-builder/create-pattern',
 			'pattern-builder/update-pattern',
 		);
@@ -86,7 +88,7 @@ class Test_Abilities extends WP_UnitTestCase {
 	public function test_annotations_map_to_the_methods_we_intend() {
 		$this->require_abilities_api();
 
-		foreach ( array( 'get-design-system', 'list-block-types', 'list-patterns', 'get-pattern', 'render-pattern', 'get-authoring-guide' ) as $read ) {
+		foreach ( array( 'get-design-system', 'list-block-types', 'list-patterns', 'get-pattern', 'render-pattern', 'get-authoring-guide', 'get-validator', 'get-editor-scripts' ) as $read ) {
 			$meta = wp_get_ability( 'pattern-builder/' . $read )->get_meta();
 			$this->assertTrue( $meta['annotations']['readonly'], $read . ' should be readonly (GET).' );
 			$this->assertTrue( $meta['show_in_rest'], $read . ' must be reachable over REST.' );
@@ -349,6 +351,85 @@ class Test_Abilities extends WP_UnitTestCase {
 
 		$this->assertSame( array(), $this->abilities->execute_authoring_guide()['guides'] );
 		$this->assertWPError( $this->abilities->execute_authoring_guide( array( 'guide' => 'authoring' ) ) );
+	}
+
+	/**
+	 * The guides tell an agent to validate before storing anything, and for an
+	 * agent that arrived over HTTP that instruction is unfollowable unless the
+	 * tool travels too. No server can run the check itself — `save()` is
+	 * JavaScript — but it can hand over the thing that can.
+	 */
+	public function test_the_validator_travels() {
+		$result = $this->abilities->execute_validator();
+
+		$this->assertSame( 'validate-pattern.mjs', $result['entry'] );
+
+		$names = wp_list_pluck( $result['files'], 'name' );
+		$this->assertContains( 'validate-pattern.mjs', $names );
+		$this->assertContains( 'wp-core.mjs', $names );
+
+		foreach ( $result['files'] as $file ) {
+			$this->assertGreaterThan( 1000, strlen( $file['contents'] ), $file['name'] . ' looks empty.' );
+		}
+
+		// It is the entry point that has to be runnable, and the other file is
+		// what it imports.
+		$by_name = array_column( $result['files'], 'contents', 'name' );
+		$this->assertStringContainsString( 'wp-core.mjs', $by_name['validate-pattern.mjs'] );
+		$this->assertStringContainsString( 'jsdom', $result['usage'] );
+	}
+
+	/**
+	 * WordPress serves its editor scripts to anyone, but not the order they
+	 * load in: the manifest core generates is a PHP file, so a request for it
+	 * executes and returns nothing. Only the site can answer this.
+	 */
+	public function test_editor_scripts_come_back_as_ordered_urls() {
+		$result = $this->abilities->execute_editor_scripts();
+
+		$this->assertNotEmpty( $result['scripts'] );
+		$this->assertSame( home_url(), $result['site'] );
+
+		foreach ( $result['scripts'] as $url ) {
+			$this->assertStringStartsWith( 'http', $url, 'Every entry must be fetchable as-is.' );
+		}
+
+		$joined = implode( ' ', $result['scripts'] );
+		$this->assertStringContainsString( 'blocks.min.js', $joined );
+		$this->assertStringContainsString( 'block-library.min.js', $joined );
+
+		/*
+		 * Order is the whole point of asking. The JSX runtime reads
+		 * `globalThis.React` as it loads, so React has to be there first —
+		 * and when it is not, every JSX call in the editor bundles fails
+		 * with nothing but a missing function to show for it.
+		 */
+		$react = $this->position_of( $result['scripts'], 'vendor/react.min.js' );
+		$jsx   = $this->position_of( $result['scripts'], 'react-jsx-runtime' );
+		$this->assertNotNull( $react );
+		$this->assertNotNull( $jsx );
+		$this->assertLessThan( $jsx, $react, 'React must load before the JSX runtime.' );
+
+		// And the library everything else supports comes last.
+		$blocks  = $this->position_of( $result['scripts'], 'dist/blocks.min.js' );
+		$library = $this->position_of( $result['scripts'], 'block-library.min.js' );
+		$this->assertLessThan( $library, $blocks );
+	}
+
+	/**
+	 * Where a fragment first appears in a list of URLs.
+	 *
+	 * @param array  $urls     URLs.
+	 * @param string $fragment Substring to find.
+	 * @return int|null
+	 */
+	private function position_of( $urls, $fragment ) {
+		foreach ( $urls as $index => $url ) {
+			if ( false !== strpos( $url, $fragment ) ) {
+				return $index;
+			}
+		}
+		return null;
 	}
 
 	public function test_an_unknown_pattern_is_an_error_not_a_fatal() {

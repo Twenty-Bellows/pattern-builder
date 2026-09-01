@@ -18,7 +18,9 @@
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 
 const require = createRequire( import.meta.url );
@@ -197,6 +199,92 @@ export function handleToFile( wpRoot, handle ) {
  * @return {Object} The block API, plus the window it lives in.
  */
 export function loadWordPressBlocks( wpRoot ) {
+	const handles = scriptOrder( wpRoot, [
+		'wp-blocks',
+		'wp-block-editor',
+		'wp-block-library',
+	] );
+
+	const sources = [];
+	const missing = [];
+	for ( const handle of handles ) {
+		const file = handleToFile( wpRoot, handle );
+		if ( ! file ) {
+			continue;
+		}
+		if ( ! fs.existsSync( file ) ) {
+			missing.push( handle );
+			continue;
+		}
+		sources.push( {
+			label: handle,
+			code: fs.readFileSync( file, 'utf8' ),
+		} );
+	}
+
+	return {
+		...bootBlocks( sources, missing ),
+		version: wordPressVersion( wpRoot ),
+	};
+}
+
+/**
+ * The same, for a site reachable only over HTTP.
+ *
+ * WordPress serves its editor scripts to anyone, so the code is a fetch away
+ * — but the dependency graph is not: core's manifest is a PHP file, so asking
+ * for it over HTTP executes it and returns nothing. The order has to come
+ * from the site itself, which is what `pattern-builder/get-editor-scripts`
+ * is for.
+ *
+ * @param {Array}  urls    Script URLs, dependencies first.
+ * @param {Object} options cacheDir, and a label for messages.
+ * @return {Promise<Object>} The block API.
+ */
+export async function loadWordPressBlocksFromUrls( urls, options = {} ) {
+	const cacheDir =
+		options.cacheDir ||
+		path.join(
+			os.tmpdir(),
+			'pattern-builder-wp-' + digest( urls.join( '\n' ) )
+		);
+
+	fs.mkdirSync( cacheDir, { recursive: true } );
+
+	const sources = [];
+	let fetched = 0;
+	for ( const url of urls ) {
+		// The URL carries a version, so a changed file is a changed name and
+		// a stale cache cannot outlive an upgrade.
+		const cached = path.join( cacheDir, digest( url ) + '.js' );
+		if ( ! fs.existsSync( cached ) ) {
+			const response = await fetch( url );
+			if ( ! response.ok ) {
+				throw new Error( `${ url } → HTTP ${ response.status }` );
+			}
+			fs.writeFileSync( cached, await response.text() );
+			fetched++;
+		}
+		sources.push( { label: url, code: fs.readFileSync( cached, 'utf8' ) } );
+	}
+
+	if ( fetched ) {
+		console.error(
+			`Downloaded ${ fetched } script(s) into ${ cacheDir } — later runs reuse them.`
+		);
+	}
+
+	return { ...bootBlocks( sources, [] ), version: options.version || '' };
+}
+
+/**
+ * Run the editor's block code in a DOM and hand back what validation needs.
+ *
+ * @param {Array} sources Each with a label and its code, in load order.
+ * @param {Array} missing Handles that could not be found, for the error.
+ * @return {Object} The block API, plus the window it lives in.
+ */
+function bootBlocks( sources, missing ) {
 	let JSDOM, VirtualConsole;
 	try {
 		( { JSDOM, VirtualConsole } = require( 'jsdom' ) );
@@ -243,24 +331,9 @@ export function loadWordPressBlocks( wpRoot ) {
 	win.cancelIdleCallback = ( id ) => clearTimeout( id );
 	win.CSS = win.CSS || { supports: () => false };
 
-	const handles = scriptOrder( wpRoot, [
-		'wp-blocks',
-		'wp-block-editor',
-		'wp-block-library',
-	] );
-
-	const missing = [];
-	for ( const handle of handles ) {
-		const file = handleToFile( wpRoot, handle );
-		if ( ! file ) {
-			continue;
-		}
-		if ( ! fs.existsSync( file ) ) {
-			missing.push( handle );
-			continue;
-		}
+	for ( const { code } of sources ) {
 		const script = win.document.createElement( 'script' );
-		script.textContent = fs.readFileSync( file, 'utf8' );
+		script.textContent = code;
 		win.document.head.appendChild( script );
 	}
 
@@ -283,8 +356,21 @@ export function loadWordPressBlocks( wpRoot ) {
 		getBlockTypes: wp.blocks.getBlockTypes,
 		parseRaw: wp.blockSerializationDefaultParser.parse,
 		window: win,
-		version: wordPressVersion( wpRoot ),
 	};
+}
+
+/**
+ * A short, stable name for a string, used for cache file names.
+ *
+ * @param {string} value Anything.
+ * @return {string} Sixteen hex characters.
+ */
+function digest( value ) {
+	return crypto
+		.createHash( 'sha256' )
+		.update( value )
+		.digest( 'hex' )
+		.slice( 0, 16 );
 }
 
 /**
