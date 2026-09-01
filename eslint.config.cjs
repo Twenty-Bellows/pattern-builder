@@ -18,6 +18,15 @@ const defaultConfig = require( '@wordpress/scripts/config/eslint.config.cjs' );
 module.exports = [
 	...defaultConfig,
 	{
+		/*
+		 * The author-facing validators are command line tools whose entire
+		 * output is what they print, so the console is the interface rather
+		 * than a debugging leftover.
+		 */
+		files: [ 'guides/pattern-author/scripts/**/*.mjs' ],
+		rules: { 'no-console': 'off' },
+	},
+	{
 		files: [ 'src/runtime/**/*.js' ],
 		rules: {
 			'jsdoc/no-undefined-types': 'off',
