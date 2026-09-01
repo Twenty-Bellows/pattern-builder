@@ -221,9 +221,33 @@ them: the pattern renders, the editor is quiet, and the design is just wrong.
 
 It handles a theme pattern's PHP header and inline `<?php echo esc_url( … ); ?>`
 expressions, and it takes `-` to read markup from stdin — useful for checking a
-draft before it is ever a file. It needs `@wordpress/blocks`,
-`@wordpress/block-library` and `jsdom` resolvable; if the project doesn't have
-them, `npm i --no-save @wordpress/blocks @wordpress/block-library jsdom`.
+draft before it is ever a file.
+
+**It validates against a WordPress install, not against npm.** Every install
+already carries the editor's block code — about 4MB under `wp-includes/js/dist`
+— so there is nothing to download, and more importantly it is the *exact*
+version the pattern is destined for. That is not a detail: block library 10.5
+moved text alignment into a typography support, so it disagrees with 9.22 about
+whether the same file is current. The first line of output says what was used:
+
+```
+Checked against WordPress 7.1 at /srv/www/example — 113 block types.
+```
+
+It finds the install by itself when you are working anywhere inside one — a
+theme directory, a plugin directory — and the script ships inside the plugin,
+so it usually finds the install it lives in. Otherwise point it:
+
+```bash
+node <skill>/scripts/validate-pattern.mjs --wp /path/to/wordpress pattern.php
+WP_PATH=/path/to/wordpress node <skill>/scripts/validate-pattern.mjs pattern.php
+```
+
+The one thing WordPress cannot supply is a browser, and its editor code expects
+a document to exist as it loads: `npm i --no-save jsdom`. With no WordPress
+anywhere, `--npm` uses `@wordpress/blocks` and `@wordpress/block-library` from
+`node_modules` instead, which is the same check against whichever version npm
+resolved.
 
 If the project has its own validator (`npm run validate:blocks`), prefer it —
 it may carry project-specific lints as well.

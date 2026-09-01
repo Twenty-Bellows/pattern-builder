@@ -40,6 +40,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { findWordPress, loadWordPressBlocks } from './wp-core.mjs';
 
 /*
  * The WordPress packages' ESM builds import JSON without an import attribute,
@@ -76,13 +77,38 @@ function installDom() {
 	} );
 
 	for ( const key of [
-		'HTMLElement', 'HTMLDocument', 'Element', 'Node', 'NodeList', 'DOMParser',
-		'Event', 'CustomEvent', 'MouseEvent', 'KeyboardEvent', 'FocusEvent',
-		'getComputedStyle', 'DocumentFragment', 'Text', 'Range', 'XMLSerializer',
-		'File', 'FileList', 'Blob', 'FormData', 'URL', 'URLSearchParams',
-		'localStorage', 'sessionStorage', 'location', 'history', 'screen',
+		'HTMLElement',
+		'HTMLDocument',
+		'Element',
+		'Node',
+		'NodeList',
+		'DOMParser',
+		'Event',
+		'CustomEvent',
+		'MouseEvent',
+		'KeyboardEvent',
+		'FocusEvent',
+		'getComputedStyle',
+		'DocumentFragment',
+		'Text',
+		'Range',
+		'XMLSerializer',
+		'File',
+		'FileList',
+		'Blob',
+		'FormData',
+		'URL',
+		'URLSearchParams',
+		'localStorage',
+		'sessionStorage',
+		'location',
+		'history',
+		'screen',
 	] ) {
-		if ( dom.window[ key ] !== undefined && globalThis[ key ] === undefined ) {
+		if (
+			dom.window[ key ] !== undefined &&
+			globalThis[ key ] === undefined
+		) {
 			globalThis[ key ] = dom.window[ key ];
 		}
 	}
@@ -91,23 +117,46 @@ function installDom() {
 		observe() {}
 		unobserve() {}
 		disconnect() {}
-		takeRecords() { return []; }
+		takeRecords() {
+			return [];
+		}
 	}
-	for ( const key of [ 'MutationObserver', 'IntersectionObserver', 'ResizeObserver' ] ) {
-		if ( globalThis[ key ] === undefined ) globalThis[ key ] = NoopObserver;
-		if ( dom.window[ key ] === undefined ) dom.window[ key ] = globalThis[ key ];
+	for ( const key of [
+		'MutationObserver',
+		'IntersectionObserver',
+		'ResizeObserver',
+	] ) {
+		if ( globalThis[ key ] === undefined ) {
+			globalThis[ key ] = NoopObserver;
+		}
+		if ( dom.window[ key ] === undefined ) {
+			dom.window[ key ] = globalThis[ key ];
+		}
 	}
 
-	globalThis.requestAnimationFrame = dom.window.requestAnimationFrame || ( ( cb ) => setTimeout( () => cb( Date.now() ), 0 ) );
-	globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame || ( ( id ) => clearTimeout( id ) );
-	globalThis.requestIdleCallback = ( cb ) => setTimeout( () => cb( { didTimeout: false, timeRemaining: () => 50 } ), 0 );
+	globalThis.requestAnimationFrame =
+		dom.window.requestAnimationFrame ||
+		( ( cb ) => setTimeout( () => cb( Date.now() ), 0 ) );
+	globalThis.cancelAnimationFrame =
+		dom.window.cancelAnimationFrame || ( ( id ) => clearTimeout( id ) );
+	globalThis.requestIdleCallback = ( cb ) =>
+		setTimeout(
+			() => cb( { didTimeout: false, timeRemaining: () => 50 } ),
+			0
+		);
 	globalThis.cancelIdleCallback = ( id ) => clearTimeout( id );
-	globalThis.matchMedia = dom.window.matchMedia || ( () => ( {
-		matches: false, media: '', onchange: null,
-		addListener() {}, removeListener() {},
-		addEventListener() {}, removeEventListener() {},
-		dispatchEvent: () => false,
-	} ) );
+	globalThis.matchMedia =
+		dom.window.matchMedia ||
+		( () => ( {
+			matches: false,
+			media: '',
+			onchange: null,
+			addListener() {},
+			removeListener() {},
+			addEventListener() {},
+			removeEventListener() {},
+			dispatchEvent: () => false,
+		} ) );
 	dom.window.matchMedia = dom.window.matchMedia || globalThis.matchMedia;
 }
 
@@ -118,15 +167,22 @@ function installDom() {
  * `<?php echo esc_url( … ); ?>` inside an attribute. Substituting a plausible
  * literal for each inline expression leaves markup that parses the way it
  * would at runtime.
+ * @param {string} source
  */
 function stripPhp( source ) {
-	return source
-		.replace( /^﻿/, '' )
-		// The header docblock and any opening PHP section.
-		.replace( /^\s*<\?php[\s\S]*?\?>\s*/, '' )
-		// Inline expressions inside attributes become a stand-in URL/string.
-		.replace( /<\?php\s*echo\s+esc_url\([\s\S]*?\)\s*;?\s*\?>/g, 'https://example.com/' )
-		.replace( /<\?php[\s\S]*?\?>/g, 'placeholder' );
+	return (
+		source
+			// A byte order mark, as an escape rather than the character itself.
+			.replace( /^\uFEFF/, '' )
+			// The header docblock and any opening PHP section.
+			.replace( /^\s*<\?php[\s\S]*?\?>\s*/, '' )
+			// Inline expressions inside attributes become a stand-in URL/string.
+			.replace(
+				/<\?php\s*echo\s+esc_url\([\s\S]*?\)\s*;?\s*\?>/g,
+				'https://example.com/'
+			)
+			.replace( /<\?php[\s\S]*?\?>/g, 'placeholder' )
+	);
 }
 
 /**
@@ -135,11 +191,22 @@ function stripPhp( source ) {
  * `parse()` logs the whole expected-vs-actual diff for every invalid block.
  * That detail is the useful part, but it is available per block through
  * `validationIssues`, and letting it stream to stdout buries the report.
+ * @param {Function} fn
  */
 function quietly( fn ) {
-	const saved = { log: console.log, info: console.info, warn: console.warn, error: console.error };
+	const saved = {
+		log: console.log,
+		info: console.info,
+		warn: console.warn,
+		error: console.error,
+	};
 	const noop = () => {};
-	Object.assign( console, { log: noop, info: noop, warn: noop, error: noop } );
+	Object.assign( console, {
+		log: noop,
+		info: noop,
+		warn: noop,
+		error: noop,
+	} );
 	try {
 		return fn();
 	} finally {
@@ -147,11 +214,17 @@ function quietly( fn ) {
 	}
 }
 
-/** Every block in the tree, inner blocks included. */
+/**
+ * Every block in the tree, inner blocks included.
+ * @param {Array} blocks
+ * @param {Array} acc
+ */
 function flatten( blocks, acc = [] ) {
 	for ( const block of blocks ) {
 		acc.push( block );
-		if ( block.innerBlocks?.length ) flatten( block.innerBlocks, acc );
+		if ( block.innerBlocks?.length ) {
+			flatten( block.innerBlocks, acc );
+		}
 	}
 	return acc;
 }
@@ -201,29 +274,46 @@ function survivedElsewhere( value, attributes ) {
 function attributeLosses( authored, parsed, out = [] ) {
 	const wrote = authored.filter( ( b ) => b.blockName );
 	const got = parsed.filter( ( b ) => b.name && b.name !== 'core/freeform' );
-	if ( wrote.length !== got.length ) return out;
+	if ( wrote.length !== got.length ) {
+		return out;
+	}
 
 	for ( let i = 0; i < wrote.length; i++ ) {
-		if ( wrote[ i ].blockName !== got[ i ].name ) return out;
+		if ( wrote[ i ].blockName !== got[ i ].name ) {
+			return out;
+		}
 
-		const dropped = Object.keys( wrote[ i ].attrs || {} ).filter( ( key ) => {
-			/*
-			 * `content` on core/pattern is the synced-pattern runtime's, supplied
-			 * by Pattern Builder rather than core. Core drops it here exactly as
-			 * it would on a site without the runtime, which is a real failure but
-			 * a different one, and not this file's to report.
-			 */
-			if ( got[ i ].name === 'core/pattern' && key === 'content' ) return false;
-			if ( got[ i ].attributes?.[ key ] !== undefined ) return false;
-			// Relocated by a migration rather than thrown away.
-			return ! survivedElsewhere( wrote[ i ].attrs[ key ], got[ i ].attributes );
-		} );
+		const dropped = Object.keys( wrote[ i ].attrs || {} ).filter(
+			( key ) => {
+				/*
+				 * `content` on core/pattern is the synced-pattern runtime's, supplied
+				 * by Pattern Builder rather than core. Core drops it here exactly as
+				 * it would on a site without the runtime, which is a real failure but
+				 * a different one, and not this file's to report.
+				 */
+				if ( got[ i ].name === 'core/pattern' && key === 'content' ) {
+					return false;
+				}
+				if ( got[ i ].attributes?.[ key ] !== undefined ) {
+					return false;
+				}
+				// Relocated by a migration rather than thrown away.
+				return ! survivedElsewhere(
+					wrote[ i ].attrs[ key ],
+					got[ i ].attributes
+				);
+			}
+		);
 
 		if ( dropped.length ) {
 			out.push( { name: got[ i ].name, dropped } );
 		}
 
-		attributeLosses( wrote[ i ].innerBlocks || [], got[ i ].innerBlocks || [], out );
+		attributeLosses(
+			wrote[ i ].innerBlocks || [],
+			got[ i ].innerBlocks || [],
+			out
+		);
 	}
 	return out;
 }
@@ -233,10 +323,14 @@ function attributeLosses( authored, parsed, out = [] ) {
  *
  * Nearly every strict failure is a block-supports class that never made it
  * into the markup, so naming the class beats printing core's tokenizer diff.
+ * @param {string} expected
+ * @param {string} actual
  */
 function classDiff( expected, actual ) {
 	const classesOf = ( html ) =>
-		[ ...String( html ).matchAll( /\sclass="([^"]*)"/g ) ].map( ( m ) => m[ 1 ] );
+		[ ...String( html ).matchAll( /\sclass="([^"]*)"/g ) ].map(
+			( m ) => m[ 1 ]
+		);
 	const want = classesOf( expected );
 	const have = classesOf( actual );
 
@@ -246,11 +340,14 @@ function classDiff( expected, actual ) {
 		const missing = wanted.filter( ( c ) => ! present.includes( c ) );
 		const extra = present.filter( ( c ) => ! wanted.includes( c ) );
 		if ( missing.length || extra.length ) {
-			const quote = ( list ) => list.map( ( c ) => `"${ c }"` ).join( ', ' );
+			const quote = ( list ) =>
+				list.map( ( c ) => `"${ c }"` ).join( ', ' );
 			return [
 				missing.length ? `missing class ${ quote( missing ) }` : '',
 				extra.length ? `unexpected class ${ quote( extra ) }` : '',
-			].filter( Boolean ).join( '; ' );
+			]
+				.filter( Boolean )
+				.join( '; ' );
 		}
 	}
 	return '';
@@ -262,7 +359,9 @@ function classDiff( expected, actual ) {
  * @param {Object} issue One entry of validateBlock()'s second return value.
  */
 function formatIssue( issue ) {
-	if ( ! issue?.args?.length ) return '';
+	if ( ! issue?.args?.length ) {
+		return '';
+	}
 	const [ message, ...values ] = issue.args;
 	let i = 0;
 	return String( message ).replace( /%[so]/g, () => {
@@ -272,52 +371,161 @@ function formatIssue( issue ) {
 }
 
 function readInput( file ) {
-	if ( file === '-' ) return fs.readFileSync( 0, 'utf8' );
+	if ( file === '-' ) {
+		return fs.readFileSync( 0, 'utf8' );
+	}
 	return fs.readFileSync( file, 'utf8' );
 }
 
+/**
+ * Where the block code comes from.
+ *
+ * A WordPress install is preferred over anything on npm, and not only to
+ * spare somebody a few hundred megabytes of install. Whether markup is what a
+ * block writes *today* is a question only a specific block library can
+ * answer — block library 10.5 moved text alignment into a typography support
+ * and so disagrees with 9.22 about the same file — so the honest thing to
+ * check against is the WordPress the pattern is destined for, not whatever
+ * npm last resolved.
+ *
+ * @return {Object} parse, validateBlock, getSaveContent, parseRaw, describe.
+ */
+function loadCore() {
+	const hint = flagValue( '--wp' );
+
+	if ( ! process.argv.includes( '--npm' ) ) {
+		const wpRoot = findWordPress( hint );
+		if ( wpRoot ) {
+			let core;
+			try {
+				core = loadWordPressBlocks( wpRoot );
+			} catch ( err ) {
+				console.error( err.message );
+				process.exit( 2 );
+			}
+			return {
+				...core,
+				describe:
+					`Checked against WordPress ${
+						core.version || '(unknown version)'
+					} at ${ wpRoot } — ` +
+					`${ core.getBlockTypes().length } block types.`,
+			};
+		}
+		if ( hint ) {
+			console.error( `No WordPress install at ${ hint }.` );
+			process.exit( 2 );
+		}
+	}
+
+	// Nothing to point at, so fall back to whatever the project has.
+	let blocks;
+	try {
+		installDom();
+		blocks = require( '@wordpress/blocks' );
+	} catch ( err ) {
+		console.error(
+			'Nothing to validate against.\n\n' +
+				'The cheapest fix is to point at a WordPress install, which already has\n' +
+				'every byte of this and has the version your pattern is destined for:\n\n' +
+				'  validate-pattern.mjs --wp /path/to/wordpress <file...>\n' +
+				'  WP_PATH=/path/to/wordpress validate-pattern.mjs <file...>\n' +
+				'  …or just run it from anywhere inside the install.\n\n' +
+				"It still needs jsdom, to play the browser WordPress's editor code expects:\n" +
+				'  npm i --no-save jsdom\n\n' +
+				'With no WordPress anywhere, the packages themselves work:\n' +
+				'  npm i --no-save @wordpress/blocks @wordpress/block-library jsdom\n\n' +
+				`( ${ err.message.split( '\n' )[ 0 ] } )`
+		);
+		process.exit( 2 );
+	}
+
+	const { registerCoreBlocks } = require( '@wordpress/block-library' );
+	quietly( () => registerCoreBlocks() );
+
+	/*
+	 * Block-supports classes are not written by a block's own save(); filters
+	 * in the editor package add them, and without those registered the strict
+	 * check silently loses most of its value. The block library pulls the
+	 * package in already, but say so out loud and check rather than trust.
+	 */
+	try {
+		quietly( () => require( '@wordpress/block-editor' ) );
+	} catch {
+		// The check below reports the consequence.
+	}
+	if (
+		! require( '@wordpress/hooks' ).hasFilter(
+			'blocks.getSaveContent.extraProps'
+		)
+	) {
+		console.log(
+			'WARNING: @wordpress/block-editor did not load, so block-supports classes are not being checked.'
+		);
+	}
+
+	const version = ( () => {
+		try {
+			return require( '@wordpress/block-library/package.json' ).version;
+		} catch {
+			return '';
+		}
+	} )();
+
+	return {
+		parse: blocks.parse,
+		validateBlock: blocks.validateBlock,
+		getSaveContent: blocks.getSaveContent,
+		parseRaw: require( '@wordpress/block-serialization-default-parser' )
+			.parse,
+		describe:
+			`Checked against @wordpress/block-library ${
+				version || '?'
+			} from node_modules. ` +
+			'A WordPress install would be a better answer: pass --wp <path>.',
+	};
+}
+
+/**
+ * Read `--flag value` from the command line.
+ *
+ * @param {string} name Flag name.
+ * @return {string} The value, or an empty string.
+ */
+function flagValue( name ) {
+	const at = process.argv.indexOf( name );
+	return at !== -1 && process.argv[ at + 1 ] ? process.argv[ at + 1 ] : '';
+}
+
 function main() {
-	const files = process.argv.slice( 2 ).filter( ( a ) => ! a.startsWith( '--' ) );
+	const argv = process.argv.slice( 2 );
+	const wpAt = argv.indexOf( '--wp' );
+	// `--wp` takes a value, which is not a file. Guard the index: with no
+	// `--wp` at all, `wpAt + 1` is 0 and would swallow the first file.
+	const files = argv.filter(
+		( a, i ) =>
+			! a.startsWith( '--' ) && ! ( wpAt !== -1 && i === wpAt + 1 )
+	);
 	if ( ! files.length ) {
-		console.error( 'Usage: validate-pattern.mjs <file...>   (or "-" for stdin)' );
+		console.error(
+			'Usage: validate-pattern.mjs <file...>   (or "-" for stdin)'
+		);
 		process.exit( 2 );
 	}
 
 	const allowOldForm = process.argv.includes( '--allow-old-form' );
 
-	installDom();
-	const { parse, validateBlock, getSaveContent } = require( '@wordpress/blocks' );
-	const { parse: parseRaw } = require( '@wordpress/block-serialization-default-parser' );
-	const { registerCoreBlocks } = require( '@wordpress/block-library' );
-	quietly( () => registerCoreBlocks() );
-
-	/*
-	 * Block-supports classes (color, typography, spacing, alignment) are not
-	 * written by a block's own save(); they are added by filters that live in
-	 * the editor package. Without those registered, `save()` output is missing
-	 * every one of them and the strict check silently loses most of its value.
-	 * The block library pulls the package in already, but say so out loud, and
-	 * check that the filter really is there rather than trusting it.
-	 */
-	try {
-		quietly( () => require( '@wordpress/block-editor' ) );
-	} catch ( err ) {
-		// Fall through to the check below, which reports the consequence.
-	}
-	const { hasFilter } = require( '@wordpress/hooks' );
-	const supportsChecked = hasFilter( 'blocks.getSaveContent.extraProps' );
-	if ( ! supportsChecked ) {
-		console.log(
-			'WARNING: @wordpress/block-editor did not load, so block-supports classes are not being checked.\n'
-		);
-	}
+	const core = loadCore();
+	const { parse, validateBlock, getSaveContent, parseRaw } = core;
+	console.log( core.describe + '\n' );
 
 	let problems = 0;
 	let oldForm = 0;
 	let lost = 0;
 
 	for ( const file of files ) {
-		const label = file === '-' ? '<stdin>' : path.relative( process.cwd(), file );
+		const label =
+			file === '-' ? '<stdin>' : path.relative( process.cwd(), file );
 		let blocks;
 		let authored;
 		const source = stripPhp( readInput( file ) );
@@ -341,23 +549,34 @@ function main() {
 
 		for ( const block of flatten( blocks ) ) {
 			if ( block.name === 'core/missing' ) {
-				const original = ( block.attributes?.originalName ) || 'unknown';
-				console.log( `${ label }: UNREGISTERED BLOCK "${ original }" — not available on a site with only core blocks.` );
+				const original = block.attributes?.originalName || 'unknown';
+				console.log(
+					`${ label }: UNREGISTERED BLOCK "${ original }" — not available on a site with only core blocks.`
+				);
 				problems++;
 				continue;
 			}
-			if ( block.name === null ) continue; // Freeform whitespace between blocks.
+			if ( block.name === null ) {
+				continue;
+			} // Freeform whitespace between blocks.
 
 			/*
 			 * A migration can invent inner blocks (a deprecated list grows
 			 * list-item children). Nothing of theirs is on disk, so there is
 			 * nothing here to hold them to.
 			 */
-			if ( block.originalContent === undefined ) continue;
+			if ( block.originalContent === undefined ) {
+				continue;
+			}
 
 			if ( ! block.isValid ) {
-				const detail = block.validationIssues?.[ 0 ]?.log?.join?.( ' ' ) || '';
-				console.log( `${ label }: INVALID ${ block.name }${ detail ? ' — ' + detail : '' }` );
+				const detail =
+					block.validationIssues?.[ 0 ]?.log?.join?.( ' ' ) || '';
+				console.log(
+					`${ label }: INVALID ${ block.name }${
+						detail ? ' — ' + detail : ''
+					}`
+				);
 				problems++;
 				continue;
 			}
@@ -369,21 +588,29 @@ function main() {
 			 * reserves markup for the bound value too, which a bare Node
 			 * context has no way to fill.
 			 */
-			if ( block.attributes?.metadata?.bindings ) continue;
+			if ( block.attributes?.metadata?.bindings ) {
+				continue;
+			}
 
 			/*
 			 * parse() accepted it, which only means some version of this block
 			 * once saved markup like this. Ask whether the current one would.
 			 */
 			const [ current, issues ] = quietly( () => validateBlock( block ) );
-			if ( current ) continue;
+			if ( current ) {
+				continue;
+			}
 
 			let expected = '';
 			try {
 				expected = quietly( () =>
-					getSaveContent( block.name, block.attributes, block.innerBlocks )
+					getSaveContent(
+						block.name,
+						block.attributes,
+						block.innerBlocks
+					)
 				);
-			} catch ( err ) {
+			} catch {
 				expected = '';
 			}
 
@@ -391,13 +618,19 @@ function main() {
 				classDiff( expected, block.originalContent || '' ) ||
 				formatIssue( issues?.[ 0 ] );
 
-			console.log( `${ label }: OLD FORM ${ block.name }${ detail ? ' — ' + detail : '' }` );
+			console.log(
+				`${ label }: OLD FORM ${ block.name }${
+					detail ? ' — ' + detail : ''
+				}`
+			);
 			oldForm++;
 		}
 	}
 
 	if ( problems === 0 && oldForm === 0 && lost === 0 ) {
-		console.log( `All blocks valid and current across ${ files.length } file(s).` );
+		console.log(
+			`All blocks valid and current across ${ files.length } file(s).`
+		);
 		process.exit( 0 );
 	}
 
