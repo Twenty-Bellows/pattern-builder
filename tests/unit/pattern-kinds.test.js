@@ -6,15 +6,25 @@
 
 import {
 	PATTERN_KINDS,
+	PATTERN_KIND_GROUPS,
 	DESIGN,
 	SYNCED_DESIGN,
-	STARTER,
+	PAGE_STARTER,
 	BLOCK_STARTER,
+	TEMPLATE,
+	TEMPLATE_PART,
+	DESIGN_GROUP,
+	STARTER_GROUP,
 	POST_CONTENT_BLOCK,
+	FULL_WIDTH_VIEWPORT,
 	STORAGE_FIELD,
 	POST_TYPES_FIELD,
 	BLOCK_TYPES_FIELD,
+	TEMPLATE_TYPES_FIELD,
+	TEMPLATE_PART_AREA_FIELD,
 	getPatternKind,
+	getPatternKindsInGroup,
+	getTemplatePartArea,
 	getInitialValues,
 	kindHasField,
 	canCreate,
@@ -28,13 +38,32 @@ const valuesFor = ( key, overrides = {} ) => ( {
 } );
 
 describe( 'pattern kinds', () => {
-	it( 'offers a design, a synced design, and the two starter kinds', () => {
+	it( 'lists the design kinds, then everywhere a pattern can be offered', () => {
 		expect( PATTERN_KINDS.map( ( kind ) => kind.key ) ).toEqual( [
 			DESIGN,
 			SYNCED_DESIGN,
-			STARTER,
+			PAGE_STARTER,
 			BLOCK_STARTER,
+			TEMPLATE,
+			TEMPLATE_PART,
 		] );
+	} );
+
+	it( 'files every kind under one of the two groups', () => {
+		expect( PATTERN_KIND_GROUPS.map( ( group ) => group.key ) ).toEqual( [
+			DESIGN_GROUP,
+			STARTER_GROUP,
+		] );
+		expect(
+			getPatternKindsInGroup( DESIGN_GROUP ).map( ( kind ) => kind.key )
+		).toEqual( [ DESIGN, SYNCED_DESIGN ] );
+		expect(
+			getPatternKindsInGroup( STARTER_GROUP ).map( ( kind ) => kind.key )
+		).toEqual( [ PAGE_STARTER, BLOCK_STARTER, TEMPLATE, TEMPLATE_PART ] );
+		expect(
+			getPatternKindsInGroup( DESIGN_GROUP ).length +
+				getPatternKindsInGroup( STARTER_GROUP ).length
+		).toBe( PATTERN_KINDS.length );
 	} );
 
 	it( 'every kind describes itself', () => {
@@ -58,7 +87,7 @@ describe( 'pattern kinds', () => {
 	} );
 
 	it( 'never asks a starter pattern where to live — a wp_block cannot carry its headers', () => {
-		[ STARTER, BLOCK_STARTER ].forEach( ( key ) => {
+		[ PAGE_STARTER, BLOCK_STARTER ].forEach( ( key ) => {
 			const kind = getPatternKind( key );
 
 			expect( kindHasField( kind, STORAGE_FIELD ) ).toBe( false );
@@ -67,8 +96,8 @@ describe( 'pattern kinds', () => {
 
 		expect(
 			buildCreateRequest(
-				getPatternKind( STARTER ),
-				valuesFor( STARTER )
+				getPatternKind( PAGE_STARTER ),
+				valuesFor( PAGE_STARTER )
 			).path
 		).toBe( '/pattern-builder/v1/patterns' );
 	} );
@@ -99,13 +128,34 @@ describe( 'canCreate', () => {
 		).toBe( true );
 	} );
 
+	it( 'requires a template pattern to name at least one template type', () => {
+		const kind = getPatternKind( TEMPLATE );
+
+		expect( kindHasField( kind, TEMPLATE_TYPES_FIELD ) ).toBe( true );
+		expect( canCreate( kind, valuesFor( TEMPLATE ) ) ).toBe( false );
+		expect(
+			canCreate(
+				kind,
+				valuesFor( TEMPLATE, { templateTypes: [ 'archive' ] } )
+			)
+		).toBe( true );
+	} );
+
+	it( 'asks a template part pattern for nothing but an area, which it starts with', () => {
+		const kind = getPatternKind( TEMPLATE_PART );
+
+		expect( kindHasField( kind, TEMPLATE_PART_AREA_FIELD ) ).toBe( true );
+		expect( getInitialValues( kind ).templatePartArea ).toBe( 'header' );
+		expect( canCreate( kind, valuesFor( TEMPLATE_PART ) ) ).toBe( true );
+	} );
+
 	it( 'requires a starter pattern to name at least one post type', () => {
-		const starter = getPatternKind( STARTER );
+		const starter = getPatternKind( PAGE_STARTER );
 
 		expect(
-			canCreate( starter, valuesFor( STARTER, { postTypes: [] } ) )
+			canCreate( starter, valuesFor( PAGE_STARTER, { postTypes: [] } ) )
 		).toBe( false );
-		expect( canCreate( starter, valuesFor( STARTER ) ) ).toBe( true );
+		expect( canCreate( starter, valuesFor( PAGE_STARTER ) ) ).toBe( true );
 	} );
 } );
 
@@ -162,8 +212,8 @@ describe( 'buildCreateRequest', () => {
 
 	it( 'gives a starter pattern the headers WordPress reads when new content is created', () => {
 		const request = buildCreateRequest(
-			getPatternKind( STARTER ),
-			valuesFor( STARTER, { postTypes: [ 'page', 'post' ] } )
+			getPatternKind( PAGE_STARTER ),
+			valuesFor( PAGE_STARTER, { postTypes: [ 'page', 'post' ] } )
 		);
 
 		expect( request.data ).toEqual( {
@@ -177,10 +227,10 @@ describe( 'buildCreateRequest', () => {
 
 	it( 'starts a starter pattern on pages', () => {
 		expect(
-			getInitialValues( getPatternKind( STARTER ) ).postTypes
+			getInitialValues( getPatternKind( PAGE_STARTER ) ).postTypes
 		).toEqual( [ 'page' ] );
 		expect(
-			kindHasField( getPatternKind( STARTER ), POST_TYPES_FIELD )
+			kindHasField( getPatternKind( PAGE_STARTER ), POST_TYPES_FIELD )
 		).toBe( true );
 	} );
 
@@ -209,21 +259,74 @@ describe( 'buildCreateRequest', () => {
 	} );
 
 	it( 'keeps the page starter pattern on core/post-content, which it never asks about', () => {
-		const kind = getPatternKind( STARTER );
+		const kind = getPatternKind( PAGE_STARTER );
 
 		expect( kindHasField( kind, BLOCK_TYPES_FIELD ) ).toBe( false );
 		expect(
 			buildCreateRequest(
 				kind,
-				valuesFor( STARTER, { blockTypes: [ 'core/cover' ] } )
+				valuesFor( PAGE_STARTER, { blockTypes: [ 'core/cover' ] } )
 			).data.blockTypes
 		).toEqual( [ POST_CONTENT_BLOCK ] );
 	} );
 
+	it( 'writes a template pattern the way the themes that ship them do', () => {
+		const request = buildCreateRequest(
+			getPatternKind( TEMPLATE ),
+			valuesFor( TEMPLATE, {
+				templateTypes: [ 'archive', 'category' ],
+			} )
+		);
+
+		expect( request.data ).toEqual( {
+			title: 'Hero',
+			description: '',
+			synced: false,
+			templateTypes: [ 'archive', 'category' ],
+			// A whole template belongs in the Site Editor's template
+			// chooser, not in the block inserter.
+			inserter: false,
+			viewportWidth: FULL_WIDTH_VIEWPORT,
+		} );
+	} );
+
+	it( 'turns a template part area into the block type and category that go with it', () => {
+		expect(
+			buildCreateRequest(
+				getPatternKind( TEMPLATE_PART ),
+				valuesFor( TEMPLATE_PART, { templatePartArea: 'footer' } )
+			).data
+		).toEqual( {
+			title: 'Hero',
+			description: '',
+			synced: false,
+			blockTypes: [ 'core/template-part/footer' ],
+			categories: [ 'footer' ],
+			viewportWidth: FULL_WIDTH_VIEWPORT,
+		} );
+
+		const header = buildCreateRequest(
+			getPatternKind( TEMPLATE_PART ),
+			valuesFor( TEMPLATE_PART )
+		).data;
+
+		expect( header.blockTypes ).toEqual( [ 'core/template-part/header' ] );
+		expect( header.categories ).toEqual( [ 'header' ] );
+		// Unlike a whole template, a header is worth inserting by hand.
+		expect( header.inserter ).toBeUndefined();
+	} );
+
+	it( 'knows only the two template part areas WordPress supports', () => {
+		expect( getTemplatePartArea( 'header' ).blockType ).toBe(
+			'core/template-part/header'
+		);
+		expect( getTemplatePartArea( 'sidebar' ).key ).toBe( 'header' );
+	} );
+
 	it( 'ignores a source the kind never asked for', () => {
 		const request = buildCreateRequest(
-			getPatternKind( STARTER ),
-			valuesFor( STARTER, { source: 'user' } )
+			getPatternKind( PAGE_STARTER ),
+			valuesFor( PAGE_STARTER, { source: 'user' } )
 		);
 
 		expect( request.path ).toBe( '/pattern-builder/v1/patterns' );

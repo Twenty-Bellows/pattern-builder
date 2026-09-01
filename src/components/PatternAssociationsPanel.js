@@ -12,24 +12,9 @@ import { dispatch, useSelect } from '@wordpress/data';
 import { store as blocksStore } from '@wordpress/blocks';
 import { store as coreStore } from '@wordpress/core-data';
 
-const ALL_TEMPLATE_TYPES = [
-	'index',
-	'home',
-	'front-page',
-	'singular',
-	'single',
-	'page',
-	'archive',
-	'author',
-	'category',
-	'taxonomy',
-	'date',
-	'tag',
-	'attachment',
-	'search',
-	'privacy-policy',
-	'404',
-];
+import { TEMPLATE_TYPES } from './patternKinds';
+
+const ALL_TEMPLATE_TYPES = TEMPLATE_TYPES.map( ( type ) => type.slug );
 
 /**
  * Edits a theme pattern's contextual associations.

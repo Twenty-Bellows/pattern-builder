@@ -308,6 +308,54 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'Synced:', $file_contents );
 	}
 
+	public function test_create_writes_a_template_pattern_the_way_themes_ship_them() {
+		$request = $this->create_rest_request( 'POST', '/pattern-builder/v1/patterns' );
+		$request->set_body_params(
+			array(
+				'title'         => 'Archive Layout',
+				'synced'        => false,
+				'templateTypes' => array( 'archive', 'category' ),
+				'viewportWidth' => 1400,
+				'inserter'      => false,
+			)
+		);
+
+		$response = rest_get_server()->dispatch( $request );
+
+		$this->assertEquals( 201, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertEquals( array( 'archive', 'category' ), $data['templateTypes'] );
+		$this->assertFalse( $data['inserter'] );
+
+		$file_contents = file_get_contents( $this->test_dir . '/patterns/archive-layout.php' );
+		$this->assertStringContainsString( 'Template Types: archive, category', $file_contents );
+		$this->assertStringContainsString( 'Viewport Width: 1400', $file_contents );
+		$this->assertStringContainsString( 'Inserter: no', $file_contents );
+	}
+
+	public function test_create_writes_a_template_part_pattern_with_its_area() {
+		$request = $this->create_rest_request( 'POST', '/pattern-builder/v1/patterns' );
+		$request->set_body_params(
+			array(
+				'title'      => 'Centered Header',
+				'synced'     => false,
+				'blockTypes' => array( 'core/template-part/header' ),
+				'categories' => array( 'header' ),
+			)
+		);
+
+		$response = rest_get_server()->dispatch( $request );
+
+		$this->assertEquals( 201, $response->get_status() );
+
+		$file_contents = file_get_contents( $this->test_dir . '/patterns/centered-header.php' );
+		$this->assertStringContainsString( 'Categories: header', $file_contents );
+		$this->assertStringContainsString( 'Block Types: core/template-part/header', $file_contents );
+		// A header is worth inserting by hand, unlike a whole template.
+		$this->assertStringNotContainsString( 'Inserter: no', $file_contents );
+	}
+
 	public function test_create_requires_a_title() {
 		$request = $this->create_rest_request( 'POST', '/pattern-builder/v1/patterns' );
 		$request->set_body_params( array( 'content' => '<!-- wp:paragraph --><p>No title</p><!-- /wp:paragraph -->' ) );

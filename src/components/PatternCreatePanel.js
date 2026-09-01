@@ -5,6 +5,7 @@ import { __ } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
 import { useState } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
+import { useInstanceId } from '@wordpress/compose';
 import {
 	CheckboxControl,
 	TextControl,
@@ -28,12 +29,17 @@ import { store as coreStore } from '@wordpress/core-data';
 import { navigateToPattern } from '../utils/patternNavigation';
 import { BlockTypePicker } from './BlockTypePicker';
 import {
-	PATTERN_KINDS,
+	PATTERN_KIND_GROUPS,
 	DESIGN,
 	STORAGE_FIELD,
 	POST_TYPES_FIELD,
 	BLOCK_TYPES_FIELD,
+	TEMPLATE_TYPES_FIELD,
+	TEMPLATE_PART_AREA_FIELD,
+	TEMPLATE_TYPES,
+	TEMPLATE_PART_AREAS,
 	getPatternKind,
+	getPatternKindsInGroup,
 	getInitialValues,
 	kindHasField,
 	canCreate,
@@ -86,6 +92,48 @@ function StorageField( { value, onChange } ) {
 }
 
 /**
+ * A field that collects several values out of a known, short vocabulary.
+ *
+ * @param {Object}   props          Component props.
+ * @param {string}   props.label    The question the checkboxes answer.
+ * @param {string}   props.legend   The group's name, for assistive technology.
+ * @param {Object[]} props.options  `{ slug, label }` for each checkbox.
+ * @param {string[]} props.value    The chosen slugs.
+ * @param {Function} props.onChange Called with the chosen slugs.
+ */
+function CheckboxGridField( { label, legend, options, value, onChange } ) {
+	const toggle = ( slug, checked ) =>
+		onChange(
+			checked
+				? [ ...value, slug ]
+				: value.filter( ( item ) => item !== slug )
+		);
+
+	return (
+		<div className="pattern-builder-create__field">
+			<p className="pattern-builder-create__field-label">{ label }</p>
+			<div
+				className="pattern-builder-create__checkboxes"
+				role="group"
+				aria-label={ legend }
+			>
+				{ options.map( ( option ) => (
+					<CheckboxControl
+						key={ option.slug }
+						__nextHasNoMarginBottom
+						label={ option.label }
+						checked={ value.includes( option.slug ) }
+						onChange={ ( checked ) =>
+							toggle( option.slug, checked )
+						}
+					/>
+				) ) }
+			</div>
+		</div>
+	);
+}
+
+/**
  * Which post types are offered the pattern when new content is created.
  *
  * @param {Object}   props          Component props.
@@ -104,37 +152,76 @@ function PostTypesField( { value, onChange } ) {
 			} ) );
 	}, [] );
 
-	const toggle = ( slug, checked ) => {
-		onChange(
-			checked
-				? [ ...value, slug ]
-				: value.filter( ( item ) => item !== slug )
-		);
-	};
+	return (
+		<CheckboxGridField
+			label={ __(
+				'Which post types should offer this pattern?',
+				'pattern-builder'
+			) }
+			legend={ __( 'Post types', 'pattern-builder' ) }
+			options={ postTypes }
+			value={ value }
+			onChange={ onChange }
+		/>
+	);
+}
 
+/**
+ * Which templates the pattern is offered for.
+ *
+ * @param {Object}   props          Component props.
+ * @param {string[]} props.value    The chosen template type slugs.
+ * @param {Function} props.onChange Called with the chosen slugs.
+ */
+function TemplateTypesField( { value, onChange } ) {
+	return (
+		<CheckboxGridField
+			label={ __(
+				'Which templates should offer this pattern?',
+				'pattern-builder'
+			) }
+			legend={ __( 'Template types', 'pattern-builder' ) }
+			options={ TEMPLATE_TYPES }
+			value={ value }
+			onChange={ onChange }
+		/>
+	);
+}
+
+/**
+ * Which template part the pattern belongs to.
+ *
+ * @param {Object}   props          Component props.
+ * @param {string}   props.value    The chosen area key.
+ * @param {Function} props.onChange Called with the chosen area key.
+ */
+function TemplatePartAreaField( { value, onChange } ) {
 	return (
 		<div className="pattern-builder-create__field">
-			<p className="pattern-builder-create__field-label">
-				{ __(
-					'Which post types should offer this pattern?',
+			<ToggleGroupControl
+				__next40pxDefaultSize
+				__nextHasNoMarginBottom
+				label={ __(
+					'Which part is this pattern for?',
 					'pattern-builder'
 				) }
-			</p>
-			<div
-				className="pattern-builder-create__checkboxes"
-				role="group"
-				aria-label={ __( 'Post types', 'pattern-builder' ) }
+				value={ value }
+				onChange={ onChange }
 			>
-				{ postTypes.map( ( type ) => (
-					<CheckboxControl
-						key={ type.slug }
-						__nextHasNoMarginBottom
-						label={ type.label }
-						checked={ value.includes( type.slug ) }
-						onChange={ ( checked ) => toggle( type.slug, checked ) }
+				{ TEMPLATE_PART_AREAS.map( ( area ) => (
+					<ToggleGroupControlOption
+						key={ area.key }
+						value={ area.key }
+						label={ area.label }
 					/>
 				) ) }
-			</div>
+			</ToggleGroupControl>
+			<Text variant="muted">
+				{ __(
+					'WordPress offers template part patterns for headers and footers only; a pattern for any other area is never shown.',
+					'pattern-builder'
+				) }
+			</Text>
 		</div>
 	);
 }
@@ -158,6 +245,10 @@ export const PatternCreatePanel = ( { onCreated, layout = 'columns' } ) => {
 		};
 	}, [] );
 
+	const groupId = useInstanceId(
+		PatternCreatePanel,
+		'pattern-builder-create-group'
+	);
 	const [ kindKey, setKindKey ] = useState( DESIGN );
 	const [ values, setValues ] = useState( () =>
 		getInitialValues( getPatternKind( DESIGN ) )
@@ -224,27 +315,44 @@ export const PatternCreatePanel = ( { onCreated, layout = 'columns' } ) => {
 				role="group"
 				aria-label={ __( 'Kind of pattern', 'pattern-builder' ) }
 			>
-				{ PATTERN_KINDS.map( ( item ) => (
-					<button
-						key={ item.key }
-						type="button"
-						aria-pressed={ item.key === kindKey }
-						className={
-							'pattern-builder-create__kind' +
-							( item.key === kindKey ? ' is-selected' : '' )
-						}
-						onClick={ () => selectKind( item.key ) }
+				{ PATTERN_KIND_GROUPS.map( ( group ) => (
+					<div
+						key={ group.key }
+						className="pattern-builder-create__group"
+						role="group"
+						aria-labelledby={ `${ groupId }-${ group.key }` }
 					>
-						<Icon icon={ item.icon } size={ 24 } />
-						<span className="pattern-builder-create__kind-text">
-							<span className="pattern-builder-create__kind-label">
-								{ item.label }
-							</span>
-							<span className="pattern-builder-create__kind-summary">
-								{ item.summary }
-							</span>
-						</span>
-					</button>
+						<h4
+							id={ `${ groupId }-${ group.key }` }
+							className="pattern-builder-create__group-label"
+						>
+							{ group.label }
+						</h4>
+						{ getPatternKindsInGroup( group.key ).map( ( item ) => (
+							<button
+								key={ item.key }
+								type="button"
+								aria-pressed={ item.key === kindKey }
+								className={
+									'pattern-builder-create__kind' +
+									( item.key === kindKey
+										? ' is-selected'
+										: '' )
+								}
+								onClick={ () => selectKind( item.key ) }
+							>
+								<Icon icon={ item.icon } size={ 24 } />
+								<span className="pattern-builder-create__kind-text">
+									<span className="pattern-builder-create__kind-label">
+										{ item.label }
+									</span>
+									<span className="pattern-builder-create__kind-summary">
+										{ item.summary }
+									</span>
+								</span>
+							</button>
+						) ) }
+					</div>
 				) ) }
 			</div>
 
@@ -295,6 +403,22 @@ export const PatternCreatePanel = ( { onCreated, layout = 'columns' } ) => {
 								value={ values.postTypes }
 								onChange={ ( value ) =>
 									setValue( { postTypes: value } )
+								}
+							/>
+						) }
+						{ kindHasField( kind, TEMPLATE_TYPES_FIELD ) && (
+							<TemplateTypesField
+								value={ values.templateTypes }
+								onChange={ ( value ) =>
+									setValue( { templateTypes: value } )
+								}
+							/>
+						) }
+						{ kindHasField( kind, TEMPLATE_PART_AREA_FIELD ) && (
+							<TemplatePartAreaField
+								value={ values.templatePartArea }
+								onChange={ ( value ) =>
+									setValue( { templatePartArea: value } )
 								}
 							/>
 						) }
