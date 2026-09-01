@@ -9,7 +9,7 @@ import {
 	PATTERN_KIND_GROUPS,
 	DESIGN,
 	SYNCED_DESIGN,
-	PAGE_STARTER,
+	PAGE,
 	BLOCK_STARTER,
 	TEMPLATE,
 	TEMPLATE_PART,
@@ -42,7 +42,7 @@ describe( 'pattern kinds', () => {
 		expect( PATTERN_KINDS.map( ( kind ) => kind.key ) ).toEqual( [
 			DESIGN,
 			SYNCED_DESIGN,
-			PAGE_STARTER,
+			PAGE,
 			BLOCK_STARTER,
 			TEMPLATE,
 			TEMPLATE_PART,
@@ -59,7 +59,7 @@ describe( 'pattern kinds', () => {
 		).toEqual( [ DESIGN, SYNCED_DESIGN ] );
 		expect(
 			getPatternKindsInGroup( STARTER_GROUP ).map( ( kind ) => kind.key )
-		).toEqual( [ PAGE_STARTER, BLOCK_STARTER, TEMPLATE, TEMPLATE_PART ] );
+		).toEqual( [ PAGE, BLOCK_STARTER, TEMPLATE, TEMPLATE_PART ] );
 		expect(
 			getPatternKindsInGroup( DESIGN_GROUP ).length +
 				getPatternKindsInGroup( STARTER_GROUP ).length
@@ -87,7 +87,7 @@ describe( 'pattern kinds', () => {
 	} );
 
 	it( 'never asks a starter pattern where to live — a wp_block cannot carry its headers', () => {
-		[ PAGE_STARTER, BLOCK_STARTER ].forEach( ( key ) => {
+		[ PAGE, BLOCK_STARTER ].forEach( ( key ) => {
 			const kind = getPatternKind( key );
 
 			expect( kindHasField( kind, STORAGE_FIELD ) ).toBe( false );
@@ -95,10 +95,7 @@ describe( 'pattern kinds', () => {
 		} );
 
 		expect(
-			buildCreateRequest(
-				getPatternKind( PAGE_STARTER ),
-				valuesFor( PAGE_STARTER )
-			).path
+			buildCreateRequest( getPatternKind( PAGE ), valuesFor( PAGE ) ).path
 		).toBe( '/pattern-builder/v1/patterns' );
 	} );
 } );
@@ -150,12 +147,12 @@ describe( 'canCreate', () => {
 	} );
 
 	it( 'requires a starter pattern to name at least one post type', () => {
-		const starter = getPatternKind( PAGE_STARTER );
+		const starter = getPatternKind( PAGE );
 
 		expect(
-			canCreate( starter, valuesFor( PAGE_STARTER, { postTypes: [] } ) )
+			canCreate( starter, valuesFor( PAGE, { postTypes: [] } ) )
 		).toBe( false );
-		expect( canCreate( starter, valuesFor( PAGE_STARTER ) ) ).toBe( true );
+		expect( canCreate( starter, valuesFor( PAGE ) ) ).toBe( true );
 	} );
 } );
 
@@ -212,8 +209,8 @@ describe( 'buildCreateRequest', () => {
 
 	it( 'gives a starter pattern the headers WordPress reads when new content is created', () => {
 		const request = buildCreateRequest(
-			getPatternKind( PAGE_STARTER ),
-			valuesFor( PAGE_STARTER, { postTypes: [ 'page', 'post' ] } )
+			getPatternKind( PAGE ),
+			valuesFor( PAGE, { postTypes: [ 'page', 'post' ] } )
 		);
 
 		expect( request.data ).toEqual( {
@@ -226,12 +223,12 @@ describe( 'buildCreateRequest', () => {
 	} );
 
 	it( 'starts a starter pattern on pages', () => {
-		expect(
-			getInitialValues( getPatternKind( PAGE_STARTER ) ).postTypes
-		).toEqual( [ 'page' ] );
-		expect(
-			kindHasField( getPatternKind( PAGE_STARTER ), POST_TYPES_FIELD )
-		).toBe( true );
+		expect( getInitialValues( getPatternKind( PAGE ) ).postTypes ).toEqual(
+			[ 'page' ]
+		);
+		expect( kindHasField( getPatternKind( PAGE ), POST_TYPES_FIELD ) ).toBe(
+			true
+		);
 	} );
 
 	it( 'binds a block starter pattern to the blocks the user picked', () => {
@@ -259,13 +256,13 @@ describe( 'buildCreateRequest', () => {
 	} );
 
 	it( 'keeps the page starter pattern on core/post-content, which it never asks about', () => {
-		const kind = getPatternKind( PAGE_STARTER );
+		const kind = getPatternKind( PAGE );
 
 		expect( kindHasField( kind, BLOCK_TYPES_FIELD ) ).toBe( false );
 		expect(
 			buildCreateRequest(
 				kind,
-				valuesFor( PAGE_STARTER, { blockTypes: [ 'core/cover' ] } )
+				valuesFor( PAGE, { blockTypes: [ 'core/cover' ] } )
 			).data.blockTypes
 		).toEqual( [ POST_CONTENT_BLOCK ] );
 	} );
@@ -325,8 +322,8 @@ describe( 'buildCreateRequest', () => {
 
 	it( 'ignores a source the kind never asked for', () => {
 		const request = buildCreateRequest(
-			getPatternKind( PAGE_STARTER ),
-			valuesFor( PAGE_STARTER, { source: 'user' } )
+			getPatternKind( PAGE ),
+			valuesFor( PAGE, { source: 'user' } )
 		);
 
 		expect( request.path ).toBe( '/pattern-builder/v1/patterns' );

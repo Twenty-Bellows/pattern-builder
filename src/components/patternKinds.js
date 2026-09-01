@@ -24,7 +24,7 @@ import {
 
 export const DESIGN = 'design';
 export const SYNCED_DESIGN = 'synced-design';
-export const PAGE_STARTER = 'page-starter';
+export const PAGE = 'page';
 export const BLOCK_STARTER = 'block-starter';
 export const TEMPLATE = 'template';
 export const TEMPLATE_PART = 'template-part';
@@ -163,10 +163,10 @@ export const PATTERN_KINDS = [
 		defaults: { source: 'theme', synced: true },
 	},
 	{
-		key: PAGE_STARTER,
+		key: PAGE,
 		group: STARTER_GROUP,
 		icon: pageIcon,
-		label: __( 'Page Starter Pattern', 'pattern-builder' ),
+		label: __( 'Page Pattern', 'pattern-builder' ),
 		summary: __(
 			'Offered when new content is created.',
 			'pattern-builder'
