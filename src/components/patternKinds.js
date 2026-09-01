@@ -10,11 +10,17 @@
  */
 
 import { __ } from '@wordpress/i18n';
-import { layout, symbol, page as pageIcon } from '@wordpress/icons';
+import {
+	layout,
+	symbol,
+	page as pageIcon,
+	blockDefault,
+} from '@wordpress/icons';
 
 export const DESIGN = 'design';
 export const SYNCED_DESIGN = 'synced-design';
 export const STARTER = 'starter';
+export const BLOCK_STARTER = 'block-starter';
 
 /**
  * The block type WordPress reads to offer a pattern as starter content for
@@ -26,10 +32,12 @@ export const POST_CONTENT_BLOCK = 'core/post-content';
  * Extra inputs a kind asks the user for, beyond name and description.
  *
  * `storage` — theme file or database. `postTypes` — which post types get
- * offered the pattern when new content is created.
+ * offered the pattern when new content is created. `blockTypes` — which
+ * blocks offer the pattern when they are inserted.
  */
 export const STORAGE_FIELD = 'storage';
 export const POST_TYPES_FIELD = 'postTypes';
+export const BLOCK_TYPES_FIELD = 'blockTypes';
 
 export const PATTERN_KINDS = [
 	{
@@ -85,6 +93,20 @@ export const PATTERN_KINDS = [
 			postTypes: [ 'page' ],
 		},
 	},
+	{
+		key: BLOCK_STARTER,
+		icon: blockDefault,
+		label: __( 'Block Starter Pattern', 'pattern-builder' ),
+		summary: __( 'Offered when a block is inserted.', 'pattern-builder' ),
+		description: __(
+			'These patterns belong to a block. WordPress offers them when that block is inserted and still empty — an untouched Query Loop or Cover asks which one to start from — and from the block’s toolbar, to swap one design for another.',
+			'pattern-builder'
+		),
+		// Same story as a starter pattern: Block Types is a pattern-file
+		// header, so this kind is always a theme pattern.
+		fields: [ BLOCK_TYPES_FIELD ],
+		defaults: { source: 'theme', synced: false, blockTypes: [] },
+	},
 ];
 
 /**
@@ -122,6 +144,7 @@ export function getInitialValues( kind ) {
 		description: '',
 		source: kind.defaults.source,
 		postTypes: kind.defaults.postTypes || [],
+		blockTypes: kind.defaults.blockTypes || [],
 	};
 }
 
@@ -139,6 +162,10 @@ export function canCreate( kind, values ) {
 
 	if ( kindHasField( kind, POST_TYPES_FIELD ) ) {
 		return ( values.postTypes || [] ).length > 0;
+	}
+
+	if ( kindHasField( kind, BLOCK_TYPES_FIELD ) ) {
+		return ( values.blockTypes || [] ).length > 0;
 	}
 
 	return true;
@@ -178,7 +205,9 @@ export function buildCreateRequest( kind, values ) {
 	}
 
 	const data = { title, description, synced };
-	const blockTypes = kind.defaults.blockTypes || [];
+	const blockTypes = kindHasField( kind, BLOCK_TYPES_FIELD )
+		? values.blockTypes || []
+		: kind.defaults.blockTypes || [];
 	const postTypes = kindHasField( kind, POST_TYPES_FIELD )
 		? values.postTypes || []
 		: kind.defaults.postTypes || [];

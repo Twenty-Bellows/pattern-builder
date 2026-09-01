@@ -9,9 +9,11 @@ import {
 	DESIGN,
 	SYNCED_DESIGN,
 	STARTER,
+	BLOCK_STARTER,
 	POST_CONTENT_BLOCK,
 	STORAGE_FIELD,
 	POST_TYPES_FIELD,
+	BLOCK_TYPES_FIELD,
 	getPatternKind,
 	getInitialValues,
 	kindHasField,
@@ -26,11 +28,12 @@ const valuesFor = ( key, overrides = {} ) => ( {
 } );
 
 describe( 'pattern kinds', () => {
-	it( 'offers a design, a synced design, and a starter kind', () => {
+	it( 'offers a design, a synced design, and the two starter kinds', () => {
 		expect( PATTERN_KINDS.map( ( kind ) => kind.key ) ).toEqual( [
 			DESIGN,
 			SYNCED_DESIGN,
 			STARTER,
+			BLOCK_STARTER,
 		] );
 	} );
 
@@ -55,13 +58,19 @@ describe( 'pattern kinds', () => {
 	} );
 
 	it( 'never asks a starter pattern where to live — a wp_block cannot carry its headers', () => {
-		const starter = getPatternKind( STARTER );
+		[ STARTER, BLOCK_STARTER ].forEach( ( key ) => {
+			const kind = getPatternKind( key );
 
-		expect( kindHasField( starter, STORAGE_FIELD ) ).toBe( false );
-		expect( starter.defaults.source ).toBe( 'theme' );
-		expect( buildCreateRequest( starter, valuesFor( STARTER ) ).path ).toBe(
-			'/pattern-builder/v1/patterns'
-		);
+			expect( kindHasField( kind, STORAGE_FIELD ) ).toBe( false );
+			expect( kind.defaults.source ).toBe( 'theme' );
+		} );
+
+		expect(
+			buildCreateRequest(
+				getPatternKind( STARTER ),
+				valuesFor( STARTER )
+			).path
+		).toBe( '/pattern-builder/v1/patterns' );
 	} );
 } );
 
@@ -75,6 +84,18 @@ describe( 'canCreate', () => {
 		).toBe( false );
 		expect(
 			canCreate( getPatternKind( DESIGN ), valuesFor( DESIGN ) )
+		).toBe( true );
+	} );
+
+	it( 'requires a block starter pattern to name at least one block', () => {
+		const kind = getPatternKind( BLOCK_STARTER );
+
+		expect( canCreate( kind, valuesFor( BLOCK_STARTER ) ) ).toBe( false );
+		expect(
+			canCreate(
+				kind,
+				valuesFor( BLOCK_STARTER, { blockTypes: [ 'core/cover' ] } )
+			)
 		).toBe( true );
 	} );
 
@@ -161,6 +182,42 @@ describe( 'buildCreateRequest', () => {
 		expect(
 			kindHasField( getPatternKind( STARTER ), POST_TYPES_FIELD )
 		).toBe( true );
+	} );
+
+	it( 'binds a block starter pattern to the blocks the user picked', () => {
+		const request = buildCreateRequest(
+			getPatternKind( BLOCK_STARTER ),
+			valuesFor( BLOCK_STARTER, {
+				blockTypes: [ 'core/query', 'core/cover' ],
+			} )
+		);
+
+		expect( request.data ).toEqual( {
+			title: 'Hero',
+			description: '',
+			synced: false,
+			blockTypes: [ 'core/query', 'core/cover' ],
+		} );
+		expect( request.data.postTypes ).toBeUndefined();
+	} );
+
+	it( 'starts a block starter pattern with no block chosen', () => {
+		const kind = getPatternKind( BLOCK_STARTER );
+
+		expect( getInitialValues( kind ).blockTypes ).toEqual( [] );
+		expect( kindHasField( kind, BLOCK_TYPES_FIELD ) ).toBe( true );
+	} );
+
+	it( 'keeps the page starter pattern on core/post-content, which it never asks about', () => {
+		const kind = getPatternKind( STARTER );
+
+		expect( kindHasField( kind, BLOCK_TYPES_FIELD ) ).toBe( false );
+		expect(
+			buildCreateRequest(
+				kind,
+				valuesFor( STARTER, { blockTypes: [ 'core/cover' ] } )
+			).data.blockTypes
+		).toEqual( [ POST_CONTENT_BLOCK ] );
 	} );
 
 	it( 'ignores a source the kind never asked for', () => {

@@ -13,8 +13,6 @@ import {
 	Icon,
 	Notice,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
-	__experimentalVStack as VStack,
-	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalText as Text,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalToggleGroupControl as ToggleGroupControl,
@@ -28,11 +26,13 @@ import { store as coreStore } from '@wordpress/core-data';
  * Internal dependencies
  */
 import { navigateToPattern } from '../utils/patternNavigation';
+import { BlockTypePicker } from './BlockTypePicker';
 import {
 	PATTERN_KINDS,
 	DESIGN,
 	STORAGE_FIELD,
 	POST_TYPES_FIELD,
+	BLOCK_TYPES_FIELD,
 	getPatternKind,
 	getInitialValues,
 	kindHasField,
@@ -50,7 +50,7 @@ import './PatternCreatePanel.scss';
  */
 function StorageField( { value, onChange } ) {
 	return (
-		<VStack spacing={ 2 }>
+		<div className="pattern-builder-create__field">
 			<ToggleGroupControl
 				__next40pxDefaultSize
 				__nextHasNoMarginBottom
@@ -81,7 +81,7 @@ function StorageField( { value, onChange } ) {
 							'pattern-builder'
 					  ) }
 			</Text>
-		</VStack>
+		</div>
 	);
 }
 
@@ -113,7 +113,7 @@ function PostTypesField( { value, onChange } ) {
 	};
 
 	return (
-		<VStack spacing={ 2 }>
+		<div className="pattern-builder-create__field">
 			<p className="pattern-builder-create__field-label">
 				{ __(
 					'Which post types should offer this pattern?',
@@ -135,13 +135,7 @@ function PostTypesField( { value, onChange } ) {
 					/>
 				) ) }
 			</div>
-			<Text variant="muted">
-				{ __(
-					'Starter Patterns are stored in your theme — the contexts they are offered in are recorded in the pattern file.',
-					'pattern-builder'
-				) }
-			</Text>
-		</VStack>
+		</div>
 	);
 }
 
@@ -256,57 +250,75 @@ export const PatternCreatePanel = ( { onCreated, layout = 'columns' } ) => {
 
 			<div className="pattern-builder-create__detail">
 				<div className="pattern-builder-create__body">
-					<VStack spacing={ 6 }>
-						<VStack spacing={ 2 }>
-							<h3 className="pattern-builder-create__title">
-								{ kind.label }
-							</h3>
-							<p className="pattern-builder-create__description">
-								{ kind.description }
-							</p>
-						</VStack>
+					<div className="pattern-builder-create__intro">
+						<h3 className="pattern-builder-create__title">
+							{ kind.label }
+						</h3>
+						<p className="pattern-builder-create__description">
+							{ kind.description }
+						</p>
+					</div>
 
-						<VStack spacing={ 4 }>
-							<TextControl
-								__next40pxDefaultSize
-								__nextHasNoMarginBottom
-								label={ __( 'Name', 'pattern-builder' ) }
-								value={ values.title }
+					<div className="pattern-builder-create__fields">
+						<TextControl
+							__next40pxDefaultSize
+							__nextHasNoMarginBottom
+							label={ __( 'Name', 'pattern-builder' ) }
+							value={ values.title }
+							onChange={ ( value ) =>
+								setValue( { title: value } )
+							}
+						/>
+						<TextareaControl
+							__nextHasNoMarginBottom
+							label={ __( 'Description', 'pattern-builder' ) }
+							value={ values.description }
+							rows={ 3 }
+							placeholder={ __(
+								'A short description of the pattern',
+								'pattern-builder'
+							) }
+							onChange={ ( value ) =>
+								setValue( { description: value } )
+							}
+						/>
+						{ kindHasField( kind, STORAGE_FIELD ) && (
+							<StorageField
+								value={ values.source }
 								onChange={ ( value ) =>
-									setValue( { title: value } )
+									setValue( { source: value } )
 								}
 							/>
-							<TextareaControl
-								__nextHasNoMarginBottom
-								label={ __( 'Description', 'pattern-builder' ) }
-								value={ values.description }
-								rows={ 3 }
-								placeholder={ __(
-									'A short description of the pattern',
+						) }
+						{ kindHasField( kind, POST_TYPES_FIELD ) && (
+							<PostTypesField
+								value={ values.postTypes }
+								onChange={ ( value ) =>
+									setValue( { postTypes: value } )
+								}
+							/>
+						) }
+						{ kindHasField( kind, BLOCK_TYPES_FIELD ) && (
+							<BlockTypePicker
+								label={ __(
+									'Which blocks should offer this pattern?',
 									'pattern-builder'
 								) }
+								value={ values.blockTypes }
 								onChange={ ( value ) =>
-									setValue( { description: value } )
+									setValue( { blockTypes: value } )
 								}
 							/>
-							{ kindHasField( kind, STORAGE_FIELD ) && (
-								<StorageField
-									value={ values.source }
-									onChange={ ( value ) =>
-										setValue( { source: value } )
-									}
-								/>
-							) }
-							{ kindHasField( kind, POST_TYPES_FIELD ) && (
-								<PostTypesField
-									value={ values.postTypes }
-									onChange={ ( value ) =>
-										setValue( { postTypes: value } )
-									}
-								/>
-							) }
-						</VStack>
-					</VStack>
+						) }
+						{ ! kindHasField( kind, STORAGE_FIELD ) && (
+							<Text variant="muted">
+								{ __(
+									'Stored in your theme: the contexts a pattern is offered in are pattern-file headers.',
+									'pattern-builder'
+								) }
+							</Text>
+						) }
+					</div>
 				</div>
 
 				<div className="pattern-builder-create__footer">
