@@ -77,6 +77,18 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 4. Start development environment: `npm run start`
 5. Watch for changes: `npm run watch`
 
+== External services ==
+
+Everything local works without an account and without sending anything anywhere. Two services are involved only when you choose to use them:
+
+**patternbuilderwp.com** — the cloud library and community directory, and the account behind them. When you sign in or create an account from Appearance → Pattern Builder, your email and password are relayed once, server-side, to patternbuilderwp.com; only the returned access token is stored, on this site, for your WordPress user. Browsing the Uploaded and Community tabs, uploading and downloading patterns, starting a password reset, and confirming a purchase all talk to patternbuilderwp.com through this site. Anonymous usage reporting, if you allow it, goes there too (see below). Terms: https://patternbuilderwp.com/terms/ — Privacy: https://patternbuilderwp.com/privacy/
+
+**Freemius** — the checkout for Pattern Builder Pro. Choosing Go Pro loads Freemius's checkout script (https://checkout.freemius.com/js/v1/) on the Pattern Builder screen and opens their checkout; nothing from Freemius loads anywhere else or before that click. Terms: https://freemius.com/terms/ — Privacy: https://freemius.com/privacy/
+
+= Usage reporting (opt-in) =
+
+The first time the pattern browser opens on a site, it asks once whether Pattern Builder may report anonymous usage, with Allow and No thanks buttons. Nothing is sent unless an administrator chooses Allow, and the choice can be changed on the same screen at any time. What is sent when allowed: which features are used (the browser opened, a pattern created, the community browsed, an upload or download) and the environment — WordPress, PHP and plugin versions, locale, active theme, multisite, and environment type — under a random install id. What is never sent: the site's address or name, pattern content, or anything about the site's visitors.
+
 == Frequently Asked Questions ==
 
 = Can I use this with any theme? =
@@ -90,6 +102,13 @@ Yes, Pattern Builder provides a unified interface to manage both theme patterns 
 == Screenshots ==
 
 == Changelog ==
+
+= 2.1.0 =
+* Community patterns are browsed as an account: the Community tab asks you to sign in or create a free account first
+* Creating an account from wp-admin now asks for a stronger password (eight characters, with an upper-case letter, a number and a symbol), asks whether we may email you news and offers, and sends a confirmation email
+* Forgot your password? The connect panel starts a reset; the link in the email finishes it on patternbuilderwp.com
+* Go Pro opens Freemius's checkout right on the Pattern Builder screen, and Pro is active the moment the purchase completes
+* Opt-in anonymous usage reporting, asked once with Allow and No thanks, and never on by default
 
 = 2.0.0 =
 * Complete architectural overhaul: theme pattern files are now the single source of truth — no more database mirror posts, no more custom post type rows, and no more interception of the /wp/v2/blocks REST API

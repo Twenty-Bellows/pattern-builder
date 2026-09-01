@@ -36,19 +36,22 @@ class Pattern_Builder_Cloud_Controller {
 		};
 
 		$routes = array(
-			'/cloud/status'        => array( 'GET', 'status' ),
-			'/cloud/login'         => array( 'POST', 'login' ),
-			'/cloud/signup'        => array( 'POST', 'signup' ),
-			'/cloud/disconnect'    => array( 'POST', 'disconnect' ),
-			'/cloud/library'       => array( 'GET', 'library' ),
-			'/cloud/categories'    => array( 'GET', 'categories' ),
-			'/cloud/directory'     => array( 'GET', 'directory' ),
-			'/cloud/collections'   => array( 'GET', 'collections' ),
-			'/cloud/links'         => array( 'GET', 'links' ),
-			'/cloud/pattern-state' => array( 'GET', 'pattern_state' ),
-			'/cloud/upload'        => array( 'POST', 'upload' ),
-			'/cloud/download'      => array( 'POST', 'download' ),
-			'/cloud/tokens/check'  => array( 'POST', 'tokens_check' ),
+			'/cloud/status'          => array( 'GET', 'status' ),
+			'/cloud/login'           => array( 'POST', 'login' ),
+			'/cloud/signup'          => array( 'POST', 'signup' ),
+			'/cloud/disconnect'      => array( 'POST', 'disconnect' ),
+			'/cloud/library'         => array( 'GET', 'library' ),
+			'/cloud/categories'      => array( 'GET', 'categories' ),
+			'/cloud/directory'       => array( 'GET', 'directory' ),
+			'/cloud/collections'     => array( 'GET', 'collections' ),
+			'/cloud/links'           => array( 'GET', 'links' ),
+			'/cloud/pattern-state'   => array( 'GET', 'pattern_state' ),
+			'/cloud/upload'          => array( 'POST', 'upload' ),
+			'/cloud/download'        => array( 'POST', 'download' ),
+			'/cloud/tokens/check'    => array( 'POST', 'tokens_check' ),
+			'/cloud/password/forgot' => array( 'POST', 'forgot_password' ),
+			'/cloud/verify/resend'   => array( 'POST', 'resend_verification' ),
+			'/cloud/billing/sync'    => array( 'POST', 'sync_billing' ),
 		);
 
 		foreach ( $routes as $route => $handler ) {
@@ -109,7 +112,11 @@ class Pattern_Builder_Cloud_Controller {
 				'tier'       => $me['tier'],
 				'usage'      => $me['usage'],
 				'upgradeUrl' => isset( $me['upgrade_url'] ) ? $me['upgrade_url'] : '',
+				// What the overlay checkout needs, or null once Pro (or
+				// until the service's product is configured).
+				'checkout'   => isset( $me['checkout'] ) ? $me['checkout'] : null,
 				'portalUrl'  => isset( $me['portal_url'] ) ? $me['portal_url'] : '',
+				'telemetry'  => Pattern_Builder_Telemetry::client_state(),
 			)
 		);
 	}
@@ -128,6 +135,7 @@ class Pattern_Builder_Cloud_Controller {
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
+		Pattern_Builder_Telemetry::record( 'account_connected', array( 'kind' => 'login' ) );
 		return $this->status();
 	}
 
@@ -141,8 +149,55 @@ class Pattern_Builder_Cloud_Controller {
 		$result = Pattern_Builder_Cloud::signup(
 			(string) $request->get_param( 'email' ),
 			(string) $request->get_param( 'password' ),
-			(string) $request->get_param( 'name' )
+			(string) $request->get_param( 'name' ),
+			rest_sanitize_boolean( $request->get_param( 'marketing' ) )
 		);
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		Pattern_Builder_Telemetry::record( 'account_connected', array( 'kind' => 'signup' ) );
+		return $this->status();
+	}
+
+	/**
+	 * POST /cloud/password/forgot — have the service email a reset link.
+	 *
+	 * The link opens on patternbuilderwp.com; the plugin only starts it.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function forgot_password( $request ) {
+		$email = sanitize_email( (string) $request->get_param( 'email' ) );
+		if ( ! is_email( $email ) ) {
+			return new WP_Error( 'pb_cloud_bad_email', __( 'Enter a valid email address.', 'pattern-builder' ), array( 'status' => 400 ) );
+		}
+		return rest_ensure_response( Pattern_Builder_Cloud::forgot_password( $email ) );
+	}
+
+	/**
+	 * POST /cloud/verify/resend — a fresh confirmation email.
+	 *
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function resend_verification() {
+		if ( ! Pattern_Builder_Cloud::is_connected() ) {
+			return new WP_Error( 'pb_cloud_disconnected', __( 'Connect to patternbuilderwp.com first.', 'pattern-builder' ), array( 'status' => 400 ) );
+		}
+		return rest_ensure_response( Pattern_Builder_Cloud::resend_verification() );
+	}
+
+	/**
+	 * POST /cloud/billing/sync — the overlay checkout reported a purchase.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function sync_billing( $request ) {
+		if ( ! Pattern_Builder_Cloud::is_connected() ) {
+			return new WP_Error( 'pb_cloud_disconnected', __( 'Connect to patternbuilderwp.com first.', 'pattern-builder' ), array( 'status' => 400 ) );
+		}
+		$result = Pattern_Builder_Cloud::sync_billing( (int) $request->get_param( 'licenseId' ) );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
@@ -155,6 +210,7 @@ class Pattern_Builder_Cloud_Controller {
 	 * @return WP_REST_Response
 	 */
 	public function disconnect() {
+		Pattern_Builder_Telemetry::record( 'account_disconnected' ); // While the account is still known.
 		Pattern_Builder_Cloud::disconnect();
 		return rest_ensure_response( array( 'connected' => false ) );
 	}
@@ -185,7 +241,27 @@ class Pattern_Builder_Cloud_Controller {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function directory( $request ) {
+		$gate = self::require_connection();
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
 		return $this->proxy_list( '/directory/patterns', $request );
+	}
+
+	/**
+	 * The community is browsed as an account.
+	 *
+	 * The service lists its directory to anyone; this plugin asks people
+	 * to sign in first, so what is downloaded onto a site is downloaded
+	 * by somebody. The proxy enforces it, not just the tab.
+	 *
+	 * @return true|WP_Error
+	 */
+	private static function require_connection() {
+		if ( Pattern_Builder_Cloud::is_connected() ) {
+			return true;
+		}
+		return new WP_Error( 'pb_cloud_disconnected', __( 'Sign in to patternbuilderwp.com to browse community patterns.', 'pattern-builder' ), array( 'status' => 401 ) );
 	}
 
 	/**
@@ -194,6 +270,10 @@ class Pattern_Builder_Cloud_Controller {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function collections() {
+		$gate = self::require_connection();
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
 		return rest_ensure_response( Pattern_Builder_Cloud::request( 'GET', '/directory/collections' ) );
 	}
 
@@ -359,6 +439,14 @@ class Pattern_Builder_Cloud_Controller {
 			Pattern_Builder_Cloud::set_link( $exported['localKey'], (int) $result['id'], $exported['contentHash'] );
 		}
 
+		Pattern_Builder_Telemetry::record(
+			'pattern_uploaded',
+			array(
+				'source' => $type,
+				'kind'   => $existing && ! $as_new ? 'update' : 'new',
+			)
+		);
+
 		return rest_ensure_response(
 			array(
 				'pattern'  => $result,
@@ -386,8 +474,9 @@ class Pattern_Builder_Cloud_Controller {
 		if ( ! $cloud_id ) {
 			return new WP_Error( 'pb_cloud_bad_request', __( 'Which pattern?', 'pattern-builder' ), array( 'status' => 400 ) );
 		}
-		if ( 'library' === $source && ! Pattern_Builder_Cloud::is_connected() ) {
-			return new WP_Error( 'pb_cloud_disconnected', __( 'Connect to patternbuilderwp.com first.', 'pattern-builder' ), array( 'status' => 400 ) );
+		$gate = self::require_connection();
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
 		}
 
 		$pbp = Pattern_Builder_Cloud::request( 'POST', "/{$source}/patterns/{$cloud_id}/download" );
@@ -432,6 +521,14 @@ class Pattern_Builder_Cloud_Controller {
 			$cloud_id,
 			is_wp_error( $hash ) ? '' : $hash,
 			$owned
+		);
+
+		Pattern_Builder_Telemetry::record(
+			'pattern_downloaded',
+			array(
+				'source'      => $source,
+				'destination' => $destination,
+			)
 		);
 
 		$result['tokensWritten'] = $tokens_written;

@@ -125,3 +125,42 @@
 .pattern-builder-cloud__destination-modal {
 	max-width: 420px;
 }
+
+.pattern-builder-cloud__consent {
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	padding: 8px 12px 12px;
+	margin: 0;
+
+	legend {
+		font-weight: 600;
+		padding: 0 4px;
+	}
+}
+
+.pattern-builder-cloud__consent-hint {
+	margin: 0 0 8px;
+	color: #50575e;
+	font-size: 12px;
+}
+
+.pattern-builder-cloud__verify {
+	margin: 0 0 12px;
+}
+
+.pattern-builder-telemetry-offer {
+	margin: 0;
+	text-align: center;
+	color: #50575e;
+	font-size: 12px;
+}
+
+.pattern-builder-telemetry-prompt__facts {
+	margin: 0 0 16px;
+	padding-left: 20px;
+	color: #50575e;
+
+	li {
+		margin-bottom: 6px;
+	}
+}

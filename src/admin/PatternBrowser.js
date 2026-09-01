@@ -18,6 +18,8 @@ import { PatternCard } from '../components/PatternCard';
 import { PatternDetailsPanel } from '../components/PatternDetailsPanel';
 import { PatternCreatePanel } from '../components/PatternCreatePanel';
 import { PatternBuilderLogo } from '../assets/icons';
+import { TelemetryPrompt } from '../components/TelemetryPrompt';
+import { shouldAskForTelemetry, track } from '../utils/telemetry';
 import {
 	CloudBrowser,
 	CLOUD_LIBRARY,
@@ -133,6 +135,15 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 	const [ cloudCollections, setCloudCollections ] = useState( [] );
 	const [ selectedId, setSelectedId ] = useState( null );
 	const [ isCreateOpen, setIsCreateOpen ] = useState( false );
+
+	// Asked once per site, the first time anyone opens this screen.
+	const [ askTelemetry, setAskTelemetry ] = useState(
+		shouldAskForTelemetry()
+	);
+
+	useEffect( () => {
+		track( 'browser_opened' );
+	}, [] );
 
 	const isCloud = CLOUD_COLLECTIONS.includes( collection );
 
@@ -444,12 +455,23 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 						className="pattern-builder-browser__create-modal"
 					>
 						<PatternCreatePanel
-							onCreated={ () => {
+							onCreated={ ( created ) => {
+								track( 'pattern_created', {
+									kind: created?.kind || '',
+									source: created?.source || '',
+								} );
 								setIsCreateOpen( false );
 								refresh();
 							} }
 						/>
 					</Modal>
+				) }
+
+				{ askTelemetry && (
+					<TelemetryPrompt
+						onAnswer={ () => setAskTelemetry( false ) }
+						onDismiss={ () => setAskTelemetry( false ) }
+					/>
 				) }
 
 				<SnackbarList

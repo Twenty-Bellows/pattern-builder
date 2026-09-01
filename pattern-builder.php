@@ -31,3 +31,10 @@ require_once __DIR__ . '/includes/class-pattern-builder.php';
  * provide the runtime itself or defer to the companion.
  */
 add_action( 'plugins_loaded', array( 'TwentyBellows\PatternBuilder\Pattern_Builder', 'get_instance' ) );
+
+/*
+ * Usage telemetry is opt-in (see Pattern_Builder_Telemetry): these send
+ * nothing unless an administrator already said yes on this site.
+ */
+register_activation_hook( __FILE__, array( 'TwentyBellows\PatternBuilder\Pattern_Builder_Telemetry', 'on_activation' ) );
+register_deactivation_hook( __FILE__, array( 'TwentyBellows\PatternBuilder\Pattern_Builder_Telemetry', 'on_deactivation' ) );
