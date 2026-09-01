@@ -228,6 +228,43 @@ class Test_Abilities extends WP_UnitTestCase {
 		}
 	}
 
+	/**
+	 * An agent that goes straight to create-pattern reads no guide at all, so
+	 * the one step it cannot afford to skip has to be on the index — and the
+	 * abilities it names have to be ones that exist, or it is worse than
+	 * saying nothing.
+	 */
+	public function test_the_index_says_to_validate_and_points_at_the_means() {
+		$index = $this->abilities->execute_authoring_guide();
+
+		$this->assertArrayHasKey( 'validate', $index );
+		$validate = $index['validate'];
+
+		$this->assertStringContainsString( 'save()', $validate['why'] );
+		$this->assertStringContainsString( 'jsdom', $validate['requires'] );
+
+		foreach ( array( $validate['tool'], $validate['scripts'] ) as $name ) {
+			$this->assertTrue(
+				wp_has_ability( $name ),
+				$name . ' is named on the index but is not registered.'
+			);
+		}
+
+		// And the guide it sends you to has to be one the index lists.
+		$this->assertContains( $validate['guide'], wp_list_pluck( $index['guides'], 'name' ) );
+	}
+
+	/**
+	 * The pointer belongs to the index. A single guide is the document that
+	 * was asked for and nothing else.
+	 */
+	public function test_a_single_guide_carries_no_index_furniture() {
+		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'block-markup' ) );
+
+		$this->assertArrayNotHasKey( 'validate', $guide );
+		$this->assertArrayNotHasKey( 'guides', $guide );
+	}
+
 	public function test_a_guide_comes_back_as_markdown() {
 		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'pattern-kinds' ) );
 

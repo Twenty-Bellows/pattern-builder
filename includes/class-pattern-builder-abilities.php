@@ -528,16 +528,20 @@ class Pattern_Builder_Abilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'guides'  => array(
+						'guides'   => array(
 							'type'        => 'array',
 							'description' => 'The index: name, title and size of each available guide.',
 							'items'       => array( 'type' => 'object' ),
 						),
-						'name'    => array( 'type' => 'string' ),
-						'format'  => array( 'type' => 'string' ),
-						'content' => array(
+						'name'     => array( 'type' => 'string' ),
+						'format'   => array( 'type' => 'string' ),
+						'content'  => array(
 							'type'        => 'string',
 							'description' => 'Markdown. Agent-facing instructions, not user documentation.',
+						),
+						'validate' => array(
+							'type'        => 'object',
+							'description' => 'On the index only: the check to run before storing anything, and which abilities hand you the means to run it.',
 						),
 					),
 				),
@@ -675,11 +679,25 @@ class Pattern_Builder_Abilities {
 			}
 
 			return array(
-				'guides'  => $index,
-				'format'  => 'markdown',
-				'name'    => 'index',
+				'guides'   => $index,
+				'format'   => 'markdown',
+				'name'     => 'index',
 				// Say what this is for, since an index alone does not.
-				'content' => __( 'Agent-facing instructions for writing WordPress block patterns. Request one by name with input[guide], or "all" for everything. Install the Markdown wherever your harness reads instructions from.', 'pattern-builder' ),
+				'content'  => __( 'Agent-facing instructions for writing WordPress block patterns. Request one by name with input[guide], or "all" for everything. Install the Markdown wherever your harness reads instructions from.', 'pattern-builder' ),
+
+				/*
+				 * An agent that goes straight to create-pattern never reads a
+				 * guide, and the one step it cannot afford to skip is the one
+				 * this site cannot do for it. So the index carries it, where
+				 * anyone asking what to read will see it first.
+				 */
+				'validate' => array(
+					'why'      => __( 'Validate markup before storing it. A block is valid only if re-running its save() reproduces the markup, and save() is JavaScript — no server can run it, so nothing here checks this for you. Invalid markup renders correctly on the front end and fails the moment an editor opens the pattern.', 'pattern-builder' ),
+					'tool'     => 'pattern-builder/get-validator',
+					'scripts'  => 'pattern-builder/get-editor-scripts',
+					'requires' => 'node, jsdom',
+					'guide'    => 'block-markup',
+				),
 			);
 		}
 
