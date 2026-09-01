@@ -262,6 +262,95 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'pattern-kinds', $result->get_error_message() );
 	}
 
+	/**
+	 * The shipped guides describe WordPress, not your project. What an agent
+	 * most needs on top of them is the house rule — which blocks this build
+	 * settled on, why a section is composed the way it is — that a theme knows
+	 * and the plugin cannot. So the set is filtered, and both amending a
+	 * shipped guide and adding one have to reach whoever asks, by every route
+	 * the ability offers.
+	 */
+	public function test_a_theme_can_amend_and_add_guides() {
+		add_filter(
+			'pattern_builder_authoring_guides',
+			function ( $guides ) {
+				$guides['block-vocabulary']['content'] .= "\n\nOn this site, core blocks only.";
+				$guides['house-rules']                  = array(
+					'title'   => 'House rules',
+					'content' => "# House rules\n\nSections are full width.",
+				);
+				return $guides;
+			}
+		);
+
+		$amended = $this->abilities->execute_authoring_guide( array( 'guide' => 'block-vocabulary' ) );
+		$this->assertStringContainsString( 'core blocks only', $amended['content'] );
+
+		$added = $this->abilities->execute_authoring_guide( array( 'guide' => 'house-rules' ) );
+		$this->assertStringContainsString( 'Sections are full width.', $added['content'] );
+
+		// An agent that reads only the index still has to find it.
+		$index = $this->abilities->execute_authoring_guide();
+		$this->assertContains( 'house-rules', wp_list_pluck( $index['guides'], 'name' ) );
+
+		// And "all" is what an agent installs wholesale.
+		$all = $this->abilities->execute_authoring_guide( array( 'guide' => 'all' ) );
+		$this->assertStringContainsString( 'Sections are full width.', $all['content'] );
+		$this->assertStringContainsString( 'core blocks only', $all['content'] );
+	}
+
+	/**
+	 * Titles are for the index, so a guide that arrives without one should
+	 * still read as something in a list rather than as its slug.
+	 */
+	public function test_a_guide_added_without_a_title_takes_one_from_its_heading() {
+		add_filter(
+			'pattern_builder_authoring_guides',
+			function ( $guides ) {
+				$guides['untitled'] = array( 'content' => "# Copy voice\n\nPlain sentences." );
+				return $guides;
+			}
+		);
+
+		$index  = $this->abilities->execute_authoring_guide();
+		$titles = array_column( $index['guides'], 'title', 'name' );
+
+		$this->assertSame( 'Copy voice', $titles['untitled'] );
+	}
+
+	/**
+	 * A filter is somebody else's code. One that returns nonsense should cost
+	 * the nonsense, not the ability.
+	 */
+	public function test_a_broken_filter_costs_that_guide_not_the_ability() {
+		add_filter(
+			'pattern_builder_authoring_guides',
+			function ( $guides ) {
+				$guides['no-content']   = array( 'title' => 'Nothing here' );
+				$guides['not-an-array'] = 'just a string';
+				$guides['']             = array( 'content' => 'nameless' );
+				return $guides;
+			}
+		);
+
+		$names = wp_list_pluck( $this->abilities->execute_authoring_guide()['guides'], 'name' );
+
+		$this->assertNotContains( 'no-content', $names );
+		$this->assertNotContains( 'not-an-array', $names );
+		$this->assertContains( 'authoring', $names, 'The shipped guides should survive a bad neighbour.' );
+	}
+
+	/**
+	 * And one that returns no array at all leaves an empty shelf rather than
+	 * a fatal.
+	 */
+	public function test_a_filter_that_returns_nothing_does_not_fatal() {
+		add_filter( 'pattern_builder_authoring_guides', '__return_null' );
+
+		$this->assertSame( array(), $this->abilities->execute_authoring_guide()['guides'] );
+		$this->assertWPError( $this->abilities->execute_authoring_guide( array( 'guide' => 'authoring' ) ) );
+	}
+
 	public function test_an_unknown_pattern_is_an_error_not_a_fatal() {
 		$result = $this->abilities->execute_get_pattern( array( 'id' => 'nothing/here' ) );
 

@@ -561,7 +561,7 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
-	 * The guides this plugin carries, by name.
+	 * The guides this plugin ships, by name.
 	 *
 	 * @return array name => relative path.
 	 */
@@ -577,26 +577,98 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
+	 * Every guide this site offers, loaded and filtered.
+	 *
+	 * The documents this plugin ships are general — they describe WordPress,
+	 * not your project. What an agent most needs on top of them is the house
+	 * rule: which blocks this build has settled on, the copy voice, the reason
+	 * a particular section is composed the way it is. A theme knows those and
+	 * the plugin cannot, so the set is filtered before it is served.
+	 *
+	 * The filter deals in text rather than file paths on purpose: a guide
+	 * added this way needs no filesystem access, and no caller can steer a
+	 * read outside the plugin.
+	 *
+	 * @return array name => array( title, content ).
+	 */
+	private function guides() {
+		$guides = array();
+
+		foreach ( $this->guide_files() as $name => $relative ) {
+			$text = $this->read_guide( $relative );
+			if ( null === $text ) {
+				continue;
+			}
+			$guides[ $name ] = array(
+				'title'   => $this->guide_title( $text, $name ),
+				'content' => $text,
+			);
+		}
+
+		/**
+		 * Filters the authoring guides an agent is given.
+		 *
+		 * Amend a shipped guide by appending to its `content`, or add one of
+		 * your own under a new key. Both reach every agent that asks this
+		 * site how to write a pattern, which makes this the place to put a
+		 * project's own conventions.
+		 *
+		 *     add_filter( 'pattern_builder_authoring_guides', function ( $guides ) {
+		 *         $guides['house-rules'] = array(
+		 *             'title'   => 'House rules for this theme',
+		 *             'content' => "# House rules\n\nSections are full-width…",
+		 *         );
+		 *         return $guides;
+		 *     } );
+		 *
+		 * @param array $guides Guides, keyed by name, each with `title` and
+		 *                      `content` (Markdown).
+		 */
+		$guides = apply_filters( 'pattern_builder_authoring_guides', $guides );
+
+		// A filter that returns something unusable should not take the
+		// ability down with it.
+		if ( ! is_array( $guides ) ) {
+			return array();
+		}
+
+		$clean = array();
+		foreach ( $guides as $name => $guide ) {
+			if ( ! is_array( $guide ) || empty( $guide['content'] ) || ! is_string( $guide['content'] ) ) {
+				continue;
+			}
+			$key = sanitize_key( (string) $name );
+			if ( '' === $key ) {
+				continue;
+			}
+			$clean[ $key ] = array(
+				'title'   => isset( $guide['title'] ) && is_string( $guide['title'] )
+					? $guide['title']
+					: $this->guide_title( $guide['content'], $key ),
+				'content' => $guide['content'],
+			);
+		}
+
+		return $clean;
+	}
+
+	/**
 	 * Serve the index, one guide, or all of them.
 	 *
 	 * @param array $input Ability input.
 	 * @return array|\WP_Error
 	 */
 	public function execute_authoring_guide( $input = array() ) {
-		$files  = $this->guide_files();
+		$guides = $this->guides();
 		$wanted = isset( $input['guide'] ) ? sanitize_key( (string) $input['guide'] ) : '';
 
 		if ( '' === $wanted ) {
 			$index = array();
-			foreach ( $files as $name => $relative ) {
-				$text = $this->read_guide( $relative );
-				if ( null === $text ) {
-					continue;
-				}
+			foreach ( $guides as $name => $guide ) {
 				$index[] = array(
 					'name'  => $name,
-					'title' => $this->guide_title( $text, $name ),
-					'words' => str_word_count( wp_strip_all_tags( $text ) ),
+					'title' => $guide['title'],
+					'words' => str_word_count( wp_strip_all_tags( $guide['content'] ) ),
 				);
 			}
 
@@ -611,11 +683,8 @@ class Pattern_Builder_Abilities {
 
 		if ( 'all' === $wanted ) {
 			$parts = array();
-			foreach ( $files as $name => $relative ) {
-				$text = $this->read_guide( $relative );
-				if ( null !== $text ) {
-					$parts[] = "<!-- guide: {$name} -->\n\n" . $text;
-				}
+			foreach ( $guides as $name => $guide ) {
+				$parts[] = "<!-- guide: {$name} -->\n\n" . $guide['content'];
 			}
 
 			return array(
@@ -625,24 +694,19 @@ class Pattern_Builder_Abilities {
 			);
 		}
 
-		if ( ! isset( $files[ $wanted ] ) ) {
+		if ( ! isset( $guides[ $wanted ] ) ) {
 			return new \WP_Error(
 				'pb_guide_not_found',
 				/* translators: %s: comma separated guide names. */
-				sprintf( __( 'No guide by that name. Available: %s.', 'pattern-builder' ), implode( ', ', array_keys( $files ) ) ),
+				sprintf( __( 'No guide by that name. Available: %s.', 'pattern-builder' ), implode( ', ', array_keys( $guides ) ) ),
 				array( 'status' => 404 )
 			);
-		}
-
-		$text = $this->read_guide( $files[ $wanted ] );
-		if ( null === $text ) {
-			return new \WP_Error( 'pb_guide_missing', __( 'That guide is not present in this installation.', 'pattern-builder' ), array( 'status' => 404 ) );
 		}
 
 		return array(
 			'name'    => $wanted,
 			'format'  => 'markdown',
-			'content' => $text,
+			'content' => $guides[ $wanted ]['content'],
 		);
 	}
 

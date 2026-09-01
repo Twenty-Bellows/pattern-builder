@@ -62,6 +62,17 @@ curl -u "$WP_USER:$WP_APP_PASSWORD" -G --data-urlencode 'input[namespace]=core' 
 Input goes under an `input` key — `input[key]=value` on a GET, `{"input":{…}}`
 in a POST body. See `references/abilities.md` for the full set.
 
+A site can also carry authoring guides of its own — house rules a theme adds
+through the `pattern_builder_authoring_guides` filter, like which blocks this
+build has settled on or how its copy reads. Ask for the index when you have a
+site to ask; anything it returns beyond these documents is project policy, and
+this repository cannot know it:
+
+```bash
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-authoring-guide/run"
+```
+
 **Otherwise, read the theme directly:** `theme.json` for `settings.color.palette`,
 `settings.spacing.spacingSizes`, `settings.typography.fontSizes`, and
 `settings.layout`. Check `styles/*.json` too, and the parent theme if this is a
@@ -307,4 +318,4 @@ add the token to `theme.json` and mention what you added.
 - `references/block-vocabulary.md` — which blocks are allowed where (core-only vs theme vs plugin), the core vocabulary by purpose, and composition guidance
 - `references/block-markup.md` — the attribute-to-markup contract per block, and the mistakes that produce invalid markup
 - `references/design-content-split.md` — Pattern Overrides slots, `core/pattern` `content`, synced patterns, and the silent failures
-- `references/abilities.md` — asking a running site for its design system, block types and patterns, and storing results
+- `references/abilities.md` — asking a running site for its design system, block types and patterns, storing results, and the guides the site itself carries
