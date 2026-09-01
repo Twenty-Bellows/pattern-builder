@@ -66,6 +66,7 @@ class Test_Abilities extends WP_UnitTestCase {
 			'pattern-builder/list-patterns',
 			'pattern-builder/get-pattern',
 			'pattern-builder/render-pattern',
+			'pattern-builder/get-authoring-guide',
 			'pattern-builder/create-pattern',
 			'pattern-builder/update-pattern',
 		);
@@ -85,7 +86,7 @@ class Test_Abilities extends WP_UnitTestCase {
 	public function test_annotations_map_to_the_methods_we_intend() {
 		$this->require_abilities_api();
 
-		foreach ( array( 'get-design-system', 'list-block-types', 'list-patterns', 'get-pattern', 'render-pattern' ) as $read ) {
+		foreach ( array( 'get-design-system', 'list-block-types', 'list-patterns', 'get-pattern', 'render-pattern', 'get-authoring-guide' ) as $read ) {
 			$meta = wp_get_ability( 'pattern-builder/' . $read )->get_meta();
 			$this->assertTrue( $meta['annotations']['readonly'], $read . ' should be readonly (GET).' );
 			$this->assertTrue( $meta['show_in_rest'], $read . ' must be reachable over REST.' );
@@ -202,6 +203,63 @@ class Test_Abilities extends WP_UnitTestCase {
 
 		$this->assertStringContainsString( 'Rendered body.', $rendered['html'] );
 		$this->assertStringNotContainsString( '<!-- wp:paragraph -->', $rendered['html'] );
+	}
+
+	/**
+	 * The abilities hand over what is true about this site and somewhere to
+	 * put a result; this one hands over the knowledge, so that an agent whose
+	 * harness has no notion of a "skill" can still be told how to do the job.
+	 */
+	public function test_the_authoring_guide_indexes_itself() {
+		$index = $this->abilities->execute_authoring_guide();
+
+		$this->assertArrayHasKey( 'guides', $index );
+		$names = wp_list_pluck( $index['guides'], 'name' );
+
+		foreach ( array( 'authoring', 'pattern-kinds', 'block-vocabulary', 'block-markup', 'design-content-split' ) as $expected ) {
+			$this->assertContains( $expected, $names, $expected . ' is missing from the index.' );
+		}
+
+		foreach ( $index['guides'] as $guide ) {
+			$this->assertNotEmpty( $guide['title'], $guide['name'] . ' has no title.' );
+			$this->assertGreaterThan( 100, $guide['words'], $guide['name'] . ' looks empty.' );
+		}
+	}
+
+	public function test_a_guide_comes_back_as_markdown() {
+		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'pattern-kinds' ) );
+
+		$this->assertSame( 'markdown', $guide['format'] );
+		$this->assertStringContainsString( '# Kinds of pattern', $guide['content'] );
+		$this->assertStringContainsString( 'Synced Design Pattern', $guide['content'] );
+	}
+
+	/**
+	 * The main guide doubles as a Claude skill, so it carries YAML front
+	 * matter that means nothing to any other caller.
+	 */
+	public function test_front_matter_is_stripped() {
+		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'authoring' ) );
+
+		$this->assertStringStartsNotWith( '---', $guide['content'] );
+		$this->assertStringNotContainsString( 'name: pattern-author', $guide['content'] );
+		$this->assertStringContainsString( 'save()', $guide['content'] );
+	}
+
+	public function test_every_guide_concatenates() {
+		$all = $this->abilities->execute_authoring_guide( array( 'guide' => 'all' ) );
+
+		$this->assertSame( 'all', $all['name'] );
+		$this->assertStringContainsString( 'guide: pattern-kinds', $all['content'] );
+		$this->assertStringContainsString( 'guide: block-markup', $all['content'] );
+	}
+
+	public function test_an_unknown_guide_names_the_ones_that_exist() {
+		$result = $this->abilities->execute_authoring_guide( array( 'guide' => 'nonsense' ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_guide_not_found', $result->get_error_code() );
+		$this->assertStringContainsString( 'pattern-kinds', $result->get_error_message() );
 	}
 
 	public function test_an_unknown_pattern_is_an_error_not_a_fatal() {
