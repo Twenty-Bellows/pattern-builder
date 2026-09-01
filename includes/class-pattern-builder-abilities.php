@@ -74,6 +74,8 @@ class Pattern_Builder_Abilities {
 		$this->register_get_pattern();
 		$this->register_render_pattern();
 		$this->register_authoring_guide();
+		$this->register_validator();
+		$this->register_editor_scripts();
 		$this->register_create_pattern();
 		$this->register_update_pattern();
 	}
@@ -751,6 +753,205 @@ class Pattern_Builder_Abilities {
 			return trim( $m[1] );
 		}
 		return $fallback;
+	}
+
+	/**
+	 * Hand over the validator itself.
+	 *
+	 * The guides tell an agent to validate before it stores anything, and for
+	 * an agent with a shell on this machine that is a path on disk. An agent
+	 * that reached these abilities over HTTP has no such path and no copy of
+	 * the script, which made the instruction unfollowable for exactly the
+	 * callers the Abilities API exists to serve. So the scripts travel too.
+	 */
+	private function register_validator() {
+		wp_register_ability(
+			'pattern-builder/get-validator',
+			array(
+				'label'               => __( 'Get the pattern validator', 'pattern-builder' ),
+				'description'         => __( 'Returns the source of the block markup validator, as files to write next to each other and run with Node. Block validity is decided by re-running a block\'s save(), which is JavaScript, so no server can answer it and this site cannot validate on your behalf — but it can hand you the tool. Pair it with get-editor-scripts, which says where this site\'s own block code lives, and the check runs against the exact WordPress your pattern is destined for. Requires Node and jsdom (npm i --no-save jsdom).', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'files' => array(
+							'type'        => 'array',
+							'description' => 'Each with a name and its contents. Write them into one directory.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'entry' => array(
+							'type'        => 'string',
+							'description' => 'The file to run.',
+						),
+						'usage' => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_validator' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * The files the validator is made of.
+	 *
+	 * @return array|\WP_Error
+	 */
+	public function execute_validator() {
+		$files = array();
+
+		foreach ( array( 'validate-pattern.mjs', 'wp-core.mjs' ) as $name ) {
+			$contents = $this->read_script( $name );
+			if ( null === $contents ) {
+				return new \WP_Error(
+					'pb_validator_missing',
+					/* translators: %s: file name. */
+					sprintf( __( 'The validator is not installed on this site: %s is missing.', 'pattern-builder' ), $name ),
+					array( 'status' => 500 )
+				);
+			}
+			$files[] = array(
+				'name'     => $name,
+				'contents' => $contents,
+			);
+		}
+
+		return array(
+			'files' => $files,
+			'entry' => 'validate-pattern.mjs',
+			/*
+			 * Not translated, deliberately. This is a command line recipe rather
+			 * than interface copy, and the guides it belongs beside are served as
+			 * they were written too.
+			 */
+			'usage' => implode(
+				"\n",
+				array(
+					'Write both files into one directory, then:',
+					'',
+					'  npm i --no-save jsdom',
+					"  curl -u USER:APP_PASSWORD 'SITE/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-editor-scripts/run' > scripts.json",
+					'  node validate-pattern.mjs --scripts scripts.json pattern.html',
+					'',
+					"The first run downloads this site's block code (about 4MB) and caches it.",
+					'Exit status is non-zero when anything is invalid, in an old form, or has lost an attribute.',
+				)
+			),
+		);
+	}
+
+	/**
+	 * Where this site's own editor scripts are, in the order they load.
+	 *
+	 * WordPress ships every byte the validator needs and serves it over HTTP
+	 * already. What it does not serve is the dependency graph: the manifest
+	 * core generates is a PHP file, so a request for it executes and returns
+	 * nothing. Only the site can answer that, which is why this exists.
+	 */
+	private function register_editor_scripts() {
+		wp_register_ability(
+			'pattern-builder/get-editor-scripts',
+			array(
+				'label'               => __( 'Get this site\'s editor script URLs', 'pattern-builder' ),
+				'description'         => __( 'Returns the URLs of this site\'s own block editor JavaScript, in dependency order, for a validator to load. This is the block library this site actually runs, which is the only version whose opinion counts: whether markup is what a block writes today is a question different WordPress versions answer differently. Feed the response to the validator from get-validator.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'scripts'   => array(
+							'type'        => 'array',
+							'description' => 'Absolute URLs, dependencies first. Load them in this order.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'wordpress' => array( 'type' => 'string' ),
+						'site'      => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_editor_scripts' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * Resolve the block editor's scripts to URLs, in load order.
+	 *
+	 * @return array
+	 */
+	public function execute_editor_scripts() {
+		global $wp_version;
+
+		/*
+		 * A fresh registry rather than the global one: `all_deps()` fills
+		 * `to_do`, and leaving that behind on the singleton would change what
+		 * a later part of this request decides to print.
+		 */
+		$scripts = new \WP_Scripts();
+		$scripts->all_deps( array( 'wp-blocks', 'wp-block-editor', 'wp-block-library' ) );
+
+		$urls = array();
+		foreach ( $scripts->to_do as $handle ) {
+			if ( empty( $scripts->registered[ $handle ]->src ) ) {
+				continue;
+			}
+
+			$item = $scripts->registered[ $handle ];
+			$src  = $item->src;
+
+			// Core registers its own scripts with a site-relative src.
+			if ( ! preg_match( '|^(https?:)?//|', $src ) ) {
+				$src = site_url( $src );
+			}
+
+			// The version keeps a caching client honest across upgrades.
+			$ver = isset( $item->ver ) ? $item->ver : $wp_version;
+			if ( $ver ) {
+				$src = add_query_arg( 'ver', $ver, $src );
+			}
+
+			$urls[] = $src;
+		}
+
+		return array(
+			'scripts'   => $urls,
+			'wordpress' => $wp_version,
+			'site'      => home_url(),
+		);
+	}
+
+	/**
+	 * Read one of the shipped scripts.
+	 *
+	 * @param string $name File name under the guide's scripts directory.
+	 * @return string|null Null when it is not there.
+	 */
+	private function read_script( $name ) {
+		$root = realpath( $this->guide_dir() . 'scripts' );
+		$path = realpath( $this->guide_dir() . 'scripts/' . $name );
+
+		// Nothing here takes a name from a caller, but keep the read inside
+		// the plugin regardless.
+		if ( ! $root || ! $path || 0 !== strpos( $path, $root ) || ! is_readable( $path ) ) {
+			return null;
+		}
+
+		$contents = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading a file this plugin ships.
+
+		return false === $contents ? null : $contents;
 	}
 
 	/**

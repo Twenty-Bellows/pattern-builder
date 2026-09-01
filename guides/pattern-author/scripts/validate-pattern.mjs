@@ -40,7 +40,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { findWordPress, loadWordPressBlocks } from './wp-core.mjs';
+import {
+	findWordPress,
+	loadWordPressBlocks,
+	loadWordPressBlocksFromUrls,
+} from './wp-core.mjs';
 
 /*
  * The WordPress packages' ESM builds import JSON without an import attribute,
@@ -390,7 +394,60 @@ function readInput( file ) {
  *
  * @return {Object} parse, validateBlock, getSaveContent, parseRaw, describe.
  */
-function loadCore() {
+async function loadCore() {
+	/*
+	 * A list of script URLs from `pattern-builder/get-editor-scripts`. This is
+	 * the route for an agent that reached the site over HTTP and has no copy
+	 * of WordPress on disk: the scripts are served to anyone, but the order
+	 * they load in has to come from the site, because core's manifest is a
+	 * PHP file and a request for it executes rather than serves.
+	 */
+	const listed = flagValue( '--scripts' );
+	if ( listed ) {
+		const raw = fs.readFileSync( listed, 'utf8' );
+		let urls;
+		let version = '';
+		try {
+			// The ability's response, saved verbatim, is the easiest thing to
+			// hand back to us.
+			const json = JSON.parse( raw );
+			const body = json.scripts ? json : json.output || json.data || {};
+			urls = body.scripts;
+			version = body.wordpress || '';
+		} catch {
+			// Or a plain list, one URL per line.
+			urls = raw
+				.split( '\n' )
+				.map( ( line ) => line.trim() )
+				.filter( Boolean );
+		}
+
+		if ( ! Array.isArray( urls ) || ! urls.length ) {
+			console.error( `No script URLs in ${ listed }.` );
+			process.exit( 2 );
+		}
+
+		let core;
+		try {
+			core = await loadWordPressBlocksFromUrls( urls, { version } );
+		} catch ( err ) {
+			console.error( err.message );
+			process.exit( 2 );
+		}
+
+		return {
+			...core,
+			describe:
+				`Checked against WordPress ${
+					core.version || '(unknown version)'
+				} ` +
+				`served from ${
+					new URL( urls[ urls.length - 1 ] ).origin
+				} — ` +
+				`${ core.getBlockTypes().length } block types.`,
+		};
+	}
+
 	const hint = flagValue( '--wp' );
 
 	if ( ! process.argv.includes( '--npm' ) ) {
@@ -497,14 +554,17 @@ function flagValue( name ) {
 	return at !== -1 && process.argv[ at + 1 ] ? process.argv[ at + 1 ] : '';
 }
 
-function main() {
+async function main() {
 	const argv = process.argv.slice( 2 );
-	const wpAt = argv.indexOf( '--wp' );
-	// `--wp` takes a value, which is not a file. Guard the index: with no
-	// `--wp` at all, `wpAt + 1` is 0 and would swallow the first file.
+	// These flags take a value, and the value is not a file. Guard the index,
+	// because with a flag absent `indexOf` is -1 and `at + 1` would be 0,
+	// swallowing the first file.
+	const valueAt = [ '--wp', '--scripts' ]
+		.map( ( flag ) => argv.indexOf( flag ) )
+		.filter( ( at ) => at !== -1 )
+		.map( ( at ) => at + 1 );
 	const files = argv.filter(
-		( a, i ) =>
-			! a.startsWith( '--' ) && ! ( wpAt !== -1 && i === wpAt + 1 )
+		( a, i ) => ! a.startsWith( '--' ) && ! valueAt.includes( i )
 	);
 	if ( ! files.length ) {
 		console.error(
@@ -515,7 +575,7 @@ function main() {
 
 	const allowOldForm = process.argv.includes( '--allow-old-form' );
 
-	const core = loadCore();
+	const core = await loadCore();
 	const { parse, validateBlock, getSaveContent, parseRaw } = core;
 	console.log( core.describe + '\n' );
 
@@ -655,4 +715,7 @@ function main() {
 	process.exit( problems || lost || ( oldForm && ! allowOldForm ) ? 1 : 0 );
 }
 
-main();
+main().catch( ( err ) => {
+	console.error( err.message );
+	process.exit( 2 );
+} );

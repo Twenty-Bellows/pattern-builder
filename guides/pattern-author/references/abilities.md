@@ -71,6 +71,8 @@ input and output schema.
 | `pattern-builder/get-pattern` | GET | one pattern with its markup. `input[id]` is a namespaced name or a `wp_block` post ID |
 | `pattern-builder/render-pattern` | GET | the front-end HTML a stored pattern produces. `input[id]` as above |
 | `pattern-builder/get-authoring-guide` | GET | these documents, as Markdown. No input for an index; `input[guide]` by name, or `all` |
+| `pattern-builder/get-validator` | GET | the source of the markup validator, as files to write and run with Node |
+| `pattern-builder/get-editor-scripts` | GET | this site's own block editor script URLs, in load order, for that validator |
 | `pattern-builder/create-pattern` | POST | store finished markup. `title` and `content` required; `source` is `theme` (default) or `user`; also `name`, `description`, `categories`, `keywords`, `synced`, `viewportWidth` |
 | `pattern-builder/update-pattern` | POST | replace an existing pattern. `id` and `content` required |
 
@@ -113,16 +115,52 @@ without `content` is dropped rather than served empty.
 take markup you have already composed — the judgement of what to build is
 yours, and this is only somewhere to put the result.
 
-**Nothing here validates markup.** Block validity is decided by re-running the
-block's `save()`, which is JavaScript; no PHP endpoint can answer it. Run the
-validator before calling `create-pattern`, or you will store markup that
-renders correctly and breaks the moment anyone opens it in the editor.
+**Nothing here validates markup for you.** Block validity is decided by
+re-running the block's `save()`, which is JavaScript; no PHP endpoint can
+answer it, and this one does not pretend to. What the site can do is hand you
+the tool and its own block code — `get-validator` and `get-editor-scripts`,
+described under **Validating from here** below. Run that before calling
+`create-pattern`, or you will store markup that renders correctly and breaks
+the moment anyone opens it in the editor.
 
 `render-pattern` is the nearest thing to a check the site can offer, and it
 answers a different question: what HTML comes out. That is genuinely useful for
 catching a missing supports class — the styling that silently didn't apply —
 which the validator cannot see. It says nothing about whether the block is
 valid.
+
+## Validating from here
+
+You need a JavaScript runtime — Node, plus `jsdom` to play the browser
+WordPress's editor code expects as it loads. That is the one requirement no
+server can lift, because `save()` is JavaScript and PHP cannot run it.
+
+Everything else the site provides:
+
+```bash
+# 1. The validator. Write each file it returns into one directory.
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-validator/run"
+
+# 2. This site's own block code, in the order it loads.
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-editor-scripts/run" \
+  > scripts.json
+
+# 3. Check.
+npm i --no-save jsdom
+node validate-pattern.mjs --scripts scripts.json pattern.html
+```
+
+The second call exists because WordPress serves its editor scripts to anyone
+but not the order they load in: core's dependency manifest is a PHP file, so a
+request for it executes and returns nothing at all. Only the site can answer
+it — and getting it wrong is not loud. The JSX runtime reads `globalThis.React`
+as it loads, so React arriving late costs every JSX call in the editor bundles,
+with nothing but a missing function to show for it.
+
+The scripts are cached after the first download (about 4MB) and their URLs
+carry version strings, so an upgraded site fetches afresh.
 
 ## Without a site
 
