@@ -203,6 +203,22 @@ block library registered:
 node <skill>/scripts/validate-pattern.mjs path/to/pattern.php
 ```
 
+It reports three different things, and only the first is the one people expect:
+
+- **INVALID** — no version of the block ever wrote markup like this. The editor
+  will say "unexpected or invalid content".
+- **OLD FORM** — the markup matches a *deprecated* version of the block. The
+  editor opens it happily and migrates it, so it never looks broken there, but
+  the file on disk is missing what the block writes today — nearly always a
+  block-supports class, which means the style silently does not apply on the
+  front end.
+- **DROPPED ATTRIBUTE** — the same migration threw away something you wrote.
+  A heading with `"fontSize":"xx-large"` and no `has-xx-large-font-size` class
+  comes back with no `fontSize` at all.
+
+The last two are the dangerous ones, because nothing else anywhere reports
+them: the pattern renders, the editor is quiet, and the design is just wrong.
+
 It handles a theme pattern's PHP header and inline `<?php echo esc_url( … ); ?>`
 expressions, and it takes `-` to read markup from stdin — useful for checking a
 draft before it is ever a file. It needs `@wordpress/blocks`,
@@ -230,11 +246,11 @@ still show the design pattern's placeholder. A misspelled slot name reports as
 `MISSED quesiton — no slot by that name in the design pattern (typo?)`; an
 unregistered slug reports that the reference renders as nothing at all.
 
-Remember what block validation cannot see: missing block-supports classes leave
-a *valid* block that renders unstyled. After validating, re-read your own markup against
-the attribute-to-class table in `references/block-markup.md`, and where a
-running site is available, `pattern-builder/render-pattern` will show you the
-HTML that actually comes out.
+When it names a missing class, the attribute-to-class table in
+`references/block-markup.md` says what each attribute requires. Where a running
+site is available, `pattern-builder/render-pattern` is a useful second look —
+it shows the HTML that actually comes out, which is the thing your visitor
+gets.
 
 If the pattern uses Pattern Overrides slots, also check the split rules in
 `references/design-content-split.md` — block validation cannot see those

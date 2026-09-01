@@ -18,7 +18,8 @@ import { humanTimeDiff } from '@wordpress/date';
 
 import {
 	findInvalidBlocks,
-	describeInvalidBlocks,
+	findOutdatedBlocks,
+	describeBlocks,
 } from '../utils/blockValidity';
 
 const BASE = '/pattern-builder/v1/cloud';
@@ -88,6 +89,13 @@ export function PatternCloudControls( {
 	// The saved markup is what the server uploads, so that is what gets
 	// checked — not whatever is unsaved in the canvas.
 	const invalid = useMemo( () => findInvalidBlocks( content ), [ content ] );
+
+	// Not a fault the service will refuse, and not one an editor complains
+	// about either — which is exactly why it is worth saying here.
+	const outdated = useMemo(
+		() => findOutdatedBlocks( content ),
+		[ content ]
+	);
 
 	if ( ! state ) {
 		return <Spinner />;
@@ -223,7 +231,20 @@ export function PatternCloudControls( {
 							'This pattern cannot be uploaded: %s would open as "unexpected or invalid content" in the editor. Edit the pattern and use Attempt Block Recovery on the blocks marked in red, then save.',
 							'pattern-builder'
 						),
-						describeInvalidBlocks( invalid )
+						describeBlocks( invalid )
+					) }
+				</Notice>
+			) }
+
+			{ ! blockedByInvalidBlocks && outdated.length > 0 && (
+				<Notice status="warning" isDismissible={ false }>
+					{ sprintf(
+						/* translators: %s: comma separated block names, e.g. "heading (2), list". */
+						__(
+							'Stored in an older form: %s. These upload and render, but WordPress reads them as a previous version of the block, so styling set on them may not be applied. Open the pattern in the editor and save it to rewrite them.',
+							'pattern-builder'
+						),
+						describeBlocks( outdated )
 					) }
 				</Notice>
 			) }
