@@ -207,7 +207,7 @@ body.appearance_page_pattern-builder {
 		// A fixed frame, so the two panes scroll inside it rather than
 		// growing the modal past the viewport.
 		width: min(880px, calc(100vw - 32px));
-		height: min(640px, calc(100vh - 64px));
+		height: min(680px, calc(100vh - 64px));
 
 		.components-modal__header {
 			margin-bottom: 0;

@@ -83,10 +83,37 @@
 		min-width: 0;
 	}
 
+	// A column, so a field that wants the leftover room (the block picker)
+	// can take it and scroll inside itself, instead of pushing the whole
+	// pane into a scroll of its own.
 	&__body {
+		display: flex;
+		flex-direction: column;
+		gap: 24px;
 		flex: 1;
+		min-height: 0;
 		overflow-y: auto;
 		padding: 24px;
+	}
+
+	&__intro {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	&__fields {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		flex: 1;
+		min-height: 0;
+	}
+
+	&__field {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
 	}
 
 	&__title {
