@@ -70,7 +70,7 @@ input and output schema.
 | `pattern-builder/list-patterns` | GET | patterns on the site, without markup. Optional `input[source]=theme\|user\|all` |
 | `pattern-builder/get-pattern` | GET | one pattern with its markup. `input[id]` is a namespaced name or a `wp_block` post ID |
 | `pattern-builder/render-pattern` | GET | the front-end HTML a stored pattern produces. `input[id]` as above |
-| `pattern-builder/get-authoring-guide` | GET | these documents, as Markdown. No input for an index; `input[guide]` by name, or `all` |
+| `pattern-builder/get-authoring-guide` | GET | these documents, as Markdown. No input for an index; `input[guide]` by name, or `all`. The index also carries a `validate` block naming what to run before storing anything |
 | `pattern-builder/get-validator` | GET | the source of the markup validator, as files to write and run with Node |
 | `pattern-builder/get-editor-scripts` | GET | this site's own block editor script URLs, in load order, for that validator |
 | `pattern-builder/create-pattern` | POST | store finished markup. `title` and `content` required; `source` is `theme` (default) or `user`; also `name`, `description`, `categories`, `keywords`, `synced`, `viewportWidth` |
