@@ -7,6 +7,7 @@ import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/editor';
 import {
 	PanelBody,
 	Navigator,
+	useNavigator,
 	Icon,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalVStack as VStack,
@@ -28,10 +29,56 @@ import {
 } from '@wordpress/icons';
 
 import { fetchAllPatterns } from '../utils/resolvers';
-import { PatternCreatePanel } from './PatternCreatePanel';
+import { PatternKindList, PatternCreateForm } from './PatternCreatePanel';
+import { getPatternKind } from './patternKinds';
 import { PatternBrowserPanel } from './PatternBrowserPanel';
 import { PatternBuilderConfiguration } from './PatternBuilderConfiguration';
 import { patternBuilderAppIcon } from '../assets/icons';
+
+/**
+ * The kinds, as the first of the two screens creating a pattern takes in
+ * the sidebar. Picking one goes to that kind's own screen.
+ */
+function CreateKindsScreen() {
+	const navigator = useNavigator();
+
+	return (
+		<PatternKindList
+			layout="stacked"
+			onSelect={ ( key ) => navigator.goTo( `/create/${ key }` ) }
+		/>
+	);
+}
+
+/**
+ * The second screen: the kind named by the route, and its form.
+ *
+ * @param {Object}   props           Component props.
+ * @param {Function} props.onCreated Called with the created pattern.
+ */
+function CreateFormScreen( { onCreated } ) {
+	const navigator = useNavigator();
+	const kind = getPatternKind( navigator.params.kind );
+
+	return (
+		<>
+			<HStack spacing={ 2 } alignment="left">
+				<Navigator.BackButton
+					icon={ chevronLeft }
+					label={ __( 'Back', 'pattern-builder' ) }
+				/>
+				<Heading level={ 2 } size={ 13 } style={ { margin: 0 } }>
+					{ kind.label }
+				</Heading>
+			</HStack>
+			<PatternCreateForm
+				layout="stacked"
+				kind={ kind }
+				onCreated={ onCreated }
+			/>
+		</>
+	);
+}
 
 export const EditorSidePanel = () => {
 	const [ allPatterns, setAllPatterns ] = useState( [] );
@@ -186,10 +233,12 @@ export const EditorSidePanel = () => {
 									) }
 								</Heading>
 							</HStack>
-							<PatternCreatePanel
-								layout="stacked"
-								onCreated={ refreshPatterns }
-							/>
+							<CreateKindsScreen />
+						</PanelBody>
+					</Navigator.Screen>
+					<Navigator.Screen path="/create/:kind">
+						<PanelBody>
+							<CreateFormScreen onCreated={ refreshPatterns } />
 						</PanelBody>
 					</Navigator.Screen>
 					<Navigator.Screen path="/browse/:category">
