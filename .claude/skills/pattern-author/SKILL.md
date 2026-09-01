@@ -95,22 +95,44 @@ block anyway.
 vocabulary by purpose, and the composition guidance — which block is right for
 a job, and where hand-building something core already provides goes wrong.
 
-### 3. Decide the pattern's shape
+### 3. Decide what the pattern is *for*
 
-Look at how the project already works rather than imposing a structure on it.
+"Pattern" covers six different jobs, and the job settles most of the
+mechanics — where it can be stored, which headers place it, whether it appears
+in the inserter. Pick the kind before writing markup:
 
-If existing patterns use **Pattern Overrides slots** and there are
-`page-*.php` patterns filling them through `core/pattern`'s `content`
-attribute, the project uses the design/content split — follow it. Design
-patterns own markup and carry placeholder copy; page patterns own the words.
-Read `references/design-content-split.md` before writing either half; the
-rules there are not obvious and the failure modes are silent.
+| The user wants… | Kind | What it fixes |
+|---|---|---|
+| a section to drop in and edit | **Design Pattern** | unsynced; theme or database |
+| a component whose design stays consistent everywhere | **Synced Design Pattern** | `Synced: yes`; theme or database |
+| a starting layout for new pages | **Page Pattern** | `Block Types: core/post-content` + `Post Types` |
+| a design for an empty Query Loop, Cover, etc. | **Block Starter Pattern** | `Block Types: <that block>` |
+| a whole archive/404/home layout | **Template Pattern** | `Template Types`, `Inserter: no`, wide viewport |
+| a header or footer design | **Template Part Pattern** | `Block Types: core/template-part/header\|footer` |
 
-If patterns are self-contained, write self-contained patterns. Introducing
-the split unasked adds a plugin dependency the project may not want: the
-`content` attribute on `core/pattern` is not core, it comes from Pattern
-Builder or Synced Patterns for Themes. Without one of them installed,
-WordPress drops the attribute and every page renders placeholder copy.
+A kind is a starting point, not a stored property — nothing records it, and
+everything stays editable afterwards. `references/pattern-kinds.md` has each
+one in full.
+
+Two consequences that catch people out:
+
+**The four starter kinds are always theme patterns.** Their placement lives in
+pattern-file headers, and a `wp_block` in the database has nowhere to put
+them. If a request wants a database pattern *and* wants WordPress to offer it
+for new pages, those conflict — say so rather than silently picking one.
+
+**Synced Design Pattern + Page Pattern is the design/content split.** Where a
+project uses that layering, those two kinds are its halves: the synced pattern
+owns the markup and carries placeholder copy, the page pattern owns the words
+and fills the slots. Read `references/design-content-split.md` before writing
+either; the failure modes there are silent.
+
+Follow the project rather than imposing on it. If existing patterns are
+self-contained, write self-contained patterns — introducing the split unasked
+adds a dependency the project may not want, since `core/pattern`'s `content`
+attribute comes from Pattern Builder or Synced Patterns for Themes, not core.
+Without one of them, WordPress drops the attribute and every page renders
+placeholder copy.
 
 ### 4. Write the markup
 
@@ -225,9 +247,11 @@ header comment:
 <!-- wp:group ... -->
 ```
 
-`Title` and `Slug` are required; the slug must be namespaced with the theme
-slug. `Synced: yes` marks it as a synced pattern — see the split reference.
-Other useful headers: `Keywords`, `Block Types`, `Post Types`, `Viewport Width`.
+`Title` and `Slug` are required, and the slug must be namespaced with the
+theme slug. Which of the other headers you need follows from the kind —
+`references/pattern-kinds.md` lists them; `Keywords`, `Block Types`,
+`Post Types`, `Template Types`, `Viewport Width` and `Inserter` are the ones
+that appear.
 
 Write the file directly when you have filesystem access. When you're working
 against a running site instead, `pattern-builder/create-pattern` stores
@@ -279,6 +303,7 @@ add the token to `theme.json` and mention what you added.
 
 ## References
 
+- `references/pattern-kinds.md` — the six kinds, what each is for, and the headers each one writes
 - `references/block-vocabulary.md` — which blocks are allowed where (core-only vs theme vs plugin), the core vocabulary by purpose, and composition guidance
 - `references/block-markup.md` — the attribute-to-markup contract per block, and the mistakes that produce invalid markup
 - `references/design-content-split.md` — Pattern Overrides slots, `core/pattern` `content`, synced patterns, and the silent failures
