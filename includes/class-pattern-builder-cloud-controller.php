@@ -48,7 +48,6 @@ class Pattern_Builder_Cloud_Controller {
 			'/cloud/pattern-state' => array( 'GET', 'pattern_state' ),
 			'/cloud/upload'        => array( 'POST', 'upload' ),
 			'/cloud/download'      => array( 'POST', 'download' ),
-			'/cloud/generate'      => array( 'POST', 'generate' ),
 			'/cloud/tokens/check'  => array( 'POST', 'tokens_check' ),
 		);
 
@@ -71,16 +70,6 @@ class Pattern_Builder_Cloud_Controller {
 				'methods'             => 'DELETE',
 				'permission_callback' => $can_manage,
 				'callback'            => array( $this, 'delete_library_pattern' ),
-			)
-		);
-
-		register_rest_route(
-			self::NS,
-			'/cloud/generate/(?P<id>\d+)',
-			array(
-				'methods'             => 'GET',
-				'permission_callback' => $can_manage,
-				'callback'            => array( $this, 'generate_status' ),
 			)
 		);
 	}
@@ -121,7 +110,6 @@ class Pattern_Builder_Cloud_Controller {
 				'usage'      => $me['usage'],
 				'upgradeUrl' => isset( $me['upgrade_url'] ) ? $me['upgrade_url'] : '',
 				'portalUrl'  => isset( $me['portal_url'] ) ? $me['portal_url'] : '',
-				'ai'         => isset( $me['ai'] ) ? $me['ai'] : array( 'enabled' => false ),
 			)
 		);
 	}
@@ -484,57 +472,6 @@ class Pattern_Builder_Cloud_Controller {
 			}
 		}
 
-		return rest_ensure_response( $result );
-	}
-
-	/**
-	 * POST /cloud/generate — submit an AI generation (prompt and/or image).
-	 *
-	 * @param WP_REST_Request $request Request.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public function generate( $request ) {
-		if ( ! Pattern_Builder_Cloud::is_connected() ) {
-			return new WP_Error( 'pb_cloud_disconnected', __( 'Connect your patternbuilderwp.com account to generate patterns.', 'pattern-builder' ), array( 'status' => 400 ) );
-		}
-
-		$prompt = trim( (string) $request->get_param( 'prompt' ) );
-		$files  = $request->get_file_params();
-
-		if ( ! empty( $files['image']['tmp_name'] ) && empty( $files['image']['error'] ) ) {
-			$result = Pattern_Builder_Cloud::form_request(
-				'POST',
-				'/ai/generations',
-				array( 'prompt' => $prompt ),
-				array(
-					'image' => array(
-						'path' => $files['image']['tmp_name'],
-						'name' => isset( $files['image']['name'] ) ? $files['image']['name'] : 'screenshot.png',
-						'type' => isset( $files['image']['type'] ) ? $files['image']['type'] : '',
-					),
-				)
-			);
-		} else {
-			$result = Pattern_Builder_Cloud::request( 'POST', '/ai/generations', array( 'body' => array( 'prompt' => $prompt ) ) );
-		}
-
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return rest_ensure_response( $result );
-	}
-
-	/**
-	 * GET /cloud/generate/{id} — poll a generation.
-	 *
-	 * @param WP_REST_Request $request Request.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public function generate_status( $request ) {
-		$result = Pattern_Builder_Cloud::request( 'GET', '/ai/generations/' . (int) $request['id'] );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
 		return rest_ensure_response( $result );
 	}
 

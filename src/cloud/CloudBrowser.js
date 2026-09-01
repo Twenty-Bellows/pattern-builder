@@ -897,13 +897,12 @@ export function CloudBrowser( {
 						{ usage && usage.cap === -1 && (
 							<span className="pattern-builder-cloud__meta">
 								{ sprintf(
-									/* translators: 1: stored count, 2: AI credits left. */
+									/* translators: %d: stored count. */
 									__(
-										'%1$d patterns stored · %2$d AI credits left',
+										'%d patterns stored',
 										'pattern-builder'
 									),
-									usage.stored,
-									usage.ai_credits ?? 0
+									usage.stored
 								) }
 							</span>
 						) }

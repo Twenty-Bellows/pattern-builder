@@ -347,7 +347,7 @@ body.appearance_page_pattern-builder {
 	}
 }
 
-// ---- Sidebar empty state and the create modal's AI section. ----
+// ---- Sidebar empty state. ----
 
 .pattern-builder-details.is-empty {
 	display: grid;
@@ -358,14 +358,6 @@ body.appearance_page_pattern-builder {
 
 .pattern-builder-details__header .pattern-builder-details__actions {
 	margin-top: 12px;
-}
-
-.pattern-builder-create__ai {
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-	padding-top: 16px;
-	border-top: 1px solid #e0e0e0;
 }
 
 // ---- Edit mode: the page hosts core's editor for one pattern.
