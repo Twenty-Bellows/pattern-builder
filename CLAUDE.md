@@ -143,7 +143,8 @@ Endpoints registered under `/wp-json/pattern-builder/v1/`. Authentication via Wo
 ## Coding Standards
 
 - **PHP**: WordPress Coding Standards (WPCS 3.x) via PHPCS. Config: `phpcs.xml.dist`
-- **JavaScript**: ESLint via `@wordpress/scripts` defaults
+- **JavaScript**: ESLint via `@wordpress/scripts` defaults, extended by `eslint.config.cjs` (flat config, as ESLint 9 requires) for one thing only: `src/runtime/` is vendored and must stay logic-identical to synced-patterns-for-themes, so two rules that disagree with how that upstream is written are turned off *there* and nowhere else
+- **Jest**: `jest-unit.config.js` extends the `@wordpress/scripts` config to compile `node_modules` and `.mjs`. Much of the WordPress dependency tree now ships ESM only, and Jest cannot `require()` an ES module before Node 24.9 — without this the suite fails to *load* rather than failing a test
 - **CSS/SCSS**: Stylelint via `@wordpress/scripts` defaults
 - **Formatting**: Prettier (wp-prettier) for JS/CSS
 

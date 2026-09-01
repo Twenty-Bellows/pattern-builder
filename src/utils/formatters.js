@@ -11,7 +11,7 @@ export function validateBlockMarkup( blockMarkup ) {
 				return false;
 			}
 		}
-	} catch ( e ) {
+	} catch {
 		return false;
 	}
 	return true;

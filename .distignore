@@ -18,6 +18,8 @@
 /composer.lock
 /dev-assets
 /docs
+/eslint.config.cjs
+/jest-unit.config.js
 /node_modules
 /package.json
 /package-lock.json

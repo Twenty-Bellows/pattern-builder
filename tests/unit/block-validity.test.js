@@ -31,6 +31,7 @@ const MOVES = 'pattern-builder-test/moves';
 
 beforeAll( () => {
 	registerBlockType( BOX, {
+		apiVersion: 3,
 		title: 'Box',
 		category: 'text',
 		attributes: {
@@ -41,6 +42,7 @@ beforeAll( () => {
 
 	// Rendered server-side, so nothing to validate: a container to nest in.
 	registerBlockType( STACK, {
+		apiVersion: 3,
 		title: 'Stack',
 		category: 'text',
 		save: () => null,
@@ -59,6 +61,7 @@ beforeAll( () => {
 	};
 
 	registerBlockType( KEEPS, {
+		apiVersion: 3,
 		title: 'Keeps',
 		category: 'text',
 		attributes: sized,
@@ -89,6 +92,7 @@ beforeAll( () => {
 	 * not be reported as a loss.
 	 */
 	registerBlockType( MOVES, {
+		apiVersion: 3,
 		title: 'Moves',
 		category: 'text',
 		attributes: {
@@ -129,6 +133,7 @@ beforeAll( () => {
 	} );
 
 	registerBlockType( DROPS, {
+		apiVersion: 3,
 		title: 'Drops',
 		category: 'text',
 		attributes: sized,

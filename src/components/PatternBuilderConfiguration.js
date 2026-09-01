@@ -87,7 +87,7 @@ export const PatternBuilderConfiguration = () => {
 					}
 				);
 			}
-		} catch ( error ) {
+		} catch {
 			createErrorNotice(
 				__(
 					'Error reprocessing theme patterns. Please try again.',
