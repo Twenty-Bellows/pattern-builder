@@ -341,6 +341,7 @@ export function PatternCreateForm( { kind, onCreated, layout = 'columns' } ) {
 					id: pattern.id,
 					name: pattern.name,
 					source: pattern.source || 'user',
+					kind: kind.key,
 				};
 
 				if ( onCreated ) {

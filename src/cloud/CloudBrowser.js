@@ -24,6 +24,14 @@ import { useDispatch } from '@wordpress/data';
 import { store as noticesStore } from '@wordpress/notices';
 import { addQueryArgs } from '@wordpress/url';
 
+import { TelemetryOffer } from '../components/TelemetryPrompt';
+import {
+	hasDeclinedTelemetry,
+	setTelemetryState,
+	track,
+} from '../utils/telemetry';
+import { openCheckout } from './checkout';
+
 import './cloud.scss';
 
 const BASE = '/pattern-builder/v1/cloud';
@@ -36,33 +44,135 @@ export const CLOUD_LIBRARY = 'cloud-library';
 export const CLOUD_DIRECTORY = 'cloud-directory';
 
 /**
- * Sign in / create an account without leaving wp-admin; credentials relay
- * through this site's proxy, which stores only the returned token.
+ * The password rule, as the service enforces it: eight characters with an
+ * upper-case letter, a digit and a symbol. Checked here first so the form
+ * can say what is missing before a round trip, and again on the service,
+ * whose answer is the one that counts.
+ *
+ * @param {string} password Candidate password.
+ * @return {string} What is missing, or '' when it passes.
+ */
+export function passwordProblem( password ) {
+	const missing = [];
+	if ( password.length < 8 ) {
+		missing.push( __( 'at least 8 characters', 'pattern-builder' ) );
+	}
+	if ( ! /\p{Lu}/u.test( password ) ) {
+		missing.push( __( 'an upper-case letter', 'pattern-builder' ) );
+	}
+	if ( ! /\d/.test( password ) ) {
+		missing.push( __( 'a number', 'pattern-builder' ) );
+	}
+	if ( ! /[^\p{L}\p{N}\s]/u.test( password ) ) {
+		missing.push( __( 'a symbol', 'pattern-builder' ) );
+	}
+	return missing.length
+		? sprintf(
+				/* translators: %s: comma-separated list of what the password lacks. */
+				__( 'Your password needs %s.', 'pattern-builder' ),
+				missing.join( ', ' )
+		  )
+		: '';
+}
+
+const PASSWORD_RULE = __(
+	'At least 8 characters, with an upper-case letter, a number and a symbol.',
+	'pattern-builder'
+);
+
+/**
+ * Sign in / create an account / start a password reset without leaving
+ * wp-admin; credentials relay through this site's proxy, which stores only
+ * the returned token. A reset finishes on patternbuilderwp.com, from the
+ * emailed link — the plugin only starts it.
+ *
+ * Creating an account asks one more question, in two buttons with neither
+ * preselected: may we email you news and offers? No answer is no, and the
+ * service records the answer with when and where it was given.
  *
  * @param {Object}   props             Component props.
  * @param {Function} props.onConnected Receives the fresh status payload.
+ * @param {string}   props.intro       Why to connect, for this tab.
  */
-function ConnectPanel( { onConnected } ) {
+function ConnectPanel( { onConnected, intro } ) {
 	const [ mode, setMode ] = useState( 'login' );
 	const [ email, setEmail ] = useState( '' );
 	const [ password, setPassword ] = useState( '' );
 	const [ name, setName ] = useState( '' );
+	const [ marketing, setMarketing ] = useState( null ); // null = unanswered.
 	const [ busy, setBusy ] = useState( false );
 	const [ error, setError ] = useState( '' );
+	const [ notice, setNotice ] = useState( '' );
+	const [ offerTelemetry, setOfferTelemetry ] = useState(
+		hasDeclinedTelemetry()
+	);
 
 	const isSignup = mode === 'signup';
+	const isForgot = mode === 'forgot';
+
+	const switchMode = ( next ) => {
+		setMode( next );
+		setError( '' );
+		setNotice( '' );
+	};
+
+	const canSubmit = isForgot
+		? !! email
+		: !! email && !! password && ( ! isSignup || marketing !== null );
 
 	const submit = ( event ) => {
 		event.preventDefault();
-		if ( busy || ! email || ! password ) {
+		if ( busy || ! canSubmit ) {
 			return;
 		}
+
+		if ( isSignup ) {
+			const problem = passwordProblem( password );
+			if ( problem ) {
+				setError( problem );
+				return;
+			}
+		}
+
 		setBusy( true );
 		setError( '' );
+		setNotice( '' );
+
+		if ( isForgot ) {
+			apiFetch( {
+				path: `${ BASE }/password/forgot`,
+				method: 'POST',
+				data: { email },
+			} )
+				.then( ( data ) => {
+					setBusy( false );
+					setNotice(
+						data.message ||
+							__(
+								'If that address has an account, a reset link is on its way.',
+								'pattern-builder'
+							)
+					);
+				} )
+				.catch( ( err ) => {
+					setBusy( false );
+					setError(
+						err.message ||
+							__(
+								'That did not work. Try again.',
+								'pattern-builder'
+							)
+					);
+				} );
+			return;
+		}
+
 		apiFetch( {
 			path: `${ BASE }/${ isSignup ? 'signup' : 'login' }`,
 			method: 'POST',
-			data: isSignup ? { email, password, name } : { email, password },
+			data: isSignup
+				? { email, password, name, marketing: marketing === true }
+				: { email, password },
 		} )
 			.then( ( data ) => onConnected( data ) )
 			.catch( ( err ) => {
@@ -77,6 +187,10 @@ function ConnectPanel( { onConnected } ) {
 			} );
 	};
 
+	const title = isForgot
+		? __( 'Reset your password', 'pattern-builder' )
+		: __( 'Your patterns, on every site.', 'pattern-builder' );
+
 	return (
 		<form className="pattern-builder-cloud__connect" onSubmit={ submit }>
 			<VStack spacing={ 4 }>
@@ -85,13 +199,19 @@ function ConnectPanel( { onConnected } ) {
 					size={ 18 }
 					className="pattern-builder-cloud__connect-title"
 				>
-					{ __( 'Your patterns, on every site.', 'pattern-builder' ) }
+					{ title }
 				</Heading>
 				<p className="pattern-builder-cloud__connect-intro">
-					{ __(
-						'Keep a pattern library on patternbuilderwp.com: upload patterns from this site, download them anywhere, and share collections with the community.',
-						'pattern-builder'
-					) }
+					{ isForgot
+						? __(
+								'Enter your account’s email and we’ll send a link to choose a new password. The link opens on patternbuilderwp.com.',
+								'pattern-builder'
+						  )
+						: intro ||
+						  __(
+								'Keep a pattern library on patternbuilderwp.com: upload patterns from this site, download them anywhere, and share collections with the community.',
+								'pattern-builder'
+						  ) }
 				</p>
 				{ isSignup && (
 					<TextControl
@@ -111,55 +231,126 @@ function ConnectPanel( { onConnected } ) {
 					autoComplete="email"
 					required
 				/>
-				<TextControl
-					__nextHasNoMarginBottom
-					label={ __( 'Password', 'pattern-builder' ) }
-					type="password"
-					value={ password }
-					onChange={ setPassword }
-					autoComplete={
-						isSignup ? 'new-password' : 'current-password'
-					}
-					help={
-						isSignup
-							? __( 'At least 8 characters.', 'pattern-builder' )
-							: undefined
-					}
-					required
-				/>
+				{ ! isForgot && (
+					<TextControl
+						__nextHasNoMarginBottom
+						label={ __( 'Password', 'pattern-builder' ) }
+						type="password"
+						value={ password }
+						onChange={ setPassword }
+						autoComplete={
+							isSignup ? 'new-password' : 'current-password'
+						}
+						help={ isSignup ? PASSWORD_RULE : undefined }
+						required
+					/>
+				) }
+				{ isSignup && (
+					<fieldset className="pattern-builder-cloud__consent">
+						<legend>
+							{ __(
+								'Can we email you news and offers?',
+								'pattern-builder'
+							) }
+						</legend>
+						<p className="pattern-builder-cloud__consent-hint">
+							{ __(
+								'Occasional notes about new patterns, features and Pro — no more than a couple a month. Change your mind any time from your account.',
+								'pattern-builder'
+							) }
+						</p>
+						<HStack spacing={ 2 } justify="flex-start">
+							<Button
+								variant={
+									marketing === true ? 'primary' : 'secondary'
+								}
+								aria-pressed={ marketing === true }
+								onClick={ () => setMarketing( true ) }
+							>
+								{ __(
+									'Yes, keep me posted',
+									'pattern-builder'
+								) }
+							</Button>
+							<Button
+								variant={
+									marketing === false
+										? 'primary'
+										: 'secondary'
+								}
+								aria-pressed={ marketing === false }
+								onClick={ () => setMarketing( false ) }
+							>
+								{ __( 'No thanks', 'pattern-builder' ) }
+							</Button>
+						</HStack>
+					</fieldset>
+				) }
 				{ error && (
 					<Notice status="error" isDismissible={ false }>
 						{ error }
 					</Notice>
 				) }
+				{ notice && (
+					<Notice status="success" isDismissible={ false }>
+						{ notice }
+					</Notice>
+				) }
 				<Button
 					variant="primary"
 					type="submit"
-					icon={ cloudUpload }
+					icon={ isForgot ? undefined : cloudUpload }
 					isBusy={ busy }
-					disabled={ busy || ! email || ! password }
+					disabled={ busy || ! canSubmit }
 				>
-					{ isSignup
-						? __( 'Create account & connect', 'pattern-builder' )
-						: __( 'Sign in & connect', 'pattern-builder' ) }
+					{ isForgot &&
+						__( 'Email me a reset link', 'pattern-builder' ) }
+					{ isSignup &&
+						__( 'Create account & connect', 'pattern-builder' ) }
+					{ ! isForgot &&
+						! isSignup &&
+						__( 'Sign in & connect', 'pattern-builder' ) }
 				</Button>
-				<Button
-					variant="link"
-					onClick={ () => {
-						setMode( isSignup ? 'login' : 'signup' );
-						setError( '' );
-					} }
-				>
-					{ isSignup
-						? __(
-								'Already have an account? Sign in',
-								'pattern-builder'
-						  )
-						: __(
-								'New here? Create a free account',
-								'pattern-builder'
-						  ) }
-				</Button>
+				<VStack spacing={ 1 } alignment="center">
+					{ ! isForgot && (
+						<Button
+							variant="link"
+							onClick={ () =>
+								switchMode( isSignup ? 'login' : 'signup' )
+							}
+						>
+							{ isSignup
+								? __(
+										'Already have an account? Sign in',
+										'pattern-builder'
+								  )
+								: __(
+										'New here? Create a free account',
+										'pattern-builder'
+								  ) }
+						</Button>
+					) }
+					{ ! isSignup && (
+						<Button
+							variant="link"
+							onClick={ () =>
+								switchMode( isForgot ? 'login' : 'forgot' )
+							}
+						>
+							{ isForgot
+								? __( 'Back to sign in', 'pattern-builder' )
+								: __(
+										'Forgot your password?',
+										'pattern-builder'
+								  ) }
+						</Button>
+					) }
+				</VStack>
+				{ offerTelemetry && (
+					<TelemetryOffer
+						onAnswer={ () => setOfferTelemetry( false ) }
+					/>
+				) }
 			</VStack>
 		</form>
 	);
@@ -533,6 +724,9 @@ export function CloudBrowser( {
 		return apiFetch( { path: `${ BASE }/status` } )
 			.then( ( data ) => {
 				setStatus( data );
+				if ( data?.telemetry ) {
+					setTelemetryState( data.telemetry );
+				}
 				return data;
 			} )
 			.catch( () => setStatus( { connected: false } ) );
@@ -541,6 +735,11 @@ export function CloudBrowser( {
 	useEffect( () => {
 		refreshStatus();
 	}, [ refreshStatus ] );
+
+	// Which cloud tab was opened — one event per visit, not per page.
+	useEffect( () => {
+		track( isLibrary ? 'cloud_browsed' : 'community_browsed' );
+	}, [ isLibrary ] );
 
 	/*
 	 * Checkout happens on Freemius, in another tab, and the licence reaches
@@ -595,8 +794,66 @@ export function CloudBrowser( {
 
 	const awaitUpgrade = useCallback( () => setAwaitingUpgrade( true ), [] );
 
+	/*
+	 * Go Pro opens Freemius's overlay right here when the service handed
+	 * over a checkout configuration; the hosted-page link is the fallback
+	 * for a service that has not, or a script that would not load. Either
+	 * way the poll above watches for the licence to land.
+	 */
+	const goPro = () => {
+		track( 'upgrade_opened' );
+		if ( ! status?.checkout ) {
+			window.open( status.upgradeUrl, '_blank', 'noopener' );
+			awaitUpgrade();
+			return;
+		}
+		openCheckout( status.checkout, {
+			onSynced: ( next ) => {
+				setStatus( next );
+				if ( next?.tier === 'pro' ) {
+					createSuccessNotice(
+						__(
+							'Pattern Builder Pro is active.',
+							'pattern-builder'
+						),
+						{ type: 'snackbar' }
+					);
+				}
+			},
+			onClosed: () => refreshStatus(),
+		} ).catch( () => {
+			window.open( status.upgradeUrl, '_blank', 'noopener' );
+			awaitUpgrade();
+		} );
+		awaitUpgrade();
+	};
+
+	const resendVerification = () => {
+		apiFetch( { path: `${ BASE }/verify/resend`, method: 'POST' } )
+			.then( ( data ) =>
+				createSuccessNotice(
+					data.message ||
+						__(
+							'A new confirmation email is on its way.',
+							'pattern-builder'
+						),
+					{ type: 'snackbar' }
+				)
+			)
+			.catch( ( err ) =>
+				createErrorNotice(
+					err.message ||
+						__(
+							'That did not work. Try again.',
+							'pattern-builder'
+						),
+					{ type: 'snackbar' }
+				)
+			);
+	};
+
 	const loadItems = useCallback( () => {
-		if ( ! status?.connected && isLibrary ) {
+		if ( ! status?.connected ) {
 			return;
 		}
 		setItems( null );
@@ -635,7 +892,7 @@ export function CloudBrowser( {
 		if ( ! onCollections ) {
 			return;
 		}
-		if ( isLibrary && ! status?.connected ) {
+		if ( ! status?.connected ) {
 			onCollections( [] );
 			return;
 		}
@@ -821,11 +1078,24 @@ export function CloudBrowser( {
 		);
 	}
 
-	// The directory browses anonymously; the library needs an account.
-	if ( ! status.connected && isLibrary ) {
+	/*
+	 * Both cloud tabs are browsed as an account. The service would list its
+	 * directory to anyone; here the community is behind a sign-in so what a
+	 * site downloads is downloaded by somebody, and the proxy enforces the
+	 * same rule. The intro says why for the tab that was opened.
+	 */
+	if ( ! status.connected ) {
 		return (
 			<main className="pattern-builder-browser__main">
 				<ConnectPanel
+					intro={
+						isLibrary
+							? undefined
+							: __(
+									'Sign in to browse community patterns and add them to this site. A free account takes a minute, and keeps your own patterns in the cloud too.',
+									'pattern-builder'
+							  )
+					}
 					onConnected={ ( data ) => {
 						setStatus( data );
 						createSuccessNotice(
@@ -907,18 +1177,20 @@ export function CloudBrowser( {
 							</span>
 						) }
 
-						{ status.tier !== 'pro' && status.upgradeUrl && (
-							<Button
-								variant="primary"
-								size="small"
-								href={ status.upgradeUrl }
-								target="_blank"
-								rel="noreferrer"
-								onClick={ awaitUpgrade }
-							>
-								{ __( 'Go Pro', 'pattern-builder' ) }
-							</Button>
-						) }
+						{ status.tier !== 'pro' &&
+							( status.checkout || status.upgradeUrl ) && (
+								<Button
+									variant="primary"
+									size="small"
+									disabled={
+										status.account &&
+										status.account.verified === false
+									}
+									onClick={ goPro }
+								>
+									{ __( 'Go Pro', 'pattern-builder' ) }
+								</Button>
+							) }
 
 						{ status.tier === 'pro' && status.portalUrl && (
 							<Button
@@ -952,13 +1224,24 @@ export function CloudBrowser( {
 					</HStack>
 				) }
 
-				{ ! status.connected && ! isLibrary && (
-					<p className="pattern-builder-cloud__meta">
+				{ status.account && status.account.verified === false && (
+					<Notice
+						status="warning"
+						isDismissible={ false }
+						className="pattern-builder-cloud__verify"
+						actions={ [
+							{
+								label: __( 'Send it again', 'pattern-builder' ),
+								onClick: resendVerification,
+								variant: 'link',
+							},
+						] }
+					>
 						{ __(
-							'Browsing the public directory. Connect from My Cloud Library to upload and manage your own patterns.',
+							'Confirm your email address to upload patterns, download from the community, and go Pro. The link is in your inbox.',
 							'pattern-builder'
 						) }
-					</p>
+					</Notice>
 				) }
 
 				<div className="pattern-builder-cloud__content">

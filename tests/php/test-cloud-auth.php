@@ -196,4 +196,137 @@ class Test_Cloud_Auth extends WP_UnitTestCase {
 
 		$this->assertSame( 403, $response->get_status() );
 	}
+
+	public function test_the_community_is_browsed_as_an_account() {
+		$this->mock_service(
+			function () {
+				$this->fail( 'A disconnected site must not reach the service for the directory.' );
+			}
+		);
+
+		$this->assertSame( 401, $this->request( 'GET', '/pattern-builder/v1/cloud/directory' )->get_status() );
+		$this->assertSame( 401, $this->request( 'GET', '/pattern-builder/v1/cloud/collections' )->get_status() );
+		$download = $this->request(
+			'POST',
+			'/pattern-builder/v1/cloud/download',
+			array(
+				'source'  => 'directory',
+				'cloudId' => 5,
+			)
+		);
+		$this->assertSame( 401, $download->get_status() );
+		$this->assertSame( 'pb_cloud_disconnected', $download->get_data()['code'] );
+	}
+
+	public function test_signup_relays_the_marketing_answer_as_yes_or_no() {
+		$seen = array();
+		$this->mock_service(
+			function ( $args, $url ) use ( &$seen ) {
+				if ( false !== strpos( $url, rawurlencode( '/auth/signup' ) ) ) {
+					$seen[] = $args['body'];
+					return $this->grant_response();
+				}
+				return array(
+					'headers'  => array(),
+					'response' => array( 'code' => 200 ),
+					'body'     => wp_json_encode( array( 'account' => array( 'id' => 12 ), 'tier' => 'free', 'usage' => array() ) ),
+				);
+			}
+		);
+
+		$this->request(
+			'POST',
+			'/pattern-builder/v1/cloud/signup',
+			array(
+				'email'     => 'new@example.test',
+				'password'  => 'Correct-horse-1',
+				'marketing' => true,
+			)
+		);
+		$this->assertSame( 'yes', $seen[0]['marketing'] );
+
+		delete_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_TOKEN );
+		$this->request(
+			'POST',
+			'/pattern-builder/v1/cloud/signup',
+			array(
+				'email'    => 'quiet@example.test',
+				'password' => 'Correct-horse-1',
+			)
+		);
+		$this->assertSame( 'no', $seen[1]['marketing'], 'No answer relays as no.' );
+	}
+
+	public function test_forgot_password_relays_the_address_and_needs_no_connection() {
+		$seen = array();
+		$this->mock_service(
+			function ( $args, $url ) use ( &$seen ) {
+				$seen[] = array(
+					'url'  => $url,
+					'body' => $args['body'],
+				);
+				return array(
+					'headers'  => array(),
+					'response' => array( 'code' => 200 ),
+					'body'     => wp_json_encode(
+						array(
+							'sent'    => true,
+							'message' => 'If that address has an account, a reset link is on its way.',
+						)
+					),
+				);
+			}
+		);
+
+		$this->assertSame( 400, $this->request( 'POST', '/pattern-builder/v1/cloud/password/forgot', array( 'email' => 'nope' ) )->get_status() );
+
+		$response = $this->request( 'POST', '/pattern-builder/v1/cloud/password/forgot', array( 'email' => 'who@example.test' ) );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertStringContainsString( 'reset link', $response->get_data()['message'] );
+		$this->assertStringContainsString( rawurlencode( '/auth/password/forgot' ), $seen[0]['url'] );
+		$this->assertSame( 'who@example.test', $seen[0]['body']['email'] );
+		$this->assertArrayNotHasKey( 'Authorization', $seen[0]['body'] );
+	}
+
+	public function test_billing_sync_relays_the_licence_and_returns_the_new_status() {
+		update_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_TOKEN, 'pbwp_' . str_repeat( 'a', 64 ) );
+		$seen = array();
+		$this->mock_service(
+			function ( $args, $url ) use ( &$seen ) {
+				if ( false !== strpos( $url, rawurlencode( '/billing/sync' ) ) ) {
+					$seen[] = json_decode( $args['body'], true );
+					return array(
+						'headers'  => array(),
+						'response' => array( 'code' => 200 ),
+						'body'     => wp_json_encode( array( 'tier' => 'pro' ) ),
+					);
+				}
+				return array(
+					'headers'  => array(),
+					'response' => array( 'code' => 200 ),
+					'body'     => wp_json_encode(
+						array(
+							'account'  => array(
+								'id'       => 12,
+								'name'     => 'Demo',
+								'verified' => true,
+							),
+							'tier'     => 'pro',
+							'usage'    => array(),
+							'checkout' => null,
+						)
+					),
+				);
+			}
+		);
+
+		$response = $this->request( 'POST', '/pattern-builder/v1/cloud/billing/sync', array( 'licenseId' => 5001 ) );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( array( 'license_id' => 5001 ), $seen[0] );
+		$this->assertSame( 'pro', $response->get_data()['tier'] );
+		$this->assertNull( $response->get_data()['checkout'] );
+		$this->assertArrayHasKey( 'telemetry', $response->get_data() );
+	}
 }

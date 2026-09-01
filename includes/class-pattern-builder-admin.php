@@ -214,6 +214,7 @@ class Pattern_Builder_Admin {
 						'patternType'    => $this->get_requested_pattern_type(),
 						'adminUrl'       => $browse_url,
 						'backUrl'        => $back_url ? $back_url : $browse_url,
+						'telemetry'      => Pattern_Builder_Telemetry::client_state(),
 					)
 				)
 			),

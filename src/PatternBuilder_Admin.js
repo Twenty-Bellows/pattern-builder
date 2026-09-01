@@ -12,9 +12,13 @@ import { registerCoreBlocks } from '@wordpress/block-library';
 import { PatternBuilderAdminApp } from './admin/App';
 import { bootPatternEditor } from './admin/editor-boot';
 import { registerPreviewBindings } from './admin/preview-bindings';
+import { setTelemetryState } from './utils/telemetry';
 import './admin/admin.scss';
 
 const settings = window.patternBuilderAdmin || {};
+
+// Whether this site allows usage reporting, as the PHP side recorded it.
+setTelemetryState( settings.telemetry );
 
 /**
  * Pins the app's bottom edge to the viewport so the browser panes scroll

@@ -162,16 +162,18 @@ class Pattern_Builder_Cloud {
 	 *
 	 * @param string $email    Email address.
 	 * @param string $password Password.
-	 * @param string $name     Display name (optional).
+	 * @param string $name      Display name (optional).
+	 * @param bool   $marketing Whether the person said yes to news and offers.
 	 * @return array|WP_Error Account info.
 	 */
-	public static function signup( $email, $password, $name = '' ) {
+	public static function signup( $email, $password, $name = '', $marketing = false ) {
 		return self::credential_connect(
 			'/auth/signup',
 			array(
-				'email'    => $email,
-				'password' => $password,
-				'name'     => $name,
+				'email'     => $email,
+				'password'  => $password,
+				'name'      => $name,
+				'marketing' => $marketing ? 'yes' : 'no',
 			)
 		);
 	}
@@ -208,6 +210,47 @@ class Pattern_Builder_Cloud {
 		update_user_meta( get_current_user_id(), self::META_ACCOUNT, isset( $data['account'] ) ? (array) $data['account'] : array() );
 
 		return self::account();
+	}
+
+	/**
+	 * Ask the service to email a password reset link.
+	 *
+	 * Unauthenticated on purpose — the person cannot sign in — and the
+	 * service answers the same whether or not the address is an account.
+	 *
+	 * @param string $email Email address.
+	 * @return array|WP_Error The service's message.
+	 */
+	public static function forgot_password( $email ) {
+		$response = wp_remote_post(
+			self::endpoint( '/auth/password/forgot' ),
+			array(
+				'timeout' => 30,
+				'body'    => array( 'email' => $email ),
+			)
+		);
+
+		return self::parse_response( $response );
+	}
+
+	/**
+	 * Ask the service for a fresh email-confirmation link.
+	 *
+	 * @return array|WP_Error
+	 */
+	public static function resend_verification() {
+		return self::request( 'POST', '/auth/verify/resend' );
+	}
+
+	/**
+	 * Tell the service the overlay checkout completed a purchase, so the
+	 * licence is granted now rather than when the webhook lands.
+	 *
+	 * @param int $license_id Licence ID the checkout reported.
+	 * @return array|WP_Error The account as the service now describes it.
+	 */
+	public static function sync_billing( $license_id ) {
+		return self::request( 'POST', '/billing/sync', array( 'body' => array( 'license_id' => (int) $license_id ) ) );
 	}
 
 	/**
