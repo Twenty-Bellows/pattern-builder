@@ -72,7 +72,30 @@ Then read two or three existing patterns in `patterns/`. They tell you more
 about house style than any description: how sections are spaced, whether
 groups are constrained or full, how headings step down.
 
-### 2. Decide the pattern's shape
+### 2. Establish which blocks you may use
+
+Ask where the pattern is going, because it decides the vocabulary — and say
+which answer you assumed if nobody told you.
+
+**Core blocks only** for anything that leaves this site: the WordPress.org
+pattern directory, a shared or public cloud library, a theme other people will
+install. Markup for a block the receiving site lacks parses to `core/missing`
+and renders as a grey "block cannot be displayed" box — it doesn't degrade, it
+breaks, and it breaks where you can't see it. This is the safe default when
+the destination is unclear.
+
+**Core plus the theme's own blocks and styles** for a pattern shipping inside
+that theme; they travel together. A registered block style
+(`{"className":"is-style-card"}`) is usually the better tool than a custom
+block anyway.
+
+**Core plus installed plugins** only for patterns staying on this site.
+
+`references/block-vocabulary.md` has the full rule, the current core
+vocabulary by purpose, and the composition guidance — which block is right for
+a job, and where hand-building something core already provides goes wrong.
+
+### 3. Decide the pattern's shape
 
 Look at how the project already works rather than imposing a structure on it.
 
@@ -89,7 +112,7 @@ the split unasked adds a plugin dependency the project may not want: the
 Builder or Synced Patterns for Themes. Without one of them installed,
 WordPress drops the attribute and every page renders placeholder copy.
 
-### 3. Write the markup
+### 4. Write the markup
 
 Block markup is HTML comments wrapping HTML:
 
@@ -105,7 +128,7 @@ ways** that need different defences:
 **Structure the block's own `save()` writes** — a heading's tag matching its
 `level`, `wp-block-group` on a group, a button's anchor, a column's class. Get
 these wrong and the block is *invalid*: the editor offers to discard it. The
-validator catches all of these, which is why step 4 is not optional.
+validator catches all of these, which is why the validation step is not optional.
 
 **Classes contributed by block supports** — `"backgroundColor":"primary"`
 obliges `has-primary-background-color has-background`; `"align":"center"`
@@ -135,7 +158,7 @@ Write real placeholder copy, not lorem ipsum. Copy of a plausible length is
 what tells you the layout works, and in a design pattern the placeholder is
 what shows in the inserter preview.
 
-### 4. Validate — every time, before placing the file
+### 5. Validate — every time, before placing the file
 
 This is the step that makes the difference, and it cannot be done by reading
 the markup or by looking at the front end.
@@ -160,8 +183,22 @@ Fix what it reports and run it again; an empty report is the only acceptable
 result. A `core/missing` means the block is not registered on the target site,
 so either the markup has a typo or the site genuinely lacks that block.
 
-Remember what this cannot see: missing block-supports classes leave a *valid*
-block that renders unstyled. After validating, re-read your own markup against
+**If the pattern uses Pattern Overrides slots, render it.** Slot problems are
+invisible to block validation in both directions, and both ship the wrong
+words with no error anywhere. Against a site with the runtime:
+
+```bash
+wp eval-file <skill>/scripts/check-slots.php path/to/page-pattern.php
+wp eval-file <skill>/scripts/check-slots.php my-theme/faq '{"question":{"content":"…"}}'
+```
+
+It renders the reference and reports which slots took their value and which
+still show the design pattern's placeholder. A misspelled slot name reports as
+`MISSED quesiton — no slot by that name in the design pattern (typo?)`; an
+unregistered slug reports that the reference renders as nothing at all.
+
+Remember what block validation cannot see: missing block-supports classes leave
+a *valid* block that renders unstyled. After validating, re-read your own markup against
 the attribute-to-class table in `references/block-markup.md`, and where a
 running site is available, `pattern-builder/render-pattern` will show you the
 HTML that actually comes out.
@@ -170,7 +207,7 @@ If the pattern uses Pattern Overrides slots, also check the split rules in
 `references/design-content-split.md` — block validation cannot see those
 mistakes at all, because malformed attributes leave a *valid* block behind.
 
-### 5. Place it
+### 6. Place it
 
 A theme pattern is a PHP file in the theme's `patterns/` directory with a
 header comment:
@@ -242,6 +279,7 @@ add the token to `theme.json` and mention what you added.
 
 ## References
 
+- `references/block-vocabulary.md` — which blocks are allowed where (core-only vs theme vs plugin), the core vocabulary by purpose, and composition guidance
 - `references/block-markup.md` — the attribute-to-markup contract per block, and the mistakes that produce invalid markup
 - `references/design-content-split.md` — Pattern Overrides slots, `core/pattern` `content`, synced patterns, and the silent failures
 - `references/abilities.md` — asking a running site for its design system, block types and patterns, and storing results
