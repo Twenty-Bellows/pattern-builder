@@ -170,15 +170,15 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 						</PanelBody>
 
 						<PanelBody
-							title={_x(
+							title={ _x(
 								'Pattern Synced Status',
 								'UI String',
 								'pattern-builder'
-							)}
+							) }
 						>
 							<PatternSyncedStatusPanel
-								patternPost={record}
-								postType={postType}
+								patternPost={ record }
+								postType={ postType }
 							/>
 						</PanelBody>
 

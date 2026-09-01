@@ -78,7 +78,6 @@ export const PatternBuilderPanel = ( { patternPost, postType } ) => {
 				/>
 			</PluginDocumentSettingPanel>
 
-
 			{ isThemePattern && (
 				<PluginDocumentSettingPanel
 					name={ 'pattern-panel-additions-restrictions' }
@@ -116,7 +115,6 @@ export const PatternBuilderPanel = ( { patternPost, postType } ) => {
 					postType={ postType }
 				/>
 			</PluginDocumentSettingPanel>
-
 		</>
 	);
 };
