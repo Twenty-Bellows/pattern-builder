@@ -9,7 +9,6 @@ jest.mock( '@wordpress/block-editor', () => ( {
 	store: 'core/block-editor',
 } ) );
 
-// eslint-disable-next-line import/first
 import { getPatternOverrideValues } from '../../src/admin/preview-bindings';
 
 const selectWith = ( attributes ) => () => ( {
