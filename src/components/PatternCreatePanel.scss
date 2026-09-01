@@ -20,6 +20,16 @@
 		padding: 16px 12px;
 		background: #f8f8f8;
 		border-right: 1px solid #e0e0e0;
+
+		// In the editor sidebar the list is a screen of its own, so it has
+		// no pane to be the side of.
+		&.is-stacked {
+			flex: 1;
+			overflow: visible;
+			padding: 8px 0 0;
+			background: transparent;
+			border-right: 0;
+		}
 	}
 
 	&__group {
@@ -178,27 +188,13 @@
 		}
 	}
 
-	// ---- Stacked: the editor sidebar, too narrow for two panes. ----
-
-	&.is-stacked {
-		flex-direction: column;
-		min-height: 0;
-
-		.pattern-builder-create__kinds {
-			flex: 0 0 auto;
-			padding: 0 0 16px;
-			background: transparent;
-			border-right: 0;
-		}
+	// The form as the editor sidebar shows it: a screen of its own, so the
+	// pane's edges and its own scrolling both come off.
+	&__detail.is-stacked {
 
 		.pattern-builder-create__body {
 			overflow: visible;
-			padding: 16px 0 0;
-			border-top: 1px solid #e0e0e0;
-		}
-
-		.pattern-builder-create__title {
-			font-size: 15px;
+			padding: 8px 0 0;
 		}
 
 		.pattern-builder-create__footer {

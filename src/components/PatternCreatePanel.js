@@ -3,7 +3,7 @@
  */
 import { __ } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
-import { useState } from '@wordpress/element';
+import { useEffect, useState } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import { useInstanceId } from '@wordpress/compose';
 import {
@@ -20,6 +20,7 @@ import {
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
 } from '@wordpress/components';
+import { chevronRight } from '@wordpress/icons';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as coreStore } from '@wordpress/core-data';
 
@@ -216,17 +217,95 @@ function TemplatePartAreaField( { value, onChange } ) {
 }
 
 /**
- * Creates a pattern from one of a few kinds.
+ * The kinds, grouped, as a list to pick from.
  *
- * The kinds sit on the left; picking one describes what that kind of pattern
- * is for and asks only for what it leaves open — every kind takes a name and
- * a description, and each fixes the rest of the metadata itself.
+ * In the modal the pick swaps the pane beside it, so the chosen kind stays
+ * marked; in the editor sidebar the pick is a navigation to the kind's own
+ * screen, which is why the rows carry a chevron there and nothing is marked.
+ *
+ * @param {Object}   props              Component props.
+ * @param {string}   props.selectedKind The chosen kind's key, where one stays chosen.
+ * @param {Function} props.onSelect     Called with a kind key.
+ * @param {string}   props.layout       'columns' (the modal) or 'stacked' (the editor sidebar).
+ */
+export function PatternKindList( {
+	selectedKind,
+	onSelect,
+	layout = 'columns',
+} ) {
+	const isStacked = 'stacked' === layout;
+	const groupId = useInstanceId(
+		PatternKindList,
+		'pattern-builder-create-group'
+	);
+
+	return (
+		<div
+			className={
+				'pattern-builder-create__kinds' +
+				( isStacked ? ' is-stacked' : '' )
+			}
+			role="group"
+			aria-label={ __( 'Kind of pattern', 'pattern-builder' ) }
+		>
+			{ PATTERN_KIND_GROUPS.map( ( group ) => (
+				<div
+					key={ group.key }
+					className="pattern-builder-create__group"
+					role="group"
+					aria-labelledby={ `${ groupId }-${ group.key }` }
+				>
+					<h4
+						id={ `${ groupId }-${ group.key }` }
+						className="pattern-builder-create__group-label"
+					>
+						{ group.label }
+					</h4>
+					{ getPatternKindsInGroup( group.key ).map( ( item ) => (
+						<button
+							key={ item.key }
+							type="button"
+							aria-pressed={
+								isStacked
+									? undefined
+									: item.key === selectedKind
+							}
+							className={
+								'pattern-builder-create__kind' +
+								( ! isStacked && item.key === selectedKind
+									? ' is-selected'
+									: '' )
+							}
+							onClick={ () => onSelect( item.key ) }
+						>
+							<Icon icon={ item.icon } size={ 24 } />
+							<span className="pattern-builder-create__kind-text">
+								<span className="pattern-builder-create__kind-label">
+									{ item.label }
+								</span>
+								<span className="pattern-builder-create__kind-summary">
+									{ item.summary }
+								</span>
+							</span>
+							{ isStacked && <Icon icon={ chevronRight } /> }
+						</button>
+					) ) }
+				</div>
+			) ) }
+		</div>
+	);
+}
+
+/**
+ * One kind of pattern: what it is for, what it still needs, and the button
+ * that creates it.
  *
  * @param {Object}   props           Component props.
+ * @param {Object}   props.kind      The chosen kind.
  * @param {Function} props.onCreated Called with the created pattern.
  * @param {string}   props.layout    'columns' (the modal) or 'stacked' (the editor sidebar).
  */
-export const PatternCreatePanel = ( { onCreated, layout = 'columns' } ) => {
+export function PatternCreateForm( { kind, onCreated, layout = 'columns' } ) {
 	const { onNavigateToEntityRecord } = useSelect( ( select ) => {
 		const { getSettings } = select( blockEditorStore );
 		return {
@@ -234,33 +313,23 @@ export const PatternCreatePanel = ( { onCreated, layout = 'columns' } ) => {
 		};
 	}, [] );
 
-	const groupId = useInstanceId(
-		PatternCreatePanel,
-		'pattern-builder-create-group'
-	);
-	const [ kindKey, setKindKey ] = useState( DESIGN );
-	const [ values, setValues ] = useState( () =>
-		getInitialValues( getPatternKind( DESIGN ) )
-	);
+	const [ values, setValues ] = useState( () => getInitialValues( kind ) );
 	const [ error, setError ] = useState( '' );
 	const [ isCreating, setIsCreating ] = useState( false );
 
-	const kind = getPatternKind( kindKey );
-
-	const setValue = ( edit ) =>
-		setValues( ( current ) => ( { ...current, ...edit } ) );
-
-	const selectKind = ( key ) => {
-		setKindKey( key );
-		setError( '' );
-		// What the user has typed survives the switch; what the previous
-		// kind decided does not.
+	// Where the kind can be swapped without leaving the form, its own fields
+	// start again; what the user has typed is theirs and stays.
+	useEffect( () => {
 		setValues( ( current ) => ( {
-			...getInitialValues( getPatternKind( key ) ),
+			...getInitialValues( kind ),
 			title: current.title,
 			description: current.description,
 		} ) );
-	};
+		setError( '' );
+	}, [ kind ] );
+
+	const setValue = ( edit ) =>
+		setValues( ( current ) => ( { ...current, ...edit } ) );
 
 	const create = () => {
 		setIsCreating( true );
@@ -292,158 +361,138 @@ export const PatternCreatePanel = ( { onCreated, layout = 'columns' } ) => {
 			} );
 	};
 
+	const isStacked = 'stacked' === layout;
+
 	return (
 		<div
 			className={
-				'pattern-builder-create' +
-				( 'stacked' === layout ? ' is-stacked' : '' )
+				'pattern-builder-create__detail' +
+				( isStacked ? ' is-stacked' : '' )
 			}
 		>
-			<div
-				className="pattern-builder-create__kinds"
-				role="group"
-				aria-label={ __( 'Kind of pattern', 'pattern-builder' ) }
-			>
-				{ PATTERN_KIND_GROUPS.map( ( group ) => (
-					<div
-						key={ group.key }
-						className="pattern-builder-create__group"
-						role="group"
-						aria-labelledby={ `${ groupId }-${ group.key }` }
-					>
-						<h4
-							id={ `${ groupId }-${ group.key }` }
-							className="pattern-builder-create__group-label"
-						>
-							{ group.label }
-						</h4>
-						{ getPatternKindsInGroup( group.key ).map( ( item ) => (
-							<button
-								key={ item.key }
-								type="button"
-								aria-pressed={ item.key === kindKey }
-								className={
-									'pattern-builder-create__kind' +
-									( item.key === kindKey
-										? ' is-selected'
-										: '' )
-								}
-								onClick={ () => selectKind( item.key ) }
-							>
-								<Icon icon={ item.icon } size={ 24 } />
-								<span className="pattern-builder-create__kind-text">
-									<span className="pattern-builder-create__kind-label">
-										{ item.label }
-									</span>
-									<span className="pattern-builder-create__kind-summary">
-										{ item.summary }
-									</span>
-								</span>
-							</button>
-						) ) }
-					</div>
-				) ) }
-			</div>
-
-			<div className="pattern-builder-create__detail">
-				<div className="pattern-builder-create__body">
-					<div className="pattern-builder-create__intro">
+			<div className="pattern-builder-create__body">
+				<div className="pattern-builder-create__intro">
+					{ /* Stacked, the screen this form is on is already named
+					     after the kind. */ }
+					{ ! isStacked && (
 						<h3 className="pattern-builder-create__title">
 							{ kind.label }
 						</h3>
-						<p className="pattern-builder-create__description">
-							{ kind.description }
-						</p>
-					</div>
+					) }
+					<p className="pattern-builder-create__description">
+						{ kind.description }
+					</p>
+				</div>
 
-					<div className="pattern-builder-create__fields">
-						<TextControl
-							__next40pxDefaultSize
-							__nextHasNoMarginBottom
-							label={ __( 'Name', 'pattern-builder' ) }
-							value={ values.title }
+				<div className="pattern-builder-create__fields">
+					<TextControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+						label={ __( 'Name', 'pattern-builder' ) }
+						value={ values.title }
+						onChange={ ( value ) => setValue( { title: value } ) }
+					/>
+					<TextareaControl
+						__nextHasNoMarginBottom
+						label={ __( 'Description', 'pattern-builder' ) }
+						value={ values.description }
+						rows={ 3 }
+						placeholder={ __(
+							'A short description of the pattern',
+							'pattern-builder'
+						) }
+						onChange={ ( value ) =>
+							setValue( { description: value } )
+						}
+					/>
+					{ kindHasField( kind, STORAGE_FIELD ) && (
+						<StorageField
+							value={ values.source }
 							onChange={ ( value ) =>
-								setValue( { title: value } )
+								setValue( { source: value } )
 							}
 						/>
-						<TextareaControl
-							__nextHasNoMarginBottom
-							label={ __( 'Description', 'pattern-builder' ) }
-							value={ values.description }
-							rows={ 3 }
-							placeholder={ __(
-								'A short description of the pattern',
+					) }
+					{ kindHasField( kind, POST_TYPES_FIELD ) && (
+						<PostTypesField
+							value={ values.postTypes }
+							onChange={ ( value ) =>
+								setValue( { postTypes: value } )
+							}
+						/>
+					) }
+					{ kindHasField( kind, TEMPLATE_TYPES_FIELD ) && (
+						<TemplateTypesField
+							value={ values.templateTypes }
+							onChange={ ( value ) =>
+								setValue( { templateTypes: value } )
+							}
+						/>
+					) }
+					{ kindHasField( kind, TEMPLATE_PART_AREA_FIELD ) && (
+						<TemplatePartAreaField
+							value={ values.templatePartArea }
+							onChange={ ( value ) =>
+								setValue( { templatePartArea: value } )
+							}
+						/>
+					) }
+					{ kindHasField( kind, BLOCK_TYPES_FIELD ) && (
+						<BlockTypePicker
+							label={ __(
+								'Which blocks should offer this pattern?',
 								'pattern-builder'
 							) }
+							value={ values.blockTypes }
 							onChange={ ( value ) =>
-								setValue( { description: value } )
+								setValue( { blockTypes: value } )
 							}
 						/>
-						{ kindHasField( kind, STORAGE_FIELD ) && (
-							<StorageField
-								value={ values.source }
-								onChange={ ( value ) =>
-									setValue( { source: value } )
-								}
-							/>
-						) }
-						{ kindHasField( kind, POST_TYPES_FIELD ) && (
-							<PostTypesField
-								value={ values.postTypes }
-								onChange={ ( value ) =>
-									setValue( { postTypes: value } )
-								}
-							/>
-						) }
-						{ kindHasField( kind, TEMPLATE_TYPES_FIELD ) && (
-							<TemplateTypesField
-								value={ values.templateTypes }
-								onChange={ ( value ) =>
-									setValue( { templateTypes: value } )
-								}
-							/>
-						) }
-						{ kindHasField( kind, TEMPLATE_PART_AREA_FIELD ) && (
-							<TemplatePartAreaField
-								value={ values.templatePartArea }
-								onChange={ ( value ) =>
-									setValue( { templatePartArea: value } )
-								}
-							/>
-						) }
-						{ kindHasField( kind, BLOCK_TYPES_FIELD ) && (
-							<BlockTypePicker
-								label={ __(
-									'Which blocks should offer this pattern?',
-									'pattern-builder'
-								) }
-								value={ values.blockTypes }
-								onChange={ ( value ) =>
-									setValue( { blockTypes: value } )
-								}
-							/>
-						) }
-					</div>
-				</div>
-
-				<div className="pattern-builder-create__footer">
-					{ error && (
-						<Notice status="error" isDismissible={ false }>
-							{ error }
-						</Notice>
 					) }
-					<Button
-						__next40pxDefaultSize
-						variant="primary"
-						disabled={ isCreating || ! canCreate( kind, values ) }
-						accessibleWhenDisabled
-						isBusy={ isCreating }
-						onClick={ create }
-					>
-						{ __( 'Create This Pattern', 'pattern-builder' ) }
-					</Button>
 				</div>
 			</div>
+
+			<div className="pattern-builder-create__footer">
+				{ error && (
+					<Notice status="error" isDismissible={ false }>
+						{ error }
+					</Notice>
+				) }
+				<Button
+					__next40pxDefaultSize
+					variant="primary"
+					disabled={ isCreating || ! canCreate( kind, values ) }
+					accessibleWhenDisabled
+					isBusy={ isCreating }
+					onClick={ create }
+				>
+					{ __( 'Create This Pattern', 'pattern-builder' ) }
+				</Button>
+			</div>
+		</div>
+	);
+}
+
+/**
+ * Creates a pattern from one of a few kinds, both panes at once.
+ *
+ * The kinds sit on the left; picking one describes what that kind of pattern
+ * is for and asks only for what it leaves open. The editor sidebar has no
+ * room for two panes, so it puts these same two pieces on two screens.
+ *
+ * @param {Object}   props           Component props.
+ * @param {Function} props.onCreated Called with the created pattern.
+ */
+export const PatternCreatePanel = ( { onCreated } ) => {
+	const [ kindKey, setKindKey ] = useState( DESIGN );
+
+	return (
+		<div className="pattern-builder-create">
+			<PatternKindList selectedKind={ kindKey } onSelect={ setKindKey } />
+			<PatternCreateForm
+				kind={ getPatternKind( kindKey ) }
+				onCreated={ onCreated }
+			/>
 		</div>
 	);
 };
