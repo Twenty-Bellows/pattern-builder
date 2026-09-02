@@ -11,6 +11,15 @@ A **collection** is the unit of organisation, publishing and installation on the
 - **Installed patterns** land under a local pattern category named for the collection they came from.
 - **Agents** get abilities for all of it, through the connection the WordPress user made.
 
+### Names (D37)
+
+A pattern on the cloud is named `{handle}/{collection}/{pattern}` — the account's handle, the collection's slug, the pattern's slug — and **that is the name it installs under here**. So:
+
+- The connect panel's signup form asks for a handle, and the New collection dialogs (the modal on the Uploaded tab, and `New collection…` inline in the picker) ask for a slug alongside the name. Both are permanent; the field follows the name until it is typed into. `slugProblem()` and `handleProblem()` mirror the service's rules so a form can say no before the round trip; the service is the check that counts.
+- A downloaded pattern keeps its cloud name instead of being renamed into this theme's namespace, and is written to `patterns/{handle}/{collection}/{slug}.php`. Core scans `patterns/` to unlimited depth, so nothing has to register it — and two accounts' `hero` patterns no longer overwrite each other, which is what `get_stylesheet() . '/' . $slug` did.
+- The theme's own patterns keep the flat layout every theme uses: a directory named after the theme, inside the theme, says nothing.
+- Uploading does not rename a pattern; only the namespace it hangs under changes. `export_local()` sends the last segment of the local name as the slug, and the service refuses it if that name is already used in the target collection.
+
 ## 2. The proxy (`/pattern-builder/v1/cloud/*`, `Pattern_Builder_Cloud_Controller`)
 
 Every route stays nonce- and capability-gated and answers 401 disconnected, as today. The service's verified-account and Pro rules are enforced there; the proxy relays the refusal and its message.
@@ -44,7 +53,7 @@ Every route stays nonce- and capability-gated and answers 401 disconnected, as t
 ## 4. Uploaded tab
 
 - **Rail**: the account's collections, Personal first with a lock icon and its meter ("7 of 25", or the count alone on Pro). Selecting one filters the grid.
-- **New collection**: name, description; visibility only where the account may choose (Pro). A free account is told, in the same dialog, that the collection will be public and why.
+- **New collection**: name, slug (permanent — part of the name of every pattern in the collection), description; visibility only where the account may choose (Pro). A free account is told, in the same dialog, that the collection will be public and why.
 - **Collection header**: Rename, Describe, Visibility (as allowed; Personal offers only Describe), **Delete** with the prompt: delete its patterns, or move them to Personal. A refused move (past the cap) shows the upgrade prompt and leaves delete available.
 - **Pattern actions**: **Move to collection** in the details sidebar.
 - **Over policy** (a lapsed Pro): a banner from `/me` saying what is locked and the three ways out, matching the service's rule.
