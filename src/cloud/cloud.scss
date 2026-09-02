@@ -295,10 +295,12 @@
 		align-self: flex-start;
 	}
 
+	// Grid, not flex: the actions are an HStack, which sizes itself to
+	// its container, and as a flex item that container is the whole row.
 	&__header {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: start;
 		gap: 24px;
 		padding-bottom: 16px;
 		border-bottom: 1px solid #ddd;
@@ -323,8 +325,7 @@
 	}
 
 	&__actions {
-		flex: 0 0 auto;
-		width: auto;
+		justify-self: end;
 	}
 }
 
