@@ -27,6 +27,11 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 * **Tags & Keywords** - Add metadata to make patterns discoverable
 * **Sync Status** - Manage synced and unsynced patterns effortlessly
 
+**Your Patterns, on Every Site**
+* **Collections** - Keep patterns on patternbuilderwp.com in collections: a private Personal for yourself, public ones for the community
+* **Install a whole collection** - Save any community collection to a site in one action, as theme patterns or user patterns, images included
+* **Agents welcome** - An agent connected to your site can browse, install and upload through your account, and never holds a cloud credential
+
 **Developer-Friendly**
 * **Export to Theme** - Convert user patterns to theme files with proper formatting
 * **Asset Management** - Automatically handles pattern images and media
@@ -81,7 +86,7 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 
 Everything local works without an account and without sending anything anywhere. Two services are involved only when you choose to use them:
 
-**patternbuilderwp.com** — the cloud library and community directory, and the account behind them. When you sign in or create an account from Appearance → Pattern Builder, your email and password are relayed once, server-side, to patternbuilderwp.com; only the returned access token is stored, on this site, for your WordPress user. Browsing the Uploaded and Community tabs, uploading and downloading patterns, starting a password reset, and confirming a purchase all talk to patternbuilderwp.com through this site. Anonymous usage reporting, if you allow it, goes there too (see below). Terms: https://patternbuilderwp.com/terms/ — Privacy: https://patternbuilderwp.com/privacy/
+**patternbuilderwp.com** — the cloud library and community directory, and the account behind them. When you sign in or create an account from Appearance → Pattern Builder, your email and password are relayed once, server-side, to patternbuilderwp.com; only the returned access token is stored, on this site, for your WordPress user. Browsing the Uploaded and Community tabs, managing your collections, uploading patterns and installing patterns or whole collections, starting a password reset, and confirming a purchase all talk to patternbuilderwp.com through this site. Pattern Builder is the only way to install anything from patternbuilderwp.com: the website shows collections and sends people here. Anonymous usage reporting, if you allow it, goes there too (see below). Terms: https://patternbuilderwp.com/terms/ — Privacy: https://patternbuilderwp.com/privacy/
 
 **Freemius** — the checkout for Pattern Builder Pro. Choosing Go Pro loads Freemius's checkout script (https://checkout.freemius.com/js/v1/) on the Pattern Builder screen and opens their checkout; nothing from Freemius loads anywhere else or before that click. Terms: https://freemius.com/terms/ — Privacy: https://freemius.com/privacy/
 
@@ -104,6 +109,11 @@ Yes, Pattern Builder provides a unified interface to manage both theme patterns 
 == Changelog ==
 
 = 2.1.0 =
+* Collections: every pattern on patternbuilderwp.com lives in exactly one collection. Every account has a private Personal; free accounts share the rest publicly, Pro builds collections in private
+* The Community tab is collections first: open one, save a single pattern, or save the whole collection to this site in one action, with one design-tokens step and a progress count
+* The Uploaded tab manages your collections — create, rename, describe, set the visibility, delete with the choice of deleting the patterns or moving them to Personal — and uploads ask which collection when there is more than Personal
+* Patterns installed from a collection land under a local pattern category named for it
+* Seven new abilities for agents: list and search collections and patterns, install a pattern or a collection, upload into a collection, create a private collection — all through the WordPress user's own connection
 * Community patterns are browsed as an account: the Community tab asks you to sign in or create a free account first
 * Creating an account from wp-admin now asks for a stronger password (eight characters, with an upper-case letter, a number and a symbol), asks whether we may email you news and offers, and sends a confirmation email
 * Forgot your password? The connect panel starts a reset; the link in the email finishes it on patternbuilderwp.com
