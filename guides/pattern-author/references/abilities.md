@@ -76,6 +76,47 @@ input and output schema.
 | `pattern-builder/create-pattern` | POST | store finished markup. `title` and `content` required; `source` is `theme` (default) or `user`; also `name`, `description`, `categories`, `keywords`, `synced`, `viewportWidth` |
 | `pattern-builder/update-pattern` | POST | replace an existing pattern. `id` and `content` required |
 
+## The cloud, through the site's connection
+
+Where the WordPress user you authenticate as has connected Pattern Builder to
+a [patternbuilderwp.com](https://patternbuilderwp.com) account, seven more
+abilities reach that cloud through the site. You never hold a cloud
+credential: the site admin issued your application password, the account
+holder made the connection, and every call runs as that user with that
+connection. Without a connection each of these refuses with
+`pattern_builder_not_connected` — "Connect Pattern Builder to your
+patternbuilderwp.com account on this site first" — which is for a person to
+do on the Pattern Builder screen, not for you.
+
+A **collection** is the unit there: every cloud pattern is in exactly one,
+every account has a locked private **Personal**, and a collection is public or
+private as a whole. Installing puts each pattern under a local pattern
+category named for its collection.
+
+| Name | Method | Purpose |
+|---|---|---|
+| `pattern-builder/list-collections` | GET | the community's public and premium collections (`input[scope]=community`, the default; `input[search]`), or the account's own, Personal first (`input[scope]=mine`) |
+| `pattern-builder/get-collection` | GET | one collection with its pattern summaries, each marked `installed` when this site already has it. `input[owner]` + `input[slug]` for a community collection, `input[id]` for one of the account's own |
+| `pattern-builder/search-cloud-patterns` | GET | search public patterns by `input[search]`; each names its collection; `input[collection]=owner/slug` narrows to one |
+| `pattern-builder/install-collection` | POST | every pattern of a collection, in one action: `owner`, `slug`, `destination` (`theme`\|`user`, default user), `tokens` (`add`\|`skip`, default add). Already-installed patterns are skipped, a failure is reported and the rest carry on; per-pattern results come back |
+| `pattern-builder/install-cloud-pattern` | POST | one pattern by `id`, with the same `destination` and `tokens`; `source` is `directory` (default) or `library` |
+| `pattern-builder/upload-pattern` | POST | a local pattern (`id`) or finished markup (`title` + `content`, stored here as a user pattern first) into `collection` — an id, or `personal` (the default). Validate first, as for create-pattern |
+| `pattern-builder/create-collection` | POST | a **private** collection: `name`, `description`. On a free account the service refuses with an upgrade message, since free accounts only make public collections and an agent never publishes; upload into Personal instead |
+
+No ability makes a collection public, changes a visibility, or deletes a
+collection. Those are the account holder's, in Pattern Builder.
+
+```bash
+# What is there.
+curl -u "$WP_USER:$WP_APP_PASSWORD" -G --data-urlencode 'input[search]=hero' \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/list-collections/run"
+
+# Install one, as theme patterns.
+curl -u "$WP_USER:$WP_APP_PASSWORD" -X POST -H 'Content-Type: application/json' \
+  --data '{"input":{"owner":2,"slug":"starter-sections","destination":"theme"}}' \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/install-collection/run"
+```
+
 ## Guides the site itself carries
 
 `get-authoring-guide` serves this documentation over the wire — the same

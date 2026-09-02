@@ -17,7 +17,16 @@
  *
  * `pattern-id` is a theme pattern's namespaced name and defaults to one with
  * a local image, which is the case worth checking. The site must already
- * point at the service (`PATTERN_BUILDER_CLOUD_URL`, or the option).
+ * point at the service (`PATTERN_BUILDER_CLOUD_URL`, or the option). The
+ * upload goes into a collection made for the run ("E2E Roundtrip", public
+ * on a free account), and the output names it as `{owner}/{slug}`.
+ *
+ * Then, on a SECOND site connected to any account, install that collection:
+ *
+ *   wp eval-file tests/e2e/cloud-roundtrip.php <token> install <owner>/<slug>
+ *
+ * which is the whole-collection path — the fetch, each download, the local
+ * category footprint — against the real service.
  *
  * Exits non-zero on the first thing that does not hold.
  *
@@ -80,7 +89,59 @@ if ( empty( $out['status']['connected'] ) ) {
 	WP_CLI::error( 'Not connected: ' . wp_json_encode( $out['status'] ) );
 }
 
-// 1. Upload. The pattern's images travel with it as package assets.
+// The second site's half: install a collection the first run made.
+if ( 'install' === $pattern_id ) {
+	$target = isset( $args[2] ) ? explode( '/', $args[2], 2 ) : array();
+	if ( 2 !== count( $target ) ) {
+		WP_CLI::error( 'Usage: wp eval-file tests/e2e/cloud-roundtrip.php <token> install <owner>/<slug>' );
+	}
+
+	$porter  = new \TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Porter();
+	$install = $porter->install_collection( (int) $target[0], $target[1], 'user', 'add' );
+	if ( is_wp_error( $install ) ) {
+		WP_CLI::error( 'Install failed: ' . $install->get_error_message() );
+	}
+	WP_CLI::log( wp_json_encode( $install, JSON_PRETTY_PRINT ) );
+
+	$landed   = array_filter( $install['results'], static function ( $r ) { return 'installed' === $r['status']; } );
+	$category = \TwentyBellows\PatternBuilder\Pattern_Builder_Cloud::collection_category_slug( (int) $target[0], $target[1] );
+	$filed    = true;
+	foreach ( $landed as $r ) {
+		$filed = $filed && in_array( $category, wp_get_object_terms( $r['id'], 'wp_pattern_category', array( 'fields' => 'slugs' ) ), true );
+	}
+
+	if ( $install['failed'] || ! $filed ) {
+		WP_CLI::error( sprintf( 'Collection install broke: %d failed, filed under %s: %s', $install['failed'], $category, $filed ? 'yes' : 'no' ) );
+	}
+	WP_CLI::success( sprintf( 'Collection installed: %d landed, %d already here, all under %s.', $install['installed'], $install['skipped'], $category ) );
+	return;
+}
+
+// 1. A collection for the run, then the upload into it. The pattern's
+// images travel with it as package assets.
+$collections   = $attempt( 'List collections', $controller->library_collections() );
+$e2e           = null;
+foreach ( $collections as $candidate ) {
+	if ( 'E2E Roundtrip' === $candidate['title'] ) {
+		$e2e = $candidate;
+	}
+}
+if ( ! $e2e ) {
+	$e2e = $attempt(
+		'Create collection',
+		$controller->create_collection(
+			$request(
+				'library/collections',
+				array(
+					'name'        => 'E2E Roundtrip',
+					'description' => 'Made by tests/e2e/cloud-roundtrip.php.',
+				)
+			)
+		)
+	);
+}
+$out['collection'] = sprintf( '%d/%s', $e2e['owner'], $e2e['slug'] );
+
 $out['upload'] = $attempt(
 	'Upload',
 	$controller->upload(
@@ -89,7 +150,7 @@ $out['upload'] = $attempt(
 			array(
 				'patternType' => 'theme',
 				'patternId'   => $pattern_id,
-				'categories'  => array( 'E2E Roundtrip' ),
+				'collection'  => $e2e['id'],
 			)
 		)
 	)
@@ -145,7 +206,7 @@ $checks = array(
 	'image points at this site'     => $image_url && 0 === strpos( $image_url, $uploads['baseurl'] ),
 	'image file was fetched'        => $image_path && file_exists( $image_path ),
 	'image names its attachment'    => (bool) preg_match( '/wp-image-\d+/', $post->post_content ),
-	'categories came across'        => ! empty( wp_get_object_terms( $post->ID, 'wp_pattern_category', array( 'fields' => 'names' ) ) ),
+	'filed in the collection'       => isset( $out['upload']['pattern']['collection']['slug'] ) && $out['upload']['pattern']['collection']['slug'] === $e2e['slug'],
 );
 
 $out['checks'] = $checks;
@@ -157,4 +218,4 @@ if ( $failed ) {
 	WP_CLI::error( 'Round trip broke: ' . implode( '; ', $failed ) );
 }
 
-WP_CLI::success( sprintf( 'Round trip intact (cloud pattern %d → local post %d).', $cloud_id, $post->ID ) );
+WP_CLI::success( sprintf( 'Round trip intact (cloud pattern %d → local post %d). Install the collection on a second site with: install %s', $cloud_id, $post->ID, $out['collection'] ) );
