@@ -83,6 +83,26 @@ abstract class Pattern_Test_Case extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Marks a pattern as synced for the duration of a test, through the
+	 * filter, as a plugin would.
+	 *
+	 * @param string $slug Pattern slug.
+	 * @return void
+	 */
+	protected function mark_synced( string $slug ): void {
+		add_filter(
+			'pattern_builder_synced_patterns',
+			static function ( $slugs ) use ( $slug ) {
+				$slugs[] = $slug;
+
+				return $slugs;
+			}
+		);
+
+		\TwentyBellows\PatternBuilder\Synced_Patterns::flush();
+	}
+
+	/**
 	 * Serializes a `core/pattern` block that carries content.
 	 *
 	 * @param string $slug    Pattern slug.
