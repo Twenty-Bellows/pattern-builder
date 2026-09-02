@@ -844,6 +844,7 @@ class Pattern_Builder_Abilities {
 		return array(
 			'files' => $files,
 			'entry' => 'validate-pattern.mjs',
+
 			/*
 			 * Not translated, deliberately. This is a command line recipe rather
 			 * than interface copy, and the guides it belongs beside are served as

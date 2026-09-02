@@ -14,7 +14,12 @@ use WP_Error;
  * Import: PBP → local pattern. Assets are fetched from the service into the
  * media library first; a theme-destination pattern then flows through
  * Pattern_File_Store::update_theme_pattern(), which moves home-URL images
- * into theme assets exactly as user→theme conversion always has.
+ * into theme assets exactly as user→theme conversion always has. A pattern
+ * installed from a cloud collection lands under a local pattern category
+ * named for that collection — its footprint on this site.
+ *
+ * Installing a whole collection is one method, install_collection(), used by
+ * the REST route's caller and by the agent ability alike.
  */
 class Pattern_Builder_Cloud_Porter {
 
@@ -71,21 +76,24 @@ class Pattern_Builder_Cloud_Porter {
 		$slug = $pattern->name ? basename( (string) $pattern->name ) : sanitize_title( $pattern->title );
 
 		$pbp = array(
-			'format'        => 'pbp/1',
-			'title'         => $pattern->title,
-			'slug'          => $slug,
-			'description'   => (string) $pattern->description,
-			'keywords'      => array_values( (array) $pattern->keywords ),
-			'categories'    => array_values( (array) $pattern->categories ),
-			'viewportWidth' => (int) $pattern->viewportWidth, // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
-			'synced'        => (bool) $pattern->synced,
-			'blockTypes'    => array_values( (array) $pattern->blockTypes ), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
-			'postTypes'     => array_values( (array) $pattern->postTypes ), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
-			'templateTypes' => array_values( (array) $pattern->templateTypes ), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
-			'content'       => $content,
-			'assets'        => array_values( $assets ),
-			'tokens'        => Pattern_Builder_Cloud_Tokens::collect( (string) $pattern->content ),
-			'origin'        => array(
+			'format'             => 'pbp/1',
+			'title'              => $pattern->title,
+			'slug'               => $slug,
+			'description'        => (string) $pattern->description,
+			'keywords'           => array_values( (array) $pattern->keywords ),
+			// The pattern file's own Categories: header travels along as
+			// classification for the inserter. Which cloud collection the
+			// pattern goes into is the request's business, not the package's.
+			'inserterCategories' => array_values( (array) $pattern->categories ),
+			'viewportWidth'      => (int) $pattern->viewportWidth, // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			'synced'             => (bool) $pattern->synced,
+			'blockTypes'         => array_values( (array) $pattern->blockTypes ), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			'postTypes'          => array_values( (array) $pattern->postTypes ), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			'templateTypes'      => array_values( (array) $pattern->templateTypes ), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			'content'            => $content,
+			'assets'             => array_values( $assets ),
+			'tokens'             => Pattern_Builder_Cloud_Tokens::collect( (string) $pattern->content ),
+			'origin'             => array(
 				'site' => home_url(),
 				'kind' => $type,
 			),
@@ -141,9 +149,13 @@ class Pattern_Builder_Cloud_Porter {
 	 *
 	 * @param array  $pbp         Package from the service.
 	 * @param string $destination 'user' or 'theme'.
+	 * @param array  $collection  The cloud collection it came from, as
+	 *                            { owner, slug, title }, or empty. When
+	 *                            given, the pattern lands under a local
+	 *                            category named for the collection.
 	 * @return array|WP_Error { type: string, id: string|int, title: string }
 	 */
-	public function import_pbp( $pbp, $destination ) {
+	public function import_pbp( $pbp, $destination, $collection = array() ) {
 		if ( ! is_array( $pbp ) || empty( $pbp['content'] ) || empty( $pbp['title'] ) ) {
 			return new WP_Error( 'pb_cloud_bad_package', __( 'The downloaded pattern package is malformed.', 'pattern-builder' ), array( 'status' => 502 ) );
 		}
@@ -184,8 +196,20 @@ class Pattern_Builder_Cloud_Porter {
 		$title       = sanitize_text_field( (string) $pbp['title'] );
 		$slug        = sanitize_title( ! empty( $pbp['slug'] ) ? (string) $pbp['slug'] : $title );
 		$description = sanitize_textarea_field( isset( $pbp['description'] ) ? (string) $pbp['description'] : '' );
-		$categories  = array_map( 'sanitize_text_field', isset( $pbp['categories'] ) && is_array( $pbp['categories'] ) ? $pbp['categories'] : array() );
+		$categories  = array_map( 'sanitize_text_field', isset( $pbp['inserterCategories'] ) && is_array( $pbp['inserterCategories'] ) ? $pbp['inserterCategories'] : array() );
 		$synced      = ! empty( $pbp['synced'] );
+
+		/*
+		 * The collection's footprint: a category slug `pbwp-{owner}-{slug}`
+		 * on the installed pattern, and the collection's title remembered
+		 * so the inserter shows "Starter Sections" rather than the slug.
+		 */
+		$collection = Pattern_Builder_Cloud::describe_collection( $collection );
+		if ( $collection ) {
+			$categories[] = Pattern_Builder_Cloud::collection_category_slug( $collection['owner'], $collection['slug'] );
+			$categories   = array_values( array_unique( $categories ) );
+			Pattern_Builder_Cloud::remember_collection_category( $collection );
+		}
 
 		if ( 'theme' === $destination ) {
 			/*
@@ -736,7 +760,11 @@ class Pattern_Builder_Cloud_Porter {
 		}
 
 		if ( ! empty( $categories ) ) {
-			wp_set_object_terms( $post_id, $categories, 'wp_pattern_category', false );
+			$term_ids = array();
+			foreach ( $categories as $category ) {
+				$term_ids[] = $this->pattern_category_term( $category );
+			}
+			wp_set_object_terms( $post_id, array_filter( $term_ids ), 'wp_pattern_category', false );
 		}
 
 		return array(
@@ -744,6 +772,221 @@ class Pattern_Builder_Cloud_Porter {
 			'id'    => $post_id,
 			'title' => $title,
 		);
+	}
+
+	/**
+	 * The wp_pattern_category term for a category name or slug, created
+	 * when missing. A collection's category is created by slug with the
+	 * collection's title as its name, so the editor's own lists show the
+	 * title too.
+	 *
+	 * @param string $category A category name or slug.
+	 * @return int Term ID, or 0.
+	 */
+	private function pattern_category_term( $category ) {
+		$existing = get_term_by( 'slug', sanitize_title( $category ), 'wp_pattern_category' );
+		if ( ! $existing ) {
+			$existing = get_term_by( 'name', $category, 'wp_pattern_category' );
+		}
+		if ( $existing instanceof \WP_Term ) {
+			return (int) $existing->term_id;
+		}
+
+		$labels = Pattern_Builder_Cloud::collection_categories();
+		$name   = isset( $labels[ $category ] ) ? $labels[ $category ] : $category;
+
+		$created = wp_insert_term( $name, 'wp_pattern_category', array( 'slug' => sanitize_title( $category ) ) );
+		return is_wp_error( $created ) ? 0 : (int) $created['term_id'];
+	}
+
+	/**
+	 * Which local pattern (if any) a cloud pattern is installed as; a
+	 * deleted local copy reads as not installed.
+	 *
+	 * @param int $cloud_id Cloud pattern ID.
+	 * @return array|null { type, id, title, collection: array }
+	 */
+	public function find_installed( $cloud_id ) {
+		foreach ( Pattern_Builder_Cloud::links() as $key => $link ) {
+			if ( (int) $link['cloudId'] !== (int) $cloud_id ) {
+				continue;
+			}
+
+			$parts = explode( ':', (string) $key, 2 );
+			if ( 2 !== count( $parts ) ) {
+				continue;
+			}
+
+			$type  = 'user' === $parts[0] ? 'user' : 'theme';
+			$id    = 'user' === $type ? (int) $parts[1] : $parts[1];
+			$local = $this->describe_local( $type, $id );
+			if ( $local ) {
+				$local['collection'] = isset( $link['collection'] ) && is_array( $link['collection'] ) ? $link['collection'] : array();
+				return $local;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Install a whole cloud collection onto this site.
+	 *
+	 * Fetches the collection, then imports each pattern in turn through the
+	 * single-pattern path: one the link map says is already installed from
+	 * this collection is skipped, a failure is recorded and the rest carry
+	 * on, and every pattern lands under the collection's local category.
+	 * The browser drives the same steps itself through /cloud/download so it
+	 * can show progress; the agent ability calls this.
+	 *
+	 * @param int    $owner       The collection owner's account id.
+	 * @param string $slug        The collection's plain slug.
+	 * @param string $destination 'user' or 'theme'.
+	 * @param string $tokens      'add' to write the design tokens this site
+	 *                            lacks into the destination, 'skip' to leave
+	 *                            them.
+	 * @return array|WP_Error { collection, results: array, installed, skipped, failed }
+	 */
+	public function install_collection( $owner, $slug, $destination, $tokens = 'add' ) {
+		$destination = 'theme' === $destination ? 'theme' : 'user';
+		$owner       = (int) $owner;
+		$slug        = sanitize_title( (string) $slug );
+
+		$collection = Pattern_Builder_Cloud::request( 'GET', "/directory/collections/{$owner}/{$slug}" );
+		if ( is_wp_error( $collection ) ) {
+			return $collection;
+		}
+		if ( empty( $collection['patterns'] ) || ! is_array( $collection['patterns'] ) ) {
+			$collection['patterns'] = array();
+		}
+
+		$described = Pattern_Builder_Cloud::describe_collection( $collection );
+		$results   = array();
+		$counts    = array(
+			'installed' => 0,
+			'skipped'   => 0,
+			'failed'    => 0,
+		);
+
+		foreach ( $collection['patterns'] as $summary ) {
+			$cloud_id = isset( $summary['id'] ) ? (int) $summary['id'] : 0;
+			$title    = isset( $summary['title'] ) ? (string) $summary['title'] : '';
+			$result   = array(
+				'cloudId' => $cloud_id,
+				'title'   => $title,
+			);
+
+			$installed = $cloud_id ? $this->find_installed( $cloud_id ) : null;
+			if ( $installed && ! empty( $installed['collection']['slug'] )
+				&& $installed['collection']['slug'] === $described['slug']
+				&& (int) $installed['collection']['owner'] === $described['owner'] ) {
+				$result['status'] = 'skipped';
+				$result['type']   = $installed['type'];
+				$result['id']     = $installed['id'];
+				++$counts['skipped'];
+				$results[] = $result;
+				continue;
+			}
+
+			$outcome = $this->install_cloud_pattern( $cloud_id, $destination, 'add' === $tokens, $described, ! empty( $summary['mine'] ) );
+			if ( is_wp_error( $outcome ) ) {
+				$result['status']  = 'failed';
+				$result['message'] = $outcome->get_error_message();
+				++$counts['failed'];
+			} else {
+				$result['status'] = 'installed';
+				$result['type']   = $outcome['type'];
+				$result['id']     = $outcome['id'];
+				++$counts['installed'];
+			}
+			$results[] = $result;
+		}
+
+		unset( $collection['patterns'] );
+
+		return array_merge(
+			array(
+				'collection' => $collection,
+				'results'    => $results,
+			),
+			$counts
+		);
+	}
+
+	/**
+	 * Download one directory pattern and land it here: the single-pattern
+	 * path the REST route and install_collection() share. Missing design
+	 * tokens go to the same destination as the pattern, and the link map
+	 * records the cloud copy and its collection.
+	 *
+	 * @param int    $cloud_id   Cloud pattern ID.
+	 * @param string $destination 'user' or 'theme'.
+	 * @param bool   $add_tokens Whether to write the design tokens this site lacks.
+	 * @param array  $collection { owner, slug, title } or empty.
+	 * @param bool   $mine       Whether the cloud copy is this account's, as the service said.
+	 * @param string $source     'directory' or 'library'.
+	 * @return array|WP_Error { type, id, title, tokensWritten }
+	 */
+	public function install_cloud_pattern( $cloud_id, $destination, $add_tokens, $collection = array(), $mine = false, $source = 'directory' ) {
+		$cloud_id    = (int) $cloud_id;
+		$destination = 'theme' === $destination ? 'theme' : 'user';
+		$source      = 'library' === $source ? 'library' : 'directory';
+
+		if ( ! $cloud_id ) {
+			return new WP_Error( 'pb_cloud_bad_request', __( 'Which pattern?', 'pattern-builder' ), array( 'status' => 400 ) );
+		}
+
+		$pbp = Pattern_Builder_Cloud::request( 'POST', "/{$source}/patterns/{$cloud_id}/download" );
+		if ( is_wp_error( $pbp ) ) {
+			return $pbp;
+		}
+
+		/*
+		 * Which collection the pattern is in: a caller that already knows
+		 * (a whole-collection install, the browser with the summary in
+		 * hand) says so; otherwise the directory is asked, so a pattern an
+		 * agent names by id alone still lands under its collection's
+		 * category. A pattern from the account's own library carries no
+		 * footprint — it is the account's own work, not something installed.
+		 */
+		$collection = Pattern_Builder_Cloud::describe_collection( $collection );
+		if ( ! $collection && 'directory' === $source ) {
+			$summary = Pattern_Builder_Cloud::request( 'GET', "/directory/patterns/{$cloud_id}" );
+			if ( ! is_wp_error( $summary ) && ! empty( $summary['collection'] ) ) {
+				$collection = Pattern_Builder_Cloud::describe_collection( $summary['collection'] );
+			}
+		}
+
+		$tokens_written = array();
+		if ( $add_tokens && ! empty( $pbp['tokens'] ) ) {
+			$tokens_written = Pattern_Builder_Cloud_Tokens::apply( $pbp['tokens'], $destination );
+			if ( is_wp_error( $tokens_written ) ) {
+				return $tokens_written;
+			}
+		}
+
+		$result = $this->import_pbp( $pbp, $destination, $collection );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		$hash = $this->content_hash( $result['type'], $result['id'] );
+
+		/*
+		 * Whether the cloud copy is this account's to update later. One from
+		 * the account's own library always is; one from the directory only if
+		 * the service said so when it listed it.
+		 */
+		Pattern_Builder_Cloud::set_link(
+			self::local_key( $result['type'], $result['id'] ),
+			$cloud_id,
+			is_wp_error( $hash ) ? '' : $hash,
+			'library' === $source || $mine,
+			$collection
+		);
+
+		$result['tokensWritten'] = $tokens_written;
+		return $result;
 	}
 
 	/**
