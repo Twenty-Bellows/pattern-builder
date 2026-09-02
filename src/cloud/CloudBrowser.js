@@ -31,6 +31,8 @@ import {
 	track,
 } from '../utils/telemetry';
 import { openCheckout } from './checkout';
+import { CommunityTab } from './CommunityTab';
+import { UploadedTab } from './UploadedTab';
 
 import './cloud.scss';
 
@@ -368,7 +370,7 @@ function ConnectPanel( { onConnected, intro } ) {
  * @param {boolean}  props.isSelected Whether the card is selected.
  * @param {Function} props.onSelect   Selection callback.
  */
-function CloudCard( { pattern, isSelected, onSelect } ) {
+export function CloudCard( { pattern, isSelected, onSelect } ) {
 	return (
 		<button
 			type="button"
@@ -412,14 +414,16 @@ function CloudCard( { pattern, isSelected, onSelect } ) {
  * @param {Function} props.onDelete    Called with the pattern (library only).
  * @param {Function} props.onEditLocal Called with { source, id } of the local copy.
  * @param {boolean}  props.busy        Whether an action is in flight.
+ * @param {Element}  props.children    Extra panels (the Uploaded tab's move control).
  */
-function CloudDetails( {
+export function CloudDetails( {
 	pattern,
 	source,
 	onDownload,
 	onDelete,
 	onEditLocal,
 	busy,
+	children,
 } ) {
 	// undefined = looking it up, null = not installed, else { type, id, title }.
 	const [ installed, setInstalled ] = useState( undefined );
@@ -493,12 +497,13 @@ function CloudDetails( {
 						{ pattern.description && (
 							<Text variant="muted">{ pattern.description }</Text>
 						) }
-						{ pattern.categories?.length > 0 && (
+						{ pattern.collection?.title && (
 							<Text variant="muted" size="12px">
-								{ __( 'Collections:', 'pattern-builder' ) }{ ' ' }
-								{ pattern.categories
-									.map( ( category ) => category.name )
-									.join( ', ' ) }
+								{ sprintf(
+									/* translators: %s: collection title. */
+									__( 'Collection: %s', 'pattern-builder' ),
+									pattern.collection.title
+								) }
 							</Text>
 						) }
 						{ source === 'directory' && pattern.author && (
@@ -526,6 +531,8 @@ function CloudDetails( {
 						) }
 					</VStack>
 				</PanelBody>
+
+				{ children }
 
 				{ source === 'library' && (
 					<PanelBody
@@ -556,7 +563,7 @@ function CloudDetails( {
  * @param {Function} props.onConfirm Called with 'user' or 'theme'.
  * @param {Function} props.onClose   Close/cancel callback.
  */
-function DestinationModal( { pattern, busy, onConfirm, onClose } ) {
+export function DestinationModal( { pattern, busy, onConfirm, onClose } ) {
 	return (
 		<Modal
 			title={ sprintf(
@@ -608,15 +615,13 @@ function DestinationModal( { pattern, busy, onConfirm, onClose } ) {
  * @param {Function} props.onConfirm   Proceed with the download.
  * @param {Function} props.onClose     Close/cancel callback.
  */
-function TokensModal( { missing, destination, busy, onConfirm, onClose } ) {
-	const typeLabels = {
-		color: __( 'Color', 'pattern-builder' ),
-		gradient: __( 'Gradient', 'pattern-builder' ),
-		spacing: __( 'Spacing', 'pattern-builder' ),
-		fontSize: __( 'Font size', 'pattern-builder' ),
-		fontFamily: __( 'Font family', 'pattern-builder' ),
-	};
-
+export function TokensModal( {
+	missing,
+	destination,
+	busy,
+	onConfirm,
+	onClose,
+} ) {
 	return (
 		<Modal
 			title={ __(
@@ -637,28 +642,7 @@ function TokensModal( { missing, destination, busy, onConfirm, onClose } ) {
 							'pattern-builder'
 					  ) }
 			</p>
-			<ul className="pattern-builder-cloud__tokens-list">
-				{ missing.map( ( token ) => (
-					<li key={ `${ token.type }:${ token.slug }` }>
-						{ ( token.type === 'color' ||
-							token.type === 'gradient' ) && (
-							<span
-								className="pattern-builder-cloud__token-swatch"
-								style={ { background: token.value } }
-							/>
-						) }
-						<span className="pattern-builder-cloud__token-name">
-							{ token.name || token.slug }
-						</span>
-						<span className="pattern-builder-cloud__token-meta">
-							{ typeLabels[ token.type ] || token.type }
-						</span>
-						<code className="pattern-builder-cloud__token-value">
-							{ token.value }
-						</code>
-					</li>
-				) ) }
-			</ul>
+			<TokensList missing={ missing } />
 			<HStack
 				alignment="right"
 				spacing={ 2 }
@@ -685,17 +669,225 @@ function TokensModal( { missing, destination, busy, onConfirm, onClose } ) {
 }
 
 /**
- * The cloud browsing surface: connect state, My Cloud Library, and the
- * Public Directory — rendered in place of the local grid when a cloud rail
- * item is active.
+ * The design tokens a download would add, listed with a swatch for colors.
+ *
+ * @param {Object} props         Component props.
+ * @param {Array}  props.missing Tokens the site lacks.
+ */
+export function TokensList( { missing } ) {
+	const typeLabels = {
+		color: __( 'Color', 'pattern-builder' ),
+		gradient: __( 'Gradient', 'pattern-builder' ),
+		spacing: __( 'Spacing', 'pattern-builder' ),
+		fontSize: __( 'Font size', 'pattern-builder' ),
+		fontFamily: __( 'Font family', 'pattern-builder' ),
+	};
+
+	return (
+		<ul className="pattern-builder-cloud__tokens-list">
+			{ missing.map( ( token ) => (
+				<li key={ `${ token.type }:${ token.slug }` }>
+					{ ( token.type === 'color' ||
+						token.type === 'gradient' ) && (
+						<span
+							className="pattern-builder-cloud__token-swatch"
+							style={ { background: token.value } }
+						/>
+					) }
+					<span className="pattern-builder-cloud__token-name">
+						{ token.name || token.slug }
+					</span>
+					<span className="pattern-builder-cloud__token-meta">
+						{ typeLabels[ token.type ] || token.type }
+					</span>
+					<code className="pattern-builder-cloud__token-value">
+						{ token.value }
+					</code>
+				</li>
+			) ) }
+		</ul>
+	);
+}
+
+/**
+ * The single-pattern save: a destination, then the tokens the site lacks,
+ * then the download — as a hook, so the Community and Uploaded tabs share
+ * one flow and render its two modals where they like.
+ *
+ * @param {Object}   options              Hook options.
+ * @param {string}   options.source       'library' or 'directory'.
+ * @param {Function} options.onDownloaded Called after a pattern lands locally.
+ * @return {Object} { busy, requestDownload, modals }
+ */
+export function useDownloadFlow( { source, onDownloaded } ) {
+	const [ busy, setBusy ] = useState( false );
+	const [ pendingDownload, setPendingDownload ] = useState( null );
+	const [ pendingDestination, setPendingDestination ] = useState( null );
+	const { createSuccessNotice, createErrorNotice } =
+		useDispatch( noticesStore );
+
+	// Save asks for a destination first; the rest of the flow is unchanged.
+	const requestDownload = ( pattern ) => setPendingDestination( pattern );
+
+	// `addTokens` carries the answer to the tokens modal; the tokens follow
+	// the pattern to `destination`, which the server decides for itself.
+	const performDownload = ( pattern, destination, addTokens = false ) => {
+		setBusy( true );
+		apiFetch( {
+			path: `${ BASE }/download`,
+			method: 'POST',
+			data: {
+				source,
+				cloudId: pattern.id,
+				destination,
+				addTokens,
+				// Whose the cloud copy is, as the service reported it: what
+				// decides whether this site is later offered an update for
+				// it. The service checks again when one is attempted.
+				mine: !! pattern.mine,
+				// Which collection it came from, so it lands under that
+				// collection's local category.
+				collection: pattern.collection
+					? {
+							owner: pattern.collection.owner,
+							slug: pattern.collection.slug,
+							title: pattern.collection.title,
+					  }
+					: null,
+			},
+		} )
+			.then( ( result ) => {
+				setPendingDownload( null );
+				const message =
+					destination === 'theme'
+						? sprintf(
+								/* translators: %s: pattern title. */
+								__(
+									'“%s” added to your theme patterns.',
+									'pattern-builder'
+								),
+								result.title
+						  )
+						: sprintf(
+								/* translators: %s: pattern title. */
+								__(
+									'“%s” added to your user patterns.',
+									'pattern-builder'
+								),
+								result.title
+						  );
+				createSuccessNotice( message, { type: 'snackbar' } );
+				const writtenCount = Object.values(
+					result.tokensWritten || {}
+				).reduce( ( sum, slugs ) => sum + slugs.length, 0 );
+				if ( writtenCount > 0 ) {
+					createSuccessNotice(
+						sprintf(
+							/* translators: 1: token count, 2: where they were added. */
+							_n(
+								'%1$d design token added to %2$s.',
+								'%1$d design tokens added to %2$s.',
+								writtenCount,
+								'pattern-builder'
+							),
+							writtenCount,
+							destination === 'theme'
+								? __( 'theme.json', 'pattern-builder' )
+								: __( 'Site styles', 'pattern-builder' )
+						),
+						{ type: 'snackbar' }
+					);
+				}
+				onDownloaded?.();
+			} )
+			.catch( ( error ) => {
+				createErrorNotice(
+					error.message ||
+						__(
+							'The pattern could not be downloaded.',
+							'pattern-builder'
+						),
+					{ type: 'snackbar' }
+				);
+			} )
+			.finally( () => setBusy( false ) );
+	};
+
+	// Tokens this site lacks need a destination before the download (§4a).
+	const download = ( pattern, destination ) => {
+		if ( ! pattern.tokens?.length ) {
+			performDownload( pattern, destination );
+			return;
+		}
+		setBusy( true );
+		apiFetch( {
+			path: `${ BASE }/tokens/check`,
+			method: 'POST',
+			data: { tokens: pattern.tokens },
+		} )
+			.then( ( check ) => {
+				if ( check.missing?.length ) {
+					setBusy( false );
+					setPendingDownload( {
+						pattern,
+						destination,
+						missing: check.missing,
+					} );
+				} else {
+					performDownload( pattern, destination );
+				}
+			} )
+			.catch( () => performDownload( pattern, destination ) );
+	};
+
+	const modals = (
+		<>
+			{ pendingDestination && (
+				<DestinationModal
+					pattern={ pendingDestination }
+					busy={ busy }
+					onConfirm={ ( destination ) => {
+						const pattern = pendingDestination;
+						setPendingDestination( null );
+						download( pattern, destination );
+					} }
+					onClose={ () => setPendingDestination( null ) }
+				/>
+			) }
+			{ pendingDownload && (
+				<TokensModal
+					missing={ pendingDownload.missing }
+					destination={ pendingDownload.destination }
+					busy={ busy }
+					onConfirm={ () =>
+						performDownload(
+							pendingDownload.pattern,
+							pendingDownload.destination,
+							true
+						)
+					}
+					onClose={ () => setPendingDownload( null ) }
+				/>
+			) }
+		</>
+	);
+
+	return { busy, requestDownload, modals };
+}
+
+/**
+ * The cloud browsing surface: connect state and the account bar, then the
+ * Uploaded tab (the account's collections and patterns) or the Community
+ * tab (public collections first, then patterns) — rendered in place of the
+ * local grid when a cloud tab is active.
  *
  * @param {Object}   props               Component props.
  * @param {string}   props.view          CLOUD_LIBRARY or CLOUD_DIRECTORY.
  * @param {Function} props.onDownloaded  Called after a pattern lands locally.
  * @param {Function} props.onEditLocal   Opens an installed local copy's editor.
  * @param {string}   props.search        Search term, owned by the browser chrome.
- * @param {string}   props.collection    Active collection filter ('' for all).
- * @param {Function} props.onCollections Reports this view's collections for the rail.
+ * @param {string}   props.collection    The Uploaded tab's rail selection: a collection id, or '' for all.
+ * @param {Function} props.onCollections Reports the Uploaded tab's collections for the rail.
  */
 export function CloudBrowser( {
 	view,
@@ -706,13 +898,6 @@ export function CloudBrowser( {
 	onCollections,
 } ) {
 	const [ status, setStatus ] = useState( null );
-	const [ items, setItems ] = useState( null );
-	const [ page, setPage ] = useState( 1 );
-	const [ pages, setPages ] = useState( 1 );
-	const [ selected, setSelected ] = useState( null );
-	const [ busy, setBusy ] = useState( false );
-	const [ pendingDownload, setPendingDownload ] = useState( null );
-	const [ pendingDestination, setPendingDestination ] = useState( null );
 	const [ awaitingUpgrade, setAwaitingUpgrade ] = useState( false );
 
 	const { createSuccessNotice, createErrorNotice } =
@@ -828,6 +1013,9 @@ export function CloudBrowser( {
 		awaitUpgrade();
 	};
 
+	const canGoPro =
+		status?.tier !== 'pro' && !! ( status?.checkout || status?.upgradeUrl );
+
 	const resendVerification = () => {
 		apiFetch( { path: `${ BASE }/verify/resend`, method: 'POST' } )
 			.then( ( data ) =>
@@ -852,64 +1040,11 @@ export function CloudBrowser( {
 			);
 	};
 
-	const loadItems = useCallback( () => {
-		if ( ! status?.connected ) {
-			return;
-		}
-		setItems( null );
-		const query = new URLSearchParams( { page: String( page ) } );
-		if ( search ) {
-			query.set( 'search', search );
-		}
-		if ( collection ) {
-			query.set( 'category', collection );
-		}
-		apiFetch( {
-			path: `${ BASE }/${
-				isLibrary ? 'library' : 'directory'
-			}?${ query }`,
-		} )
-			.then( ( data ) => {
-				setItems( data.items || [] );
-				setPages( data.pages || 1 );
-			} )
-			.catch( ( error ) => {
-				setItems( [] );
-				createErrorNotice(
-					error.message ||
-						__( 'Could not load patterns.', 'pattern-builder' ),
-					{ type: 'snackbar' }
-				);
-			} );
-	}, [ status, isLibrary, page, search, collection, createErrorNotice ] );
-
-	useEffect( loadItems, [ loadItems ] );
-
-	// A new search or collection filter restarts paging.
-	useEffect( () => setPage( 1 ), [ search, collection, view ] );
-
-	useEffect( () => {
-		if ( ! onCollections ) {
-			return;
-		}
-		if ( ! status?.connected ) {
-			onCollections( [] );
-			return;
-		}
-		apiFetch( {
-			path: `${ BASE }/${ isLibrary ? 'categories' : 'collections' }`,
-		} )
-			.then( ( data ) =>
-				onCollections( Array.isArray( data ) ? data : [] )
-			)
-			.catch( () => onCollections( [] ) );
-	}, [ isLibrary, status, onCollections ] );
-
 	const disconnect = () => {
 		apiFetch( { path: `${ BASE }/disconnect`, method: 'POST' } ).then(
 			() => {
 				setStatus( { connected: false } );
-				setItems( null );
+				onCollections?.( [] );
 				createSuccessNotice(
 					__(
 						'Disconnected from patternbuilderwp.com.',
@@ -919,153 +1054,6 @@ export function CloudBrowser( {
 				);
 			}
 		);
-	};
-
-	// Save asks for a destination first; the rest of the flow is unchanged.
-	const requestDownload = ( pattern ) => setPendingDestination( pattern );
-
-	// Tokens this site lacks need a destination before the download (§4a).
-	const download = ( pattern, destination ) => {
-		if ( ! pattern.tokens?.length ) {
-			performDownload( pattern, destination );
-			return;
-		}
-		setBusy( true );
-		apiFetch( {
-			path: `${ BASE }/tokens/check`,
-			method: 'POST',
-			data: { tokens: pattern.tokens },
-		} )
-			.then( ( check ) => {
-				if ( check.missing?.length ) {
-					setBusy( false );
-					setPendingDownload( {
-						pattern,
-						destination,
-						missing: check.missing,
-					} );
-				} else {
-					performDownload( pattern, destination );
-				}
-			} )
-			.catch( () => performDownload( pattern, destination ) );
-	};
-
-	// `addTokens` carries the answer to the tokens modal; the tokens follow
-	// the pattern to `destination`, which the server decides for itself.
-	const performDownload = ( pattern, destination, addTokens = false ) => {
-		setBusy( true );
-		apiFetch( {
-			path: `${ BASE }/download`,
-			method: 'POST',
-			data: {
-				source: view === CLOUD_DIRECTORY ? 'directory' : 'library',
-				cloudId: pattern.id,
-				destination,
-				addTokens,
-				// Whose the cloud copy is, as the service reported it: what
-				// decides whether this site is later offered an update for
-				// it. The service checks again when one is attempted.
-				mine: !! pattern.mine,
-			},
-		} )
-			.then( ( result ) => {
-				setPendingDownload( null );
-				const message =
-					destination === 'theme'
-						? sprintf(
-								/* translators: %s: pattern title. */
-								__(
-									'“%s” added to your theme patterns.',
-									'pattern-builder'
-								),
-								result.title
-						  )
-						: sprintf(
-								/* translators: %s: pattern title. */
-								__(
-									'“%s” added to your user patterns.',
-									'pattern-builder'
-								),
-								result.title
-						  );
-				createSuccessNotice( message, { type: 'snackbar' } );
-				const writtenCount = Object.values(
-					result.tokensWritten || {}
-				).reduce( ( sum, slugs ) => sum + slugs.length, 0 );
-				if ( writtenCount > 0 ) {
-					createSuccessNotice(
-						sprintf(
-							/* translators: 1: token count, 2: where they were added. */
-							_n(
-								'%1$d design token added to %2$s.',
-								'%1$d design tokens added to %2$s.',
-								writtenCount,
-								'pattern-builder'
-							),
-							writtenCount,
-							destination === 'theme'
-								? __( 'theme.json', 'pattern-builder' )
-								: __( 'Site styles', 'pattern-builder' )
-						),
-						{ type: 'snackbar' }
-					);
-				}
-				onDownloaded?.();
-			} )
-			.catch( ( error ) => {
-				createErrorNotice(
-					error.message ||
-						__(
-							'The pattern could not be downloaded.',
-							'pattern-builder'
-						),
-					{ type: 'snackbar' }
-				);
-			} )
-			.finally( () => setBusy( false ) );
-	};
-
-	const deleteCloudPattern = ( pattern ) => {
-		const confirmed =
-			// eslint-disable-next-line no-alert
-			window.confirm(
-				__(
-					'Delete this pattern from your cloud library? Sites that downloaded it keep their copies.',
-					'pattern-builder'
-				)
-			);
-		if ( ! confirmed ) {
-			return;
-		}
-		setBusy( true );
-		apiFetch( {
-			path: `${ BASE }/library/${ pattern.id }`,
-			method: 'DELETE',
-		} )
-			.then( () => {
-				setSelected( null );
-				createSuccessNotice(
-					__(
-						'Pattern deleted from your cloud library.',
-						'pattern-builder'
-					),
-					{ type: 'snackbar' }
-				);
-				refreshStatus();
-				loadItems();
-			} )
-			.catch( ( error ) => {
-				createErrorNotice(
-					error.message ||
-						__(
-							'Could not delete the pattern.',
-							'pattern-builder'
-						),
-					{ type: 'snackbar' }
-				);
-			} )
-			.finally( () => setBusy( false ) );
 	};
 
 	if ( ! status ) {
@@ -1092,7 +1080,7 @@ export function CloudBrowser( {
 						isLibrary
 							? undefined
 							: __(
-									'Sign in to browse community patterns and add them to this site. A free account takes a minute, and keeps your own patterns in the cloud too.',
+									'Sign in to browse community collections and add them to this site. A free account takes a minute, and keeps your own patterns in the cloud too.',
 									'pattern-builder'
 							  )
 					}
@@ -1111,236 +1099,146 @@ export function CloudBrowser( {
 		);
 	}
 
-	const tokensModal = pendingDownload && (
-		<TokensModal
-			missing={ pendingDownload.missing }
-			destination={ pendingDownload.destination }
-			busy={ busy }
-			onConfirm={ () =>
-				performDownload(
-					pendingDownload.pattern,
-					pendingDownload.destination,
-					true
-				)
-			}
-			onClose={ () => setPendingDownload( null ) }
-		/>
+	const personal = status.personal;
+
+	const accountBar = isLibrary && (
+		<HStack
+			alignment="left"
+			spacing={ 2 }
+			className="pattern-builder-cloud__account"
+		>
+			<span>
+				{ sprintf(
+					/* translators: 1: account name, 2: tier. */
+					__( 'Connected as %1$s (%2$s)', 'pattern-builder' ),
+					status.account?.name || '',
+					status.tier === 'pro'
+						? __( 'Pro', 'pattern-builder' )
+						: __( 'Free', 'pattern-builder' )
+				) }
+			</span>
+			{ personal && personal.cap > 0 && (
+				<span className="pattern-builder-cloud__meta">
+					{ sprintf(
+						/* translators: 1: patterns in Personal, 2: the cap. */
+						__( 'Personal: %1$d of %2$d', 'pattern-builder' ),
+						personal.count,
+						personal.cap
+					) }
+				</span>
+			) }
+			{ personal && personal.cap === -1 && (
+				<span className="pattern-builder-cloud__meta">
+					{ sprintf(
+						/* translators: %d: patterns in Personal. */
+						_n(
+							'Personal: %d pattern',
+							'Personal: %d patterns',
+							personal.count,
+							'pattern-builder'
+						),
+						personal.count
+					) }
+				</span>
+			) }
+
+			{ canGoPro && (
+				<Button
+					variant="primary"
+					size="small"
+					disabled={
+						status.account && status.account.verified === false
+					}
+					onClick={ goPro }
+				>
+					{ __( 'Go Pro', 'pattern-builder' ) }
+				</Button>
+			) }
+
+			{ status.tier === 'pro' && status.portalUrl && (
+				<Button
+					variant="tertiary"
+					size="small"
+					href={ status.portalUrl }
+					target="_blank"
+					rel="noreferrer"
+				>
+					{ __( 'Manage billing', 'pattern-builder' ) }
+				</Button>
+			) }
+
+			{ awaitingUpgrade && (
+				<span className="pattern-builder-cloud__meta">
+					<Spinner />
+					{ __(
+						'Waiting for your purchase to land…',
+						'pattern-builder'
+					) }
+				</span>
+			) }
+
+			<Button
+				variant="tertiary"
+				icon={ closeSmall }
+				onClick={ disconnect }
+			>
+				{ __( 'Disconnect', 'pattern-builder' ) }
+			</Button>
+		</HStack>
 	);
 
-	const usage = status.usage;
+	const verifyNotice = status.account &&
+		status.account.verified === false && (
+			<Notice
+				status="warning"
+				isDismissible={ false }
+				className="pattern-builder-cloud__verify"
+				actions={ [
+					{
+						label: __( 'Send it again', 'pattern-builder' ),
+						onClick: resendVerification,
+						variant: 'link',
+					},
+				] }
+			>
+				{ __(
+					'Confirm your email address to upload patterns, install from the community, and go Pro. The link is in your inbox.',
+					'pattern-builder'
+				) }
+			</Notice>
+		);
+
+	const chrome = (
+		<>
+			{ accountBar }
+			{ verifyNotice }
+		</>
+	);
+
+	if ( isLibrary ) {
+		return (
+			<UploadedTab
+				chrome={ chrome }
+				status={ status }
+				refreshStatus={ refreshStatus }
+				search={ search }
+				collection={ collection }
+				onCollections={ onCollections }
+				onDownloaded={ onDownloaded }
+				onEditLocal={ onEditLocal }
+				onGoPro={ canGoPro ? goPro : null }
+			/>
+		);
+	}
 
 	return (
-		<>
-			<main className="pattern-builder-browser__main pattern-builder-cloud">
-				{ isLibrary && status.connected && (
-					<HStack
-						alignment="left"
-						spacing={ 2 }
-						className="pattern-builder-cloud__account"
-					>
-						<span>
-							{ sprintf(
-								/* translators: 1: account name, 2: tier. */
-								__(
-									'Connected as %1$s (%2$s)',
-									'pattern-builder'
-								),
-								status.account?.name || '',
-								status.tier === 'pro'
-									? __( 'Pro', 'pattern-builder' )
-									: __( 'Free', 'pattern-builder' )
-							) }
-						</span>
-						{ usage && usage.cap > 0 && (
-							<span className="pattern-builder-cloud__meta">
-								{ sprintf(
-									/* translators: 1: stored count, 2: cap. */
-									__(
-										'%1$d of %2$d patterns stored',
-										'pattern-builder'
-									),
-									usage.stored,
-									usage.cap
-								) }
-							</span>
-						) }
-						{ usage && usage.cap === -1 && (
-							<span className="pattern-builder-cloud__meta">
-								{ sprintf(
-									/* translators: %d: stored count. */
-									__(
-										'%d patterns stored',
-										'pattern-builder'
-									),
-									usage.stored
-								) }
-							</span>
-						) }
-
-						{ status.tier !== 'pro' &&
-							( status.checkout || status.upgradeUrl ) && (
-								<Button
-									variant="primary"
-									size="small"
-									disabled={
-										status.account &&
-										status.account.verified === false
-									}
-									onClick={ goPro }
-								>
-									{ __( 'Go Pro', 'pattern-builder' ) }
-								</Button>
-							) }
-
-						{ status.tier === 'pro' && status.portalUrl && (
-							<Button
-								variant="tertiary"
-								size="small"
-								href={ status.portalUrl }
-								target="_blank"
-								rel="noreferrer"
-							>
-								{ __( 'Manage billing', 'pattern-builder' ) }
-							</Button>
-						) }
-
-						{ awaitingUpgrade && (
-							<span className="pattern-builder-cloud__meta">
-								<Spinner />
-								{ __(
-									'Waiting for your purchase to land…',
-									'pattern-builder'
-								) }
-							</span>
-						) }
-
-						<Button
-							variant="tertiary"
-							icon={ closeSmall }
-							onClick={ disconnect }
-						>
-							{ __( 'Disconnect', 'pattern-builder' ) }
-						</Button>
-					</HStack>
-				) }
-
-				{ status.account && status.account.verified === false && (
-					<Notice
-						status="warning"
-						isDismissible={ false }
-						className="pattern-builder-cloud__verify"
-						actions={ [
-							{
-								label: __( 'Send it again', 'pattern-builder' ),
-								onClick: resendVerification,
-								variant: 'link',
-							},
-						] }
-					>
-						{ __(
-							'Confirm your email address to upload patterns, download from the community, and go Pro. The link is in your inbox.',
-							'pattern-builder'
-						) }
-					</Notice>
-				) }
-
-				<div className="pattern-builder-cloud__content">
-					<div className="pattern-builder-cloud__grid-column">
-						{ items === null && <Spinner /> }
-						{ items !== null && items.length === 0 && (
-							<p>
-								{ __(
-									'No patterns found.',
-									'pattern-builder'
-								) }
-							</p>
-						) }
-						<div className="pattern-builder-cloud__grid">
-							{ ( items || [] ).map( ( pattern ) => (
-								<CloudCard
-									key={ pattern.id }
-									pattern={ pattern }
-									isSelected={ selected?.id === pattern.id }
-									onSelect={ ( picked ) =>
-										setSelected(
-											selected?.id === picked.id
-												? null
-												: picked
-										)
-									}
-								/>
-							) ) }
-						</div>
-						{ pages > 1 && (
-							<HStack
-								alignment="center"
-								spacing={ 2 }
-								className="pattern-builder-cloud__pagination"
-							>
-								<Button
-									variant="tertiary"
-									disabled={ page <= 1 }
-									onClick={ () => setPage( page - 1 ) }
-								>
-									{ __( 'Previous', 'pattern-builder' ) }
-								</Button>
-								<span>
-									{ sprintf(
-										/* translators: 1: current page, 2: total pages. */
-										__(
-											'Page %1$d of %2$d',
-											'pattern-builder'
-										),
-										page,
-										pages
-									) }
-								</span>
-								<Button
-									variant="tertiary"
-									disabled={ page >= pages }
-									onClick={ () => setPage( page + 1 ) }
-								>
-									{ __( 'Next', 'pattern-builder' ) }
-								</Button>
-							</HStack>
-						) }
-					</div>
-				</div>
-
-				{ pendingDestination && (
-					<DestinationModal
-						pattern={ pendingDestination }
-						busy={ busy }
-						onConfirm={ ( destination ) => {
-							const pattern = pendingDestination;
-							setPendingDestination( null );
-							download( pattern, destination );
-						} }
-						onClose={ () => setPendingDestination( null ) }
-					/>
-				) }
-
-				{ tokensModal }
-			</main>
-
-			<aside className="pattern-builder-browser__details">
-				{ selected ? (
-					<CloudDetails
-						pattern={ selected }
-						source={ isLibrary ? 'library' : 'directory' }
-						onDownload={ requestDownload }
-						onDelete={ deleteCloudPattern }
-						onEditLocal={ onEditLocal }
-						busy={ busy }
-					/>
-				) : (
-					<div className="pattern-builder-details is-empty">
-						<Text variant="muted">
-							{ __( 'No pattern selected.', 'pattern-builder' ) }
-						</Text>
-					</div>
-				) }
-			</aside>
-		</>
+		<CommunityTab
+			chrome={ chrome }
+			status={ status }
+			search={ search }
+			onDownloaded={ onDownloaded }
+			onEditLocal={ onEditLocal }
+			onGoPro={ canGoPro ? goPro : null }
+		/>
 	);
 }

@@ -81,8 +81,8 @@ function CollectionTabs( { active, onSelect } ) {
 }
 
 /**
- * The category rail: filters within the active collection — pattern
- * categories for the local collections, cloud collections for the others.
+ * The category rail: filters within the active tab — pattern categories
+ * for the local tabs, the account's cloud collections for Uploaded.
  *
  * @param {Object}   props            Component props.
  * @param {Array}    props.categories The category descriptors.
@@ -120,8 +120,8 @@ function CategoryRail( { categories, active, onSelect } ) {
 
 /**
  * The browse screen: a header with the four collection tabs, a category
- * rail scoped to the active collection, a grid, and a details sidebar that
- * is always present.
+ * rail scoped to the active tab (none on Community, whose landing is its
+ * collections), a grid, and a details sidebar that is always present.
  *
  * @param {Object}   props                Component props.
  * @param {Function} props.onEdit         Called with the pattern to open its editor.
@@ -221,17 +221,15 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 
 	const categories = useMemo( () => {
 		if ( isCloud ) {
+			// The Uploaded tab's rail is the account's collections, Personal
+			// first with its meter, as the cloud browser reports them.
 			return [
 				{
 					slug: ALL,
 					label: __( 'All patterns', 'pattern-builder' ),
 					count: '',
 				},
-				...cloudCollections.map( ( item ) => ( {
-					slug: item.id ? String( item.id ) : UNCATEGORIZED,
-					label: item.name,
-					count: item.count ?? '',
-				} ) ),
+				...cloudCollections,
 			];
 		}
 
@@ -378,16 +376,19 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 				</header>
 
 				<div className="pattern-builder-browser__body">
-					<aside className="pattern-builder-browser__sidebar">
-						<CategoryRail
-							categories={ categories }
-							active={ category }
-							onSelect={ ( slug ) => {
-								setCategory( slug );
-								setSelectedId( null );
-							} }
-						/>
-					</aside>
+					{ /* The Community tab's landing is its collections, so it has no rail. */ }
+					{ collection !== COMMUNITY && (
+						<aside className="pattern-builder-browser__sidebar">
+							<CategoryRail
+								categories={ categories }
+								active={ category }
+								onSelect={ ( slug ) => {
+									setCategory( slug );
+									setSelectedId( null );
+								} }
+							/>
+						</aside>
+					) }
 
 					{ isCloud && (
 						<CloudBrowser

@@ -1,3 +1,4 @@
+@use "sass:math";
 @use "../pattern-tiles" as tiles;
 
 .pattern-builder-cloud {
@@ -159,6 +160,183 @@
 	margin: 0 0 16px;
 	padding-left: 20px;
 	color: #50575e;
+
+	li {
+		margin-bottom: 6px;
+	}
+}
+
+// ---- Collections: tiles on the Community landing, and the opened view.
+
+.pattern-builder-cloud__collections {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, tiles.$tile * 1px);
+	gap: tiles.$gap * 1px;
+	align-items: start;
+	margin-bottom: 16px;
+}
+
+.pattern-builder-collection-tile {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	width: tiles.$tile * 1px;
+	padding: 0;
+	border: 0;
+	background: none;
+	cursor: pointer;
+	text-align: start;
+	color: #1e1e1e;
+
+	// The art: a 2x2 collage of previews, each cell a quarter-size pattern
+	// tile — the same 1400px document, scaled by half the tile's ratio —
+	// or the collection's cover, or nothing yet.
+	&__art {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-auto-rows: minmax(0, 1fr);
+		gap: 2px;
+		position: relative;
+		width: 100%;
+		aspect-ratio: 1 / 1;
+		overflow: hidden;
+		border-radius: 4px;
+		background: #f0f0f1;
+
+		&::after {
+			content: "";
+			position: absolute;
+			inset: 0;
+			border-radius: 4px;
+			box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+			pointer-events: none;
+		}
+
+		&.is-single {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		&.has-cover {
+			display: block;
+		}
+
+		img {
+			display: block;
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+		}
+	}
+
+	&__cell {
+		position: relative;
+		overflow: hidden;
+		background: #fff;
+
+		iframe {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: tiles.$preview-width * 1px;
+			height: tiles.$preview-width * 1px;
+			border: 0;
+			transform-origin: 0 0;
+			transform: scale(math.div(tiles.$tile, tiles.$preview-width * 2));
+			pointer-events: none;
+		}
+	}
+
+	&__art.is-single &__cell iframe {
+		transform: scale(math.div(tiles.$tile, tiles.$preview-width));
+	}
+
+	&__empty {
+		grid-column: 1 / -1;
+		display: grid;
+		place-items: center;
+		color: #50575e;
+		font-size: 12px;
+	}
+
+	&:hover &__art::after {
+		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+	}
+
+	&__title {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		font-size: 12px;
+		font-weight: 500;
+		line-height: 16px;
+		min-width: 0;
+
+		> span:first-child {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+	}
+
+	&__meta {
+		font-size: 11px;
+		line-height: 14px;
+		color: #50575e;
+	}
+}
+
+.pattern-builder-collection-view {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+
+	&__back {
+		align-self: flex-start;
+	}
+
+	&__header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 24px;
+		padding-bottom: 16px;
+		border-bottom: 1px solid #ddd;
+
+		h2 {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			margin: 0 0 4px;
+		}
+	}
+
+	&__text {
+		flex: 1;
+		min-width: 0;
+	}
+
+	&__description {
+		margin: 8px 0 0;
+		max-width: 640px;
+		color: #1e1e1e;
+	}
+
+	&__actions {
+		flex: 0 0 auto;
+		width: auto;
+	}
+}
+
+.pattern-builder-cloud__progress {
+	margin: 0;
+	font-size: 13px;
+}
+
+.pattern-builder-cloud__failures {
+	margin: 0;
+	padding-left: 20px;
+	font-size: 13px;
 
 	li {
 		margin-bottom: 6px;
