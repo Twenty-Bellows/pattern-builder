@@ -179,13 +179,21 @@ export function CommunityTab( {
 			.catch( () => setPatterns( [] ) );
 	}, [ open, isSearching, search, patternsPage ] );
 
-	// The opened collection with its patterns.
+	// The opened collection with its patterns. A reload after an install
+	// refetches in place — the view (and a save flow showing its results)
+	// stays mounted; only opening a different collection clears it.
 	useEffect( () => {
 		if ( ! open ) {
 			setOpened( null );
 			return;
 		}
-		setOpened( null );
+		setOpened( ( current ) =>
+			current &&
+			current.owner === open.owner &&
+			current.slug === open.slug
+				? current
+				: null
+		);
 		apiFetch( {
 			path: `${ BASE }/collections/${ open.owner }/${ open.slug }`,
 		} )
