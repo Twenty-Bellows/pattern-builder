@@ -24,7 +24,7 @@ import { store as noticesStore } from '@wordpress/notices';
 
 import { CloudCard, CloudDetails, useDownloadFlow } from './CloudBrowser';
 import { CollectionPicker, createCollection } from './CollectionPicker';
-import { isListed } from './collections';
+import { isListed, slugProblem, suggestSlug } from './collections';
 
 const BASE = '/pattern-builder/v1/cloud';
 
@@ -70,6 +70,11 @@ export function railFor( collections, personal ) {
  */
 function NewCollectionModal( { canPrivate, onCreated, onClose, onGoPro } ) {
 	const [ name, setName ] = useState( '' );
+	// The slug follows the name until it is typed into. It is permanent —
+	// it is the middle segment of every pattern name in the collection —
+	// so it is a field rather than something a title decides.
+	const [ slug, setSlug ] = useState( '' );
+	const [ slugTouched, setSlugTouched ] = useState( false );
 	const [ description, setDescription ] = useState( '' );
 	const [ visibility, setVisibility ] = useState(
 		canPrivate ? 'private' : 'public'
@@ -82,10 +87,17 @@ function NewCollectionModal( { canPrivate, onCreated, onClose, onGoPro } ) {
 		if ( busy || ! name.trim() ) {
 			return;
 		}
+		const wanted = slug.trim() || suggestSlug( name );
+		const problem = slugProblem( wanted );
+		if ( problem ) {
+			setError( problem );
+			return;
+		}
 		setBusy( true );
 		setError( '' );
 		createCollection(
 			name.trim(),
+			wanted,
 			description.trim(),
 			canPrivate ? visibility : ''
 		)
@@ -115,7 +127,27 @@ function NewCollectionModal( { canPrivate, onCreated, onClose, onGoPro } ) {
 						__next40pxDefaultSize
 						label={ __( 'Name', 'pattern-builder' ) }
 						value={ name }
-						onChange={ setName }
+						onChange={ ( next ) => {
+							setName( next );
+							if ( ! slugTouched ) {
+								setSlug( suggestSlug( next ) );
+							}
+						} }
+						required
+					/>
+					<TextControl
+						__nextHasNoMarginBottom
+						__next40pxDefaultSize
+						label={ __( 'Slug', 'pattern-builder' ) }
+						help={ __(
+							'Part of the name of every pattern in this collection, so it cannot be changed later. The name above can be changed whenever you like.',
+							'pattern-builder'
+						) }
+						value={ slug }
+						onChange={ ( next ) => {
+							setSlugTouched( true );
+							setSlug( next );
+						} }
 						required
 					/>
 					<TextareaControl

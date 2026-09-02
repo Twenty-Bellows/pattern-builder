@@ -32,13 +32,7 @@ class Pattern_File_Store {
 		$seen     = array();
 
 		foreach ( $this->get_pattern_directories() as $directory ) {
-			$pattern_files = glob( $directory . '/*.php' );
-
-			if ( ! is_array( $pattern_files ) ) {
-				continue;
-			}
-
-			foreach ( $pattern_files as $pattern_file ) {
+			foreach ( $this->pattern_files_in( $directory ) as $pattern_file ) {
 				$pattern = Abstract_Pattern::from_file( $pattern_file );
 
 				if ( '' === $pattern->name || isset( $seen[ $pattern->name ] ) ) {
@@ -52,6 +46,35 @@ class Pattern_File_Store {
 		}
 
 		return $patterns;
+	}
+
+	/**
+	 * Every pattern file under a directory, however deep.
+	 *
+	 * Core scans `patterns/` to unlimited depth (`WP_Theme::scandir()` with
+	 * a depth of -1), so a pattern in a subdirectory is a pattern
+	 * WordPress already registers. This plugin files installed patterns
+	 * that way — `patterns/{handle}/{collection}/{slug}.php` — so that two
+	 * accounts' patterns of the same name can both live here, and so a
+	 * pattern's namespace is legible from the theme's file tree.
+	 *
+	 * @param string $directory Directory to scan.
+	 * @return string[] Absolute file paths.
+	 */
+	private function pattern_files_in( $directory ) {
+		$files = glob( $directory . '/*.php' );
+		$files = is_array( $files ) ? $files : array();
+		sort( $files );
+
+		$subdirectories = glob( $directory . '/*', GLOB_ONLYDIR );
+		if ( is_array( $subdirectories ) ) {
+			sort( $subdirectories );
+			foreach ( $subdirectories as $subdirectory ) {
+				$files = array_merge( $files, $this->pattern_files_in( $subdirectory ) );
+			}
+		}
+
+		return $files;
 	}
 
 	/**
@@ -281,7 +304,7 @@ class Pattern_File_Store {
 	 * @return string|WP_Error Pattern file path on success, WP_Error if not found.
 	 */
 	public function get_pattern_filepath( $pattern ) {
-		$path = $pattern->filePath ?? get_stylesheet_directory() . '/patterns/' . sanitize_file_name( basename( $pattern->name ) ) . '.php';
+		$path = $pattern->filePath ?? $this->path_for_name( $pattern->name );
 
 		if ( file_exists( $path ) ) {
 			return $path;
@@ -301,6 +324,37 @@ class Pattern_File_Store {
 	}
 
 	/**
+	 * The file a pattern's name implies, under the active theme.
+	 *
+	 * A pattern's name is its namespace, and the namespace is the path.
+	 * The theme's own patterns keep the flat layout every theme uses —
+	 * `mytheme/hero` is `patterns/hero.php` — because the theme slug is
+	 * the theme's whole namespace and a directory named after the theme
+	 * inside the theme says nothing. Everything else keeps its namespace
+	 * as directories: a pattern installed from the cloud is
+	 * `{handle}/{collection}/{slug}`, so it lands in
+	 * `patterns/{handle}/{collection}/{slug}.php` and cannot collide with
+	 * another account's pattern of the same name.
+	 *
+	 * @param string $name Namespaced pattern name.
+	 * @return string Absolute path.
+	 */
+	private function path_for_name( $name ) {
+		$segments = array_values( array_filter( explode( '/', (string) $name ), 'strlen' ) );
+		$slug     = array_pop( $segments );
+
+		// A single leading segment naming this theme is the theme's own
+		// namespace, and is not a directory.
+		if ( 1 === count( $segments ) && in_array( $segments[0], array( get_stylesheet(), get_template() ), true ) ) {
+			$segments = array();
+		}
+
+		$parts = array_map( 'sanitize_file_name', array_merge( $segments, array( $slug ) ) );
+
+		return get_stylesheet_directory() . '/patterns/' . implode( '/', $parts ) . '.php';
+	}
+
+	/**
 	 * Writes a theme pattern's PHP file to disk.
 	 *
 	 * Creates the file if it doesn't exist. Content is formatted before writing.
@@ -313,8 +367,7 @@ class Pattern_File_Store {
 
 		// If get_pattern_filepath returns an error, construct a new path.
 		if ( is_wp_error( $path ) ) {
-			$filename = sanitize_file_name( basename( $pattern->name ) );
-			$path     = get_stylesheet_directory() . '/patterns/' . $filename . '.php';
+			$path = $this->path_for_name( $pattern->name );
 		}
 
 		$formatted_content = $this->format_block_markup( $pattern->content );

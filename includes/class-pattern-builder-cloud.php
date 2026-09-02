@@ -236,18 +236,21 @@ class Pattern_Builder_Cloud {
 	/**
 	 * Create a service account and connect as it.
 	 *
-	 * @param string $email    Email address.
-	 * @param string $password Password.
+	 * @param string $email     Email address.
+	 * @param string $password  Password.
+	 * @param string $handle    The account's permanent handle: the first
+	 *                          segment of every pattern name it publishes.
 	 * @param string $name      Display name (optional).
 	 * @param bool   $marketing Whether the person said yes to news and offers.
 	 * @return array|WP_Error Account info.
 	 */
-	public static function signup( $email, $password, $name = '', $marketing = false ) {
+	public static function signup( $email, $password, $handle = '', $name = '', $marketing = false ) {
 		return self::credential_connect(
 			'/auth/signup',
 			array(
 				'email'     => $email,
 				'password'  => $password,
+				'handle'    => $handle,
 				'name'      => $name,
 				'marketing' => $marketing ? 'yes' : 'no',
 			)

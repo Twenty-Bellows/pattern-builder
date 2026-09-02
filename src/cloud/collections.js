@@ -5,6 +5,8 @@
  * upload should default to.
  */
 
+import { __, sprintf } from '@wordpress/i18n';
+
 /**
  * The `{owner}/{slug}` key a collection is addressed by.
  *
@@ -157,4 +159,72 @@ export function isListed( collection ) {
 		collection?.visibility === 'public' ||
 		collection?.visibility === 'premium'
 	);
+}
+
+/**
+ * The shape a slug has to have: lower-case letters, numbers and single
+ * hyphens, starting with a letter. The service's `Slug` class is where
+ * this rule lives; this is the copy that lets a form say no before the
+ * round trip, and the service is the check that counts.
+ */
+const SLUG_SHAPE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+const SLUG_MIN = 3;
+const SLUG_MAX = 32;
+
+/**
+ * A slug suggested from a collection's name, for a field the author is
+ * free to overwrite.
+ *
+ * @param {string} name The collection's name.
+ * @return {string} A slug, or '' when nothing usable is left.
+ */
+export function suggestSlug( name ) {
+	return String( name || '' )
+		.toLowerCase()
+		.normalize( 'NFD' )
+		.replace( /[\u0300-\u036f]/g, '' )
+		.replace( /[^a-z0-9]+/g, '-' )
+		.replace( /^-+|-+$/g, '' )
+		.replace( /^[0-9]+-?/, '' )
+		.slice( 0, SLUG_MAX )
+		.replace( /-+$/, '' );
+}
+
+/**
+ * What is wrong with a slug, in a sentence, or '' when nothing is.
+ *
+ * @param {string} slug The slug as typed.
+ * @return {string} The problem, ready to show.
+ */
+export function slugProblem( slug ) {
+	const value = String( slug || '' ).trim();
+
+	if ( value === '' ) {
+		return __( 'Give the collection a slug.', 'pattern-builder' );
+	}
+	if ( value === 'personal' ) {
+		return __(
+			'Every account already has a Personal collection.',
+			'pattern-builder'
+		);
+	}
+	if ( value.length < SLUG_MIN || value.length > SLUG_MAX ) {
+		return sprintf(
+			/* translators: 1: minimum length, 2: maximum length. */
+			__(
+				'A slug is between %1$d and %2$d characters.',
+				'pattern-builder'
+			),
+			SLUG_MIN,
+			SLUG_MAX
+		);
+	}
+	if ( ! SLUG_SHAPE.test( value ) ) {
+		return __(
+			'A slug uses lower-case letters, numbers and single hyphens, and starts with a letter.',
+			'pattern-builder'
+		);
+	}
+
+	return '';
 }

@@ -193,6 +193,7 @@ class Pattern_Builder_Cloud_Controller {
 		$result = Pattern_Builder_Cloud::signup(
 			(string) $request->get_param( 'email' ),
 			(string) $request->get_param( 'password' ),
+			(string) $request->get_param( 'handle' ),
 			(string) $request->get_param( 'name' ),
 			rest_sanitize_boolean( $request->get_param( 'marketing' ) )
 		);
@@ -299,6 +300,9 @@ class Pattern_Builder_Cloud_Controller {
 
 		$body = array(
 			'name'        => sanitize_text_field( (string) $request->get_param( 'name' ) ),
+			// The collection's permanent slug. Its shape is the service's
+			// to judge; this only stops obvious rubbish reaching it.
+			'slug'        => sanitize_key( (string) $request->get_param( 'slug' ) ),
 			'description' => sanitize_textarea_field( (string) $request->get_param( 'description' ) ),
 		);
 		if ( null !== $request->get_param( 'visibility' ) ) {
