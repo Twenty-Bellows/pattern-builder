@@ -21,8 +21,46 @@ import {
 	findOutdatedBlocks,
 	describeBlocks,
 } from '../utils/blockValidity';
+import {
+	getLocalStorageValue,
+	setLocalStorageValue,
+} from '../utils/localStorage';
+import { CollectionPicker } from '../cloud/CollectionPicker';
+import {
+	pickDefaultCollection,
+	shouldAskForCollection,
+} from '../cloud/collections';
 
 const BASE = '/pattern-builder/v1/cloud';
+
+// Which collection the last upload went into, so the next one offers it.
+const LAST_COLLECTION_KEY = 'cloud-last-collection';
+
+/**
+ * The account's collections, fetched once the panel knows it is connected.
+ *
+ * @param {boolean} connected Whether there is a connection.
+ * @return {Object} { collections, reload }
+ */
+export function useCloudCollections( connected ) {
+	const [ collections, setCollections ] = useState( null );
+
+	const reload = useCallback( () => {
+		if ( ! connected ) {
+			setCollections( null );
+			return;
+		}
+		apiFetch( { path: `${ BASE }/library/collections` } )
+			.then( ( data ) =>
+				setCollections( Array.isArray( data ) ? data : [] )
+			)
+			.catch( () => setCollections( [] ) );
+	}, [ connected ] );
+
+	useEffect( reload, [ reload ] );
+
+	return { collections, reload };
+}
 
 /**
  * One pattern's cloud standing: null while loading, then the
@@ -84,7 +122,29 @@ export function PatternCloudControls( {
 } ) {
 	const [ busy, setBusy ] = useState( false );
 	const [ error, setError ] = useState( '' );
+	const [ collectionId, setCollectionId ] = useState( 0 );
+	const [ moveTo, setMoveTo ] = useState( 0 );
 	const { createSuccessNotice } = useDispatch( noticesStore );
+
+	const { collections, reload: reloadCollections } = useCloudCollections(
+		!! state?.connected
+	);
+
+	// With only Personal, nothing is asked; with more, the picker defaults
+	// to the collection used last.
+	const asks = shouldAskForCollection( collections );
+	useEffect( () => {
+		if ( ! collections || collectionId ) {
+			return;
+		}
+		const chosen = pickDefaultCollection(
+			collections,
+			Number( getLocalStorageValue( LAST_COLLECTION_KEY, 0 ) )
+		);
+		if ( chosen ) {
+			setCollectionId( chosen.id );
+		}
+	}, [ collections, collectionId ] );
 
 	// The saved markup is what the server uploads, so that is what gets
 	// checked — not whatever is unsaved in the canvas.
@@ -113,13 +173,21 @@ export function PatternCloudControls( {
 		}
 		setBusy( true );
 		setError( '' );
+		const data = { patternType, patternId };
+		// An update keeps its collection; a first upload names one.
+		if ( ! isUpdate ) {
+			data.collection = collectionId || 'personal';
+		}
 		apiFetch( {
 			path: `${ BASE }/upload`,
 			method: 'POST',
-			data: { patternType, patternId },
+			data,
 		} )
 			.then( () => {
 				setBusy( false );
+				if ( ! isUpdate && collectionId ) {
+					setLocalStorageValue( LAST_COLLECTION_KEY, collectionId );
+				}
 				createSuccessNotice(
 					isUpdate
 						? __( 'Cloud copy updated.', 'pattern-builder' )
@@ -144,6 +212,40 @@ export function PatternCloudControls( {
 							'The upload failed. Try again.',
 							'pattern-builder'
 						) ) + details
+				);
+			} );
+	};
+
+	// Move the cloud copy into another collection; nothing is re-uploaded.
+	const move = () => {
+		if ( busy || ! moveTo || ! state.cloudId ) {
+			return;
+		}
+		setBusy( true );
+		setError( '' );
+		apiFetch( {
+			path: `${ BASE }/library/${ state.cloudId }`,
+			method: 'PUT',
+			data: { collection: moveTo },
+		} )
+			.then( ( updated ) => {
+				setBusy( false );
+				setMoveTo( 0 );
+				createSuccessNotice(
+					sprintf(
+						/* translators: %s: collection title. */
+						__( 'Moved to %s.', 'pattern-builder' ),
+						updated.collection?.title || ''
+					),
+					{ type: 'snackbar' }
+				);
+				onRefresh();
+			} )
+			.catch( ( err ) => {
+				setBusy( false );
+				setError(
+					err.message ||
+						__( 'The move failed. Try again.', 'pattern-builder' )
 				);
 			} );
 	};
@@ -178,6 +280,15 @@ export function PatternCloudControls( {
 							'pattern-builder'
 						) }
 					</Text>
+					{ asks && (
+						<CollectionPicker
+							collections={ collections }
+							value={ collectionId }
+							onChange={ setCollectionId }
+							onCreated={ reloadCollections }
+							disabled={ busy }
+						/>
+					) }
 					<Button
 						variant="primary"
 						icon={ cloudUpload }
@@ -221,6 +332,36 @@ export function PatternCloudControls( {
 					) }
 					{ uploadedAgo ? ` ${ uploadedAgo }` : '' }
 				</Text>
+			) }
+
+			{ state.linked && state.owned && asks && (
+				<VStack spacing={ 2 }>
+					<Text variant="muted" size="12px">
+						{ state.collection?.title
+							? sprintf(
+									/* translators: %s: collection title. */
+									__( 'In %s.', 'pattern-builder' ),
+									state.collection.title
+							  )
+							: '' }
+					</Text>
+					<CollectionPicker
+						label={ __( 'Move to…', 'pattern-builder' ) }
+						collections={ collections }
+						value={ moveTo || 0 }
+						onChange={ setMoveTo }
+						onCreated={ reloadCollections }
+						disabled={ busy }
+					/>
+					<Button
+						variant="secondary"
+						isBusy={ busy }
+						disabled={ busy || ! moveTo }
+						onClick={ move }
+					>
+						{ __( 'Move', 'pattern-builder' ) }
+					</Button>
+				</VStack>
 			) }
 
 			{ blockedByInvalidBlocks && (
