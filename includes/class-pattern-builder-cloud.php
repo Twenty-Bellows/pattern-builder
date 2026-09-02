@@ -14,6 +14,14 @@ class Pattern_Builder_Cloud {
 	const OPTION_URL   = 'pattern_builder_cloud_url';
 	const OPTION_LINKS = 'pattern_builder_cloud_links';
 
+	/**
+	 * The local pattern categories that stand for cloud collections:
+	 * slug => title. A pattern installed from a collection carries a
+	 * category named for it, and this is how the inserter learns the title
+	 * rather than showing the slug.
+	 */
+	const OPTION_COLLECTION_CATEGORIES = 'pattern_builder_collection_categories';
+
 	const META_TOKEN   = '_pattern_builder_cloud_token';
 	const META_ACCOUNT = '_pattern_builder_cloud_account';
 
@@ -23,6 +31,74 @@ class Pattern_Builder_Cloud {
 	public static function register() {
 		add_filter( 'http_request_host_is_external', array( __CLASS__, 'allow_service_host' ), 10, 3 );
 		add_filter( 'http_allowed_safe_ports', array( __CLASS__, 'allow_service_port' ), 10, 2 );
+		add_action( 'init', array( __CLASS__, 'register_collection_categories' ) );
+	}
+
+	/**
+	 * The slug of the local pattern category that stands for a cloud
+	 * collection: `pbwp-{owner}-{slug}`, unique across accounts the way the
+	 * collection's own URL is.
+	 *
+	 * @param int    $owner Account id of the collection's owner.
+	 * @param string $slug  The collection's plain slug.
+	 * @return string
+	 */
+	public static function collection_category_slug( $owner, $slug ) {
+		return 'pbwp-' . (int) $owner . '-' . sanitize_title( $slug );
+	}
+
+	/**
+	 * Remember a collection's title for its local category, so the inserter
+	 * can show it. Called whenever a pattern is installed from a collection.
+	 *
+	 * @param array $collection { owner, slug, title }.
+	 */
+	public static function remember_collection_category( $collection ) {
+		if ( empty( $collection['slug'] ) || ! isset( $collection['owner'] ) ) {
+			return;
+		}
+		$categories = get_option( self::OPTION_COLLECTION_CATEGORIES );
+		$categories = is_array( $categories ) ? $categories : array();
+
+		$slug                = self::collection_category_slug( $collection['owner'], $collection['slug'] );
+		$categories[ $slug ] = sanitize_text_field( ! empty( $collection['title'] ) ? $collection['title'] : $collection['slug'] );
+
+		update_option( self::OPTION_COLLECTION_CATEGORIES, $categories, false );
+		self::register_collection_category( $slug, $categories[ $slug ] );
+	}
+
+	/**
+	 * The remembered collection categories: slug => title.
+	 *
+	 * @return array
+	 */
+	public static function collection_categories() {
+		$categories = get_option( self::OPTION_COLLECTION_CATEGORIES );
+		return is_array( $categories ) ? $categories : array();
+	}
+
+	/**
+	 * Register every remembered collection category with its title, on
+	 * init, so the browse grid and the block inserter show the collection's
+	 * name over a pattern installed from it rather than `pbwp-5-heroes`.
+	 */
+	public static function register_collection_categories() {
+		foreach ( self::collection_categories() as $slug => $title ) {
+			self::register_collection_category( $slug, $title );
+		}
+	}
+
+	/**
+	 * Register one collection category, unless something already did.
+	 *
+	 * @param string $slug  Category slug.
+	 * @param string $title Category label.
+	 */
+	private static function register_collection_category( $slug, $title ) {
+		$registry = \WP_Block_Pattern_Categories_Registry::get_instance();
+		if ( ! $registry->is_registered( $slug ) ) {
+			register_block_pattern_category( $slug, array( 'label' => $title ) );
+		}
 	}
 
 	/**
@@ -300,15 +376,23 @@ class Pattern_Builder_Cloud {
 	 * @param string $path   Route path within pbwp/v1.
 	 * @param array  $pbp    Package array.
 	 * @param array  $files  key => absolute file path.
+	 * @param array  $fields Plain fields sent beside the package, e.g. the
+	 *                       collection the pattern goes into.
 	 * @return array|WP_Error Decoded response.
 	 */
-	public static function upload( $method, $path, $pbp, $files ) {
+	public static function upload( $method, $path, $pbp, $files, $fields = array() ) {
 		$boundary = 'pbcloud' . bin2hex( random_bytes( 12 ) );
 		$body     = '';
 
 		$body .= "--{$boundary}\r\n";
 		$body .= "Content-Disposition: form-data; name=\"pbp\"\r\n\r\n";
 		$body .= wp_json_encode( $pbp ) . "\r\n";
+
+		foreach ( $fields as $name => $value ) {
+			$body .= "--{$boundary}\r\n";
+			$body .= "Content-Disposition: form-data; name=\"{$name}\"\r\n\r\n";
+			$body .= $value . "\r\n";
+		}
 
 		foreach ( $files as $key => $file_path ) {
 			$contents = file_get_contents( $file_path ); // phpcs:ignore WordPressVIPMinimum.Performance.FetchingRemoteData.FileGetContentsUnknown, WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local file.
@@ -411,8 +495,12 @@ class Pattern_Builder_Cloud {
 	 * @param bool     $owned        Whether the cloud copy is this account's
 	 *                               to update. False for a pattern downloaded
 	 *                               from somebody else's.
+	 * @param array    $collection   The cloud collection the pattern is in,
+	 *                               as { owner, slug, title } — what
+	 *                               "already installed from this collection"
+	 *                               reads. Empty when unknown.
 	 */
-	public static function set_link( $local_key, $cloud_id, $content_hash = '', $owned = true ) {
+	public static function set_link( $local_key, $cloud_id, $content_hash = '', $owned = true, $collection = array() ) {
 		$links = self::links();
 		if ( null === $cloud_id ) {
 			unset( $links[ $local_key ] );
@@ -423,9 +511,28 @@ class Pattern_Builder_Cloud {
 				'hash'       => (string) $content_hash,
 				'uploadedAt' => time(),
 				'owned'      => (bool) $owned,
+				'collection' => self::describe_collection( $collection ),
 			);
 		}
 		update_option( self::OPTION_LINKS, $links, false );
+	}
+
+	/**
+	 * The three things the link map keeps about a collection.
+	 *
+	 * @param mixed $collection A collection summary from the service, or a
+	 *                          request's { owner, slug, title }.
+	 * @return array { owner: int, slug: string, title: string }, or empty.
+	 */
+	public static function describe_collection( $collection ) {
+		if ( ! is_array( $collection ) || empty( $collection['slug'] ) ) {
+			return array();
+		}
+		return array(
+			'owner' => (int) ( $collection['owner'] ?? 0 ),
+			'slug'  => sanitize_title( (string) $collection['slug'] ),
+			'title' => sanitize_text_field( (string) ( $collection['title'] ?? $collection['slug'] ) ),
+		);
 	}
 
 	/**

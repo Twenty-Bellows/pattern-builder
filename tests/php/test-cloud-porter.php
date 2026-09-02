@@ -258,7 +258,7 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 			'title'       => 'Downloaded Hero',
 			'slug'        => 'downloaded-hero',
 			'description' => 'From the cloud.',
-			'categories'  => array( 'Heroes', 'Featured' ),
+			'inserterCategories' => array( 'Heroes', 'Featured' ),
 			'synced'      => false,
 			'content'     => "<!-- wp:image -->\n<figure class=\"wp-block-image\"><img src=\"pbp-asset://hero-img\" alt=\"\"/></figure>\n<!-- /wp:image -->",
 			'assets'      => array(

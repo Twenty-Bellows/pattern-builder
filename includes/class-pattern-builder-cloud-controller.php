@@ -36,43 +36,80 @@ class Pattern_Builder_Cloud_Controller {
 		};
 
 		$routes = array(
-			'/cloud/status'          => array( 'GET', 'status' ),
-			'/cloud/login'           => array( 'POST', 'login' ),
-			'/cloud/signup'          => array( 'POST', 'signup' ),
-			'/cloud/disconnect'      => array( 'POST', 'disconnect' ),
-			'/cloud/library'         => array( 'GET', 'library' ),
-			'/cloud/categories'      => array( 'GET', 'categories' ),
-			'/cloud/directory'       => array( 'GET', 'directory' ),
-			'/cloud/collections'     => array( 'GET', 'collections' ),
-			'/cloud/links'           => array( 'GET', 'links' ),
-			'/cloud/pattern-state'   => array( 'GET', 'pattern_state' ),
-			'/cloud/upload'          => array( 'POST', 'upload' ),
-			'/cloud/download'        => array( 'POST', 'download' ),
-			'/cloud/tokens/check'    => array( 'POST', 'tokens_check' ),
-			'/cloud/password/forgot' => array( 'POST', 'forgot_password' ),
-			'/cloud/verify/resend'   => array( 'POST', 'resend_verification' ),
-			'/cloud/billing/sync'    => array( 'POST', 'sync_billing' ),
+			'/cloud/status'              => array( 'GET', 'status' ),
+			'/cloud/login'               => array( 'POST', 'login' ),
+			'/cloud/signup'              => array( 'POST', 'signup' ),
+			'/cloud/disconnect'          => array( 'POST', 'disconnect' ),
+			'/cloud/library'             => array( 'GET', 'library' ),
+			'/cloud/library/collections' => array( array( 'GET', 'library_collections' ), array( 'POST', 'create_collection' ) ),
+			'/cloud/directory'           => array( 'GET', 'directory' ),
+			'/cloud/collections'         => array( 'GET', 'collections' ),
+			'/cloud/links'               => array( 'GET', 'links' ),
+			'/cloud/pattern-state'       => array( 'GET', 'pattern_state' ),
+			'/cloud/upload'              => array( 'POST', 'upload' ),
+			'/cloud/download'            => array( 'POST', 'download' ),
+			'/cloud/tokens/check'        => array( 'POST', 'tokens_check' ),
+			'/cloud/password/forgot'     => array( 'POST', 'forgot_password' ),
+			'/cloud/verify/resend'       => array( 'POST', 'resend_verification' ),
+			'/cloud/billing/sync'        => array( 'POST', 'sync_billing' ),
 		);
 
-		foreach ( $routes as $route => $handler ) {
-			register_rest_route(
-				self::NS,
-				$route,
-				array(
+		foreach ( $routes as $route => $handlers ) {
+			// One handler, or a list of (method, callback) pairs for a route
+			// that answers more than one method.
+			$handlers = is_array( $handlers[0] ) ? $handlers : array( $handlers );
+			$args     = array();
+			foreach ( $handlers as $handler ) {
+				$args[] = array(
 					'methods'             => $handler[0],
 					'permission_callback' => $can_manage,
 					'callback'            => array( $this, $handler[1] ),
-				)
-			);
+				);
+			}
+			register_rest_route( self::NS, $route, $args );
 		}
 
 		register_rest_route(
 			self::NS,
 			'/cloud/library/(?P<id>\d+)',
 			array(
-				'methods'             => 'DELETE',
+				array(
+					'methods'             => 'DELETE',
+					'permission_callback' => $can_manage,
+					'callback'            => array( $this, 'delete_library_pattern' ),
+				),
+				array(
+					'methods'             => array( 'PUT', 'POST' ),
+					'permission_callback' => $can_manage,
+					'callback'            => array( $this, 'move_library_pattern' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NS,
+			'/cloud/library/collections/(?P<id>\d+)',
+			array(
+				array(
+					'methods'             => array( 'PUT', 'POST' ),
+					'permission_callback' => $can_manage,
+					'callback'            => array( $this, 'update_collection' ),
+				),
+				array(
+					'methods'             => 'DELETE',
+					'permission_callback' => $can_manage,
+					'callback'            => array( $this, 'delete_collection' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NS,
+			'/cloud/collections/(?P<owner>\d+)/(?P<slug>[a-z0-9\-]+)',
+			array(
+				'methods'             => 'GET',
 				'permission_callback' => $can_manage,
-				'callback'            => array( $this, 'delete_library_pattern' ),
+				'callback'            => array( $this, 'collection' ),
 			)
 		);
 	}
@@ -106,17 +143,24 @@ class Pattern_Builder_Cloud_Controller {
 
 		return rest_ensure_response(
 			array(
-				'connected'  => true,
-				'serviceUrl' => Pattern_Builder_Cloud::service_url(),
-				'account'    => $me['account'],
-				'tier'       => $me['tier'],
-				'usage'      => $me['usage'],
-				'upgradeUrl' => isset( $me['upgrade_url'] ) ? $me['upgrade_url'] : '',
+				'connected'    => true,
+				'serviceUrl'   => Pattern_Builder_Cloud::service_url(),
+				'account'      => $me['account'],
+				'tier'         => $me['tier'],
+				'usage'        => isset( $me['usage'] ) ? $me['usage'] : array(),
+				// The tiers as the service cuts them: the Personal cap, whether
+				// a private collection may be made, the fair-use ceilings.
+				'entitlements' => isset( $me['entitlements'] ) ? $me['entitlements'] : array(),
+				// Personal's meter: { id, count, cap } with cap -1 for none.
+				'personal'     => isset( $me['personal'] ) ? $me['personal'] : array(),
+				// A lapsed Pro holding more than a free account may.
+				'overPolicy'   => ! empty( $me['over_policy'] ),
+				'upgradeUrl'   => isset( $me['upgrade_url'] ) ? $me['upgrade_url'] : '',
 				// What the overlay checkout needs, or null once Pro (or
 				// until the service's product is configured).
-				'checkout'   => isset( $me['checkout'] ) ? $me['checkout'] : null,
-				'portalUrl'  => isset( $me['portal_url'] ) ? $me['portal_url'] : '',
-				'telemetry'  => Pattern_Builder_Telemetry::client_state(),
+				'checkout'     => isset( $me['checkout'] ) ? $me['checkout'] : null,
+				'portalUrl'    => isset( $me['portal_url'] ) ? $me['portal_url'] : '',
+				'telemetry'    => Pattern_Builder_Telemetry::client_state(),
 			)
 		);
 	}
@@ -226,12 +270,127 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * GET /cloud/categories — the account's cloud categories.
+	 * GET /cloud/library/collections — the account's collections, Personal
+	 * first, with counts.
 	 *
 	 * @return WP_REST_Response|WP_Error
 	 */
-	public function categories() {
-		return rest_ensure_response( Pattern_Builder_Cloud::request( 'GET', '/library/categories' ) );
+	public function library_collections() {
+		if ( ! Pattern_Builder_Cloud::is_connected() ) {
+			return self::disconnected();
+		}
+		return rest_ensure_response( Pattern_Builder_Cloud::request( 'GET', '/library/collections' ) );
+	}
+
+	/**
+	 * POST /cloud/library/collections — create one. The service decides
+	 * what an account may make (free: public only) and its refusal is
+	 * relayed as it came, upgrade link included.
+	 *
+	 * Params: name, description, visibility (optional).
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function create_collection( $request ) {
+		if ( ! Pattern_Builder_Cloud::is_connected() ) {
+			return self::disconnected();
+		}
+
+		$body = array(
+			'name'        => sanitize_text_field( (string) $request->get_param( 'name' ) ),
+			'description' => sanitize_textarea_field( (string) $request->get_param( 'description' ) ),
+		);
+		if ( null !== $request->get_param( 'visibility' ) ) {
+			$body['visibility'] = sanitize_key( $request->get_param( 'visibility' ) );
+		}
+
+		return rest_ensure_response( Pattern_Builder_Cloud::request( 'POST', '/library/collections', array( 'body' => $body ) ) );
+	}
+
+	/**
+	 * PUT /cloud/library/collections/{id} — rename, describe, set visibility.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function update_collection( $request ) {
+		if ( ! Pattern_Builder_Cloud::is_connected() ) {
+			return self::disconnected();
+		}
+
+		$body = array();
+		foreach ( array( 'name', 'description', 'visibility' ) as $field ) {
+			$value = $request->get_param( $field );
+			if ( null !== $value ) {
+				$body[ $field ] = 'description' === $field ? sanitize_textarea_field( (string) $value ) : sanitize_text_field( (string) $value );
+			}
+		}
+
+		return rest_ensure_response( Pattern_Builder_Cloud::request( 'PUT', '/library/collections/' . (int) $request['id'], array( 'body' => $body ) ) );
+	}
+
+	/**
+	 * DELETE /cloud/library/collections/{id}?patterns=delete|move
+	 *
+	 * A refused move (past the Personal cap) is relayed as it came, with
+	 * the upgrade link; delete remains available. Links to patterns the
+	 * service deleted are forgotten here too.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function delete_collection( $request ) {
+		if ( ! Pattern_Builder_Cloud::is_connected() ) {
+			return self::disconnected();
+		}
+
+		$patterns = 'move' === $request->get_param( 'patterns' ) ? 'move' : 'delete';
+		$result   = Pattern_Builder_Cloud::request(
+			'DELETE',
+			'/library/collections/' . (int) $request['id'],
+			array( 'query' => array( 'patterns' => $patterns ) )
+		);
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return rest_ensure_response( $result );
+	}
+
+	/**
+	 * PUT /cloud/library/{id} — move a cloud pattern into another of the
+	 * account's collections. Params: collection (an id, or `personal`).
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function move_library_pattern( $request ) {
+		if ( ! Pattern_Builder_Cloud::is_connected() ) {
+			return self::disconnected();
+		}
+
+		$collection = $request->get_param( 'collection' );
+		if ( null === $collection || '' === $collection ) {
+			return new WP_Error( 'pb_cloud_bad_request', __( 'Which collection?', 'pattern-builder' ), array( 'status' => 400 ) );
+		}
+
+		return rest_ensure_response(
+			Pattern_Builder_Cloud::request(
+				'PUT',
+				'/library/patterns/' . (int) $request['id'],
+				array( 'body' => array( 'collection' => is_numeric( $collection ) ? (int) $collection : sanitize_key( $collection ) ) )
+			)
+		);
+	}
+
+	/**
+	 * Every write to the cloud needs a connection.
+	 *
+	 * @return WP_Error
+	 */
+	private static function disconnected() {
+		return new WP_Error( 'pb_cloud_disconnected', __( 'Connect to patternbuilderwp.com first.', 'pattern-builder' ), array( 'status' => 400 ) );
 	}
 
 	/**
@@ -265,16 +424,47 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * GET /cloud/collections — public + premium collections.
+	 * GET /cloud/collections — public + premium collections: search, page.
 	 *
+	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
 	 */
-	public function collections() {
+	public function collections( $request ) {
 		$gate = self::require_connection();
 		if ( is_wp_error( $gate ) ) {
 			return $gate;
 		}
-		return rest_ensure_response( Pattern_Builder_Cloud::request( 'GET', '/directory/collections' ) );
+		return $this->proxy_list( '/directory/collections', $request );
+	}
+
+	/**
+	 * GET /cloud/collections/{owner}/{slug} — one collection with its
+	 * pattern summaries (tokens included, so the union check needs no
+	 * second pass), each marked with whether it is installed here already.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function collection( $request ) {
+		$gate = self::require_connection();
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
+
+		$collection = Pattern_Builder_Cloud::request( 'GET', '/directory/collections/' . (int) $request['owner'] . '/' . sanitize_title( $request['slug'] ) );
+		if ( is_wp_error( $collection ) ) {
+			return $collection;
+		}
+
+		$porter = new Pattern_Builder_Cloud_Porter();
+		if ( ! empty( $collection['patterns'] ) && is_array( $collection['patterns'] ) ) {
+			foreach ( $collection['patterns'] as &$pattern ) {
+				$pattern['installed'] = isset( $pattern['id'] ) ? $porter->find_installed( (int) $pattern['id'] ) : null;
+			}
+			unset( $pattern );
+		}
+
+		return rest_ensure_response( $collection );
 	}
 
 	/**
@@ -297,7 +487,7 @@ class Pattern_Builder_Cloud_Controller {
 	public function pattern_state( $request ) {
 		$cloud_id = (int) $request->get_param( 'cloudId' );
 		if ( $cloud_id ) {
-			return rest_ensure_response( array( 'installed' => $this->find_installed( $cloud_id ) ) );
+			return rest_ensure_response( array( 'installed' => ( new Pattern_Builder_Cloud_Porter() )->find_installed( $cloud_id ) ) );
 		}
 
 		if ( ! Pattern_Builder_Cloud::is_connected() ) {
@@ -341,46 +531,18 @@ class Pattern_Builder_Cloud_Controller {
 				// the record.
 				'owned'      => ! isset( $link['owned'] ) || (bool) $link['owned'],
 				'uploadedAt' => isset( $link['uploadedAt'] ) ? (int) $link['uploadedAt'] : 0,
+				// The cloud collection the copy is in, as last recorded.
+				'collection' => isset( $link['collection'] ) && is_array( $link['collection'] ) ? $link['collection'] : array(),
 			)
 		);
 	}
 
 	/**
-	 * Which local pattern (if any) a cloud pattern is installed as; a
-	 * deleted local copy reads as not installed.
-	 *
-	 * @param int $cloud_id Cloud pattern ID.
-	 * @return array|null { type: string, id: string|int, title: string }
-	 */
-	private function find_installed( $cloud_id ) {
-		$porter = new Pattern_Builder_Cloud_Porter();
-
-		foreach ( Pattern_Builder_Cloud::links() as $key => $link ) {
-			if ( (int) $link['cloudId'] !== $cloud_id ) {
-				continue;
-			}
-
-			$parts = explode( ':', (string) $key, 2 );
-			if ( 2 !== count( $parts ) ) {
-				continue;
-			}
-
-			$type  = 'user' === $parts[0] ? 'user' : 'theme';
-			$id    = 'user' === $type ? (int) $parts[1] : $parts[1];
-			$local = $porter->describe_local( $type, $id );
-			if ( $local ) {
-				return $local;
-			}
-		}
-
-		return null;
-	}
-
-	/**
 	 * POST /cloud/upload — send a local pattern to the account's library.
 	 *
-	 * Params: patternType (theme|user), patternId, categories (string[]),
-	 * asNew (bool — force a new cloud copy even when linked).
+	 * Params: patternType (theme|user), patternId, collection (a collection
+	 * id or `personal`; `personal` when left out — the one case nothing
+	 * asks), asNew (bool — force a new cloud copy even when linked).
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -399,18 +561,18 @@ class Pattern_Builder_Cloud_Controller {
 			return $exported;
 		}
 
-		$categories = $request->get_param( 'categories' );
-		if ( is_array( $categories ) && ! empty( $categories ) ) {
-			$exported['pbp']['categories'] = array_map( 'sanitize_text_field', $categories );
-		}
+		$collection = $request->get_param( 'collection' );
+		$collection = ( null === $collection || '' === $collection ) ? 'personal' : ( is_numeric( $collection ) ? (int) $collection : sanitize_key( $collection ) );
 
 		$links    = Pattern_Builder_Cloud::links();
 		$existing = isset( $links[ $exported['localKey'] ] ) ? (int) $links[ $exported['localKey'] ]['cloudId'] : 0;
 		$as_new   = (bool) $request->get_param( 'asNew' );
 
 		if ( $existing && ! $as_new ) {
+			// An update keeps the pattern's collection unless asked to move it.
+			$fields = null !== $request->get_param( 'collection' ) && '' !== $request->get_param( 'collection' ) ? array( 'collection' => $collection ) : array();
 			// POST, not PUT: PHP only parses multipart bodies on POST.
-			$result = Pattern_Builder_Cloud::upload( 'POST', '/library/patterns/' . $existing, $exported['pbp'], $exported['files'] );
+			$result = Pattern_Builder_Cloud::upload( 'POST', '/library/patterns/' . $existing, $exported['pbp'], $exported['files'], $fields );
 			// The cloud copy may have been deleted remotely; fall through to create.
 			if ( is_wp_error( $result ) && 404 === (int) ( $result->get_error_data()['status'] ?? 0 ) ) {
 				$existing = 0;
@@ -429,14 +591,20 @@ class Pattern_Builder_Cloud_Controller {
 		}
 
 		if ( ! $existing || $as_new ) {
-			$result = Pattern_Builder_Cloud::upload( 'POST', '/library/patterns', $exported['pbp'], $exported['files'] );
+			$result = Pattern_Builder_Cloud::upload( 'POST', '/library/patterns', $exported['pbp'], $exported['files'], array( 'collection' => $collection ) );
 			if ( is_wp_error( $result ) ) {
 				return $result;
 			}
 		}
 
 		if ( ! empty( $result['id'] ) ) {
-			Pattern_Builder_Cloud::set_link( $exported['localKey'], (int) $result['id'], $exported['contentHash'] );
+			Pattern_Builder_Cloud::set_link(
+				$exported['localKey'],
+				(int) $result['id'],
+				$exported['contentHash'],
+				true,
+				isset( $result['collection'] ) ? $result['collection'] : array()
+			);
 		}
 
 		Pattern_Builder_Telemetry::record(
@@ -461,7 +629,10 @@ class Pattern_Builder_Cloud_Controller {
 	 *
 	 * Params: source (library|directory), cloudId, destination (user|theme),
 	 * addTokens (whether to add the design tokens the site is missing, which
-	 * go to the same destination as the pattern).
+	 * go to the same destination as the pattern), collection (the
+	 * { owner, slug, title } the pattern is in, so the porter can file it
+	 * under the collection's local category), mine (whose the cloud copy is,
+	 * as the service reported it).
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -479,49 +650,20 @@ class Pattern_Builder_Cloud_Controller {
 			return $gate;
 		}
 
-		$pbp = Pattern_Builder_Cloud::request( 'POST', "/{$source}/patterns/{$cloud_id}/download" );
-		if ( is_wp_error( $pbp ) ) {
-			return $pbp;
-		}
-
-		/*
-		 * Missing design tokens land wherever the pattern lands — the
-		 * destination is the one the user already chose, never a second
-		 * question — and only the missing ones: apply() re-checks, so a
-		 * token this site already defines keeps its own value (§4a).
-		 */
-		$tokens_written = array();
-		if ( ! empty( $pbp['tokens'] ) && $request->get_param( 'addTokens' ) ) {
-			$tokens_written = Pattern_Builder_Cloud_Tokens::apply( $pbp['tokens'], $destination );
-			if ( is_wp_error( $tokens_written ) ) {
-				return $tokens_written;
-			}
-		}
+		$collection = $request->get_param( 'collection' );
 
 		$porter = new Pattern_Builder_Cloud_Porter();
-		$result = $porter->import_pbp( $pbp, $destination );
+		$result = $porter->install_cloud_pattern(
+			$cloud_id,
+			$destination,
+			(bool) $request->get_param( 'addTokens' ),
+			is_array( $collection ) ? $collection : array(),
+			(bool) $request->get_param( 'mine' ),
+			$source
+		);
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
-
-		// The imported content matches its cloud copy, so the stored hash reads as up to date.
-		$hash = $porter->content_hash( $result['type'], $result['id'] );
-
-		/*
-		 * Whether the cloud copy is this account's to update later. One from
-		 * the account's own library always is; one from the directory only if
-		 * the service said so when it listed it. The service is the authority
-		 * either way — this is what keeps an Update button off a pattern
-		 * somebody else published, rather than what enforces it.
-		 */
-		$owned = 'library' === $source || (bool) $request->get_param( 'mine' );
-
-		Pattern_Builder_Cloud::set_link(
-			Pattern_Builder_Cloud_Porter::local_key( $result['type'], $result['id'] ),
-			$cloud_id,
-			is_wp_error( $hash ) ? '' : $hash,
-			$owned
-		);
 
 		Pattern_Builder_Telemetry::record(
 			'pattern_downloaded',
@@ -531,7 +673,6 @@ class Pattern_Builder_Cloud_Controller {
 			)
 		);
 
-		$result['tokensWritten'] = $tokens_written;
 		return rest_ensure_response( $result );
 	}
 
@@ -581,7 +722,7 @@ class Pattern_Builder_Cloud_Controller {
 	 */
 	private function proxy_list( $path, $request ) {
 		$query = array();
-		foreach ( array( 'page', 'per_page', 'search', 'category' ) as $param ) {
+		foreach ( array( 'page', 'per_page', 'search', 'collection' ) as $param ) {
 			$value = $request->get_param( $param );
 			if ( null !== $value && '' !== $value ) {
 				$query[ $param ] = sanitize_text_field( (string) $value );

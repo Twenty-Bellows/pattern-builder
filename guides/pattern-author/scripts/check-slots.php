@@ -124,7 +124,12 @@ foreach ( $checks as list( $slug, $content, $raw ) ) {
 
 	$markup   = sprintf(
 		'<!-- wp:pattern %s /-->',
-		wp_json_encode( array( 'slug' => $slug, 'content' => $content ) )
+		wp_json_encode(
+			array(
+				'slug'    => $slug,
+				'content' => $content,
+			)
+		)
 	);
 	$rendered = do_blocks( $markup );
 
