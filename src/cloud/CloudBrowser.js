@@ -77,6 +77,39 @@ export function passwordProblem( password ) {
 		: '';
 }
 
+/**
+ * The handle rule, as the service enforces it: three to thirty-two
+ * characters of lower-case letters, numbers and single hyphens, starting
+ * with a letter. Checked here first for the same reason the password is,
+ * and again on the service, whose answer is the one that counts.
+ *
+ * @param {string} handle Candidate handle.
+ * @return {string} What is wrong, or '' when it passes.
+ */
+export function handleProblem( handle ) {
+	const value = String( handle || '' ).trim();
+
+	if ( value.length < 3 || value.length > 32 ) {
+		return __(
+			'Your handle is between 3 and 32 characters.',
+			'pattern-builder'
+		);
+	}
+	if ( ! /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test( value ) ) {
+		return __(
+			'Your handle uses lower-case letters, numbers and single hyphens, and starts with a letter.',
+			'pattern-builder'
+		);
+	}
+
+	return '';
+}
+
+const HANDLE_RULE = __(
+	'Lower-case letters, numbers and hyphens. This is the first part of the name of every pattern you share, and it cannot be changed later.',
+	'pattern-builder'
+);
+
 const PASSWORD_RULE = __(
 	'At least 8 characters, with an upper-case letter, a number and a symbol.',
 	'pattern-builder'
@@ -101,6 +134,7 @@ function ConnectPanel( { onConnected, intro } ) {
 	const [ email, setEmail ] = useState( '' );
 	const [ password, setPassword ] = useState( '' );
 	const [ name, setName ] = useState( '' );
+	const [ handle, setHandle ] = useState( '' );
 	const [ marketing, setMarketing ] = useState( null ); // null = unanswered.
 	const [ busy, setBusy ] = useState( false );
 	const [ error, setError ] = useState( '' );
@@ -120,7 +154,9 @@ function ConnectPanel( { onConnected, intro } ) {
 
 	const canSubmit = isForgot
 		? !! email
-		: !! email && !! password && ( ! isSignup || marketing !== null );
+		: !! email &&
+		  !! password &&
+		  ( ! isSignup || ( !! handle && marketing !== null ) );
 
 	const submit = ( event ) => {
 		event.preventDefault();
@@ -129,7 +165,8 @@ function ConnectPanel( { onConnected, intro } ) {
 		}
 
 		if ( isSignup ) {
-			const problem = passwordProblem( password );
+			const problem =
+				handleProblem( handle ) || passwordProblem( password );
 			if ( problem ) {
 				setError( problem );
 				return;
@@ -173,7 +210,13 @@ function ConnectPanel( { onConnected, intro } ) {
 			path: `${ BASE }/${ isSignup ? 'signup' : 'login' }`,
 			method: 'POST',
 			data: isSignup
-				? { email, password, name, marketing: marketing === true }
+				? {
+						email,
+						password,
+						handle,
+						name,
+						marketing: marketing === true,
+				  }
 				: { email, password },
 		} )
 			.then( ( data ) => onConnected( data ) )
@@ -222,6 +265,19 @@ function ConnectPanel( { onConnected, intro } ) {
 						value={ name }
 						onChange={ setName }
 						autoComplete="name"
+					/>
+				) }
+				{ isSignup && (
+					<TextControl
+						__nextHasNoMarginBottom
+						label={ __( 'Handle', 'pattern-builder' ) }
+						value={ handle }
+						onChange={ ( next ) =>
+							setHandle( next.toLowerCase().trim() )
+						}
+						autoComplete="username"
+						help={ HANDLE_RULE }
+						required
 					/>
 				) }
 				<TextControl

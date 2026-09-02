@@ -110,7 +110,7 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 			'execute_install_collection'    => array( 'owner' => 2, 'slug' => 'starter-sections' ),
 			'execute_install_cloud_pattern' => array( 'id' => 101 ),
 			'execute_upload_pattern'        => array( 'title' => 'X', 'content' => '<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->' ),
-			'execute_create_collection'     => array( 'name' => 'Secret' ),
+			'execute_create_collection'     => array( 'name' => 'Secret', 'slug' => 'secret' ),
 		);
 
 		$this->mock_service(
@@ -299,7 +299,7 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 			}
 		);
 
-		$result = $this->abilities->execute_create_collection( array( 'name' => 'Secret', 'description' => 'Mine.' ) );
+		$result = $this->abilities->execute_create_collection( array( 'name' => 'Secret', 'slug' => 'secret', 'description' => 'Mine.' ) );
 
 		$this->assertWPError( $result );
 		$this->assertSame( 'pbwp_private_requires_pro', $result->get_error_code() );
@@ -308,6 +308,7 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 		$sent = json_decode( end( $this->seen )['body'], true );
 		$this->assertSame( 'private', $sent['visibility'] );
 		$this->assertSame( 'Secret', $sent['name'] );
+		$this->assertSame( 'secret', $sent['slug'] );
 	}
 
 	public function test_no_ability_publishes_or_deletes() {
@@ -318,7 +319,7 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 			}
 		);
 
-		$this->abilities->execute_create_collection( array( 'name' => 'Quiet' ) );
+		$this->abilities->execute_create_collection( array( 'name' => 'Quiet', 'slug' => 'quiet' ) );
 		$this->abilities->execute_list_collections( array( 'scope' => 'mine' ) );
 
 		foreach ( $this->seen as $request ) {

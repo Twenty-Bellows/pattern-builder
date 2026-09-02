@@ -671,7 +671,7 @@ class Pattern_Builder_Cloud_Abilities {
 			'pattern-builder/create-collection',
 			array(
 				'label'               => __( 'Create a cloud collection', 'pattern-builder' ),
-				'description'         => __( 'Creates a private collection on the connected account. Always private: an agent never publishes, and nothing here makes a collection public, changes a visibility or deletes one — the account holder does that in Pattern Builder. On a free account the service refuses with an upgrade message, since free accounts only create public collections; upload into Personal instead.', 'pattern-builder' ),
+				'description'         => __( 'Creates a private collection on the connected account. The slug is permanent and becomes part of the name of every pattern in the collection ({handle}/{collection}/{pattern}), so choose it deliberately: it cannot be changed, only replaced by making another collection. Always private: an agent never publishes, and nothing here makes a collection public, changes a visibility or deletes one — the account holder does that in Pattern Builder. On a free account the service refuses with an upgrade message, since free accounts only create public collections; upload into Personal instead.', 'pattern-builder' ),
 				'category'            => Pattern_Builder_Abilities::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -680,9 +680,18 @@ class Pattern_Builder_Cloud_Abilities {
 							'type'      => 'string',
 							'minLength' => 1,
 						),
+						// Permanent, and the middle segment of every pattern
+						// name in the collection. Lower-case letters, numbers
+						// and single hyphens, starting with a letter.
+						'slug'        => array(
+							'type'      => 'string',
+							'pattern'   => '^[a-z][a-z0-9]*(-[a-z0-9]+)*$',
+							'minLength' => 3,
+							'maxLength' => 32,
+						),
 						'description' => array( 'type' => 'string' ),
 					),
-					'required'             => array( 'name' ),
+					'required'             => array( 'name', 'slug' ),
 					'additionalProperties' => false,
 				),
 				'output_schema'       => array(
@@ -716,6 +725,7 @@ class Pattern_Builder_Cloud_Abilities {
 			array(
 				'body' => array(
 					'name'        => sanitize_text_field( (string) $input['name'] ),
+					'slug'        => sanitize_key( (string) $input['slug'] ),
 					'description' => isset( $input['description'] ) ? sanitize_textarea_field( (string) $input['description'] ) : '',
 					'visibility'  => 'private',
 				),

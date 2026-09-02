@@ -385,6 +385,88 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		remove_filter( 'stylesheet', $slug_filter );
 	}
 
+	public function test_a_download_lands_under_its_own_namespace() {
+		$test_dir = sys_get_temp_dir() . '/pattern-builder-namespace-test';
+		if ( ! is_dir( $test_dir . '/patterns' ) ) {
+			mkdir( $test_dir . '/patterns', 0777, true );
+		}
+		$dir_filter  = static function () use ( $test_dir ) {
+			return $test_dir;
+		};
+		$slug_filter = static function () {
+			return 'simple-theme';
+		};
+		add_filter( 'stylesheet_directory', $dir_filter );
+		add_filter( 'stylesheet', $slug_filter );
+
+		$porter = new Pattern_Builder_Cloud_Porter();
+
+		// Two accounts, each with a pattern of the same name. Before
+		// namespacing the second overwrote the first.
+		$first          = $this->make_downloaded_pbp();
+		$first['slug']  = 'hero';
+		$first['title'] = 'Studio A Hero';
+		$first['namespace'] = 'studio-a/heroes/hero';
+
+		$second              = $this->make_downloaded_pbp();
+		$second['slug']      = 'hero';
+		$second['title']     = 'Studio B Hero';
+		$second['namespace'] = 'studio-b/heroes/hero';
+
+		$a = $porter->import_pbp( $first, 'theme' );
+		$b = $porter->import_pbp( $second, 'theme' );
+
+		$this->assertIsArray( $a, is_wp_error( $a ) ? $a->get_error_message() : '' );
+		$this->assertIsArray( $b, is_wp_error( $b ) ? $b->get_error_message() : '' );
+		$this->assertSame( 'studio-a/heroes/hero', $a['id'] );
+		$this->assertSame( 'studio-b/heroes/hero', $b['id'] );
+
+		$file_a = $test_dir . '/patterns/studio-a/heroes/hero.php';
+		$file_b = $test_dir . '/patterns/studio-b/heroes/hero.php';
+		$this->assertFileExists( $file_a );
+		$this->assertFileExists( $file_b );
+		$this->assertStringContainsString( 'Title: Studio A Hero', file_get_contents( $file_a ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+		$this->assertStringContainsString( 'Title: Studio B Hero', file_get_contents( $file_b ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+
+		// And both are found by a scan of the theme, which core reads to
+		// the same depth.
+		$store = new \TwentyBellows\PatternBuilder\Pattern_File_Store();
+		$names = wp_list_pluck( $store->get_theme_patterns(), 'name' );
+		$this->assertContains( 'studio-a/heroes/hero', $names );
+		$this->assertContains( 'studio-b/heroes/hero', $names );
+
+		unlink( $file_a ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+		unlink( $file_b ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+		remove_filter( 'stylesheet_directory', $dir_filter );
+		remove_filter( 'stylesheet', $slug_filter );
+	}
+
+	public function test_a_package_without_a_namespace_lands_in_the_theme() {
+		$test_dir = sys_get_temp_dir() . '/pattern-builder-namespace-test';
+		if ( ! is_dir( $test_dir . '/patterns' ) ) {
+			mkdir( $test_dir . '/patterns', 0777, true );
+		}
+		$dir_filter  = static function () use ( $test_dir ) {
+			return $test_dir;
+		};
+		$slug_filter = static function () {
+			return 'simple-theme';
+		};
+		add_filter( 'stylesheet_directory', $dir_filter );
+		add_filter( 'stylesheet', $slug_filter );
+
+		$porter = new Pattern_Builder_Cloud_Porter();
+		$result = $porter->import_pbp( $this->make_downloaded_pbp(), 'theme' );
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$this->assertSame( 'simple-theme/downloaded-hero', $result['id'] );
+		$this->assertFileExists( $test_dir . '/patterns/downloaded-hero.php' );
+
+		unlink( $test_dir . '/patterns/downloaded-hero.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+		remove_filter( 'stylesheet_directory', $dir_filter );
+		remove_filter( 'stylesheet', $slug_filter );
+	}
+
 	public function test_import_rejects_unsafe_content() {
 		$pbp            = $this->make_downloaded_pbp();
 		$pbp['content'] = "<!-- wp:paragraph -->\n<p><a href=\"javascript:alert(1)\">x</a></p>\n<!-- /wp:paragraph -->";

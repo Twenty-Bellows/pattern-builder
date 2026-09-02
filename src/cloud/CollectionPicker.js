@@ -13,7 +13,7 @@ import {
 	__experimentalVStack as VStack,
 } from '@wordpress/components';
 
-import { isListed } from './collections';
+import { isListed, slugProblem, suggestSlug } from './collections';
 
 const BASE = '/pattern-builder/v1/cloud';
 const NEW = '__new__';
@@ -23,12 +23,19 @@ const NEW = '__new__';
  * public from the moment they exist; the service decides and says so.
  *
  * @param {string} name        Collection name.
+ * @param {string} slug        Collection slug — permanent, and the middle
+ *                             segment of every pattern name in it.
  * @param {string} description Description (optional).
  * @param {string} visibility  'public' or 'private', or '' to leave it to the service.
  * @return {Promise<Object>} The created collection summary.
  */
-export function createCollection( name, description = '', visibility = '' ) {
-	const data = { name, description };
+export function createCollection(
+	name,
+	slug,
+	description = '',
+	visibility = ''
+) {
+	const data = { name, slug, description };
 	if ( visibility ) {
 		data.visibility = visibility;
 	}
@@ -62,6 +69,11 @@ export function CollectionPicker( {
 } ) {
 	const [ creating, setCreating ] = useState( false );
 	const [ name, setName ] = useState( '' );
+	// The slug follows the name until it is typed into, after which it is
+	// the author's: it is permanent, so it is worth being able to say what
+	// it will be rather than accepting whatever a title turns into.
+	const [ slug, setSlug ] = useState( '' );
+	const [ slugTouched, setSlugTouched ] = useState( false );
 	const [ busy, setBusy ] = useState( false );
 	const [ error, setError ] = useState( '' );
 
@@ -90,13 +102,21 @@ export function CollectionPicker( {
 		if ( busy || ! name.trim() ) {
 			return;
 		}
+		const wanted = slug.trim() || suggestSlug( name );
+		const problem = slugProblem( wanted );
+		if ( problem ) {
+			setError( problem );
+			return;
+		}
 		setBusy( true );
 		setError( '' );
-		createCollection( name.trim() )
+		createCollection( name.trim(), wanted )
 			.then( ( created ) => {
 				setBusy( false );
 				setCreating( false );
 				setName( '' );
+				setSlug( '' );
+				setSlugTouched( false );
 				onCreated?.( created );
 				onChange( created.id );
 			} )
@@ -137,7 +157,29 @@ export function CollectionPicker( {
 						__next40pxDefaultSize
 						label={ __( 'Name', 'pattern-builder' ) }
 						value={ name }
-						onChange={ setName }
+						onChange={ ( next ) => {
+							setName( next );
+							if ( ! slugTouched ) {
+								setSlug( suggestSlug( next ) );
+							}
+						} }
+						disabled={ busy }
+						onKeyDown={ ( event ) => {
+							if ( event.key === 'Enter' ) {
+								event.preventDefault();
+								create();
+							}
+						} }
+					/>
+					<TextControl
+						__nextHasNoMarginBottom
+						__next40pxDefaultSize
+						label={ __( 'Slug', 'pattern-builder' ) }
+						value={ slug }
+						onChange={ ( next ) => {
+							setSlugTouched( true );
+							setSlug( next );
+						} }
 						disabled={ busy }
 						onKeyDown={ ( event ) => {
 							if ( event.key === 'Enter' ) {

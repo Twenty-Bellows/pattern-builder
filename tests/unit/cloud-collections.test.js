@@ -10,6 +10,8 @@ import {
 	pickDefaultCollection,
 	planInstall,
 	shouldAskForCollection,
+	slugProblem,
+	suggestSlug,
 	summarizeInstall,
 	unionTokens,
 } from '../../src/cloud/collections';
@@ -118,5 +120,42 @@ describe( 'collectionKey', () => {
 		expect( collectionKey( starter ) ).toBe( '2/starter-sections' );
 		expect( collectionKey( { owner: 2 } ) ).toBe( '' );
 		expect( collectionKey( null ) ).toBe( '' );
+	} );
+} );
+
+describe( 'suggestSlug', () => {
+	it( 'turns a name into a slug worth suggesting', () => {
+		expect( suggestSlug( 'Starter Sections' ) ).toBe( 'starter-sections' );
+		expect( suggestSlug( 'Héros & Co.' ) ).toBe( 'heros-co' );
+		expect( suggestSlug( '  Spaced  Out  ' ) ).toBe( 'spaced-out' );
+	} );
+
+	it( 'drops a leading number, because a slug starts with a letter', () => {
+		expect( suggestSlug( '2024 Landing Pages' ) ).toBe( 'landing-pages' );
+	} );
+
+	it( 'gives back nothing when there is nothing to work with', () => {
+		expect( suggestSlug( '###' ) ).toBe( '' );
+		expect( suggestSlug( '' ) ).toBe( '' );
+		expect( suggestSlug( null ) ).toBe( '' );
+	} );
+} );
+
+describe( 'slugProblem', () => {
+	it( 'passes a slug the service would accept', () => {
+		expect( slugProblem( 'heroes' ) ).toBe( '' );
+		expect( slugProblem( 'landing-pages-2024' ) ).toBe( '' );
+	} );
+
+	it( 'names what is wrong', () => {
+		expect( slugProblem( '' ) ).toContain( 'Give the collection a slug' );
+		expect( slugProblem( 'ab' ) ).toContain( 'between' );
+		expect( slugProblem( 'a'.repeat( 33 ) ) ).toContain( 'between' );
+		expect( slugProblem( 'Heroes' ) ).toContain( 'lower-case' );
+		expect( slugProblem( '2024-heroes' ) ).toContain(
+			'starts with a letter'
+		);
+		expect( slugProblem( 'hero--big' ) ).toContain( 'single hyphens' );
+		expect( slugProblem( 'personal' ) ).toContain( 'Personal collection' );
 	} );
 } );

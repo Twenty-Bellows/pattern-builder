@@ -218,7 +218,7 @@ class Pattern_Builder_Cloud_Porter {
 			 * (Pattern_File_Store::update_theme_pattern), so the package's
 			 * blocks stay as they arrived — an id would name nothing.
 			 */
-			return $this->import_as_theme_pattern( $pbp, $title, $slug, $description, $categories, $synced, $content );
+			return $this->import_as_theme_pattern( $pbp, $title, $this->install_name( $pbp, $slug ), $description, $categories, $synced, $content );
 		}
 
 		// A user pattern's images did land in the media library, so its blocks
@@ -990,22 +990,59 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
+	 * The name a downloaded pattern is installed under.
+	 *
+	 * The package carries the name the pattern has on the service —
+	 * `{handle}/{collection}/{slug}` — and that is the name it keeps here,
+	 * because it is the name anything referring to this pattern uses. It
+	 * is also why two accounts can both publish a `hero` and this site can
+	 * hold both: they are different names, in different directories.
+	 *
+	 * A package from before namespacing carries no name, and falls back to
+	 * the theme's own namespace, which is where such a download landed.
+	 *
+	 * @param array  $pbp  Package.
+	 * @param string $slug Sanitized slug.
+	 * @return string
+	 */
+	private function install_name( $pbp, $slug ) {
+		$namespace = isset( $pbp['namespace'] ) ? (string) $pbp['namespace'] : '';
+
+		$segments = array_values( array_filter( explode( '/', $namespace ), 'strlen' ) );
+		$segments = array_map(
+			static function ( $segment ) {
+				return preg_replace( '/[^a-z0-9_-]/', '', strtolower( $segment ) );
+			},
+			$segments
+		);
+		$segments = array_values( array_filter( $segments, 'strlen' ) );
+
+		// Two segments and a slug, or the package is not naming a namespace
+		// this site should file anything under.
+		if ( count( $segments ) < 2 ) {
+			return get_stylesheet() . '/' . $slug;
+		}
+
+		return implode( '/', $segments );
+	}
+
+	/**
 	 * Land a package as a theme pattern file.
 	 *
 	 * @param array    $pbp         Package (for viewport/keywords extras).
 	 * @param string   $title       Title.
-	 * @param string   $slug        Slug.
+	 * @param string   $name        Namespaced pattern name to install under.
 	 * @param string   $description Description.
 	 * @param string[] $categories  Category names.
 	 * @param bool     $synced      Synced flag.
 	 * @param string   $content     Sanitized markup with local URLs.
 	 * @return array|WP_Error
 	 */
-	private function import_as_theme_pattern( $pbp, $title, $slug, $description, $categories, $synced, $content ) {
+	private function import_as_theme_pattern( $pbp, $title, $name, $description, $categories, $synced, $content ) {
 		$pattern = new Abstract_Pattern(
 			array(
-				'id'            => get_stylesheet() . '/' . $slug,
-				'name'          => get_stylesheet() . '/' . $slug,
+				'id'            => $name,
+				'name'          => $name,
 				'title'         => $title,
 				'description'   => $description,
 				'content'       => $content,
