@@ -549,28 +549,58 @@ class Pattern_Builder_Cloud_Controller {
 	 */
 	public function upload( $request ) {
 		if ( ! Pattern_Builder_Cloud::is_connected() ) {
-			return new WP_Error( 'pb_cloud_disconnected', __( 'Connect to patternbuilderwp.com first.', 'pattern-builder' ), array( 'status' => 400 ) );
+			return self::disconnected();
 		}
 
 		$type = 'user' === $request->get_param( 'patternType' ) ? 'user' : 'theme';
 		$id   = 'user' === $type ? (int) $request->get_param( 'patternId' ) : (string) $request->get_param( 'patternId' );
 
+		$collection = $request->get_param( 'collection' );
+		$result     = self::upload_pattern(
+			$type,
+			$id,
+			( null === $collection || '' === $collection ) ? null : $collection,
+			(bool) $request->get_param( 'asNew' )
+		);
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return rest_ensure_response( $result );
+	}
+
+	/**
+	 * Send a local pattern to the account's library: the work behind the
+	 * upload route, shared with the upload-pattern ability.
+	 *
+	 * A pattern already linked to a cloud copy updates it (unless `as_new`),
+	 * keeping its collection unless one is named; a pattern not yet linked
+	 * is created in the named collection, or Personal when none is — the
+	 * one case nothing asks. The link map records the cloud id, the content
+	 * hash and the collection.
+	 *
+	 * @param string     $type       'theme' or 'user'.
+	 * @param string|int $id         Local identifier.
+	 * @param mixed      $collection A collection id or `personal`, or null to leave it unsaid.
+	 * @param bool       $as_new     Force a new cloud copy even when linked.
+	 * @return array|WP_Error { pattern, updated, localKey }
+	 */
+	public static function upload_pattern( $type, $id, $collection = null, $as_new = false ) {
 		$porter   = new Pattern_Builder_Cloud_Porter();
 		$exported = $porter->export_local( $type, $id );
 		if ( is_wp_error( $exported ) ) {
 			return $exported;
 		}
 
-		$collection = $request->get_param( 'collection' );
-		$collection = ( null === $collection || '' === $collection ) ? 'personal' : ( is_numeric( $collection ) ? (int) $collection : sanitize_key( $collection ) );
+		$named      = null !== $collection;
+		$collection = ! $named ? 'personal' : ( is_numeric( $collection ) ? (int) $collection : sanitize_key( $collection ) );
 
 		$links    = Pattern_Builder_Cloud::links();
 		$existing = isset( $links[ $exported['localKey'] ] ) ? (int) $links[ $exported['localKey'] ]['cloudId'] : 0;
-		$as_new   = (bool) $request->get_param( 'asNew' );
 
 		if ( $existing && ! $as_new ) {
 			// An update keeps the pattern's collection unless asked to move it.
-			$fields = null !== $request->get_param( 'collection' ) && '' !== $request->get_param( 'collection' ) ? array( 'collection' => $collection ) : array();
+			$fields = $named ? array( 'collection' => $collection ) : array();
 			// POST, not PUT: PHP only parses multipart bodies on POST.
 			$result = Pattern_Builder_Cloud::upload( 'POST', '/library/patterns/' . $existing, $exported['pbp'], $exported['files'], $fields );
 			// The cloud copy may have been deleted remotely; fall through to create.
@@ -615,12 +645,10 @@ class Pattern_Builder_Cloud_Controller {
 			)
 		);
 
-		return rest_ensure_response(
-			array(
-				'pattern'  => $result,
-				'updated'  => (bool) $existing && ! $as_new,
-				'localKey' => $exported['localKey'],
-			)
+		return array(
+			'pattern'  => $result,
+			'updated'  => (bool) $existing && ! $as_new,
+			'localKey' => $exported['localKey'],
 		);
 	}
 

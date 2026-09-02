@@ -71,6 +71,14 @@ class Test_Abilities extends WP_UnitTestCase {
 			'pattern-builder/get-editor-scripts',
 			'pattern-builder/create-pattern',
 			'pattern-builder/update-pattern',
+			// The cloud, through this site's connection.
+			'pattern-builder/list-collections',
+			'pattern-builder/get-collection',
+			'pattern-builder/search-cloud-patterns',
+			'pattern-builder/install-collection',
+			'pattern-builder/install-cloud-pattern',
+			'pattern-builder/upload-pattern',
+			'pattern-builder/create-collection',
 		);
 
 		foreach ( $expected as $name ) {
