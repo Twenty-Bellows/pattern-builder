@@ -1,26 +1,26 @@
 {
-  "skill_name": "pattern-author",
-  "evals": [
-    {
-      "id": 0,
-      "name": "slotted-pricing-section",
-      "prompt": "I need a pricing section pattern for the patternbuilderwp theme at /home/user/patternbuilderwp.com/wp-content/themes/patternbuilderwp — two plans side by side, each with a plan name, a price, a short list of what's included, and a call-to-action button. Match how the theme already does things. Write the finished pattern file(s) to OUTPUT_DIR (don't modify the theme itself).",
-      "expected_output": "Valid block markup using only patternbuilderwp's own token slugs, following the theme's slotted design/content split.",
-      "files": []
-    },
-    {
-      "id": 1,
-      "name": "hero-thin-design-system",
-      "prompt": "Write a hero pattern for the theme at /home/user/pattern-builder/dev-assets/themes/simple-theme — big headline, a sentence under it, and a button. Save the pattern file to OUTPUT_DIR (don't modify the theme).",
-      "expected_output": "Valid block markup. The theme's theme.json has almost no presets, so it should not invent token slugs that don't exist.",
-      "files": []
-    },
-    {
-      "id": 2,
-      "name": "styled-band-supports-classes",
-      "prompt": "Make me a full-width call-to-action band pattern for the patternbuilderwp theme at /home/user/patternbuilderwp.com/wp-content/themes/patternbuilderwp. Dark background, centered white heading, and a button below it. Generous vertical padding. Save it to OUTPUT_DIR.",
-      "expected_output": "Valid markup where every color/spacing/font attribute is paired with its matching class and preset variable spelling.",
-      "files": []
-    }
-  ]
+	"skill_name": "pattern-author",
+	"evals": [
+		{
+			"id": 0,
+			"name": "slotted-pricing-section",
+			"prompt": "I need a pricing section pattern for the patternbuilderwp theme at /home/user/patternbuilderwp.com/wp-content/themes/patternbuilderwp — two plans side by side, each with a plan name, a price, a short list of what's included, and a call-to-action button. Match how the theme already does things. Write the finished pattern file(s) to OUTPUT_DIR (don't modify the theme itself).",
+			"expected_output": "Valid block markup using only patternbuilderwp's own token slugs, following the theme's slotted design/content split.",
+			"files": []
+		},
+		{
+			"id": 1,
+			"name": "hero-thin-design-system",
+			"prompt": "Write a hero pattern for the theme at /home/user/pattern-builder/dev-assets/themes/simple-theme — big headline, a sentence under it, and a button. Save the pattern file to OUTPUT_DIR (don't modify the theme).",
+			"expected_output": "Valid block markup. The theme's theme.json has almost no presets, so it should not invent token slugs that don't exist.",
+			"files": []
+		},
+		{
+			"id": 2,
+			"name": "styled-band-supports-classes",
+			"prompt": "Make me a full-width call-to-action band pattern for the patternbuilderwp theme at /home/user/patternbuilderwp.com/wp-content/themes/patternbuilderwp. Dark background, centered white heading, and a button below it. Generous vertical padding. Save it to OUTPUT_DIR.",
+			"expected_output": "Valid markup where every color/spacing/font attribute is paired with its matching class and preset variable spelling.",
+			"files": []
+		}
+	]
 }

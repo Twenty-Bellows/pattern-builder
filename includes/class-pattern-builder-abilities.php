@@ -693,6 +693,7 @@ class Pattern_Builder_Abilities {
 				 */
 				'validate' => array(
 					'why'      => __( 'Validate markup before storing it. A block is valid only if re-running its save() reproduces the markup, and save() is JavaScript — no server can run it, so nothing here checks this for you. Invalid markup renders correctly on the front end and fails the moment an editor opens the pattern.', 'pattern-builder' ),
+					'before'   => array( 'pattern-builder/create-pattern', 'pattern-builder/update-pattern', 'pattern-builder/upload-pattern' ),
 					'tool'     => 'pattern-builder/get-validator',
 					'scripts'  => 'pattern-builder/get-editor-scripts',
 					'requires' => 'node, jsdom',
