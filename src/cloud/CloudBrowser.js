@@ -470,7 +470,7 @@ export function CloudCard( { pattern, isSelected, onSelect } ) {
  * @param {Function} props.onDelete    Called with the pattern (library only).
  * @param {Function} props.onEditLocal Called with { source, id } of the local copy.
  * @param {boolean}  props.busy        Whether an action is in flight.
- * @param {Element}  props.children    Extra panels (the Uploaded tab's move control).
+ * @param {Element}  props.children    Extra panels the tab renders in the sidebar.
  */
 export function CloudDetails( {
 	pattern,

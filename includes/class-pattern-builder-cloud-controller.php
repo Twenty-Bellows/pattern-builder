@@ -79,11 +79,6 @@ class Pattern_Builder_Cloud_Controller {
 					'permission_callback' => $can_manage,
 					'callback'            => array( $this, 'delete_library_pattern' ),
 				),
-				array(
-					'methods'             => array( 'PUT', 'POST' ),
-					'permission_callback' => $can_manage,
-					'callback'            => array( $this, 'move_library_pattern' ),
-				),
 			)
 		);
 
@@ -336,11 +331,13 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * DELETE /cloud/library/collections/{id}?patterns=delete|move
+	 * DELETE /cloud/library/collections/{id} — the collection and its
+	 * patterns.
 	 *
-	 * A refused move (past the Personal cap) is relayed as it came, with
-	 * the upgrade link; delete remains available. Links to patterns the
-	 * service deleted are forgotten here too.
+	 * There is no keeping them: a pattern's collection is the middle
+	 * segment of its permanent name (D38), so moving one to Personal would
+	 * rename it. Links to patterns the service deleted are forgotten here
+	 * too.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -350,43 +347,17 @@ class Pattern_Builder_Cloud_Controller {
 			return self::disconnected();
 		}
 
-		$patterns = 'move' === $request->get_param( 'patterns' ) ? 'move' : 'delete';
-		$result   = Pattern_Builder_Cloud::request(
+		// Its patterns go with it (D38): moving one to Personal would rename
+		// it, so there is nothing to ask and nothing to relay.
+		$result = Pattern_Builder_Cloud::request(
 			'DELETE',
-			'/library/collections/' . (int) $request['id'],
-			array( 'query' => array( 'patterns' => $patterns ) )
+			'/library/collections/' . (int) $request['id']
 		);
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
 
 		return rest_ensure_response( $result );
-	}
-
-	/**
-	 * PUT /cloud/library/{id} — move a cloud pattern into another of the
-	 * account's collections. Params: collection (an id, or `personal`).
-	 *
-	 * @param WP_REST_Request $request Request.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public function move_library_pattern( $request ) {
-		if ( ! Pattern_Builder_Cloud::is_connected() ) {
-			return self::disconnected();
-		}
-
-		$collection = $request->get_param( 'collection' );
-		if ( null === $collection || '' === $collection ) {
-			return new WP_Error( 'pb_cloud_bad_request', __( 'Which collection?', 'pattern-builder' ), array( 'status' => 400 ) );
-		}
-
-		return rest_ensure_response(
-			Pattern_Builder_Cloud::request(
-				'PUT',
-				'/library/patterns/' . (int) $request['id'],
-				array( 'body' => array( 'collection' => is_numeric( $collection ) ? (int) $collection : sanitize_key( $collection ) ) )
-			)
-		);
 	}
 
 	/**
