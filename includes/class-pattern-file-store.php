@@ -22,6 +22,12 @@ require_once ABSPATH . 'wp-admin/includes/file.php';
 class Pattern_File_Store {
 
 	/**
+	 * Post meta holding a user pattern's attribution — the same thing the
+	 * `Origin:` header holds for a theme pattern (D38).
+	 */
+	const META_ORIGIN = 'pattern_builder_origin';
+
+	/**
 	 * Returns all patterns found as PHP files in the active theme's and the
 	 * parent theme's `patterns/` directories.
 	 *
@@ -444,12 +450,16 @@ class Pattern_File_Store {
 		$viewportWidth = $pattern->viewportWidth ? "\n * Viewport Width: " . (int) $pattern->viewportWidth : '';
 		$inserter      = $pattern->inserter ? '' : "\n * Inserter: no";
 		$synced        = $pattern->synced ? "\n * Synced: yes" : '';
+		// Attribution travels with the pattern, so it goes in the file (D38).
+		// Core reads a fixed list of headers and ignores the rest, so this is
+		// inert to WordPress and legible to anyone who opens the file.
+		$origin        = $pattern->origin ? "\n * Origin: " . $pattern->origin : '';
 
 		$metadata  = "<?php\n";
 		$metadata .= "/**\n";
 		$metadata .= " * Title: $pattern->title\n";
 		$metadata .= " * Slug: $pattern->name\n";
-		$metadata .= " * Description: $pattern->description$categories$keywords$blockTypes$postTypes$templateTypes$viewportWidth$inserter$synced\n";
+		$metadata .= " * Description: $pattern->description$categories$keywords$blockTypes$postTypes$templateTypes$viewportWidth$inserter$synced$origin\n";
 		$metadata .= " */\n";
 		$metadata .= "?>\n";
 		return $metadata;

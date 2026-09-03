@@ -560,4 +560,129 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		$this->assertWPError( $result );
 		$this->assertSame( 'pb_cloud_foreign_asset', $result->get_error_code() );
 	}
+
+	/**
+	 * Stand in a writable theme directory for the duration of a test.
+	 *
+	 * @param string $handle The connected account's handle, or '' for none.
+	 * @return array { dir: string, cleanup: callable }
+	 */
+	private function in_a_theme( $handle = '' ) {
+		$dir = sys_get_temp_dir() . '/pattern-builder-origin-test';
+		if ( ! is_dir( $dir . '/patterns' ) ) {
+			mkdir( $dir . '/patterns', 0777, true );
+		}
+
+		$dir_filter  = static function () use ( $dir ) {
+			return $dir;
+		};
+		$slug_filter = static function () {
+			return 'simple-theme';
+		};
+		add_filter( 'stylesheet_directory', $dir_filter );
+		add_filter( 'stylesheet', $slug_filter );
+
+		if ( '' !== $handle ) {
+			update_user_meta(
+				get_current_user_id(),
+				\TwentyBellows\PatternBuilder\Pattern_Builder_Cloud::META_ACCOUNT,
+				array(
+					'id'     => 7,
+					'handle' => $handle,
+				)
+			);
+		}
+
+		return array(
+			'dir'     => $dir,
+			'cleanup' => static function () use ( $dir_filter, $slug_filter ) {
+				remove_filter( 'stylesheet_directory', $dir_filter );
+				remove_filter( 'stylesheet', $slug_filter );
+			},
+		);
+	}
+
+	public function test_a_pattern_from_another_account_is_stamped_with_its_name() {
+		$theme  = $this->in_a_theme( 'studio-b' );
+		$porter = new Pattern_Builder_Cloud_Porter();
+
+		$pbp              = $this->make_downloaded_pbp();
+		$pbp['namespace'] = 'studio-a/heroes/downloaded-hero';
+
+		$result = $porter->import_pbp( $pbp, 'theme' );
+		$theme['cleanup']();
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+
+		$file = $theme['dir'] . '/patterns/studio-a/heroes/downloaded-hero.php';
+		$this->assertFileExists( $file );
+		$this->assertStringContainsString( 'Origin: studio-a/heroes/downloaded-hero', file_get_contents( $file ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+
+		// And it reads back off the file, so it survives the round trip.
+		$pattern = \TwentyBellows\PatternBuilder\Abstract_Pattern::from_file( $file );
+		$this->assertSame( 'studio-a/heroes/downloaded-hero', $pattern->origin );
+
+		unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+	}
+
+	public function test_an_origin_already_on_the_package_is_carried_unchanged() {
+		$theme  = $this->in_a_theme( 'studio-c' );
+		$porter = new Pattern_Builder_Cloud_Porter();
+
+		// Three accounts deep: the credit still names the first.
+		$pbp              = $this->make_downloaded_pbp();
+		$pbp['namespace'] = 'studio-b/mine/downloaded-hero';
+		$pbp['origin']    = array( 'pattern' => 'studio-a/heroes/downloaded-hero' );
+
+		$result = $porter->import_pbp( $pbp, 'theme' );
+		$theme['cleanup']();
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+
+		$file = $theme['dir'] . '/patterns/studio-b/mine/downloaded-hero.php';
+		$this->assertStringContainsString( 'Origin: studio-a/heroes/downloaded-hero', file_get_contents( $file ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+
+		unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+	}
+
+	public function test_your_own_pattern_coming_home_is_not_stamped() {
+		$theme  = $this->in_a_theme( 'studio-a' );
+		$porter = new Pattern_Builder_Cloud_Porter();
+
+		$pbp              = $this->make_downloaded_pbp();
+		$pbp['namespace'] = 'studio-a/heroes/downloaded-hero';
+
+		$result = $porter->import_pbp( $pbp, 'theme' );
+		$theme['cleanup']();
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+
+		$file = $theme['dir'] . '/patterns/studio-a/heroes/downloaded-hero.php';
+		$this->assertStringNotContainsString( 'Origin:', file_get_contents( $file ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+
+		unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+	}
+
+	public function test_a_user_pattern_records_its_origin_as_meta() {
+		update_user_meta(
+			get_current_user_id(),
+			\TwentyBellows\PatternBuilder\Pattern_Builder_Cloud::META_ACCOUNT,
+			array(
+				'id'     => 7,
+				'handle' => 'studio-b',
+			)
+		);
+
+		$porter           = new Pattern_Builder_Cloud_Porter();
+		$pbp              = $this->make_downloaded_pbp();
+		$pbp['namespace'] = 'studio-a/heroes/downloaded-hero';
+
+		$result = $porter->import_pbp( $pbp, 'user' );
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$this->assertSame(
+			'studio-a/heroes/downloaded-hero',
+			get_post_meta( $result['id'], \TwentyBellows\PatternBuilder\Pattern_File_Store::META_ORIGIN, true )
+		);
+	}
 }
