@@ -80,6 +80,7 @@ class Pattern_Builder_Abilities {
 		$this->register_update_pattern();
 		$this->register_add_design_tokens();
 		$this->register_set_global_styles();
+		$this->register_add_block_style_variation();
 		$this->register_find_media();
 		$this->register_add_asset();
 		$this->register_add_placeholder_image();
@@ -1738,6 +1739,111 @@ class Pattern_Builder_Abilities {
 		$destination = ( isset( $input['destination'] ) && 'user' === $input['destination'] ) ? 'user' : 'theme';
 
 		return Pattern_Builder_Theme_Styles::apply( $styles, $destination );
+	}
+
+	/**
+	 * Add a named look a pattern applies with a class.
+	 *
+	 * The third way to style a button, and the only one that both describes a
+	 * second kind and stays scoped to the markup that asks for it. Attributes
+	 * fossilise the design into the pattern; `styles.elements.button` is one
+	 * rule for every button on the site and cannot describe a second kind at
+	 * all.
+	 */
+	private function register_add_block_style_variation() {
+		wp_register_ability(
+			'pattern-builder/add-block-style-variation',
+			array(
+				'label'               => __( 'Add a block style variation', 'pattern-builder' ),
+				'description'         => __( 'Registers a named block style — a second kind of button, a card treatment, an inset quote — that a pattern applies by putting the returned class on a block. Use this instead of setting the same attributes on every block: the styling lives in one place, the editor offers it by name, and it applies only where the class is, so it changes nothing else on the site. Writes a theme.json partial into the active theme\'s styles directory, which is what registers a variation without PHP. Call get-design-system first: its blockStyles lists what is already here, and reusing one of WordPress\'s own (is-style-outline and the like) beats defining a new one. Raw CSS is refused.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'slug'        => array(
+							'type'        => 'string',
+							'description' => 'The name, which the class is built from: "button-secondary" gives class "is-style-button-secondary".',
+						),
+						'blockTypes'  => array(
+							'type'        => 'array',
+							'description' => 'The blocks this applies to, e.g. ["core/button"]. At least one — WordPress skips a variation that names none.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'styles'      => array(
+							'type'        => 'object',
+							'description' => 'A theme.json "styles" subtree for this variation — for example { "color": { "background": "var:preset|color|accent" }, "border": { "radius": "999px" } }. Reference presets rather than hard-coding values.',
+						),
+						'title'       => array(
+							'type'        => 'string',
+							'description' => 'The label shown in the editor\'s style picker. Derived from the slug when omitted.',
+						),
+						'description' => array(
+							'type'        => 'string',
+							'description' => 'What the variation is for.',
+						),
+					),
+					'required'             => array( 'slug', 'blockTypes', 'styles' ),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'slug'       => array( 'type' => 'string' ),
+						'title'      => array( 'type' => 'string' ),
+						'class'      => array(
+							'type'        => 'string',
+							'description' => 'The class to put on the block. This is what a pattern carries.',
+						),
+						'blockTypes' => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'string' ),
+						),
+						'path'       => array(
+							'type'        => 'string',
+							'description' => 'The partial written, relative to the theme.',
+						),
+						'written'    => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'string' ),
+						),
+						'skipped'    => array(
+							'type'        => 'array',
+							'description' => 'Style paths WordPress does not recognise, which were dropped.',
+							'items'       => array( 'type' => 'string' ),
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_add_block_style_variation' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Write the variation into the theme.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_add_block_style_variation( $input ) {
+		return Pattern_Builder_Block_Style_Variations::add(
+			array(
+				'slug'        => isset( $input['slug'] ) ? $input['slug'] : '',
+				'blockTypes'  => isset( $input['blockTypes'] ) ? $input['blockTypes'] : array(),
+				'styles'      => isset( $input['styles'] ) ? $input['styles'] : array(),
+				'title'       => isset( $input['title'] ) ? $input['title'] : '',
+				'description' => isset( $input['description'] ) ? $input['description'] : '',
+			)
+		);
 	}
 
 	/**

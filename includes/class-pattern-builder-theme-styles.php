@@ -44,17 +44,9 @@ class Pattern_Builder_Theme_Styles {
 			return new WP_Error( 'pb_styles_empty', __( 'No styles were given.', 'pattern-builder' ), array( 'status' => 400 ) );
 		}
 
-		$css = self::find_css( $styles );
-		if ( $css ) {
-			return new WP_Error(
-				'pb_styles_css_refused',
-				sprintf(
-					/* translators: %s: dotted paths within the styles tree, comma separated. */
-					__( 'Raw CSS is not accepted here (%s). WordPress does not sanitize a theme.json "css" property and gates it on the edit_css capability, so it is refused rather than written. Express the design with the styles properties instead.', 'pattern-builder' ),
-					implode( ', ', $css )
-				),
-				array( 'status' => 400 )
-			);
+		$css = self::check_css( $styles );
+		if ( is_wp_error( $css ) ) {
+			return $css;
 		}
 
 		$clean = self::sanitize( $styles );
@@ -94,6 +86,36 @@ class Pattern_Builder_Theme_Styles {
 			'destination' => $destination,
 			'written'     => self::paths( $clean ),
 			'skipped'     => $skipped,
+		);
+	}
+
+	/**
+	 * Refuse a styles tree carrying raw CSS.
+	 *
+	 * Shared with the block style variation writer, which has the same
+	 * problem for the same reason: WordPress does not sanitize a theme.json
+	 * `css` property — it gates it on `edit_css` instead, and says so in a
+	 * comment — so a string that closes its own selector writes rules for the
+	 * whole document. Everything written through these abilities is meant to
+	 * be able to travel, and unsanitisable CSS cannot.
+	 *
+	 * @param array $styles A theme.json `styles` subtree.
+	 * @return true|WP_Error
+	 */
+	public static function check_css( $styles ) {
+		$found = self::find_css( $styles );
+		if ( ! $found ) {
+			return true;
+		}
+
+		return new WP_Error(
+			'pb_styles_css_refused',
+			sprintf(
+				/* translators: %s: dotted paths within the styles tree, comma separated. */
+				__( 'Raw CSS is not accepted here (%s). WordPress does not sanitize a theme.json "css" property and gates it on the edit_css capability, so it is refused rather than written. Express the design with the styles properties instead.', 'pattern-builder' ),
+				implode( ', ', $found )
+			),
+			array( 'status' => 400 )
 		);
 	}
 
@@ -150,12 +172,15 @@ class Pattern_Builder_Theme_Styles {
 	/**
 	 * Leaf paths present in the first tree and not the second.
 	 *
+	 * Public because the block style variation writer sanitizes the same way
+	 * and owes an agent the same account of what was dropped.
+	 *
 	 * @param array  $given  What was asked for.
 	 * @param array  $kept   What survived sanitization.
 	 * @param string $prefix Path so far.
 	 * @return string[]
 	 */
-	private static function missing_paths( $given, $kept, $prefix = '' ) {
+	public static function missing_paths( $given, $kept, $prefix = '' ) {
 		$missing = array();
 
 		foreach ( $given as $key => $value ) {
@@ -180,7 +205,7 @@ class Pattern_Builder_Theme_Styles {
 	 * @param string $prefix Path so far.
 	 * @return string[]
 	 */
-	private static function paths( $node, $prefix = '' ) {
+	public static function paths( $node, $prefix = '' ) {
 		$paths = array();
 
 		foreach ( $node as $key => $value ) {

@@ -136,6 +136,7 @@ class Test_Abilities extends WP_UnitTestCase {
 			'pattern-builder/update-pattern',
 			'pattern-builder/add-design-tokens',
 			'pattern-builder/set-global-styles',
+			'pattern-builder/add-block-style-variation',
 			// Media and fonts: what a pattern points at.
 			'pattern-builder/find-media',
 			'pattern-builder/add-asset',
@@ -173,7 +174,7 @@ class Test_Abilities extends WP_UnitTestCase {
 			$this->assertTrue( $meta['show_in_rest'], $read . ' must be reachable over REST.' );
 		}
 
-		foreach ( array( 'create-pattern', 'update-pattern', 'add-design-tokens', 'set-global-styles', 'add-asset', 'add-placeholder-image', 'add-font' ) as $write ) {
+		foreach ( array( 'create-pattern', 'update-pattern', 'add-design-tokens', 'set-global-styles', 'add-block-style-variation', 'add-asset', 'add-placeholder-image', 'add-font' ) as $write ) {
 			$meta = wp_get_ability( 'pattern-builder/' . $write )->get_meta();
 			$this->assertFalse( $meta['annotations']['readonly'], $write . ' is not a read.' );
 			$this->assertFalse(

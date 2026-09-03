@@ -175,8 +175,16 @@ class Pattern_Builder_Security {
 
 		global $wp_filesystem;
 
-		// Ensure directory exists.
-		$dir = dirname( $path );
+		/*
+		 * Ensure the directory exists. `wp_mkdir_p()` refuses outright any
+		 * path carrying a `..` segment, so a theme root that reaches its
+		 * themes through one — as a registered theme root may, and as the
+		 * test fixtures do — would fail to create the directory rather than
+		 * be denied it, with "could not create" standing in for a traversal
+		 * guard that was never the point. Resolving collapses it the same way
+		 * `validate_file_path()` already did before allowing the write.
+		 */
+		$dir = self::resolve_as_far_as_it_exists( wp_normalize_path( dirname( $path ) ) );
 		if ( ! $wp_filesystem->is_dir( $dir ) ) {
 			if ( ! wp_mkdir_p( $dir ) ) {
 				return new WP_Error(
