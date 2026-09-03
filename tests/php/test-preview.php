@@ -209,6 +209,76 @@ class Test_Preview extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A pattern carries its own presets into a theme that has none.
+	 *
+	 * This is what makes the blank render mean anything. Without it, previewing
+	 * against a theme with no design system shows every reference resolving to
+	 * nothing — which is not the pattern's intent, it is the pattern stripped.
+	 * With it, the render is the pattern's own values with nothing on top: what
+	 * an upload ships, and what a download would install at the far end.
+	 */
+	public function test_a_pattern_carries_its_presets_into_a_blank_render() {
+		$pattern = $this->a_pattern(
+			'<!-- wp:paragraph {"backgroundColor":"carried-probe"} --><p class="has-carried-probe-background-color has-background">Body copy.</p><!-- /wp:paragraph -->'
+		);
+
+		// A preset this site defines and blank-theme does not.
+		$carried = array(
+			array(
+				'type'  => 'color',
+				'slug'  => 'carried-probe',
+				'name'  => 'Carried Probe',
+				'value' => '#123456',
+			),
+		);
+
+		$this->call( 'wear_theme', array( 'blank-theme' ) );
+		$this->call( 'carry_tokens', array( $carried ) );
+
+		$css = wp_get_global_stylesheet( array( 'variables' ) );
+
+		$this->call( 'take_theme_off' );
+
+		$this->assertStringContainsString( '--wp--preset--color--carried-probe: #123456', $css );
+	}
+
+	/**
+	 * What the destination already defines wins, exactly as a download does.
+	 */
+	public function test_a_carried_preset_never_overwrites_the_themes_own() {
+		$carried = array(
+			array(
+				'type'  => 'color',
+				'slug'  => 'base',
+				'name'  => 'Base',
+				'value' => '#ff0000',
+			),
+		);
+
+		$this->call( 'wear_theme', array( 'opinionated-theme' ) );
+		$this->call( 'carry_tokens', array( $carried ) );
+
+		$css = wp_get_global_stylesheet( array( 'variables' ) );
+
+		$this->call( 'take_theme_off' );
+
+		$this->assertStringNotContainsString( '--wp--preset--color--base: #ff0000', $css );
+		$this->assertStringContainsString( '--wp--preset--color--base: #fbf7f0', $css );
+	}
+
+	/**
+	 * And carrying stops when the theme comes off.
+	 */
+	public function test_carried_presets_do_not_outlive_the_render() {
+		$this->call( 'wear_theme', array( 'blank-theme' ) );
+		$this->call( 'carry_tokens', array( array( array( 'type' => 'color', 'slug' => 'leak-probe', 'name' => 'Leak', 'value' => '#abcdef' ) ) ) );
+		$this->call( 'take_theme_off' );
+
+		$this->assertFalse( has_filter( 'wp_theme_json_data_theme', array( $this->preview, 'add_carried_tokens' ) ) );
+		$this->assertStringNotContainsString( 'leak-probe', wp_get_global_stylesheet( array( 'variables' ) ) );
+	}
+
+	/**
 	 * A theme nobody has is a 404 that names what there is.
 	 */
 	public function test_an_unknown_theme_is_refused() {

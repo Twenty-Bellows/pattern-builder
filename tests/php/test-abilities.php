@@ -449,6 +449,50 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'context=page', $rendered['preview']['page'] );
 	}
 
+	/**
+	 * Rendering says which tokens this site is missing, before an upload can be.
+	 *
+	 * An upload looks every referenced preset up here and skips what it cannot
+	 * find, so a pattern naming a token the authoring site lacks ships no value
+	 * for it and arrives referencing nothing. Both ends are silent about it;
+	 * this is where it can still be caught.
+	 */
+	public function test_rendering_reports_tokens_this_site_does_not_define() {
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Token Probe',
+				'content' => '<!-- wp:paragraph {"backgroundColor":"nothing-defines-this"} --><p class="has-nothing-defines-this-background-color has-background">Copy.</p><!-- /wp:paragraph -->',
+				'source'  => 'user',
+			)
+		);
+
+		$rendered = $this->abilities->execute_render_pattern( array( 'id' => (string) $created['pattern']['id'] ) );
+
+		$this->assertArrayHasKey( 'tokens', $rendered );
+
+		$undefined = wp_list_pluck( $rendered['tokens']['undefined'], 'slug' );
+		$this->assertContains( 'nothing-defines-this', $undefined );
+		$this->assertArrayHasKey( 'note', $rendered['tokens'] );
+	}
+
+	/**
+	 * And says nothing when every reference resolves.
+	 */
+	public function test_rendering_reports_no_undefined_tokens_for_a_clean_pattern() {
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Clean Token Pattern',
+				'content' => '<!-- wp:paragraph --><p>No presets at all.</p><!-- /wp:paragraph -->',
+				'source'  => 'user',
+			)
+		);
+
+		$rendered = $this->abilities->execute_render_pattern( array( 'id' => (string) $created['pattern']['id'] ) );
+
+		$this->assertSame( array(), $rendered['tokens']['undefined'] );
+		$this->assertArrayNotHasKey( 'note', $rendered['tokens'] );
+	}
+
 	public function test_rendering_resolves_blocks() {
 		$created = $this->abilities->execute_create_pattern(
 			array(

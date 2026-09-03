@@ -6,9 +6,28 @@ a slug it does not resolves to **nothing at all**, silently. No error, no
 warning, no fallback: the block simply renders with no background, or at the
 default size, looking like a design mistake rather than a missing reference.
 
-So the question "which slugs can I rely on?" decides whether a pattern travels.
-WordPress does not answer it. Core defines presets, themes define presets, and
-nothing reconciles the two or enforces a vocabulary.
+WordPress does not reconcile this. Core defines presets, themes define presets,
+and nothing enforces a vocabulary.
+
+**A pattern that travels through the cloud carries its tokens with it**, which
+changes the question. On upload, every preset the pattern references is looked
+up *in the authoring site* and shipped with it, value and all. On download, the
+ones the destination lacks are installed and the ones it already has are left
+alone. So the destination is not where a token goes missing.
+
+Two things follow, and they are the whole of the discipline:
+
+1. **Every preset a pattern references must exist on the site it is authored
+   on.** A slug the authoring site does not define ships no value — it is
+   skipped, silently — so the pattern arrives referencing something nothing
+   defines and renders unstyled there too. The failure is made here and
+   discovered there. `render-pattern` reports it under `tokens.undefined`.
+2. **A slug the destination already defines keeps the destination's value.**
+   That is usually exactly right: the pattern adopts the site's colours and
+   sizes, which is what a design system is for. It is wrong only when the two
+   sites mean different things by the same name.
+
+Which turns the choice of slug into a choice about **who should win**.
 
 ## What the evidence says
 
@@ -88,7 +107,7 @@ two colours. The way out is not to invent slugs in place of the standard ones �
 that is how a pattern stops travelling — but to define the standard ones **and**
 the roles nothing standard covers.
 
-### Tier 1 — the portable core. Always these slugs.
+### Tier 1 — the shared vocabulary. Slugs you *want* overridden.
 
 | | Slugs |
 |---|---|
@@ -96,7 +115,11 @@ the roles nothing standard covers.
 | Font size | `small`, `medium`, `large`, `x-large`, `xx-large` |
 | Spacing | `20`, `30`, `40`, `50`, `60`, `70`, `80` |
 
-A pattern using only these works on any theme with a `theme.json`.
+These carry the *site's* identity rather than the pattern's. Use them precisely
+because they collide: a heading at `x-large` should be the destination's
+`x-large`, and a band padded with `spacing|60` should breathe the way that site
+breathes. Every theme with a `theme.json` has them, so they resolve everywhere
+even for a pattern that never went through the cloud.
 
 ### Tier 2 — roles worth adding, because no convention covers them
 
@@ -113,9 +136,12 @@ there is no portable answer to inherit — but there is a sensible one to agree 
 | `accent` | Emphasis, distinct from the action colour |
 | `hairline` | Borders, rules, separators |
 
-A pattern using these works on any theme that adopts the standard, and where one
-is missing an agent can add it with `add-design-tokens` rather than inlining a
-hex. That is the whole reason the ability exists.
+These are the pattern's *own* design intent, and they are the ones that survive
+a move intact — a destination that has never heard of `hairline` installs the
+value the pattern brought, so the pattern looks as it was drawn. Where the
+authoring site lacks one, add it with `add-design-tokens` before uploading:
+that is the whole reason the ability exists, and a token that is not in the
+design system is a token that does not travel.
 
 **`primary` is a tier-2 name here, and Twenty Twenty-Three also uses it** for
 something similar. Twenty Twenty-Four and Twenty Twenty-Five do not, which is
@@ -158,8 +184,13 @@ should call it `contrast` with `"name": "Text"`, not `text-default`.
 a theme to render against without activating it. Two themes ship with the plugin
 for exactly this:
 
-- **`blank-theme`** has no presets at all. A pattern previewed against it shows
-  what the pattern itself does. If it looks right here, the markup is right.
+- **`blank-theme`** has no presets at all, and the preview carries the pattern's
+  own into it — the same values an upload would ship, filling only what the
+  theme lacks, exactly as a download does. So what you see is the pattern with
+  its own design and nothing on top of it: **its intent**. If it looks right
+  here, the pattern is self-consistent and every token it needs is really in the
+  design system. If something renders unstyled here, that token is missing at
+  the authoring end and the pattern would arrive broken anywhere.
 - **`opinionated-theme`** follows every convention above with values chosen to
   be nobody's defaults: `base` is a warm cream, `medium` is 1.15rem, the content
   width is 560px, the body face is a serif. A pattern that references the right

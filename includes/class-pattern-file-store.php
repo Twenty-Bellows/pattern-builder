@@ -453,7 +453,7 @@ class Pattern_File_Store {
 		// Attribution travels with the pattern, so it goes in the file (D38).
 		// Core reads a fixed list of headers and ignores the rest, so this is
 		// inert to WordPress and legible to anyone who opens the file.
-		$origin        = $pattern->origin ? "\n * Origin: " . $pattern->origin : '';
+		$origin = $pattern->origin ? "\n * Origin: " . $pattern->origin : '';
 
 		$metadata  = "<?php\n";
 		$metadata .= "/**\n";

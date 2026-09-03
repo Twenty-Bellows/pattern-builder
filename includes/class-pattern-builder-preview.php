@@ -58,6 +58,13 @@ class Pattern_Builder_Preview {
 	private $worn = array();
 
 	/**
+	 * Presets the pattern brought with it, for a render against another theme.
+	 *
+	 * @var array
+	 */
+	private $carried = array();
+
+	/**
 	 * Hook the route.
 	 */
 	public function __construct() {
@@ -86,6 +93,11 @@ class Pattern_Builder_Preview {
 						'enum'        => array( 'standalone', 'page' ),
 						'default'     => 'standalone',
 						'description' => __( 'How to render it: by itself, or inside the page template.', 'pattern-builder' ),
+					),
+					'tokens'  => array(
+						'type'        => 'boolean',
+						'default'     => true,
+						'description' => __( 'Carry the presets this pattern references, at this site\'s values, into the theme being rendered against — the same ones an upload would ship, filling only what that theme lacks, as a download does. On by default: against a theme with no design system this is the difference between seeing the pattern as designed and seeing it with every reference resolving to nothing.', 'pattern-builder' ),
 					),
 					'theme'   => array(
 						'type'        => 'string',
@@ -166,10 +178,25 @@ class Pattern_Builder_Preview {
 		$theme = (string) $request->get_param( 'theme' );
 
 		if ( '' !== $theme ) {
+			/*
+			 * Collected before the swap, because the values are this site's:
+			 * they are exactly what an upload would ship. A download installs
+			 * the ones the destination lacks and leaves the rest alone, so
+			 * carrying them here renders what the pattern would actually look
+			 * like over there rather than what is left of it.
+			 */
+			$carry = $request->get_param( 'tokens' );
+			$carry = null === $carry ? true : (bool) $carry;
+			$bring = $carry ? Pattern_Builder_Cloud_Tokens::collect( (string) $pattern->content ) : array();
+
 			$wearing = $this->wear_theme( $theme );
 
 			if ( is_wp_error( $wearing ) ) {
 				return $wearing;
+			}
+
+			if ( $bring ) {
+				$this->carry_tokens( $bring );
 			}
 		}
 
@@ -283,9 +310,70 @@ class Pattern_Builder_Preview {
 	}
 
 	/**
+	 * Give the worn theme the presets the pattern brought, where it has none.
+	 *
+	 * The same rule a download follows: what the destination already defines
+	 * wins, and only the gaps are filled. Against blank-theme that means every
+	 * one of them lands, which is the point — a pattern rendered there with its
+	 * own values and nothing on top is the pattern as it was designed.
+	 *
+	 * @param array $tokens Tokens collected from the authoring site.
+	 */
+	private function carry_tokens( $tokens ) {
+		$this->carried = Pattern_Builder_Cloud_Tokens::missing( $tokens );
+
+		if ( ! $this->carried ) {
+			return;
+		}
+
+		add_filter( 'wp_theme_json_data_theme', array( $this, 'add_carried_tokens' ) );
+
+		wp_clean_theme_json_cache();
+	}
+
+	/**
+	 * Merge the carried presets into the worn theme's data.
+	 *
+	 * @param \WP_Theme_JSON_Data $theme_json The worn theme's data.
+	 * @return \WP_Theme_JSON_Data
+	 */
+	public function add_carried_tokens( $theme_json ) {
+		$types    = Pattern_Builder_Cloud_Tokens::types();
+		$settings = array();
+
+		foreach ( $this->carried as $token ) {
+			if ( ! isset( $types[ $token['type'] ] ) ) {
+				continue;
+			}
+
+			list( $group, $key ) = $types[ $token['type'] ]['path'];
+
+			$settings[ $group ][ $key ][] = array(
+				'slug'                                => $token['slug'],
+				'name'                                => isset( $token['name'] ) ? $token['name'] : $token['slug'],
+				$types[ $token['type'] ]['value_key'] => $token['value'],
+			);
+		}
+
+		if ( ! $settings ) {
+			return $theme_json;
+		}
+
+		return $theme_json->update_with(
+			array(
+				'version'  => 3,
+				'settings' => $settings,
+			)
+		);
+	}
+
+	/**
 	 * Stop wearing it, and leave the caches as they were found.
 	 */
 	private function take_theme_off() {
+		remove_filter( 'wp_theme_json_data_theme', array( $this, 'add_carried_tokens' ) );
+		$this->carried = array();
+
 		if ( isset( $this->worn['boot'] ) && function_exists( $this->worn['boot'] . '_unboot' ) ) {
 			call_user_func( $this->worn['boot'] . '_unboot' );
 		}

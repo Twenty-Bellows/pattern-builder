@@ -508,7 +508,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/render-pattern',
 			array(
 				'label'               => __( 'Render a pattern', 'pattern-builder' ),
-				'description'         => __( 'Returns the front-end HTML a stored pattern produces, with blocks resolved, and two URLs that render it as a whole page with this site\'s stylesheets — one standalone, one inside the page template. Open those in a browser to see what the pattern looks like; the HTML alone only shows which classes landed where, not what the CSS then does with them. Note that rendering correctly says nothing about whether the block markup is valid in the editor, which only a JavaScript block validator can decide.', 'pattern-builder' ),
+				'description'         => __( 'Returns the front-end HTML a stored pattern produces, with blocks resolved; which design tokens it references and whether this site defines them, since a preset missing here ships no value and arrives missing everywhere; and two URLs that render it as a whole page with this site\'s stylesheets — one standalone, one inside the page template. Open those in a browser to see what the pattern looks like; the HTML alone only shows which classes landed where, not what the CSS then does with them. Note that rendering correctly says nothing about whether the block markup is valid in the editor, which only a JavaScript block validator can decide.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -527,6 +527,10 @@ class Pattern_Builder_Abilities {
 					'type'       => 'object',
 					'properties' => array(
 						'html'    => array( 'type' => 'string' ),
+						'tokens'  => array(
+							'type'        => 'object',
+							'description' => 'The presets this pattern references: "defined" are the ones this site has, with the values an upload would ship; "undefined" are the ones it does not, which render as nothing here and would arrive as nothing anywhere else.',
+						),
 						'preview' => array(
 							'type'        => 'object',
 							'description' => 'URLs that render the pattern as a page with this site\'s styles: "standalone" for the pattern by itself, "page" for it inside the page template.',
@@ -553,6 +557,45 @@ class Pattern_Builder_Abilities {
 		}
 
 		/*
+		 * Which of the tokens this pattern references the site actually
+		 * defines. This is the check that decides whether the pattern survives
+		 * being uploaded: `Cloud_Tokens::collect()` looks every referenced slug
+		 * up in *this* design system and skips the ones it cannot find, so a
+		 * pattern naming a preset the authoring site lacks ships no value for
+		 * it and arrives somewhere else referencing nothing. The failure is
+		 * silent at both ends and it is made here, not there.
+		 */
+		$referenced = Pattern_Builder_Cloud_Tokens::referenced( $pattern->content );
+		$defined    = Pattern_Builder_Cloud_Tokens::collect( $pattern->content );
+		$has        = array();
+
+		foreach ( $defined as $token ) {
+			$has[ $token['type'] . '|' . $token['slug'] ] = true;
+		}
+
+		$undefined = array();
+
+		foreach ( $referenced as $type => $slugs ) {
+			foreach ( (array) $slugs as $slug ) {
+				if ( ! isset( $has[ $type . '|' . $slug ] ) ) {
+					$undefined[] = array(
+						'type' => $type,
+						'slug' => $slug,
+					);
+				}
+			}
+		}
+
+		$tokens = array(
+			'defined'   => $defined,
+			'undefined' => $undefined,
+		);
+
+		if ( $undefined ) {
+			$tokens['note'] = __( 'This pattern references presets this site does not define. They render as no styling at all here, and an upload carries no value for them, so they will render as nothing wherever the pattern is installed too. Add them with add-design-tokens, or reference presets that exist.', 'pattern-builder' );
+		}
+
+		/*
 		 * The HTML settles which classes are on which elements and nothing
 		 * else: what a band actually looks like is decided by stylesheets this
 		 * answer does not carry. So hand over the two URLs that do — one
@@ -561,6 +604,7 @@ class Pattern_Builder_Abilities {
 		 */
 		return array(
 			'html'    => do_blocks( $pattern->content ),
+			'tokens'  => $tokens,
 			'preview' => array(
 				'standalone' => Pattern_Builder_Preview::url_for( $pattern->id, 'standalone' ),
 				'page'       => Pattern_Builder_Preview::url_for( $pattern->id, 'page' ),
