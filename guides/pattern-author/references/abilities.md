@@ -100,7 +100,7 @@ category named for its collection.
 | `pattern-builder/search-cloud-patterns` | GET | search public patterns by `input[search]`; each names its collection; `input[collection]=owner/slug` narrows to one |
 | `pattern-builder/install-collection` | POST | every pattern of a collection, in one action: `owner`, `slug`, `destination` (`theme`\|`user`, default user), `tokens` (`add`\|`skip`, default add). Already-installed patterns are skipped, a failure is reported and the rest carry on; per-pattern results come back |
 | `pattern-builder/install-cloud-pattern` | POST | one pattern by `id`, with the same `destination` and `tokens`; `source` is `directory` (default) or `library` |
-| `pattern-builder/upload-pattern` | POST | a local pattern (`id`) or finished markup (`title` + `content`, stored here as a user pattern first) into `collection` — an id, or `personal` (the default). Validate first, as for create-pattern |
+| `pattern-builder/upload-pattern` | POST | a local pattern (`id`) or finished markup (`title` + `content`, stored here as a user pattern first) into `collection` — an id, or `personal` (the default), read on a pattern's first upload only. A pattern that references others takes them with it, and `members` lists everything that went up; a reference to a pattern this site does not have refuses the upload by name. Validate first, as for create-pattern |
 | `pattern-builder/create-collection` | POST | a **private** collection: `name`, `description`. On a free account the service refuses with an upgrade message, since free accounts only make public collections and an agent never publishes; upload into Personal instead |
 
 No ability makes a collection public, changes a visibility, or deletes a

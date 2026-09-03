@@ -111,7 +111,8 @@ Yes, Pattern Builder provides a unified interface to manage both theme patterns 
 = 2.1.0 =
 * Collections: every pattern on patternbuilderwp.com lives in exactly one collection. Every account has a private Personal; free accounts share the rest publicly, Pro builds collections in private
 * The Community tab is collections first: open one, save a single pattern, or save the whole collection to this site in one action, with one design-tokens step and a progress count
-* The Uploaded tab manages your collections — create, rename, describe, set the visibility, delete with the choice of deleting the patterns or moving them to Personal — and uploads ask which collection when there is more than Personal
+* The Uploaded tab manages your collections — create, rename, describe, set the visibility, delete with everything in it — and uploads ask which collection when there is more than Personal
+* A page pattern brings the patterns it uses: uploading one uploads its sections into the same collection, installing one installs them first, and a pattern copied from somebody else's collection records where it came from
 * Patterns installed from a collection land under a local pattern category named for it
 * Seven new abilities for agents: list and search collections and patterns, install a pattern or a collection, upload into a collection, create a private collection — all through the WordPress user's own connection
 * Community patterns are browsed as an account: the Community tab asks you to sign in or create a free account first

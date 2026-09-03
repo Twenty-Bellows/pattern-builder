@@ -30,13 +30,14 @@ The existing block-validity gate (`src/utils/blockValidity.js`) runs over **ever
 
 ## 3. Upload
 
-`Pattern_Builder_Cloud_Porter` gains `export_tree( $type, $id )` beside `export_local()`, and the controller uploads what it returns.
+The upload runs server-side, in the proxy, so the authoritative walk is `Pattern_Builder_Cloud_Porter::local_tree()` rather than the JavaScript one — and `/cloud/pattern-tree` serves the panel from that same code, so there is one answer rather than two.
 
-1. **Walk** the tree locally, leaves first.
-2. **Pre-flight.** Fetch the target collection's patterns once (`GET /cloud/library/collections/{id}` already returns them with their namespaces). For each member: already there and unchanged → skip; already there and changed → update; not there → create. Count what that adds and check it against the Personal cap and the account's entitlements **before uploading anything**, so a tree that will not fit is refused whole rather than halfway.
-3. **Rewrite** each member's references from local names to `{handle}/{collection}/{slug}` — the target collection's namespace, with each dependency's own slug unchanged, because uploading never renames a pattern. The rewrite happens on the exported copy; the local file is untouched.
-4. **Upload** leaves first. Each `POST`/`PUT` is validated by the service against what is already in the collection, so ordering is the whole of the transaction: no batching, no rollback.
-5. **Link** every member in the link map, as a single upload does today.
+1. **Walk** the tree locally, leaves first, over the theme's own pattern files.
+2. **Resolve the target.** `GET /library/collections` gives the collection's `namespace` and its count — only the service knows the account's handle and the collection's slug. A pattern that references nothing skips this entirely: there is nothing to rewrite, so an ordinary upload costs exactly what it always did.
+3. **Pre-flight the cap.** Count the members not already linked and check them against the Personal cap **before uploading anything**, so a tree that will not fit is refused whole rather than half way. The service refuses one pattern at a time, which for a tree means stopping in the middle.
+4. **Rewrite** each member's references onto the target namespace, on the exported copy; the local file is untouched, and the content hash is still of the local content so "changed since upload?" compares like with like.
+5. **Upload** leaves first. Each request is validated by the service against what is already in the collection, so ordering is the whole of the transaction: no batching, no rollback.
+6. **Link** every member in the link map, as a single upload does today.
 
 A failure part-way leaves the successfully uploaded members in place — they are valid patterns on their own — and reports which member failed and why. The parent is not uploaded.
 
@@ -65,7 +66,7 @@ The `Origin:` file header, and `pattern_builder_origin` post meta for user patte
 
 Core parses a fixed list of pattern-file headers and ignores the rest, so `Origin:` is inert to WordPress and travels with the theme — which is the point, since a link map does not. It is the one piece of service metadata that belongs in a distributed theme file: a **link** is this site's relationship to a cloud copy and stays in the option map, an **origin** is part of the pattern's identity.
 
-`PatternDetailsPanel` and the editor's Pattern Source panel show one line — *"Originally from studio-a/heroes/hero"* — linking to that pattern's page on patternbuilderwp.com. By construction an origin never names your own account, so there is no display-time check and a pattern you authored shows nothing.
+The Pattern Source panel — which both the browse sidebar and the editor render — shows one line: *"Originally from studio-a/heroes/hero"*. By construction an origin never names your own account, so there is no display-time check and a pattern you authored shows nothing.
 
 ## 6. What goes away
 
@@ -83,9 +84,9 @@ Core parses a fixed list of pattern-file headers and ignores the rest, so `Origi
 ## 8. Code map
 
 - `src/utils/patternTree.js`: the walk, cycle detection, reference rewriting. Pure, and unit-tested on its own.
-- `includes/class-pattern-builder-cloud-porter.php`: `export_tree()`, tree install, the `Origin:` stamp on import.
+- `includes/class-pattern-builder-cloud-porter.php`: `local_tree()`, `rewrite_references()`, `install_dependencies()`, the `Origin:` stamp on import.
 - `includes/class-pattern-file-store.php`: the `Origin:` header, read and written.
-- `includes/class-pattern-builder-cloud-controller.php`: the upload endpoint takes a tree; the move route goes.
+- `includes/class-pattern-builder-cloud-controller.php`: `upload_pattern()` walks and uploads the tree, `pattern_tree` answers the panel, and the move route goes.
 - `src/components/PatternCloudPanel.js`, `src/cloud/UploadedTab.js`: the tree summary before upload, the removal of Move to…, the origin line.
 - `docs/`, `CLAUDE.md`, `readme.txt`, `guides/pattern-author/`: the documentation.
 
@@ -97,11 +98,11 @@ Core parses a fixed list of pattern-file headers and ignores the rest, so `Origi
 
 ## 10. Order of work (commits, stacked on the collections branch)
 
-1. `patternTree.js` and its tests — the walk, alone, with nothing depending on it yet.
-2. The `Origin:` header: file store read/write, the stamp on import, the details line.
-3. `export_tree()` and the upload path, including the pre-flight and the refusals.
-4. Tree install, leaves first, with the theme-destination rule.
-5. Remove move, in the plugin and the service alike.
+1. ~~`patternTree.js` and its tests~~ — done. The browser's copy of the walk, used by the panel to decide whether to ask the server anything.
+2. ~~The `Origin:` header~~ — done: file store read/write, the stamp's three cases on import, the Pattern Source line.
+3. ~~The tree upload~~ — done, as `local_tree()` + `rewrite_references()` on the porter rather than an `export_tree()`: the upload runs in PHP, so the authoritative walk lives there and `/cloud/pattern-tree` serves the panel from the same code.
+4. ~~Tree install, leaves first, with the theme-destination rule~~ — done.
+5. ~~Remove move~~ — done, in the plugin and the service alike.
 6. Abilities, the panel copy, `CLAUDE.md`, `readme.txt`, the authoring guide.
 
 ## 11. Acceptance

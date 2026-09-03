@@ -144,8 +144,7 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		$this->assertSame( 400, $this->request( 'GET', '/pattern-builder/v1/cloud/library/collections' )->get_status() );
 		$this->assertSame( 400, $this->request( 'POST', '/pattern-builder/v1/cloud/library/collections', array( 'name' => 'X' ) )->get_status() );
 		$this->assertSame( 400, $this->request( 'PUT', '/pattern-builder/v1/cloud/library/collections/31', array( 'name' => 'X' ) )->get_status() );
-		$this->assertSame( 400, $this->request( 'DELETE', '/pattern-builder/v1/cloud/library/collections/31', array( 'patterns' => 'delete' ) )->get_status() );
-		$this->assertSame( 400, $this->request( 'PUT', '/pattern-builder/v1/cloud/library/42', array( 'collection' => 'personal' ) )->get_status() );
+		$this->assertSame( 400, $this->request( 'DELETE', '/pattern-builder/v1/cloud/library/collections/31' )->get_status() );
 		$this->assertSame( 401, $this->request( 'POST', '/pattern-builder/v1/cloud/download', array( 'cloudId' => 42 ) )->get_status() );
 		$this->assertSame( 404, $this->request( 'GET', '/pattern-builder/v1/cloud/categories' )->get_status() );
 	}
@@ -201,14 +200,6 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		$this->assertSame( 'Private collections are a Pattern Builder Pro feature.', $created->get_data()['message'] );
 		$this->assertSame( 'https://patternbuilderwp.com/go-pro/', $created->get_data()['data']['upgrade_url'] );
 
-		$moved = $this->request( 'DELETE', '/pattern-builder/v1/cloud/library/collections/31', array( 'patterns' => 'move' ) );
-		$this->assertSame( 403, $moved->get_status() );
-		$this->assertSame( 'pbwp_personal_cap', $moved->get_data()['code'] );
-		$this->assertSame( 'https://patternbuilderwp.com/go-pro/', $moved->get_data()['data']['upgrade_url'] );
-
-		// The move was asked for as such.
-		$last = end( $this->seen );
-		$this->assertSame( 'move', $last['query']['patterns'] );
 	}
 
 	public function test_collection_routes_relay_what_the_service_lists() {
@@ -302,22 +293,20 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'name="collection"' . "\r\n\r\npersonal", end( $this->seen )['body'] );
 	}
 
-	public function test_move_relays_a_collection_alone() {
+	public function test_a_cloud_pattern_cannot_be_moved() {
 		$this->mock_service(
-			function ( $path, $method ) {
-				if ( '/library/patterns/42' === $path && 'PUT' === $method ) {
-					return array( 'id' => 42, 'collection' => array( 'id' => 9, 'personal' => true ) );
-				}
+			function () {
 				return array();
 			}
 		);
 
+		// The route that moved a cloud pattern between collections is gone:
+		// a collection is the middle segment of a permanent name (D38).
 		$moved = $this->request( 'PUT', '/pattern-builder/v1/cloud/library/42', array( 'collection' => 'personal' ) );
-		$this->assertSame( 200, $moved->get_status() );
-		$this->assertSame( array( 'collection' => 'personal' ), json_decode( end( $this->seen )['body'], true ) );
-
-		$this->assertSame( 400, $this->request( 'PUT', '/pattern-builder/v1/cloud/library/42' )->get_status() );
+		$this->assertSame( 404, $moved->get_status() );
+		$this->assertSame( array(), $this->seen );
 	}
+
 
 	public function test_download_files_the_pattern_under_the_collection_category() {
 		$this->mock_service(

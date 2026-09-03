@@ -5,7 +5,6 @@ import {
 	Button,
 	Modal,
 	Notice,
-	PanelBody,
 	SelectControl,
 	Spinner,
 	TextControl,
@@ -23,7 +22,7 @@ import { useDispatch } from '@wordpress/data';
 import { store as noticesStore } from '@wordpress/notices';
 
 import { CloudCard, CloudDetails, useDownloadFlow } from './CloudBrowser';
-import { CollectionPicker, createCollection } from './CollectionPicker';
+import { createCollection } from './CollectionPicker';
 import { isListed, slugProblem, suggestSlug } from './collections';
 
 const BASE = '/pattern-builder/v1/cloud';
@@ -226,9 +225,10 @@ function NewCollectionModal( { canPrivate, onCreated, onClose, onGoPro } ) {
 }
 
 /**
- * The delete prompt: delete the collection's patterns, or move them to
- * Personal. A refused move (past the cap) shows the upgrade prompt and
- * leaves delete available.
+ * The delete prompt. The collection's patterns go with it: a pattern's
+ * collection is the middle segment of its permanent name (D38), so there
+ * is nowhere to move them to that would still be them, and the prompt says
+ * to download anything worth keeping first.
  *
  * @param {Object}   props            Component props.
  * @param {Object}   props.collection The collection.
@@ -240,11 +240,11 @@ function DeleteCollectionModal( { collection, onDeleted, onClose, onGoPro } ) {
 	const [ busy, setBusy ] = useState( false );
 	const [ refused, setRefused ] = useState( null );
 
-	const run = ( patterns ) => {
+	const run = () => {
 		setBusy( true );
 		setRefused( null );
 		apiFetch( {
-			path: `${ BASE }/library/collections/${ collection.id }?patterns=${ patterns }`,
+			path: `${ BASE }/library/collections/${ collection.id }`,
 			method: 'DELETE',
 		} )
 			.then( () => onDeleted() )
@@ -274,8 +274,8 @@ function DeleteCollectionModal( { collection, onDeleted, onClose, onGoPro } ) {
 					{ sprintf(
 						/* translators: %d: pattern count. */
 						_n(
-							'It holds %d pattern. Delete it too, or move it to Personal?',
-							'It holds %d patterns. Delete them too, or move them to Personal?',
+							'It holds %d pattern, which is deleted with it. A pattern cannot move between collections — its collection is part of its permanent name — so download anything worth keeping first.',
+							'It holds %d patterns, which are deleted with it. A pattern cannot move between collections — its collection is part of its permanent name — so download anything worth keeping first.',
 							collection.count || 0,
 							'pattern-builder'
 						),
@@ -304,19 +304,11 @@ function DeleteCollectionModal( { collection, onDeleted, onClose, onGoPro } ) {
 						{ __( 'Cancel', 'pattern-builder' ) }
 					</Button>
 					<Button
-						variant="secondary"
-						isBusy={ busy }
-						disabled={ busy }
-						onClick={ () => run( 'move' ) }
-					>
-						{ __( 'Move patterns to Personal', 'pattern-builder' ) }
-					</Button>
-					<Button
 						variant="primary"
 						isDestructive
 						isBusy={ busy }
 						disabled={ busy }
-						onClick={ () => run( 'delete' ) }
+						onClick={ run }
 					>
 						{ __( 'Delete patterns too', 'pattern-builder' ) }
 					</Button>
@@ -517,7 +509,7 @@ function CollectionHeader( { collection, canPrivate, onChanged, onDelete } ) {
 /**
  * The Uploaded tab: the account's collections down the rail (Personal
  * first, with its meter), the selected collection's header and actions,
- * its patterns as the grid, and a details sidebar with Save, Move to
+ * its patterns as the grid, and a details sidebar with Save,
  * collection, and Delete from cloud.
  *
  * @param {Object}   props               Component props.
@@ -549,8 +541,6 @@ export function UploadedTab( {
 	const [ selected, setSelected ] = useState( null );
 	const [ creating, setCreating ] = useState( false );
 	const [ deleting, setDeleting ] = useState( null );
-	const [ moveTo, setMoveTo ] = useState( 0 );
-	const [ moving, setMoving ] = useState( false );
 
 	const { createSuccessNotice, createErrorNotice } =
 		useDispatch( noticesStore );
@@ -663,39 +653,6 @@ export function UploadedTab( {
 			} );
 	};
 
-	const movePattern = () => {
-		if ( ! selected || ! moveTo || moving ) {
-			return;
-		}
-		setMoving( true );
-		apiFetch( {
-			path: `${ BASE }/library/${ selected.id }`,
-			method: 'PUT',
-			data: { collection: moveTo },
-		} )
-			.then( ( updated ) => {
-				setMoving( false );
-				setSelected( updated );
-				createSuccessNotice(
-					sprintf(
-						/* translators: %s: collection title. */
-						__( 'Moved to %s.', 'pattern-builder' ),
-						updated.collection?.title || ''
-					),
-					{ type: 'snackbar' }
-				);
-				changed();
-			} )
-			.catch( ( error ) => {
-				setMoving( false );
-				createErrorNotice(
-					error.message ||
-						__( 'Could not move the pattern.', 'pattern-builder' ),
-					{ type: 'snackbar' }
-				);
-			} );
-	};
-
 	return (
 		<>
 			<main className="pattern-builder-browser__main pattern-builder-cloud">
@@ -704,7 +661,7 @@ export function UploadedTab( {
 				{ status?.overPolicy && (
 					<Notice status="warning" isDismissible={ false }>
 						{ __(
-							'This account holds more than a free account may: a private collection, or a Personal over the cap. Nothing is taken away, and nothing more can be added to what is over. Make a collection public, move patterns into Personal within the cap, delete, or go Pro.',
+							'This account holds more than a free account may: a private collection, or a Personal over the cap. Nothing is taken away, and nothing more can be added to what is over. Make a collection public, delete, or go Pro.',
 							'pattern-builder'
 						) }
 						{ onGoPro && (
@@ -860,44 +817,7 @@ export function UploadedTab( {
 						onDelete={ deleteCloudPattern }
 						onEditLocal={ onEditLocal }
 						busy={ busy }
-					>
-						{ collections && collections.length > 1 && (
-							<PanelBody
-								title={ __( 'Collection', 'pattern-builder' ) }
-								initialOpen
-							>
-								<VStack spacing={ 2 }>
-									<CollectionPicker
-										label={ __(
-											'Move to collection',
-											'pattern-builder'
-										) }
-										collections={ collections }
-										value={
-											moveTo ||
-											selected.collection?.id ||
-											0
-										}
-										onChange={ setMoveTo }
-										onCreated={ () => loadCollections() }
-										disabled={ moving }
-									/>
-									<Button
-										variant="secondary"
-										isBusy={ moving }
-										disabled={
-											moving ||
-											! moveTo ||
-											moveTo === selected.collection?.id
-										}
-										onClick={ movePattern }
-									>
-										{ __( 'Move', 'pattern-builder' ) }
-									</Button>
-								</VStack>
-							</PanelBody>
-						) }
-					</CloudDetails>
+					></CloudDetails>
 				) : (
 					<div className="pattern-builder-details is-empty">
 						<Text variant="muted">
