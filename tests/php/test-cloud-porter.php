@@ -685,4 +685,84 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 			get_post_meta( $result['id'], \TwentyBellows\PatternBuilder\Pattern_File_Store::META_ORIGIN, true )
 		);
 	}
+
+	/**
+	 * A package says which WordPress it needs. Installing one this site is
+	 * too old for is not merely disappointing: the import re-sanitizes with
+	 * `wp_kses_post()` against this site's KSES, which on an older release
+	 * does not know some of the markup and removes it — MathML being the
+	 * case that costs content rather than appearance.
+	 */
+	public function test_version_problem_compares_against_this_site() {
+		$here = Pattern_Builder_Cloud_Porter::wordpress_version();
+
+		// Nothing claimed, nothing to check: the common case.
+		$this->assertNull( Pattern_Builder_Cloud_Porter::version_problem( array() ) );
+		$this->assertNull( Pattern_Builder_Cloud_Porter::version_problem( array( 'minWordPress' => '' ) ) );
+
+		// What this site already runs, and anything older, is fine.
+		$this->assertNull( Pattern_Builder_Cloud_Porter::version_problem( array( 'minWordPress' => $here ) ) );
+		$this->assertNull( Pattern_Builder_Cloud_Porter::version_problem( array( 'minWordPress' => '5.0' ) ) );
+
+		$problem = Pattern_Builder_Cloud_Porter::version_problem( array( 'minWordPress' => '99.0' ) );
+		$this->assertWPError( $problem );
+		$this->assertSame( 'pb_cloud_needs_newer_wordpress', $problem->get_error_code() );
+
+		// Both versions are named, so a client can say what to do about it.
+		$data = $problem->get_error_data();
+		$this->assertSame( '99.0', $data['minWordPress'] );
+		$this->assertSame( $here, $data['wordPress'] );
+	}
+
+	/**
+	 * A release candidate sorts *below* the release it leads to, so a site
+	 * on 7.2-RC1 must not be told it is too old for a 7.2 pattern.
+	 */
+	public function test_a_release_suffix_does_not_count_as_older() {
+		$version = Pattern_Builder_Cloud_Porter::wordpress_version();
+
+		// Whatever this site reports — 7.2, 7.2-RC1, 7.2-alpha-12345 — what
+		// gets compared is the release number alone.
+		$this->assertMatchesRegularExpression( '/^\d+(\.\d+)*$/', $version );
+		$this->assertStringStartsWith( $version, (string) get_bloginfo( 'version' ) );
+
+		$this->assertNull(
+			Pattern_Builder_Cloud_Porter::version_problem( array( 'minWordPress' => $version ) )
+		);
+	}
+
+	/**
+	 * And the gate runs before anything is written, so a refusal leaves
+	 * nothing half-applied.
+	 */
+	public function test_installing_a_pattern_this_site_is_too_old_for_is_refused() {
+		$pbp                 = $this->make_downloaded_pbp();
+		$pbp['minWordPress'] = '99.0';
+
+		$before = count( get_posts( array( 'post_type' => 'wp_block', 'post_status' => 'any', 'fields' => 'ids' ) ) );
+
+		add_filter(
+			'pre_http_request',
+			static function () use ( $pbp ) {
+				return array(
+					'headers'  => array(),
+					'response' => array(
+						'code'    => 200,
+						'message' => 'OK',
+					),
+					'body'     => wp_json_encode( $pbp ),
+				);
+			}
+		);
+
+		$porter = new Pattern_Builder_Cloud_Porter();
+		$result = $porter->install_cloud_pattern( 42, 'user', false );
+		remove_all_filters( 'pre_http_request' );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_cloud_needs_newer_wordpress', $result->get_error_code() );
+
+		$after = count( get_posts( array( 'post_type' => 'wp_block', 'post_status' => 'any', 'fields' => 'ids' ) ) );
+		$this->assertSame( $before, $after, 'A refused install still created a pattern.' );
+	}
 }

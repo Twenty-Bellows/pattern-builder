@@ -228,3 +228,63 @@ export function slugProblem( slug ) {
 
 	return '';
 }
+
+/**
+ * Compare two WordPress version numbers, segment by segment.
+ *
+ * Small enough to write out: the alternative is a dependency for one
+ * comparison, and WordPress versions are plain dotted numbers once any
+ * release suffix is off.
+ *
+ * @param {string} a First version.
+ * @param {string} b Second version.
+ * @return {number} Negative when a < b, positive when a > b, 0 when equal.
+ */
+function compareVersions( a, b ) {
+	const left = String( a ).split( '.' ).map( Number );
+	const right = String( b ).split( '.' ).map( Number );
+
+	for ( let i = 0; i < Math.max( left.length, right.length ); i++ ) {
+		const one = left[ i ] || 0;
+		const two = right[ i ] || 0;
+		if ( one !== two ) {
+			return one - two;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * The WordPress version a pattern needs, when this site is older than it.
+ *
+ * The service works out `minWordPress` from the blocks a pattern actually
+ * holds. Installing one this site is too old for is not merely
+ * disappointing: the import re-sanitizes against this site's own KSES,
+ * which on an older release does not know some of the markup and strips
+ * it, so the pattern lands looking installed and missing what it was for.
+ *
+ * The server refuses these regardless. This is what lets the browser say
+ * so first, and say what to do about it.
+ *
+ * @param {Object} pattern     A cloud pattern summary.
+ * @param {string} siteVersion This site's WordPress version.
+ * @return {string} The version needed, or '' when this site can render it.
+ */
+export function needsNewerWordPress( pattern, siteVersion ) {
+	const needs = String( pattern?.minWordPress || '' ).trim();
+	if ( ! needs ) {
+		return '';
+	}
+
+	// A release suffix (7.2-RC1) sorts below the release it leads to, so
+	// it is dropped rather than compared.
+	const here = String( siteVersion || '' ).replace( /[-+].*$/, '' );
+
+	// Nothing known about this site: leave it to the server, which knows.
+	if ( ! here ) {
+		return '';
+	}
+
+	return compareVersions( here, needs ) < 0 ? needs : '';
+}

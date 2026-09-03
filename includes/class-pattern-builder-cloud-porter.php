@@ -1126,6 +1126,58 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
+	 * This site's WordPress version, without a release suffix.
+	 *
+	 * `get_bloginfo( 'version' )` reports things like `7.2-RC1` and
+	 * `version_compare()` sorts a release candidate *below* the release it
+	 * leads to, so a site already running 7.2-RC1 would be told it is too
+	 * old for a pattern needing 7.2. The suffix is dropped rather than
+	 * compared.
+	 *
+	 * @return string
+	 */
+	public static function wordpress_version() {
+		return preg_replace( '/[-+].*$/', '', (string) get_bloginfo( 'version' ) );
+	}
+
+	/**
+	 * Whether this WordPress is too old for what a package carries.
+	 *
+	 * The service works out the version from the blocks a pattern actually
+	 * holds and sends it as `minWordPress`; a package that names none needs
+	 * nothing newer than the plugin's own floor and passes.
+	 *
+	 * @param array $pbp A Portable Pattern Package.
+	 * @return WP_Error|null An error naming both versions, or null.
+	 */
+	public static function version_problem( $pbp ) {
+		$needs = isset( $pbp['minWordPress'] ) ? trim( (string) $pbp['minWordPress'] ) : '';
+		if ( '' === $needs ) {
+			return null;
+		}
+
+		$have = self::wordpress_version();
+		if ( version_compare( $have, $needs, '>=' ) ) {
+			return null;
+		}
+
+		return new WP_Error(
+			'pb_cloud_needs_newer_wordpress',
+			sprintf(
+				/* translators: 1: required WordPress version, 2: this site's WordPress version. */
+				__( 'This pattern needs WordPress %1$s or newer, and this site runs %2$s. Update WordPress and install it again.', 'pattern-builder' ),
+				$needs,
+				$have
+			),
+			array(
+				'status'       => 409,
+				'minWordPress' => $needs,
+				'wordPress'    => $have,
+			)
+		);
+	}
+
+	/**
 	 * Download one directory pattern and land it here: the single-pattern
 	 * path the REST route and install_collection() share. Missing design
 	 * tokens go to the same destination as the pattern, and the link map
@@ -1152,6 +1204,22 @@ class Pattern_Builder_Cloud_Porter {
 		$pbp = Pattern_Builder_Cloud::request( 'POST', "/{$source}/patterns/{$cloud_id}/download" );
 		if ( is_wp_error( $pbp ) ) {
 			return $pbp;
+		}
+
+		/*
+		 * Before anything is written. A package says which WordPress it
+		 * needs, and installing one this site is too old for is not merely
+		 * disappointing: the import re-sanitizes with `wp_kses_post()`
+		 * against *this* site's KSES, which on an older release does not
+		 * know some of the markup and removes it — the pattern lands
+		 * looking installed and is missing what it was for. Checked here
+		 * rather than after the tokens and dependencies, so a refusal
+		 * leaves nothing half-applied, and on the way down each dependency
+		 * passes through this same call.
+		 */
+		$too_new = self::version_problem( $pbp );
+		if ( $too_new ) {
+			return $too_new;
 		}
 
 		/*
@@ -1285,7 +1353,7 @@ class Pattern_Builder_Cloud_Porter {
 				return $outcome;
 			}
 
-			$installed = array_merge( $installed, isset( $outcome['dependencies'] ) ? $outcome['dependencies'] : array() );
+			$installed   = array_merge( $installed, isset( $outcome['dependencies'] ) ? $outcome['dependencies'] : array() );
 			$installed[] = $reference;
 		}
 
@@ -1325,7 +1393,7 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * The name a downloaded pattern is installed under.	/**
+	 * The name a downloaded pattern is installed under.    /**
 	 * The name a downloaded pattern is installed under.
 	 *
 	 * The package carries the name the pattern has on the service —

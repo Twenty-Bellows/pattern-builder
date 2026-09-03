@@ -30,11 +30,19 @@ import {
 	setTelemetryState,
 	track,
 } from '../utils/telemetry';
+import { needsNewerWordPress } from './collections';
 import { openCheckout } from './checkout';
 import { CommunityTab } from './CommunityTab';
 import { UploadedTab } from './UploadedTab';
 
 import './cloud.scss';
+
+/**
+ * What this site's WordPress can render. A cloud pattern names the version
+ * it needs; the server refuses one this site is too old for, and this is
+ * what lets the browser say so before the round trip.
+ */
+const SITE_WORDPRESS = window.patternBuilderAdmin?.wordPressVersion || '';
 
 const BASE = '/pattern-builder/v1/cloud';
 
@@ -484,6 +492,9 @@ export function CloudDetails( {
 	// undefined = looking it up, null = not installed, else { type, id, title }.
 	const [ installed, setInstalled ] = useState( undefined );
 
+	// The version this pattern needs, when this site does not have it.
+	const needsWordPress = needsNewerWordPress( pattern, SITE_WORDPRESS );
+
 	useEffect( () => {
 		if ( busy ) {
 			return; // Re-check once the in-flight action (e.g. a download) lands.
@@ -516,7 +527,7 @@ export function CloudDetails( {
 							__next40pxDefaultSize
 							variant="primary"
 							isBusy={ busy }
-							disabled={ busy }
+							disabled={ busy || !! needsWordPress }
 							onClick={ () => onDownload( pattern ) }
 							className="pattern-builder-details__action-button"
 						>
@@ -550,6 +561,19 @@ export function CloudDetails( {
 					initialOpen
 				>
 					<VStack spacing={ 3 }>
+						{ !! needsWordPress && (
+							<Notice status="warning" isDismissible={ false }>
+								{ sprintf(
+									/* translators: 1: required WordPress version, 2: this site's WordPress version. */
+									__(
+										'Needs WordPress %1$s or newer. This site runs %2$s, and would lose part of this pattern on import.',
+										'pattern-builder'
+									),
+									needsWordPress,
+									SITE_WORDPRESS
+								) }
+							</Notice>
+						) }
 						{ pattern.description && (
 							<Text variant="muted">{ pattern.description }</Text>
 						) }
@@ -783,7 +807,33 @@ export function useDownloadFlow( { source, onDownloaded } ) {
 		useDispatch( noticesStore );
 
 	// Save asks for a destination first; the rest of the flow is unchanged.
-	const requestDownload = ( pattern ) => setPendingDestination( pattern );
+	const requestDownload = ( pattern ) => {
+		/*
+		 * Except when this site is too old for it. The server refuses these
+		 * anyway — the import would re-sanitize against this site's KSES
+		 * and quietly strip markup it does not know — so asking where to
+		 * put it first would only be a longer way round to the same no.
+		 */
+		const needs = needsNewerWordPress( pattern, SITE_WORDPRESS );
+		if ( needs ) {
+			createErrorNotice(
+				sprintf(
+					/* translators: 1: pattern title, 2: required WordPress version, 3: this site's WordPress version. */
+					__(
+						'“%1$s” needs WordPress %2$s or newer, and this site runs %3$s.',
+						'pattern-builder'
+					),
+					pattern.title,
+					needs,
+					SITE_WORDPRESS
+				),
+				{ type: 'snackbar' }
+			);
+			return;
+		}
+
+		setPendingDestination( pattern );
+	};
 
 	// `addTokens` carries the answer to the tokens modal; the tokens follow
 	// the pattern to `destination`, which the server decides for itself.
