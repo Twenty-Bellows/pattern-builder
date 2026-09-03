@@ -42,6 +42,24 @@ itself is core, so nothing reports a problem — WordPress just drops the
 unknown attribute and renders the design pattern's placeholder copy. See
 `design-content-split.md`.
 
+**patternbuilderwp.com is narrower than "core only".** A pattern uploaded to
+the cloud passes a server-side allowlist, and core membership is not the
+test: it takes the blocks that render from their own markup and attributes,
+the ones that render the destination's own identity (site title, logo,
+navigation, breadcrumbs, page list) and the ones that render its posts (the
+Query Loop family and the `post-*` fields). It refuses anything that runs
+code or names a row on the site that made it — `core/shortcode`,
+`core/html`, `core/freeform`, `core/embed`, `core/rss`, the widget blocks,
+`core/block` and `core/template-part` — and it carries images only, so
+`core/video`, `core/audio` and `core/file` do not travel either. An upload
+that includes one is refused by name rather than quietly stripped.
+
+It also records the WordPress version a pattern needs, worked out from the
+blocks it actually holds, and refuses to install one on a site too old for
+it. That matters most for `core/math`: below 6.9 the destination's KSES does
+not know MathML and removes it, so the pattern would land looking installed
+and missing its equations.
+
 **Check, don't assume.** Where a site is running, `list-block-types` says what
 is actually registered there. Otherwise look at the theme's `patterns/` for
 which blocks it already uses, and its `functions.php` or `theme.json` for
@@ -84,6 +102,9 @@ is its own block.
 top), `core/media-text` (image beside content), `core/video`, `core/audio`,
 `core/file`, `core/embed`, `core/icon`.
 
+Of these, a cloud upload takes only the image-based ones and `core/icon` —
+see "What is allowed" above.
+
 **Use `core/media-text` rather than building it from columns + image.** It
 handles the stacking behaviour, the media/content ratio and the vertical
 alignment that a hand-built pair of columns gets wrong on mobile. Same for
@@ -103,11 +124,26 @@ content.
 ### Dynamic and site content
 
 `core/query` + `core/post-template` and the `post-*` family, `core/site-title`,
-`core/site-logo`, `core/navigation`, `core/template-part`, `core/post-content`.
+`core/site-tagline`, `core/site-logo`, `core/navigation`, `core/page-list`,
+`core/breadcrumbs`, `core/search`, `core/post-content`.
 
-These pull real content at render time, so a preview shows whatever the site
-has. Fine in a page or archive pattern; usually wrong in a section pattern
-meant to be dropped anywhere.
+These render the destination's content and identity rather than yours, which
+is the point of putting them in a pattern: a header shows that site's name,
+a Query Loop that site's posts. A navigation carrying no links of its own
+falls back to the site's menu or its pages, which is usually what a header
+starter wants.
+
+Two things about them are mechanical rather than matters of taste:
+
+- **A `core/query` with no `core/post-template` inside it renders nothing.**
+  The query block is the wrapper; the template block is what repeats.
+- **`core/template-part` and `core/block` do not travel.** Both name
+  something stored on the site that made them — a template part slug in that
+  theme, a `wp_block` post id — so neither resolves anywhere else.
+
+On patternbuilderwp.com these preview against an invented site rather than
+the service's own content, so a header or a page pattern previews as
+somebody's website instead of as the service.
 
 ## Composition, briefly
 

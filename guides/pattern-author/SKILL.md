@@ -95,6 +95,12 @@ and renders as a grey "block cannot be displayed" box — it doesn't degrade, it
 breaks, and it breaks where you can't see it. This is the safe default when
 the destination is unclear.
 
+**patternbuilderwp.com is narrower still**: core membership is not its test,
+and it refuses code, raw HTML, embeds, non-image media and anything naming a
+row on the site that made it. It also records the WordPress version a pattern
+needs and refuses to install one on a site too old for it. See
+`references/block-vocabulary.md`.
+
 **Core plus the theme's own blocks and styles** for a pattern shipping inside
 that theme; they travel together. A registered block style
 (`{"className":"is-style-card"}`) is usually the better tool than a custom

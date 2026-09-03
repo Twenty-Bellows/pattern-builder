@@ -106,6 +106,12 @@ category named for its collection.
 No ability makes a collection public, changes a visibility, or deletes a
 collection. Those are the account holder's, in Pattern Builder.
 
+An install can also be refused with `pb_cloud_needs_newer_wordpress`, which
+names both the version the pattern needs and the one this site runs. Nothing
+is written when it is — not the design tokens, not the pattern's
+dependencies — so there is nothing to undo. Update WordPress, or install a
+pattern that does not need the newer blocks.
+
 ```bash
 # What is there.
 curl -u "$WP_USER:$WP_APP_PASSWORD" -G --data-urlencode 'input[search]=hero' \
