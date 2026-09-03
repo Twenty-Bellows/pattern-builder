@@ -52,14 +52,6 @@ class Pattern_Builder_Cloud_Tokens {
 	}
 
 	/**
-	 * Collect the tokens a pattern's markup references, resolved to this
-	 * site's current values. References this site can't resolve are
-	 * dropped (there is no default to carry).
-	 *
-	 * @param string $content Serialized block markup.
-	 * @return array PBP token list.
-	 */
-	/**
 	 * Collect a pattern's tokens and everything its references need.
 	 *
 	 * A page pattern is mostly `core/pattern` references, and almost none of the
@@ -112,6 +104,14 @@ class Pattern_Builder_Cloud_Tokens {
 		return array_values( $unique );
 	}
 
+	/**
+	 * Collect the tokens a pattern's markup references, resolved to this
+	 * site's current values. References this site can't resolve are
+	 * dropped (there is no default to carry).
+	 *
+	 * @param string $content Serialized block markup.
+	 * @return array PBP token list.
+	 */
 	public static function collect( $content ) {
 		$tokens = array();
 
