@@ -81,16 +81,76 @@ The default themes sit between 620px and 650px of content width, and 1200px to
 1340px wide. A pattern that needs more should declare its own `contentSize` on
 its outermost group rather than assume the theme is generous.
 
+## Two tiers, and why a theme wants both
+
+The portable vocabulary above is small, and a real design system needs more than
+two colours. The way out is not to invent slugs in place of the standard ones —
+that is how a pattern stops travelling — but to define the standard ones **and**
+the roles nothing standard covers.
+
+### Tier 1 — the portable core. Always these slugs.
+
+| | Slugs |
+|---|---|
+| Colour | `base`, `contrast` |
+| Font size | `small`, `medium`, `large`, `x-large`, `xx-large` |
+| Spacing | `20`, `30`, `40`, `50`, `60`, `70`, `80` |
+
+A pattern using only these works on any theme with a `theme.json`.
+
+### Tier 2 — roles worth adding, because no convention covers them
+
+Every design needs these and neither core nor the default themes name them, so
+there is no portable answer to inherit — but there is a sensible one to agree on:
+
+| Slug | For |
+|---|---|
+| `surface` | A panel raised or inset against `base` — a card, a well |
+| `surface-variant` | A second step of the same |
+| `text-muted` | Secondary text: captions, meta, supporting copy |
+| `primary` | The action colour — buttons, links |
+| `primary-hover` | Its hover state |
+| `accent` | Emphasis, distinct from the action colour |
+| `hairline` | Borders, rules, separators |
+
+A pattern using these works on any theme that adopts the standard, and where one
+is missing an agent can add it with `add-design-tokens` rather than inlining a
+hex. That is the whole reason the ability exists.
+
+**`primary` is a tier-2 name here, and Twenty Twenty-Three also uses it** for
+something similar. Twenty Twenty-Four and Twenty Twenty-Five do not, which is
+why it is tier 2 rather than tier 1: usable, worth standardising on, not safe to
+assume.
+
+### Put the semantics in the name, not the slug
+
+The temptation is to name spacing steps `xs`, `sm`, `md`, `lg` because it reads
+better. It reads better and it costs portability: **not one of those slugs
+exists on any default theme**, so a pattern padded with `var:preset|spacing|md`
+loses every spacing value the moment it leaves the site it was written on.
+
+`name` is the field for that. The slug is the machine reference and belongs to
+the numeric scale; the name is what a person sees in the editor, and it can say
+whatever you like:
+
+```json
+{ "slug": "40", "name": "Base", "size": "1.25rem" }
+```
+
+The same applies to colour. A palette wanting a semantic name for its body text
+should call it `contrast` with `"name": "Text"`, not `text-default`.
+
 ## The rules, in short
 
-1. **Colours** — `base` and `contrast` freely; check anything else; add what is
-   missing; never inline a hex.
+1. **Colours** — `base` and `contrast` freely, the tier-2 roles by agreement;
+   check anything else with `get-design-system`; add what is missing with
+   `add-design-tokens`; never inline a hex.
 2. **Font sizes** — `small` … `xx-large`, and nothing invented.
-3. **Spacing** — numeric, `40`–`60` for preference.
+3. **Spacing** — numeric slugs, `40`–`60` for preference. Semantics go in `name`.
 4. **Font families** — set none unless the design needs one.
 5. **Layout** — assume ~620px of content; declare your own if you need more.
-6. **Whatever you reference must exist.** `get-design-system` says what this
-   site has. A slug that does not resolve renders as no styling at all.
+6. **Whatever you reference must exist.** A slug that does not resolve renders
+   as no styling at all, with no error anywhere.
 
 ## Checking a pattern against both worlds
 

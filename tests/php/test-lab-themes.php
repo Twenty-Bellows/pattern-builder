@@ -98,9 +98,10 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 		// base and contrast are the only two every recent default theme agrees on.
 		$this->assertArrayHasKey( 'base', $colors );
 		$this->assertArrayHasKey( 'contrast', $colors );
-		// primary/secondary are Twenty Twenty-Three's and nobody else's; a theme
-		// teaching patterns to reach for them would be teaching a portability bug.
-		$this->assertArrayNotHasKey( 'primary', $colors );
+		// A tier-1 slug renamed is a tier-1 slug lost: a theme calling its body
+		// colour `text-default` teaches patterns a name that resolves nowhere
+		// else, which is the portability bug this pair exists to catch.
+		$this->assertArrayNotHasKey( 'text-default', $colors );
 		$this->assertArrayNotHasKey( 'secondary', $colors );
 
 		$sizes = wp_list_pluck( $settings['typography']['fontSizes'], 'size', 'slug' );
@@ -114,6 +115,49 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 		foreach ( array( '40', '50', '60' ) as $step ) {
 			$this->assertArrayHasKey( $step, $spacing, 'The safe middle of the scale must exist.' );
 		}
+	}
+
+	/**
+	 * And it carries the tier-2 roles the guide asks themes to agree on.
+	 *
+	 * These are the ones nothing standard covers — no default theme names a
+	 * border colour or a muted text colour — so there is no portable answer to
+	 * inherit and a convention has to be chosen. The theme is where that choice
+	 * is written down in a form something can check.
+	 */
+	public function test_opinionated_theme_carries_the_tier_two_roles() {
+		$colors = wp_list_pluck(
+			$this->theme_json( 'opinionated-theme' )['settings']['color']['palette'],
+			'color',
+			'slug'
+		);
+
+		foreach ( array( 'surface', 'surface-variant', 'text-muted', 'primary', 'primary-hover', 'accent', 'hairline' ) as $role ) {
+			$this->assertArrayHasKey( $role, $colors, $role . ' is one of the roles the guide standardises.' );
+		}
+	}
+
+	/**
+	 * Semantics live in the name, never in the slug.
+	 *
+	 * `xs`/`sm`/`md` read better and exist on no default theme, so a pattern
+	 * padded with one loses every spacing value the moment it leaves the site it
+	 * was written on. The numeric slug travels; the name is what a person reads.
+	 */
+	public function test_opinionated_theme_keeps_semantics_out_of_the_slugs() {
+		$spacing = $this->theme_json( 'opinionated-theme' )['settings']['spacing']['spacingSizes'];
+		$slugs   = wp_list_pluck( $spacing, 'slug' );
+		$names   = wp_list_pluck( $spacing, 'name', 'slug' );
+
+		foreach ( $slugs as $slug ) {
+			$this->assertMatchesRegularExpression( '/^\d+$/', $slug, 'Spacing slugs are numeric or they do not travel.' );
+		}
+
+		foreach ( array( 'xs', 'sm', 'md', 'lg', 'xl' ) as $tempting ) {
+			$this->assertNotContains( $tempting, $slugs );
+		}
+
+		$this->assertNotEmpty( $names['40'], 'The readable label belongs in name.' );
 	}
 
 	/**
@@ -147,7 +191,7 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 
 		$colors = wp_list_pluck( $settings['color']['palette'], 'color', 'slug' );
 		$this->assertArrayHasKey( 'base', $colors );
-		$this->assertArrayHasKey( 'accent-1', $colors );
+		$this->assertArrayHasKey( 'accent', $colors );
 	}
 
 	/**
@@ -173,10 +217,15 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 	public function test_opinionated_theme_is_narrow() {
 		$layout = $this->theme_json( 'opinionated-theme' )['settings']['layout'];
 
-		$this->assertSame( '560px', $layout['contentSize'] );
+		// rem rather than px, so the measure scales with the reader's root size.
+		$this->assertStringEndsWith( 'rem', $layout['contentSize'] );
+
+		$theirs = (float) $layout['contentSize'] * 16;
+		$blank  = (float) $this->theme_json( 'blank-theme' )['settings']['layout']['contentSize'];
+
 		$this->assertLessThan(
-			(int) $this->theme_json( 'blank-theme' )['settings']['layout']['contentSize'],
-			(int) $layout['contentSize'],
+			$blank,
+			$theirs,
 			'The pair is only useful if the two disagree about width.'
 		);
 	}
