@@ -135,6 +135,7 @@ class Test_Abilities extends WP_UnitTestCase {
 			'pattern-builder/create-pattern',
 			'pattern-builder/update-pattern',
 			'pattern-builder/add-design-tokens',
+			'pattern-builder/set-global-styles',
 			// Media and fonts: what a pattern points at.
 			'pattern-builder/find-media',
 			'pattern-builder/add-asset',
@@ -172,7 +173,7 @@ class Test_Abilities extends WP_UnitTestCase {
 			$this->assertTrue( $meta['show_in_rest'], $read . ' must be reachable over REST.' );
 		}
 
-		foreach ( array( 'create-pattern', 'update-pattern', 'add-design-tokens', 'add-asset', 'add-placeholder-image', 'add-font' ) as $write ) {
+		foreach ( array( 'create-pattern', 'update-pattern', 'add-design-tokens', 'set-global-styles', 'add-asset', 'add-placeholder-image', 'add-font' ) as $write ) {
 			$meta = wp_get_ability( 'pattern-builder/' . $write )->get_meta();
 			$this->assertFalse( $meta['annotations']['readonly'], $write . ' is not a read.' );
 			$this->assertFalse(
@@ -194,6 +195,38 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertNotEmpty( $result['palette'] );
 		$slugs = wp_list_pluck( $result['palette'], 'slug' );
 		$this->assertContains( 'black', $slugs );
+	}
+
+	/**
+	 * The pair only works as a pair: an agent sets a style and then reads it
+	 * back to decide what its patterns still have to say for themselves.
+	 */
+	public function test_a_style_set_through_the_ability_is_read_back_by_get_design_system() {
+		$path = get_stylesheet_directory() . '/theme.json';
+		file_put_contents( $path, wp_json_encode( array( 'version' => 3 ) ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test fixture.
+
+		try {
+			$written = $this->abilities->execute_set_global_styles(
+				array(
+					'styles' => array(
+						'elements' => array(
+							'button' => array( 'border' => array( 'radius' => '999px' ) ),
+						),
+					),
+				)
+			);
+
+			$this->assertNotWPError( $written );
+			$this->assertSame( 'theme', $written['destination'] );
+
+			$system = $this->abilities->execute_design_system();
+			$this->assertSame( '999px', $system['styles']['elements']['button']['border']['radius'] );
+		} finally {
+			if ( file_exists( $path ) ) {
+				unlink( $path );
+			}
+			wp_clean_theme_json_cache();
+		}
 	}
 
 	/**

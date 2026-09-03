@@ -79,6 +79,7 @@ class Pattern_Builder_Abilities {
 		$this->register_create_pattern();
 		$this->register_update_pattern();
 		$this->register_add_design_tokens();
+		$this->register_set_global_styles();
 		$this->register_find_media();
 		$this->register_add_asset();
 		$this->register_add_placeholder_image();
@@ -1659,6 +1660,84 @@ class Pattern_Builder_Abilities {
 			),
 			'multipart' => __( 'A multipart form works too — the first file field is taken, whatever it is named.', 'pattern-builder' ),
 		);
+	}
+
+	/**
+	 * Set the styles a pattern inherits.
+	 *
+	 * `add-design-tokens` gives a pattern a vocabulary to reference; this
+	 * decides what a block looks like when it references nothing. They are
+	 * separate abilities because they are opposite in every way that matters:
+	 * a preset is additive and inert, so a collision is skipped, while a style
+	 * is singular and immediate, so writing one replaces what was there and
+	 * repaints every page at once. Folding the second into the first would
+	 * have meant an ability documented as never overwriting that always does.
+	 */
+	private function register_set_global_styles() {
+		wp_register_ability(
+			'pattern-builder/set-global-styles',
+			array(
+				'label'               => __( 'Set global styles', 'pattern-builder' ),
+				'description'         => __( 'Sets this site\'s global styles — the root typography, colors and spacing, the styling of elements such as headings, links and buttons, and per-block styles. This is what every block looks like before any pattern says otherwise, so it changes the whole site at once, including pages you have not seen: unlike add-design-tokens, which only ever adds, this replaces whatever is already set at each property it names. Properties it does not name are left alone. Writes the active theme\'s theme.json by default, or Global Styles. Call get-design-system first and set only what is not already covered. Raw CSS (a "css" property) is refused.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'styles'      => array(
+							'type'        => 'object',
+							'description' => 'A theme.json "styles" subtree — for example { "typography": { "fontSize": "var:preset|font-size|medium" }, "elements": { "heading": { "typography": { "fontFamily": "var:preset|font-family|fraunces" } }, "link": { "color": { "text": "var:preset|color|primary" } } } }. Merged property by property, so naming one thing does not clear the rest. Reference presets as var:preset|{type}|{slug} rather than hard-coding a value.',
+						),
+						'destination' => array(
+							'type'        => 'string',
+							'enum'        => array( 'theme', 'user' ),
+							'description' => '"theme" (default) writes the active theme\'s theme.json, so the styles travel with the theme and are versioned with it; "user" writes Global Styles, which stays in this site\'s database and can be reverted in the editor.',
+						),
+					),
+					'required'             => array( 'styles' ),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'written'     => array(
+							'type'        => 'array',
+							'description' => 'The style paths that were set.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'skipped'     => array(
+							'type'        => 'array',
+							'description' => 'Paths WordPress does not recognise as styles, which were dropped rather than written.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'destination' => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_set_global_styles' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Merge the given styles into the destination.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_set_global_styles( $input ) {
+		$styles      = isset( $input['styles'] ) && is_array( $input['styles'] ) ? $input['styles'] : array();
+		$destination = ( isset( $input['destination'] ) && 'user' === $input['destination'] ) ? 'user' : 'theme';
+
+		return Pattern_Builder_Theme_Styles::apply( $styles, $destination );
 	}
 
 	/**

@@ -3,7 +3,6 @@
 namespace TwentyBellows\PatternBuilder;
 
 use WP_Error;
-use WP_Theme_JSON_Resolver;
 
 /**
  * Design tokens: the preset references a pattern carries between sites.
@@ -288,84 +287,22 @@ class Pattern_Builder_Cloud_Tokens {
 			return array();
 		}
 
-		$result = 'theme' === $destination
-			? self::write_theme_json( $to_write )
-			: self::write_user_styles( $to_write );
+		$result = Pattern_Builder_Theme_Json::edit(
+			$destination,
+			function ( $config ) use ( $to_write ) {
+				return self::merge_settings( $config, $to_write );
+			}
+		);
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
-
-		wp_clean_theme_json_cache();
 
 		$written = array();
 		foreach ( $to_write as $type => $list ) {
 			$written[ $type ] = wp_list_pluck( $list, 'slug' );
 		}
 		return $written;
-	}
-
-	/**
-	 * Merge tokens into the theme's user Global Styles post.
-	 *
-	 * @param array $to_write type => token[].
-	 * @return true|WP_Error
-	 */
-	private static function write_user_styles( $to_write ) {
-		$post_id = WP_Theme_JSON_Resolver::get_user_global_styles_post_id();
-		if ( ! $post_id ) {
-			return new WP_Error( 'pb_cloud_no_global_styles', __( 'This site has no Global Styles storage for the active theme.', 'pattern-builder' ), array( 'status' => 500 ) );
-		}
-
-		$post   = get_post( $post_id );
-		$config = $post ? json_decode( (string) $post->post_content, true ) : null;
-		if ( ! is_array( $config ) ) {
-			$config = array();
-		}
-		$config['version']                     = isset( $config['version'] ) ? $config['version'] : 3;
-		$config['isGlobalStylesUserThemeJSON'] = true;
-
-		$config = self::merge_settings( $config, $to_write );
-
-		$updated = wp_update_post(
-			array(
-				'ID'           => $post_id,
-				'post_content' => wp_slash( wp_json_encode( $config ) ),
-			),
-			true
-		);
-
-		return is_wp_error( $updated ) ? $updated : true;
-	}
-
-	/**
-	 * Merge tokens into the active theme's theme.json file.
-	 *
-	 * @param array $to_write type => token[].
-	 * @return true|WP_Error
-	 */
-	private static function write_theme_json( $to_write ) {
-		$path = get_stylesheet_directory() . '/theme.json';
-		if ( ! file_exists( $path ) ) {
-			return new WP_Error( 'pb_cloud_no_theme_json', __( 'The active theme has no theme.json — add these tokens to Site styles instead.', 'pattern-builder' ), array( 'status' => 400 ) );
-		}
-		if ( ! wp_is_writable( $path ) ) {
-			return new WP_Error( 'pb_cloud_theme_json_readonly', __( 'theme.json is not writable — add these tokens to Site styles instead.', 'pattern-builder' ), array( 'status' => 400 ) );
-		}
-
-		$config = json_decode( (string) file_get_contents( $path ), true ); // phpcs:ignore WordPressVIPMinimum.Performance.FetchingRemoteData.FileGetContentsUnknown, WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local theme file.
-		if ( ! is_array( $config ) ) {
-			return new WP_Error( 'pb_cloud_theme_json_invalid', __( 'theme.json could not be parsed.', 'pattern-builder' ), array( 'status' => 500 ) );
-		}
-
-		$config = self::merge_settings( $config, $to_write );
-
-		$written = file_put_contents( $path, wp_json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . "\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Same direct write path Pattern_File_Store uses for theme files.
-		if ( false === $written ) {
-			return new WP_Error( 'pb_cloud_theme_json_write', __( 'theme.json could not be written.', 'pattern-builder' ), array( 'status' => 500 ) );
-		}
-
-		return true;
 	}
 
 	/**
