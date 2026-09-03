@@ -208,6 +208,20 @@ class Pattern_Builder_Cloud {
 	}
 
 	/**
+	 * The connected account's handle — the first segment of every pattern
+	 * name it publishes (D37).
+	 *
+	 * What an installed pattern is checked against before it is given an
+	 * attribution: a pattern from your own account gets none.
+	 *
+	 * @return string Empty when disconnected, or on a service too old to say.
+	 */
+	public static function account_handle() {
+		$account = self::account();
+		return isset( $account['handle'] ) ? trim( (string) $account['handle'] ) : '';
+	}
+
+	/**
 	 * Whether the current user has a stored connection.
 	 *
 	 * @return bool

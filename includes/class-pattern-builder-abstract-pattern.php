@@ -120,6 +120,20 @@ class Abstract_Pattern {
 	public $filePath; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.PropertyNotSnakeCase
 
 	/**
+	 * The cloud pattern this one was first copied from, or '' when it is
+	 * original work here.
+	 *
+	 * Attribution, not linkage (D38): it travels with the pattern, in the
+	 * file header and through every upload and download, while the cloud
+	 * link — which cloud copy this site's pattern corresponds to — stays in
+	 * the site option map, because that is about this site rather than
+	 * about the pattern.
+	 *
+	 * @var string
+	 */
+	public $origin;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param array $args Pattern arguments.
@@ -146,6 +160,7 @@ class Abstract_Pattern {
 		$this->viewportWidth = isset( $args['viewportWidth'] ) && '' !== $args['viewportWidth'] ? (int) $args['viewportWidth'] : null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 
 		$this->filePath = $args['filePath'] ?? null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName
+		$this->origin   = $args['origin'] ?? '';
 
 		$this->id = $args['id'] ?? ( 'theme' === $this->source ? $this->name : null );
 	}
@@ -197,6 +212,7 @@ class Abstract_Pattern {
 				'postTypes'     => 'Post Types',
 				'templateTypes' => 'Template Types',
 				'synced'        => 'Synced',
+				'origin'        => 'Origin',
 			)
 		);
 
@@ -216,6 +232,7 @@ class Abstract_Pattern {
 				'source'        => 'theme',
 				'synced'        => in_array( strtolower( trim( $pattern_data['synced'] ) ), array( 'yes', 'true', '1', 'on' ), true ),
 				'inserter'      => 'no' !== strtolower( trim( $pattern_data['inserter'] ) ),
+				'origin'        => trim( $pattern_data['origin'] ),
 			)
 		);
 	}
@@ -248,6 +265,7 @@ class Abstract_Pattern {
 				'keywords'    => isset( $metadata['wp_pattern_keywords'][0] ) ? array_map( 'trim', explode( ',', $metadata['wp_pattern_keywords'][0] ) ) : array(),
 				'categories'  => $categories,
 				'inserter'    => true,
+				'origin'      => (string) ( $metadata[ Pattern_File_Store::META_ORIGIN ][0] ?? '' ),
 			)
 		);
 	}

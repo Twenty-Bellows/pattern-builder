@@ -458,6 +458,10 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 			'synced'        => (bool) $pattern->synced,
 			'viewportWidth' => $pattern->viewportWidth,
 			'source'        => $pattern->source,
+			// Where the pattern was first copied from, when it is somebody
+			// else's work; empty when it originated here (D38). Read-only:
+			// it is written on install and carried, never edited.
+			'origin'        => (string) $pattern->origin,
 		);
 
 		if ( $is_theme && current_user_can( 'edit_theme_options' ) ) {
@@ -632,6 +636,11 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 					'description' => __( 'Where the pattern lives: a theme file or the database.', 'pattern-builder' ),
 					'type'        => 'string',
 					'enum'        => array( 'theme', 'user' ),
+				),
+				'origin'        => array(
+					'description' => __( 'The cloud pattern this one was first copied from, or empty when it is original work here.', 'pattern-builder' ),
+					'type'        => 'string',
+					'readonly'    => true,
 				),
 				'fromWpBlock'   => array(
 					'description' => __( 'On creation, the ID of a wp_block post to convert into this theme pattern.', 'pattern-builder' ),

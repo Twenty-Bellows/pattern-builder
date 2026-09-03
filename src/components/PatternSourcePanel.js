@@ -1,4 +1,4 @@
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import {
 	Button,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
@@ -29,7 +29,10 @@ import {
  * on the last saved version and then opens the converted pattern.
  *
  * Where a pattern lives also covers the cloud: connected users get the
- * upload/update control for their patternbuilderwp.com library here.
+ * upload/update control for their patternbuilderwp.com library here, and a
+ * pattern copied from somebody else's collection says so — an origin is
+ * only ever set across an account boundary (D38), so a line here always
+ * names another person's work and never needs a "by you" case.
  *
  * @param {Object} root0             Component props.
  * @param {Object} root0.patternPost The pattern's entity record.
@@ -150,6 +153,16 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 						{ __( 'Convert to Theme Pattern', 'pattern-builder' ) }
 					</Button>
 				</>
+			) }
+
+			{ !! patternPost.origin && (
+				<Text variant="muted" size="12px">
+					{ sprintf(
+						/* translators: %s: the pattern this one was copied from, e.g. studio-a/heroes/hero. */
+						__( 'Originally from %s', 'pattern-builder' ),
+						patternPost.origin
+					) }
+				</Text>
 			) }
 
 			{ cloudState?.connected && (

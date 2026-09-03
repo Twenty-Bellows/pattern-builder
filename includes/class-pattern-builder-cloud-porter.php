@@ -211,6 +211,8 @@ class Pattern_Builder_Cloud_Porter {
 			Pattern_Builder_Cloud::remember_collection_category( $collection );
 		}
 
+		$origin = $this->origin_for( $pbp );
+
 		if ( 'theme' === $destination ) {
 			/*
 			 * No attachments to name: a theme pattern's images are moved into
@@ -218,14 +220,14 @@ class Pattern_Builder_Cloud_Porter {
 			 * (Pattern_File_Store::update_theme_pattern), so the package's
 			 * blocks stay as they arrived — an id would name nothing.
 			 */
-			return $this->import_as_theme_pattern( $pbp, $title, $this->install_name( $pbp, $slug ), $description, $categories, $synced, $content );
+			return $this->import_as_theme_pattern( $pbp, $title, $this->install_name( $pbp, $slug ), $description, $categories, $synced, $content, $origin );
 		}
 
 		// A user pattern's images did land in the media library, so its blocks
 		// can name them — the identity the export dropped, in local terms.
 		$content = $this->attach_media_library_ids( $content, $attachments );
 
-		return $this->import_as_user_pattern( $title, $slug, $description, $categories, $synced, $content );
+		return $this->import_as_user_pattern( $title, $slug, $description, $categories, $synced, $content, $origin );
 	}
 
 	/**
@@ -734,9 +736,10 @@ class Pattern_Builder_Cloud_Porter {
 	 * @param string[] $categories  Category names.
 	 * @param bool     $synced      Synced flag.
 	 * @param string   $content     Sanitized markup with local URLs.
+	 * @param string   $origin      Attribution to record, or ''.
 	 * @return array|WP_Error
 	 */
-	private function import_as_user_pattern( $title, $slug, $description, $categories, $synced, $content ) {
+	private function import_as_user_pattern( $title, $slug, $description, $categories, $synced, $content, $origin = '' ) {
 		$post_id = wp_insert_post(
 			array(
 				'post_title'   => $title,
@@ -757,6 +760,10 @@ class Pattern_Builder_Cloud_Porter {
 			delete_post_meta( $post_id, 'wp_pattern_sync_status' );
 		} else {
 			update_post_meta( $post_id, 'wp_pattern_sync_status', 'unsynced' );
+		}
+
+		if ( '' !== $origin ) {
+			update_post_meta( $post_id, Pattern_File_Store::META_ORIGIN, $origin );
 		}
 
 		if ( ! empty( $categories ) ) {
@@ -1027,6 +1034,45 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
+	 * The attribution to write into a pattern being installed (D38).
+	 *
+	 * Three cases, and the third is the one that matters:
+	 *
+	 * - The package already carries an origin: keep it, unchanged. That is
+	 *   what makes credit survive any number of hops and any amount of
+	 *   editing — a pattern three copies down still names the original.
+	 * - It carries none and came from another account: this is the moment
+	 *   the pattern first leaves the account that authored it, so stamp its
+	 *   cloud name.
+	 * - It carries none and is the account's own work: stamp nothing.
+	 *   Self-attribution says nothing, and refusing to write it is what
+	 *   keeps a private collection's name from travelling into a public one
+	 *   later on.
+	 *
+	 * @param array $pbp Package.
+	 * @return string A pattern name, or '' for original work.
+	 */
+	private function origin_for( $pbp ) {
+		$carried = isset( $pbp['origin']['pattern'] ) ? trim( (string) $pbp['origin']['pattern'] ) : '';
+		if ( '' !== $carried ) {
+			return $carried;
+		}
+
+		$namespace = isset( $pbp['namespace'] ) ? trim( (string) $pbp['namespace'] ) : '';
+		if ( '' === $namespace || substr_count( $namespace, '/' ) !== 2 ) {
+			return '';
+		}
+
+		$handle = Pattern_Builder_Cloud::account_handle();
+		if ( '' === $handle || 0 === strpos( $namespace, $handle . '/' ) ) {
+			return '';
+		}
+
+		return $namespace;
+	}
+
+	/**
+	 * Land a package as a theme pattern file.	/**
 	 * Land a package as a theme pattern file.
 	 *
 	 * @param array    $pbp         Package (for viewport/keywords extras).
@@ -1036,9 +1082,10 @@ class Pattern_Builder_Cloud_Porter {
 	 * @param string[] $categories  Category names.
 	 * @param bool     $synced      Synced flag.
 	 * @param string   $content     Sanitized markup with local URLs.
+	 * @param string   $origin      Attribution to record, or ''.
 	 * @return array|WP_Error
 	 */
-	private function import_as_theme_pattern( $pbp, $title, $name, $description, $categories, $synced, $content ) {
+	private function import_as_theme_pattern( $pbp, $title, $name, $description, $categories, $synced, $content, $origin = '' ) {
 		$pattern = new Abstract_Pattern(
 			array(
 				'id'            => $name,
@@ -1052,6 +1099,7 @@ class Pattern_Builder_Cloud_Porter {
 				'synced'        => $synced,
 				'inserter'      => true,
 				'source'        => 'theme',
+				'origin'        => $origin,
 			)
 		);
 
