@@ -51,6 +51,13 @@ class Pattern_Builder_Preview {
 	private $document = null;
 
 	/**
+	 * The theme this request is rendering against, when it is not the active one.
+	 *
+	 * @var array
+	 */
+	private $worn = array();
+
+	/**
 	 * Hook the route.
 	 */
 	public function __construct() {
@@ -80,6 +87,11 @@ class Pattern_Builder_Preview {
 						'default'     => 'standalone',
 						'description' => __( 'How to render it: by itself, or inside the page template.', 'pattern-builder' ),
 					),
+					'theme'   => array(
+						'type'        => 'string',
+						'default'     => '',
+						'description' => __( 'Render against this theme instead of the active one — "blank-theme" for a design system of nothing, "opinionated-theme" for one that is not yours, or any installed theme\'s slug. The site\'s active theme is not changed; the swap lasts for this request only.', 'pattern-builder' ),
+					),
 				),
 			)
 		);
@@ -100,16 +112,42 @@ class Pattern_Builder_Preview {
 	 *
 	 * @param string $id      Pattern id.
 	 * @param string $context 'standalone' or 'page'.
+	 * @param string $theme   Optional theme slug to render against instead of the active one.
 	 * @return string
 	 */
-	public static function url_for( $id, $context = 'standalone' ) {
-		return add_query_arg(
-			array(
-				'pattern' => rawurlencode( $id ),
-				'context' => $context,
-			),
-			rest_url( self::REST_NAMESPACE . '/preview' )
+	public static function url_for( $id, $context = 'standalone', $theme = '' ) {
+		$args = array(
+			'pattern' => rawurlencode( $id ),
+			'context' => $context,
 		);
+
+		if ( '' !== $theme ) {
+			$args['theme'] = $theme;
+		}
+
+		return add_query_arg( $args, rest_url( self::REST_NAMESPACE . '/preview' ) );
+	}
+
+	/**
+	 * The themes this plugin carries for pattern work.
+	 *
+	 * They are not registered as a theme directory, so WordPress does not list
+	 * them and nobody can activate one by accident; the preview reaches them by
+	 * path for the length of one request.
+	 *
+	 * @return array Slug => absolute directory.
+	 */
+	public static function bundled_themes() {
+		$dir    = plugin_dir_path( PATTERN_BUILDER_FILE ) . 'themes/';
+		$themes = array();
+
+		foreach ( array( 'blank-theme', 'opinionated-theme' ) as $slug ) {
+			if ( is_dir( $dir . $slug ) ) {
+				$themes[ $slug ] = $dir . $slug;
+			}
+		}
+
+		return $themes;
 	}
 
 	/**
@@ -125,13 +163,159 @@ class Pattern_Builder_Preview {
 			return $pattern;
 		}
 
+		$theme = (string) $request->get_param( 'theme' );
+
+		if ( '' !== $theme ) {
+			$wearing = $this->wear_theme( $theme );
+
+			if ( is_wp_error( $wearing ) ) {
+				return $wearing;
+			}
+		}
+
 		$this->document = 'page' === $request->get_param( 'context' )
 			? $this->page_document( $pattern )
 			: $this->standalone_document( $pattern );
 
+		if ( '' !== $theme ) {
+			$this->take_theme_off();
+		}
+
 		add_filter( 'rest_pre_serve_request', array( $this, 'write_document' ) );
 
 		return new \WP_REST_Response( null, 200 );
+	}
+
+	/**
+	 * Render as though a different theme were active, for this request only.
+	 *
+	 * Nothing is switched: `switch_theme()` would change the site for everyone,
+	 * and the point is to look at a pattern against another design system
+	 * without touching what visitors see. Filtering the four values that decide
+	 * which theme WordPress reads is enough, provided the theme.json caches are
+	 * cleared on the way in and on the way out — they are keyed on nothing that
+	 * knows about this.
+	 *
+	 * A bundled theme's own `functions.php` is loaded as well, because that is
+	 * where blank-theme empties core's presets and a theme.json cannot.
+	 *
+	 * @param string $slug Theme slug.
+	 * @return true|\WP_Error
+	 */
+	private function wear_theme( $slug ) {
+		$slug = sanitize_key( $slug );
+
+		$bundled = self::bundled_themes();
+
+		if ( isset( $bundled[ $slug ] ) ) {
+			$this->worn = array(
+				'slug'      => $slug,
+				'directory' => untrailingslashit( $bundled[ $slug ] ),
+			);
+		} else {
+			$theme = wp_get_theme( $slug );
+
+			if ( ! $theme->exists() ) {
+				return new \WP_Error(
+					'pb_preview_no_theme',
+					sprintf(
+						/* translators: 1: the theme slug asked for, 2: the slugs this plugin carries. */
+						__( 'No theme named "%1$s". This plugin carries %2$s; any theme installed on this site can be named as well.', 'pattern-builder' ),
+						$slug,
+						implode( ', ', array_keys( $bundled ) )
+					),
+					array( 'status' => 404 )
+				);
+			}
+
+			$this->worn = array(
+				'slug'      => $slug,
+				'directory' => untrailingslashit( $theme->get_stylesheet_directory() ),
+			);
+		}
+
+		/*
+		 * The directory has to be a theme root before any of this works.
+		 * WP_Theme_JSON_Resolver goes through wp_get_theme() to read a theme's
+		 * text domain and its parent, and a theme WordPress cannot construct
+		 * comes back with its presets, its layout and appearanceTools all
+		 * silently dropped — the settings survive, emptied, which reads as a
+		 * theme that declared nothing rather than one that could not be found.
+		 *
+		 * Registering inside the request is contained: $wp_theme_directories is
+		 * request state, and nothing renders Appearance → Themes from here, so
+		 * the themes stay unlisted where a person would look for them.
+		 */
+		if ( isset( $bundled[ $slug ] ) ) {
+			register_theme_directory( plugin_dir_path( PATTERN_BUILDER_FILE ) . 'themes' );
+		}
+
+		foreach ( array( 'stylesheet', 'template' ) as $which ) {
+			add_filter( $which, array( $this, 'worn_slug' ), 99 );
+			add_filter( $which . '_directory', array( $this, 'worn_directory' ), 99 );
+		}
+
+		// The theme root cache is keyed per stylesheet and was primed without ours.
+		delete_site_transient( 'theme_roots' );
+
+		$functions = $this->worn['directory'] . '/functions.php';
+
+		if ( isset( $bundled[ $slug ] ) && file_exists( $functions ) ) {
+			require_once $functions;
+
+			/*
+			 * `require_once` runs a file once per process, so a theme that
+			 * attaches its filters in the file body attaches them for the first
+			 * preview and no other. A bundled theme therefore exposes
+			 * `{slug}_boot()` and `_unboot()`, and the swap calls them either
+			 * side — which is also what keeps it contained to this request.
+			 */
+			$this->worn['boot'] = str_replace( '-', '_', $slug );
+
+			if ( function_exists( $this->worn['boot'] . '_boot' ) ) {
+				call_user_func( $this->worn['boot'] . '_boot' );
+			}
+		}
+
+		wp_clean_theme_json_cache();
+
+		return true;
+	}
+
+	/**
+	 * Stop wearing it, and leave the caches as they were found.
+	 */
+	private function take_theme_off() {
+		if ( isset( $this->worn['boot'] ) && function_exists( $this->worn['boot'] . '_unboot' ) ) {
+			call_user_func( $this->worn['boot'] . '_unboot' );
+		}
+
+		foreach ( array( 'stylesheet', 'template' ) as $which ) {
+			remove_filter( $which, array( $this, 'worn_slug' ), 99 );
+			remove_filter( $which . '_directory', array( $this, 'worn_directory' ), 99 );
+		}
+
+		$this->worn = array();
+
+		wp_clean_theme_json_cache();
+	}
+
+	/**
+	 * The slug of the theme being worn.
+	 *
+	 * @return string
+	 */
+	public function worn_slug() {
+		return isset( $this->worn['slug'] ) ? $this->worn['slug'] : '';
+	}
+
+	/**
+	 * The directory of the theme being worn.
+	 *
+	 * @return string
+	 */
+	public function worn_directory() {
+		return isset( $this->worn['directory'] ) ? $this->worn['directory'] : '';
 	}
 
 	/**

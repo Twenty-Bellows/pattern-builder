@@ -23,35 +23,66 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/**
- * Take core's own presets out of the merge.
- *
- * @param WP_Theme_JSON_Data $theme_json Core's default theme.json data.
- * @return WP_Theme_JSON_Data
- */
-function blank_theme_empty_the_defaults( $theme_json ) {
-	return $theme_json->update_with(
-		array(
-			'version'  => 3,
-			'settings' => array(
-				'color'      => array(
-					'palette'   => array(),
-					'gradients' => array(),
-					'duotone'   => array(),
+if ( ! function_exists( 'blank_theme_empty_the_defaults' ) ) :
+
+	/**
+	 * Take core's own presets out of the merge.
+	 *
+	 * Guarded because Pattern Builder's preview route loads this file directly
+	 * when it renders a pattern against this theme without activating it.
+	 *
+	 * @param WP_Theme_JSON_Data $theme_json Core's default theme.json data.
+	 * @return WP_Theme_JSON_Data
+	 */
+	function blank_theme_empty_the_defaults( $theme_json ) {
+		return $theme_json->update_with(
+			array(
+				'version'  => 3,
+				'settings' => array(
+					'color'      => array(
+						'palette'   => array(),
+						'gradients' => array(),
+						'duotone'   => array(),
+					),
+					'typography' => array(
+						'fontSizes'    => array(),
+						'fontFamilies' => array(),
+					),
+					'spacing'    => array(
+						'spacingSizes' => array(),
+						'spacingScale' => array( 'steps' => 0 ),
+					),
+					'shadow'     => array(
+						'presets' => array(),
+					),
 				),
-				'typography' => array(
-					'fontSizes'    => array(),
-					'fontFamilies' => array(),
-				),
-				'spacing'    => array(
-					'spacingSizes' => array(),
-					'spacingScale' => array( 'steps' => 0 ),
-				),
-				'shadow'     => array(
-					'presets' => array(),
-				),
-			),
-		)
-	);
-}
-add_filter( 'wp_theme_json_data_default', 'blank_theme_empty_the_defaults' );
+			)
+		);
+	}
+	endif;
+
+if ( ! function_exists( 'blank_theme_boot' ) ) :
+
+	/**
+	 * Attach what this theme does.
+	 *
+	 * Separate from the file body because Pattern Builder's preview route loads
+	 * this theme without activating it, and `require_once` runs a file once per
+	 * process: a second preview would attach nothing. The convention is
+	 * `{slug with underscores}_boot()` and `_unboot()`, which the preview calls
+	 * either side of a render so the swap is contained to it.
+	 */
+	function blank_theme_boot() {
+		add_filter( 'wp_theme_json_data_default', 'blank_theme_empty_the_defaults' );
+	}
+
+	/**
+	 * Take it off again.
+	 */
+	function blank_theme_unboot() {
+		remove_filter( 'wp_theme_json_data_default', 'blank_theme_empty_the_defaults' );
+	}
+
+	endif;
+
+blank_theme_boot();

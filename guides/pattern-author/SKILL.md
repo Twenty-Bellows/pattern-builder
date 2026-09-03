@@ -41,6 +41,13 @@ Never invent colors, spacing, or font sizes. A pattern that hard-codes
 else, and it silently opts out of the site's dark mode, style variations, and
 future redesigns.
 
+Referencing a preset the site does not define fails the same way and just as
+quietly — a slug that does not resolve renders as no styling at all.
+`references/design-tokens.md` says which slugs are actually safe, measured
+against core and the three most recent default themes: the short version is
+`base` and `contrast` for colour, the `small`…`xx-large` ladder for type, and
+the numeric spacing steps `40`–`60`. Everything else, check before you use it.
+
 Get the real values. In order of preference:
 
 **If the site is running and has Pattern Builder,** ask it — this resolves
@@ -472,6 +479,7 @@ renders as no styling at all, silently.
 
 - `references/pattern-kinds.md` — the six kinds, what each is for, and the headers each one writes
 - `references/block-vocabulary.md` — which blocks are allowed where (core-only vs theme vs plugin), the core vocabulary by purpose, and composition guidance
+- `references/design-tokens.md` — which preset slugs are safe to reference, measured against core and the three most recent default themes
 - `references/block-markup.md` — the attribute-to-markup contract per block, and the mistakes that produce invalid markup
 - `references/design-content-split.md` — Pattern Overrides slots, `core/pattern` `content`, synced patterns, and the silent failures
 - `references/assets.md` — images and fonts: finding what the site has, adding what it lacks, and the reference to write for each

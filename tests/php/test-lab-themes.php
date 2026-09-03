@@ -83,6 +83,53 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Opinionated Theme follows the conventions the guide documents.
+	 *
+	 * It is the worked example: a pattern that references these slugs adapts to
+	 * it and looks different but correct, while one that hard-codes looks wrong.
+	 * That only holds if the slugs are the ones patterns are told to use, so the
+	 * guide and the theme are asserted against each other rather than kept in
+	 * step by hand.
+	 */
+	public function test_opinionated_theme_uses_the_documented_slugs() {
+		$settings = $this->theme_json( 'opinionated-theme' )['settings'];
+
+		$colors = wp_list_pluck( $settings['color']['palette'], 'color', 'slug' );
+		// base and contrast are the only two every recent default theme agrees on.
+		$this->assertArrayHasKey( 'base', $colors );
+		$this->assertArrayHasKey( 'contrast', $colors );
+		// primary/secondary are Twenty Twenty-Three's and nobody else's; a theme
+		// teaching patterns to reach for them would be teaching a portability bug.
+		$this->assertArrayNotHasKey( 'primary', $colors );
+		$this->assertArrayNotHasKey( 'secondary', $colors );
+
+		$sizes = wp_list_pluck( $settings['typography']['fontSizes'], 'size', 'slug' );
+		$this->assertSame(
+			array( 'small', 'medium', 'large', 'x-large', 'xx-large' ),
+			array_keys( $sizes ),
+			'The five-step ladder, in order, is what the default themes ship.'
+		);
+
+		$spacing = wp_list_pluck( $settings['spacing']['spacingSizes'], 'size', 'slug' );
+		foreach ( array( '40', '50', '60' ) as $step ) {
+			$this->assertArrayHasKey( $step, $spacing, 'The safe middle of the scale must exist.' );
+		}
+	}
+
+	/**
+	 * Its values are nobody's defaults, which is what makes it a test.
+	 */
+	public function test_opinionated_theme_agrees_with_nothing_by_accident() {
+		$settings = $this->theme_json( 'opinionated-theme' )['settings'];
+		$sizes    = wp_list_pluck( $settings['typography']['fontSizes'], 'size', 'slug' );
+		$colors   = wp_list_pluck( $settings['color']['palette'], 'color', 'slug' );
+
+		$this->assertNotSame( '1rem', $sizes['medium'] );
+		$this->assertNotSame( '#ffffff', strtolower( $colors['base'] ) );
+		$this->assertNotSame( '#000000', strtolower( $colors['contrast'] ) );
+	}
+
+	/**
 	 * Opinionated Theme collides on the slugs everybody reaches for.
 	 *
 	 * A pattern that assumes `medium` is a familiar size, or that `primary` is
@@ -99,8 +146,8 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 		}
 
 		$colors = wp_list_pluck( $settings['color']['palette'], 'color', 'slug' );
-		$this->assertArrayHasKey( 'primary', $colors );
-		$this->assertArrayHasKey( 'accent', $colors );
+		$this->assertArrayHasKey( 'base', $colors );
+		$this->assertArrayHasKey( 'accent-1', $colors );
 	}
 
 	/**

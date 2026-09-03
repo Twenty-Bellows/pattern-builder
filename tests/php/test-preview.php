@@ -142,6 +142,99 @@ class Test_Preview extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Rendering against another theme, without changing the site.
+	 *
+	 * The whole point of carrying blank-theme is being able to look at a pattern
+	 * with no design system under it. Doing that by switching the site's theme
+	 * would change what every visitor sees, so the swap lasts one request: the
+	 * four values deciding which theme WordPress reads are filtered, the
+	 * theme.json caches cleared either side, and the active theme is never
+	 * touched.
+	 */
+	public function test_wearing_blank_theme_leaves_the_site_alone() {
+		$before = get_stylesheet();
+
+		$this->call( 'wear_theme', array( 'blank-theme' ) );
+
+		$this->assertSame( 'blank-theme', get_stylesheet() );
+		$this->assertStringEndsWith( '/themes/blank-theme', get_stylesheet_directory() );
+
+		$this->call( 'take_theme_off' );
+
+		$this->assertSame( $before, get_stylesheet(), 'The active theme must be exactly as it was.' );
+	}
+
+	/**
+	 * And what it renders really has none of core's presets in it.
+	 *
+	 * This is the assertion that says the swap reached theme.json rather than
+	 * merely renaming the theme: blank-theme's functions.php is what empties
+	 * core's palette, and it only runs if the preview loaded it.
+	 */
+	public function test_a_blank_preview_carries_no_core_presets() {
+		$this->call( 'wear_theme', array( 'blank-theme' ) );
+
+		$css  = wp_get_global_stylesheet( array( 'variables' ) );
+		$html = $this->call( 'standalone_document', array( $this->a_pattern() ) );
+
+		$this->call( 'take_theme_off' );
+
+		foreach ( array( 'vivid-red', 'pale-pink', 'vivid-purple' ) as $slug ) {
+			$this->assertStringNotContainsString(
+				'--wp--preset--color--' . $slug,
+				$css,
+				'A blank preview emitted a core preset it is meant to have none of.'
+			);
+		}
+
+		$this->assertStringContainsString( 'Body copy.', $html, 'It still has to render the pattern.' );
+	}
+
+	/**
+	 * The opinionated theme brings its own, which is the other half of the pair.
+	 */
+	public function test_an_opinionated_preview_carries_that_themes_presets() {
+		$this->call( 'wear_theme', array( 'opinionated-theme' ) );
+
+		// The stylesheet rather than the document: wp_head() fires its enqueue
+		// actions once per process, so a second document in the same run has an
+		// empty head and would pass this by saying nothing at all.
+		$css = wp_get_global_stylesheet( array( 'variables' ) );
+
+		$this->call( 'take_theme_off' );
+
+		$this->assertStringContainsString( '--wp--preset--color--base', $css );
+		$this->assertStringContainsString( '--wp--preset--color--contrast', $css );
+		$this->assertStringContainsString( '--wp--preset--font-size--xx-large', $css );
+	}
+
+	/**
+	 * A theme nobody has is a 404 that names what there is.
+	 */
+	public function test_an_unknown_theme_is_refused() {
+		$refused = $this->call( 'wear_theme', array( 'no-such-theme' ) );
+
+		$this->assertWPError( $refused );
+		$this->assertSame( 'pb_preview_no_theme', $refused->get_error_code() );
+		$this->assertStringContainsString( 'blank-theme', $refused->get_error_message() );
+	}
+
+	/**
+	 * Both bundled themes are found where the preview looks for them.
+	 */
+	public function test_the_bundled_themes_are_locatable() {
+		$themes = Pattern_Builder_Preview::bundled_themes();
+
+		$this->assertArrayHasKey( 'blank-theme', $themes );
+		$this->assertArrayHasKey( 'opinionated-theme', $themes );
+
+		foreach ( $themes as $slug => $dir ) {
+			$this->assertFileExists( $dir . '/theme.json', $slug . ' must carry a theme.json.' );
+			$this->assertFileExists( $dir . '/style.css', $slug . ' must carry a style.css.' );
+		}
+	}
+
+	/**
 	 * The URL is what render-pattern hands back, so its shape is part of the contract.
 	 */
 	public function test_the_url_names_the_pattern_and_context() {

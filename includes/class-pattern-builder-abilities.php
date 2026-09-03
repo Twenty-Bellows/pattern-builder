@@ -654,6 +654,7 @@ class Pattern_Builder_Abilities {
 			'pattern-kinds'        => 'references/pattern-kinds.md',
 			'block-vocabulary'     => 'references/block-vocabulary.md',
 			'block-markup'         => 'references/block-markup.md',
+			'design-tokens'        => 'references/design-tokens.md',
 			'design-content-split' => 'references/design-content-split.md',
 			'assets'               => 'references/assets.md',
 			'keeping-current'      => 'references/keeping-current.md',
