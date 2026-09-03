@@ -282,6 +282,32 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 	/**
 	 * Both are real themes WordPress would list.
 	 */
+	/**
+	 * The theme is the worked example of the guide, and the guide now covers
+	 * three layers rather than one — so it carries a block style variation
+	 * too, in the only form that registers one without PHP: a partial in the
+	 * theme's `styles/` directory with a `blockTypes` key. A pattern applying
+	 * `is-style-inset-panel` should look different but right here.
+	 */
+	public function test_opinionated_theme_ships_a_block_style_variation() {
+		$path = dirname( __DIR__, 2 ) . '/themes/opinionated-theme/styles/inset-panel.json';
+		$this->assertFileExists( $path );
+
+		$partial = json_decode( (string) file_get_contents( $path ), true );
+
+		// `blockTypes` is what makes this a *block* style variation rather
+		// than a whole-site one, and core skips a partial carrying no styles.
+		$this->assertSame( array( 'core/group' ), $partial['blockTypes'] );
+		$this->assertNotEmpty( $partial['styles'] );
+		$this->assertSame( 'inset-panel', $partial['slug'] );
+
+		// It must reference the theme's own presets rather than hard-code,
+		// or the example teaches the opposite of what the guide says.
+		$encoded = wp_json_encode( $partial['styles'] );
+		$this->assertStringContainsString( 'var(--wp--preset--color--surface)', $encoded );
+		$this->assertStringNotContainsString( '#', $encoded );
+	}
+
 	public function test_both_themes_are_well_formed() {
 		foreach ( array( 'blank-theme', 'opinionated-theme' ) as $slug ) {
 			$dir = dirname( __DIR__, 2 ) . '/themes/' . $slug;

@@ -75,7 +75,9 @@ input and output schema.
 | `pattern-builder/get-editor-scripts` | GET | this site's own block editor script URLs, in load order, for that validator |
 | `pattern-builder/create-pattern` | POST | store finished markup. `title` and `content` required; `source` is `theme` (default) or `user`; also `name`, `description`, `categories`, `keywords`, `synced`, `viewportWidth` |
 | `pattern-builder/update-pattern` | POST | replace an existing pattern. `id` and `content` required |
-| `pattern-builder/add-design-tokens` | POST | add presets to the design system. `input[tokens]` is a list of `{type, slug, name, value}`; `input[destination]` is `theme` (default) or `user` |
+| `pattern-builder/add-design-tokens` | POST | add presets to the design system. `input[tokens]` is a list of `{type, slug, name, value}`; `input[destination]` is `theme` (default) or `user`. Only ever **adds** — a slug already here is skipped |
+| `pattern-builder/set-global-styles` | POST | set what a block looks like before any pattern speaks: `input[styles]` is a theme.json `styles` subtree, `input[destination]` is `theme` (default) or `user`. **Replaces** at each property it names and changes the whole site, so read `get-design-system`'s `styles` first |
+| `pattern-builder/add-block-style-variation` | POST | register a named look a pattern applies with a class: `slug`, `blockTypes`, `styles`, optional `title` and `description`. Answers with the `class` to put on the block |
 | `pattern-builder/find-media` | GET | images the site already has, in the media library and in the theme's `assets/images`, each with the reference to write. Optional `input[search]`, `input[source]=all\|media\|theme`. The answer also carries how to upload a file |
 | `pattern-builder/add-asset` | POST | store an image: `svg` markup you authored (with `filename`), or a `url` for the site to fetch. `destination` is `theme` (default) or `media`. **A file you hold goes to the route below instead** |
 | `pattern-builder/add-placeholder-image` | POST | draw a plain placeholder into the theme: `width`, `height`, optional `label` |
@@ -151,6 +153,58 @@ that is the name your markup has to use.
 **No font files.** A `fontFamily` is a stack of names. Installing a webfont is
 a different job, and this is not it — name families the site can already
 serve, or say what needs installing.
+
+### The other two design writes
+
+`add-design-tokens` gives a pattern a vocabulary to *reference*. Two siblings
+cover the rest of the design system, and `references/design-system.md` is the
+long form.
+
+`set-global-styles` decides what a block looks like when the pattern says
+nothing — the root font size, the heading face, the link colour,
+`elements.button`. It is the opposite of the tokens in every way that matters:
+there is one `elements.link.color.text`, so setting it **replaces** what was
+there and repaints every page at once, including ones you have not seen. Right
+when the design is yours to set — recreating a site, establishing a look on a
+blank theme, filling a gap. Wrong when you are writing a pattern for somebody's
+existing site: there, read `get-design-system`'s `styles` and conform to them.
+
+```bash
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  -H 'Content-Type: application/json' \
+  -d '{"input":{"styles":{
+        "typography":{"fontSize":"var:preset|font-size|medium"},
+        "elements":{"link":{"color":{"text":"var:preset|color|primary"}}}
+      }}}' \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/set-global-styles/run"
+```
+
+`add-block-style-variation` registers a **named look applied with a class** —
+a second kind of button, a card treatment. It answers with the `class` to put
+on the block, and that class is all the markup carries. Reach for it whenever
+you catch yourself about to set the same five attributes on every button: the
+styling lives in one place, the editor offers it by name, and it applies only
+where the class is.
+
+```bash
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  -H 'Content-Type: application/json' \
+  -d '{"input":{"slug":"button-secondary","title":"Secondary",
+        "blockTypes":["core/button"],
+        "styles":{"border":{"radius":"999px"},
+                  "color":{"background":"var:preset|color|accent"}}}}' \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/add-block-style-variation/run"
+```
+
+Check `get-design-system`'s `blockStyles` first. A variation with
+`portable: true` is one WordPress itself ships — `is-style-outline` and the
+rest — and hand-rolling what one of those already does is the mistake.
+
+**Neither accepts raw CSS.** WordPress does not sanitize a theme.json `css`
+property; it gates it on the `edit_css` capability instead, because a string
+that closes its own selector writes rules for the whole document. Both refuse
+it, and the service will not store one either, so a variation carrying CSS
+cannot travel with a pattern.
 
 ## The cloud, through the site's connection
 

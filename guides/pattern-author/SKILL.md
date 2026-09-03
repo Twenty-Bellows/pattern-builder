@@ -43,10 +43,14 @@ future redesigns.
 
 Referencing a preset the site does not define fails the same way and just as
 quietly — a slug that does not resolve renders as no styling at all.
-`references/design-tokens.md` says which slugs are actually safe, measured
-against core and the three most recent default themes: the short version is
-`base` and `contrast` for colour, the `small`…`xx-large` ladder for type, and
-the numeric spacing steps `40`–`60`. Everything else, check before you use it.
+`references/design-system.md` covers all three layers a pattern leans on — the
+tokens it references, the styles it inherits and the block style variations it
+applies — and which names are actually safe, measured against core and the
+three most recent default themes: the short version is `base` and `contrast`
+for colour, the `small`…`xx-large` ladder for type, and the numeric spacing
+steps `40`–`60`. Everything else, check before you use it. It also says the
+thing hardest to see from the markup: what the site already styles is what the
+pattern inherits, so restating it is how a pattern stops adapting.
 
 Get the real values. In order of preference:
 
@@ -479,7 +483,7 @@ renders as no styling at all, silently.
 
 - `references/pattern-kinds.md` — the six kinds, what each is for, and the headers each one writes
 - `references/block-vocabulary.md` — which blocks are allowed where (core-only vs theme vs plugin), the core vocabulary by purpose, and composition guidance
-- `references/design-tokens.md` — which preset slugs are safe to reference, measured against core and the three most recent default themes
+- `references/design-system.md` — the three layers a pattern leans on: the tokens it references, the styles it inherits, the block style variations it applies, and which names travel
 - `references/block-markup.md` — the attribute-to-markup contract per block, and the mistakes that produce invalid markup
 - `references/design-content-split.md` — Pattern Overrides slots, `core/pattern` `content`, synced patterns, and the silent failures
 - `references/assets.md` — images and fonts: finding what the site has, adding what it lacks, and the reference to write for each
