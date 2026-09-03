@@ -49,7 +49,18 @@ if ( ! $token ) {
 
 wp_set_current_user( 1 );
 update_user_meta( 1, Pattern_Builder_Cloud::META_TOKEN, $token );
-update_user_meta( 1, Pattern_Builder_Cloud::META_ACCOUNT, array( 'id' => 0, 'name' => 'e2e' ) );
+
+/*
+ * The account as the service describes it, handle included. Attribution
+ * compares the connected handle against a package's namespace (D38), so a
+ * stubbed account would have this site stamping its own patterns as
+ * somebody else's work.
+ */
+$me = Pattern_Builder_Cloud::request( 'GET', '/me' );
+if ( is_wp_error( $me ) ) {
+	WP_CLI::error( 'Could not read the account: ' . $me->get_error_message() );
+}
+update_user_meta( 1, Pattern_Builder_Cloud::META_ACCOUNT, isset( $me['account'] ) ? (array) $me['account'] : array() );
 
 $controller = new Pattern_Builder_Cloud_Controller();
 $out        = array();
@@ -113,7 +124,31 @@ if ( 'install' === $pattern_id ) {
 	if ( $install['failed'] || ! $filed ) {
 		WP_CLI::error( sprintf( 'Collection install broke: %d failed, filed under %s: %s', $install['failed'], $category, $filed ? 'yes' : 'no' ) );
 	}
-	WP_CLI::success( sprintf( 'Collection installed: %d landed, %d already here, all under %s.', $install['installed'], $install['skipped'], $category ) );
+	/*
+	 * A page pattern's sections have to be here, under the names its
+	 * markup uses, or it renders their placeholder copy (D38). Installing
+	 * as `user` still lands dependencies as theme patterns, because a
+	 * `wp_block` can never be a `core/pattern` target.
+	 */
+	$store    = new \TwentyBellows\PatternBuilder\Pattern_File_Store();
+	$dangling = array();
+	foreach ( $landed as $r ) {
+		$content = 'user' === $r['type']
+			? (string) get_post_field( 'post_content', $r['id'] )
+			: (string) ( $store->find_theme_pattern( $r['id'] )->content ?? '' );
+
+		foreach ( \TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Porter::references_of( $content ) as $reference ) {
+			if ( ! $store->find_theme_pattern( $reference ) ) {
+				$dangling[] = $reference;
+			}
+		}
+	}
+
+	if ( $dangling ) {
+		WP_CLI::error( 'Installed patterns reference patterns that are not here: ' . implode( ', ', array_unique( $dangling ) ) );
+	}
+
+	WP_CLI::success( sprintf( 'Collection installed: %d landed, %d already here, all under %s, every reference resolves.', $install['installed'], $install['skipped'], $category ) );
 	return;
 }
 
@@ -134,6 +169,9 @@ if ( ! $e2e ) {
 				'library/collections',
 				array(
 					'name'        => 'E2E Roundtrip',
+					// Permanent, and the middle segment of every pattern
+					// name in it (D37), so it is given rather than derived.
+					'slug'        => 'e2e-roundtrip',
 					'description' => 'Made by tests/e2e/cloud-roundtrip.php.',
 				)
 			)
@@ -208,6 +246,47 @@ $checks = array(
 	'image names its attachment'    => (bool) preg_match( '/wp-image-\d+/', $post->post_content ),
 	'filed in the collection'       => isset( $out['upload']['pattern']['collection']['slug'] ) && $out['upload']['pattern']['collection']['slug'] === $e2e['slug'],
 );
+
+/*
+ * 5. The dependency tree (D38), when the site has one to send: a pattern
+ * that references others goes up with them, leaves first, its references
+ * rewritten onto the collection's namespace. Skipped rather than failed
+ * where the theme has no page pattern, so the script still runs anywhere.
+ */
+$tree_pattern = isset( $args[2] ) ? $args[2] : 'simple-theme/e2e-page-home';
+$store        = new \TwentyBellows\PatternBuilder\Pattern_File_Store();
+
+if ( $store->find_theme_pattern( $tree_pattern ) ) {
+	$out['tree'] = $attempt(
+		'Upload tree',
+		$controller->upload(
+			$request(
+				'upload',
+				array(
+					'patternType' => 'theme',
+					'patternId'   => $tree_pattern,
+					'collection'  => $e2e['id'],
+				)
+			)
+		)
+	);
+
+	$members = isset( $out['tree']['members'] ) ? $out['tree']['members'] : array();
+
+	// Read the stored page back and look at what its references say now.
+	$root      = Pattern_Builder_Cloud::request( 'GET', '/library/patterns/' . (int) ( $out['tree']['pattern']['id'] ?? 0 ) );
+	$namespace = is_wp_error( $root ) ? '' : (string) ( $root['namespace'] ?? '' );
+	$stored    = is_wp_error( $root ) ? '' : (string) ( $root['content'] ?? '' );
+	$prefix    = implode( '/', array_slice( explode( '/', $namespace ), 0, 2 ) );
+
+	$checks['tree went up leaves first'] = count( $members ) > 1 && end( $members ) === $tree_pattern;
+	$checks['references were rewritten'] = $prefix && false !== strpos( $stored, '"slug":"' . $prefix . '/' )
+		&& false === strpos( $stored, '"slug":"simple-theme/' );
+	$out['tree']                         = array(
+		'members'   => $members,
+		'namespace' => $namespace,
+	);
+}
 
 $out['checks'] = $checks;
 WP_CLI::log( wp_json_encode( $out, JSON_PRETTY_PRINT ) );
