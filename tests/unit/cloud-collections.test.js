@@ -14,6 +14,7 @@ import {
 	suggestSlug,
 	summarizeInstall,
 	unionTokens,
+	needsNewerWordPress,
 } from '../../src/cloud/collections';
 
 const starter = { owner: 2, slug: 'starter-sections', title: 'Starter' };
@@ -157,5 +158,66 @@ describe( 'slugProblem', () => {
 		);
 		expect( slugProblem( 'hero--big' ) ).toContain( 'single hyphens' );
 		expect( slugProblem( 'personal' ) ).toContain( 'Personal collection' );
+	} );
+} );
+
+describe( 'needsNewerWordPress', () => {
+	it( 'passes a pattern that names no version', () => {
+		expect( needsNewerWordPress( {}, '6.8' ) ).toBe( '' );
+		expect( needsNewerWordPress( { minWordPress: '' }, '6.8' ) ).toBe( '' );
+		expect( needsNewerWordPress( { minWordPress: '  ' }, '6.8' ) ).toBe(
+			''
+		);
+	} );
+
+	it( 'passes what this site already runs, and anything older', () => {
+		expect( needsNewerWordPress( { minWordPress: '6.8' }, '6.8' ) ).toBe(
+			''
+		);
+		expect( needsNewerWordPress( { minWordPress: '6.8' }, '7.1' ) ).toBe(
+			''
+		);
+		expect( needsNewerWordPress( { minWordPress: '6.9' }, '6.10' ) ).toBe(
+			''
+		);
+	} );
+
+	it( 'names the version a pattern needs when this site is older', () => {
+		expect( needsNewerWordPress( { minWordPress: '6.9' }, '6.8' ) ).toBe(
+			'6.9'
+		);
+		expect( needsNewerWordPress( { minWordPress: '7.1' }, '6.9' ) ).toBe(
+			'7.1'
+		);
+	} );
+
+	it( 'compares segment by segment, not as a decimal', () => {
+		// 6.10 is newer than 6.9, which a numeric comparison gets backwards.
+		expect( needsNewerWordPress( { minWordPress: '6.10' }, '6.9' ) ).toBe(
+			'6.10'
+		);
+		expect( needsNewerWordPress( { minWordPress: '6.9' }, '6.10' ) ).toBe(
+			''
+		);
+	} );
+
+	it( 'does not count a release suffix as older', () => {
+		// A site on 7.2-RC1 has the 7.2 blocks; only the release number
+		// counts, or every RC would be refused its own release's patterns.
+		expect(
+			needsNewerWordPress( { minWordPress: '7.2' }, '7.2-RC1' )
+		).toBe( '' );
+		expect(
+			needsNewerWordPress( { minWordPress: '7.2' }, '7.2-alpha-59999' )
+		).toBe( '' );
+	} );
+
+	it( 'leaves it to the server when this site version is unknown', () => {
+		expect( needsNewerWordPress( { minWordPress: '99.0' }, '' ) ).toBe(
+			''
+		);
+		expect(
+			needsNewerWordPress( { minWordPress: '99.0' }, undefined )
+		).toBe( '' );
 	} );
 } );

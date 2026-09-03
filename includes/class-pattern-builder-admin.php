@@ -209,12 +209,17 @@ class Pattern_Builder_Admin {
 				'window.patternBuilderAdmin = %s;',
 				wp_json_encode(
 					array(
-						'editorSettings' => $settings,
-						'pattern'        => $pattern ? $pattern : null,
-						'patternType'    => $this->get_requested_pattern_type(),
-						'adminUrl'       => $browse_url,
-						'backUrl'        => $back_url ? $back_url : $browse_url,
-						'telemetry'      => Pattern_Builder_Telemetry::client_state(),
+						'editorSettings'   => $settings,
+						'pattern'          => $pattern ? $pattern : null,
+						'patternType'      => $this->get_requested_pattern_type(),
+						'adminUrl'         => $browse_url,
+						'backUrl'          => $back_url ? $back_url : $browse_url,
+						'telemetry'        => Pattern_Builder_Telemetry::client_state(),
+						// What this site can render. A cloud pattern says
+						// which WordPress it needs, and the browser says so
+						// before the download rather than after — the
+						// server refuses either way.
+						'wordPressVersion' => Pattern_Builder_Cloud_Porter::wordpress_version(),
 					)
 				)
 			),

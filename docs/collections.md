@@ -1,6 +1,6 @@
-# Collections in Pattern Builder — the plan
+# Collections in Pattern Builder
 
-*Approved design, 2026-09-02, direction from Jason. The service side — definitions, tiers, data model, REST contract, decisions D30–D36 — is in the [patternbuilderwp.com repository's `docs/collections.md`](https://github.com/Twenty-Bellows/patternbuilderwp.com/blob/main/docs/collections.md); this document is what the plugin builds on top of that contract. Work is based on `2.1`.*
+*Decided 2026-09-02, and kept current since. How collections work in the plugin. The service side — definitions, tiers, data model, REST contract, decisions D30–D36 — is in the [patternbuilderwp.com repository's `docs/collections.md`](https://github.com/Twenty-Bellows/patternbuilderwp.com/blob/main/docs/collections.md); this document is what the plugin builds on top of that contract.*
 
 ## 1. What changes for the user
 
@@ -30,10 +30,9 @@ Every route stays nonce- and capability-gated and answers 401 disconnected, as t
 | `GET /cloud/collections/{owner}/{slug}` | One collection with its pattern summaries (tokens included, so the union check needs no second pass). |
 | `GET /cloud/directory` | Unchanged; gains `collection` filter. |
 | `POST /cloud/download` | Unchanged: one cloud pattern into theme or user, with tokens. Gains `collection` in the request so the porter can file it. |
-| `GET /cloud/library/collections` · `POST` · `PUT /{id}` · `DELETE /{id}?patterns=delete\|move` | The account's collections. Create relays the service's rule (free: public only). Delete relays the refused move past the cap. |
+| `GET /cloud/library/collections` · `POST` · `PUT /{id}` · `DELETE /{id}` | The account's collections. Create relays the service's rule (free: public only). Delete takes the collection's patterns with it — there is nowhere to move them (D38). |
 | `GET /cloud/library` | Unchanged; gains `collection` filter. |
 | `POST /cloud/upload` | Gains `collection` (required; `personal` accepted). |
-| `PUT /cloud/library/patterns/{id}` (via the existing update path) | Gains `collection` to move a pattern. |
 | `GET /cloud/status` | `/me` relayed; now carries `entitlements` (personal cap, can_create_private, fair use), `personal { count, cap }` and `over_policy`. |
 | `GET /cloud/pattern-state` | Unchanged; the link map gains the collection. |
 
@@ -54,15 +53,14 @@ Every route stays nonce- and capability-gated and answers 401 disconnected, as t
 
 - **Rail**: the account's collections, Personal first with a lock icon and its meter ("7 of 25", or the count alone on Pro). Selecting one filters the grid.
 - **New collection**: name, slug (permanent — part of the name of every pattern in the collection), description; visibility only where the account may choose (Pro). A free account is told, in the same dialog, that the collection will be public and why.
-- **Collection header**: Rename, Describe, Visibility (as allowed; Personal offers only Describe), **Delete** with the prompt: delete its patterns, or move them to Personal. A refused move (past the cap) shows the upgrade prompt and leaves delete available.
-- **Pattern actions**: **Move to collection** in the details sidebar.
+- **Collection header**: Rename, Describe, Visibility (as allowed; Personal offers only Describe), **Delete**, which says plainly that the collection's patterns go with it and offers no alternative — a move would rewrite the middle segment of a permanent name (D38), so the work is downloaded first or not at all.
 - **Over policy** (a lapsed Pro): a banner from `/me` saying what is locked and the three ways out, matching the service's rule.
 
 ## 5. Upload (`PatternCloudPanel`, inside the Pattern Source panel)
 
 - With only Personal, nothing is asked. With more, a **collection picker** defaulting to the last one used, with **New collection…** inline.
 - When the target is public: "This collection is public. The pattern will be listed once it passes the checks."
-- Update keeps the pattern's collection; **Move to…** sits beside it.
+- Update keeps the pattern's collection, which is the only thing it can do: a pattern stays in the collection it was uploaded into (D38).
 - The block-validity gate is unchanged.
 
 ## 6. Abilities (`Pattern_Builder_Abilities`, `pattern-builder/*`)
@@ -101,7 +99,7 @@ No ability changes visibility or deletes a collection. The authoring guide's `ab
 1. Proxy routes, `/cloud/status` shape, link map, the categories option.
 2. Community tab: tiles, collection view, search groups.
 3. Save collection: porter method, the flow, the footprint.
-4. Uploaded tab: rail, create, header actions, move, meter, over-policy banner.
+4. Uploaded tab: rail, create, header actions, meter, over-policy banner.
 5. Upload picker in the cloud panel.
 6. Abilities and the authoring guide.
 7. `CLAUDE.md`, `readme.txt`, and the docs pages on the website (in that repository).
@@ -112,5 +110,5 @@ No ability changes visibility or deletes a collection. The authoring guide's `ab
 - A whole collection installs in one action into the chosen destination, with one tokens step, progress, skipped-if-installed, and a failure list; the patterns carry the collection's local category and the inserter shows its title.
 - Upload into a second collection asks; upload with only Personal does not; a public target says so.
 - A free account cannot create a private collection from the plugin or from an agent, and sees the cap on Personal; Pro can.
-- Delete offers delete-or-move and relays the refused move with the upgrade prompt.
+- Delete says the patterns go with the collection, and offers no move.
 - `npm run lint:js`, `composer lint`, `npm run test:unit` and the PHP suite (SQLite route in `CLAUDE.md`) pass.
