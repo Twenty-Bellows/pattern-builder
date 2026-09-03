@@ -41,28 +41,33 @@ Comparing what core ships against the three most recent default themes:
 | **Font families** | none | typeface names | `body`, `heading` | typeface names |
 | **Content width** | none | 650px | 620px | 645px |
 
-Three things fall out of that, and they are the whole of the guidance.
+This is a map of where themes *agree*, which is what decides whether a slug
+adapts to its destination or arrives carrying its own value. It is not a list of
+what will break — for a pattern that travels through the cloud, nothing here
+breaks — and the one case where it is a breakage map is called out at the end.
 
-### Colours: only `base` and `contrast` are portable
+### Colours: `base` and `contrast` are the common ground
 
 They are the only two slugs all three default themes agree on, and they mean
-what they say — `base` is the page, `contrast` is the text on it.
+what they say — `base` is the page, `contrast` is the text on it. A pattern
+using them lands on any theme and takes that theme's colours, which is the
+behaviour you want for anything carrying the site's identity.
 
-Everything else is theme-specific. **`primary` exists in Twenty Twenty-Three
-and in neither of the two themes that followed it**, so a pattern reaching for
-`primary` renders unstyled on the two newest default themes and on anything
-built after them. `accent-1` is Twenty Twenty-Five's convention and Twenty
-Twenty-Four calls the same idea `accent`.
+Everything else is theme-specific. `primary` is Twenty Twenty-Three's and
+neither of the two themes that followed it kept the name; `accent-1` is Twenty
+Twenty-Five's convention and Twenty Twenty-Four calls the same idea `accent`.
+None of those *fail* on a travelled pattern — the value ships and is installed —
+but none of them adapt either, so the pattern keeps its own colour on a site
+that had a perfectly good one.
 
-Core's own twelve — `vivid-red`, `pale-pink` and the rest — are present on
-every site and are the wrong answer anyway: they are a fixed palette that no
-theme designed, they ignore the site's own colours, and a theme *can* switch
-them off.
+Core's own twelve — `vivid-red`, `pale-pink` and the rest — are the wrong answer
+for a different reason: they are a fixed palette no theme designed, they ignore
+the site's own colours entirely, and a theme *can* switch them off.
 
 So: **`base` and `contrast` freely. Any other colour, check first** — ask
 `get-design-system` what this site actually has, and use what is there. If
-nothing suitable exists, add your own with `add-design-tokens` under a name
-that says what it is for. Never inline a hex.
+nothing suitable exists, add it with `add-design-tokens` under a name that says
+what it is for. Never inline a hex.
 
 ### Font sizes: the five-step ladder, and know where core stops
 
@@ -77,12 +82,11 @@ is not on the ladder is a size no theme will have defined.
 
 Every theme uses core's numeric scale, but not the same span of it: `40`, `50`
 and `60` exist in all three, while `10`, `20`, `70` and `80` each go missing
-somewhere. A band whose padding is `var:preset|spacing|80` collapses to nothing
-on Twenty Twenty-Four.
+somewhere.
 
-Prefer `40`–`60` for anything a pattern needs. Where a design genuinely wants a
-large band, either check the site has the step or declare the value on the block
-and accept that it will not scale with the theme.
+Prefer `40`–`60` for the rhythm a pattern shares with its host, since those are
+the steps most likely to be the site's own. The outer steps still work — a
+travelled pattern installs the value it brought — they just stop adapting.
 
 ### Font families: there is no convention
 
@@ -175,8 +179,17 @@ should call it `contrast` with `"name": "Text"`, not `text-default`.
 3. **Spacing** — numeric slugs, `40`–`60` for preference. Semantics go in `name`.
 4. **Font families** — set none unless the design needs one.
 5. **Layout** — assume ~620px of content; declare your own if you need more.
-6. **Whatever you reference must exist.** A slug that does not resolve renders
-   as no styling at all, with no error anywhere.
+6. **Whatever you reference must exist on the site you are writing on.** A slug
+   that does not resolve renders as no styling at all, with no error anywhere,
+   and ships no value — so the pattern arrives broken as well.
+
+### The one case where the evidence above *is* a breakage map
+
+A pattern that never goes through the cloud carries nothing. Copied into a
+theme by hand, shared as a file, pasted between sites — there is no upload to
+collect its tokens and no download to install them, so it resolves against
+whatever the destination happens to define and the agreement table is the whole
+story. If a pattern is meant to travel that way, stay inside tier 1.
 
 ## Checking a pattern against both worlds
 
