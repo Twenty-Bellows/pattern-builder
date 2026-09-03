@@ -1102,6 +1102,25 @@ class Pattern_Builder_Abilities {
 				'type'        => 'boolean',
 				'description' => 'Whether the pattern is synced. A synced theme pattern can be referenced with core/pattern and have its slots filled.',
 			),
+			'blockTypes'    => array(
+				'type'        => 'array',
+				'items'       => array( 'type' => 'string' ),
+				'description' => 'Blocks this pattern is offered for. ["core/post-content"] makes it a starting layout for new content; a block\'s own name offers it when that block is inserted still empty.',
+			),
+			'postTypes'     => array(
+				'type'        => 'array',
+				'items'       => array( 'type' => 'string' ),
+				'description' => 'Post types this pattern is offered for when new content is created, e.g. ["page"]. Takes effect alongside blockTypes ["core/post-content"].',
+			),
+			'templateTypes' => array(
+				'type'        => 'array',
+				'items'       => array( 'type' => 'string' ),
+				'description' => 'Template types this pattern is offered for, e.g. ["front-page"]. A whole-template pattern usually pairs this with inserter false.',
+			),
+			'inserter'      => array(
+				'type'        => 'boolean',
+				'description' => 'Whether the pattern appears in the block inserter. Defaults to true; a whole template is noise there, so template patterns set it false.',
+			),
 			'viewportWidth' => array(
 				'type'        => 'integer',
 				'description' => 'Preview width in pixels.',
@@ -1966,8 +1985,33 @@ class Pattern_Builder_Abilities {
 		if ( isset( $input['name'] ) && '' !== $input['name'] ) {
 			$args['name'] = (string) $input['name'];
 		}
+
+		/*
+		 * The placement headers, which are what make a pattern a starting
+		 * point rather than a section: WordPress reads them from the file, so
+		 * a pattern created without them is an ordinary theme pattern however
+		 * it was meant. Each one falls back to what the file already carries,
+		 * because an update that simply does not mention a header should not
+		 * be the thing that removes it.
+		 */
+		foreach ( array( 'blockTypes', 'postTypes', 'templateTypes' ) as $list ) {
+			if ( isset( $input[ $list ] ) ) {
+				$args[ $list ] = array_values( array_filter( array_map( 'sanitize_text_field', (array) $input[ $list ] ) ) );
+			} else {
+				$args[ $list ] = $fallback( $list, array() );
+			}
+		}
+
+		if ( isset( $input['inserter'] ) ) {
+			$args['inserter'] = (bool) $input['inserter'];
+		} else {
+			$args['inserter'] = (bool) $fallback( 'inserter', true );
+		}
+
 		if ( isset( $input['viewportWidth'] ) ) {
 			$args['viewportWidth'] = (int) $input['viewportWidth'];
+		} else {
+			$args['viewportWidth'] = $fallback( 'viewportWidth', null );
 		}
 
 		return $args;

@@ -58,6 +58,9 @@ class Test_Abilities extends WP_UnitTestCase {
 			foreach ( (array) glob( $this->theme_dir . '/assets/images/*' ) as $file ) {
 				unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 			}
+			foreach ( (array) glob( $this->theme_dir . '/patterns/*' ) as $file ) {
+				unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			}
 			$this->theme_dir = '';
 		}
 		wp_clean_theme_json_cache();
@@ -83,6 +86,10 @@ class Test_Abilities extends WP_UnitTestCase {
 
 		if ( ! is_dir( $this->theme_dir . '/assets/images' ) ) {
 			mkdir( $this->theme_dir . '/assets/images', 0777, true );
+		}
+
+		if ( ! is_dir( $this->theme_dir . '/patterns' ) ) {
+			mkdir( $this->theme_dir . '/patterns', 0777, true );
 		}
 
 		add_filter( 'stylesheet_directory', array( $this, 'theme_dir' ) );
@@ -240,6 +247,99 @@ class Test_Abilities extends WP_UnitTestCase {
 		$again = $this->abilities->execute_get_pattern( array( 'id' => (string) $id ) );
 		$this->assertStringContainsString( 'Replaced.', $again['pattern']['content'] );
 		$this->assertStringNotContainsString( 'From an agent.', $again['pattern']['content'] );
+	}
+
+	/**
+	 * A page pattern needs its placement headers, and they only live in the file.
+	 *
+	 * `Block Types: core/post-content` plus `Post Types` is what makes a pattern
+	 * a starting layout WordPress offers for new pages; without them the same
+	 * markup is an ordinary theme pattern. The file store always wrote them —
+	 * only the ability had no way to ask for them, so an agent could not create
+	 * a page template at all.
+	 */
+	public function test_create_writes_the_placement_headers() {
+		$this->use_a_writable_theme();
+
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'         => 'Agent Page Starter',
+				'name'          => 'agent-page-starter',
+				'content'       => '<!-- wp:paragraph --><p>A page opens here.</p><!-- /wp:paragraph -->',
+				'source'        => 'theme',
+				'blockTypes'    => array( 'core/post-content' ),
+				'postTypes'     => array( 'page' ),
+				'viewportWidth' => 1400,
+			)
+		);
+
+		$this->assertArrayHasKey( 'pattern', $created );
+
+		$file = get_stylesheet_directory() . '/patterns/agent-page-starter.php';
+		$this->assertFileExists( $file );
+
+		$header = file_get_contents( $file );
+		$this->assertStringContainsString( 'Block Types: core/post-content', $header );
+		$this->assertStringContainsString( 'Post Types: page', $header );
+		$this->assertStringContainsString( 'Viewport Width: 1400', $header );
+	}
+
+	/**
+	 * A template pattern keeps itself out of the inserter.
+	 */
+	public function test_create_can_keep_a_pattern_out_of_the_inserter() {
+		$this->use_a_writable_theme();
+
+		$this->abilities->execute_create_pattern(
+			array(
+				'title'         => 'Agent Template',
+				'name'          => 'agent-template',
+				'content'       => '<!-- wp:paragraph --><p>Template body.</p><!-- /wp:paragraph -->',
+				'source'        => 'theme',
+				'templateTypes' => array( 'front-page' ),
+				'inserter'      => false,
+			)
+		);
+
+		$header = file_get_contents( get_stylesheet_directory() . '/patterns/agent-template.php' );
+		$this->assertStringContainsString( 'Template Types: front-page', $header );
+		$this->assertStringContainsString( 'Inserter: no', $header );
+	}
+
+	/**
+	 * An update that does not mention a header must not be what removes it.
+	 *
+	 * Every header is optional on an update, so the naive read — take what the
+	 * input carries — silently strips a page pattern's placement the first time
+	 * an agent edits its markup.
+	 */
+	public function test_update_preserves_headers_it_was_not_given() {
+		$this->use_a_writable_theme();
+
+		$this->abilities->execute_create_pattern(
+			array(
+				'title'         => 'Agent Kept Headers',
+				'name'          => 'agent-kept-headers',
+				'content'       => '<!-- wp:paragraph --><p>First.</p><!-- /wp:paragraph -->',
+				'source'        => 'theme',
+				'blockTypes'    => array( 'core/post-content' ),
+				'postTypes'     => array( 'page' ),
+				'viewportWidth' => 1400,
+			)
+		);
+
+		$this->abilities->execute_update_pattern(
+			array(
+				'id'      => 'agent-kept-headers',
+				'content' => '<!-- wp:paragraph --><p>Second.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$header = file_get_contents( get_stylesheet_directory() . '/patterns/agent-kept-headers.php' );
+		$this->assertStringContainsString( 'Second.', $header );
+		$this->assertStringContainsString( 'Block Types: core/post-content', $header );
+		$this->assertStringContainsString( 'Post Types: page', $header );
+		$this->assertStringContainsString( 'Viewport Width: 1400', $header );
 	}
 
 	/**
