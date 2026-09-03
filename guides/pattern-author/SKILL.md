@@ -193,6 +193,40 @@ own `var:preset|spacing|large` shorthand; in the actual CSS of the `style`
 attribute it must be the real custom property. Patterns that get this backwards
 render with no spacing at all.
 
+**For anything outside the common blocks, do not hand-write it — generate it.**
+`references/block-markup.md` carries the contract for the dozen or so blocks
+patterns are mostly made of. Outside that set, the shape is guesswork: the
+accordion family saves a `role="group"`, an `has-icon has-icon-right` pair, a
+`__toggle-title` span and an icon span, and nothing short of the block's own
+`save()` will tell you that. No documentation carries it — see
+`references/block-vocabulary.md` on what the handbook does and does not cover.
+
+The block library the validator already loads will write it for you, correctly
+and for the version you are targeting:
+
+```js
+import { loadWordPressBlocksFromUrls } from '<skill>/scripts/wp-core.mjs';
+const core = await loadWordPressBlocksFromUrls( urls, { version } );
+const { createBlock, serialize } = core.window.wp.blocks;
+
+console.log( serialize( [
+        createBlock( 'core/accordion', {}, [
+                createBlock( 'core/accordion-item', {}, [
+                        createBlock( 'core/accordion-heading', { title: 'A question' } ),
+                        createBlock( 'core/accordion-panel', {}, [
+                                createBlock( 'core/paragraph', { content: 'An answer.' } ),
+                        ] ),
+                ] ),
+        ] ),
+] ) );
+```
+
+`urls` comes from `pattern-builder/get-editor-scripts` (or
+`loadWordPressBlocks( wpRoot )` against a local install). Markup produced this
+way is valid by construction — it is the editor's own output — so this is
+faster and more reliable than writing a draft and iterating on validator
+errors. Validate it anyway: the run is cached and it costs a second.
+
 Write real placeholder copy, not lorem ipsum. Copy of a plausible length is
 what tells you the layout works, and in a design pattern the placeholder is
 what shows in the inserter preview.
@@ -387,4 +421,5 @@ add the token to `theme.json` and mention what you added.
 - `references/block-vocabulary.md` — which blocks are allowed where (core-only vs theme vs plugin), the core vocabulary by purpose, and composition guidance
 - `references/block-markup.md` — the attribute-to-markup contract per block, and the mistakes that produce invalid markup
 - `references/design-content-split.md` — Pattern Overrides slots, `core/pattern` `content`, synced patterns, and the silent failures
+- `references/keeping-current.md` — how to bring these guides up to a new WordPress release, and what to re-check
 - `references/abilities.md` — asking a running site for its design system, block types and patterns, storing results, and the guides the site itself carries

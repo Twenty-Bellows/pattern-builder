@@ -63,6 +63,20 @@ markup is fine and only the check would be wrong:
   computed from the file's own attributes are not comparable. Slots are checked
   by rendering them instead; see `design-content-split.md`.
 
+## What this document covers
+
+The contract below is for the blocks patterns are mostly built from — the ten
+families in "Structural requirements per block". It is deliberately not a
+catalogue of every core block: WordPress ships new ones every release, their
+saved markup is `save()`'s output rather than anything declared, and a list
+here would be wrong within two releases.
+
+**Outside those families, generate the markup instead of writing it** — the
+editor's own `createBlock`/`serialize`, as `SKILL.md` step 4 shows. That is
+right by construction and right for the version you are targeting. The
+attribute-to-class table below still applies to whatever comes out, because
+block supports are shared across every block that opts into them.
+
 ## Attribute to class
 
 | Attribute | Class the markup must carry |
@@ -72,11 +86,19 @@ markup is fine and only the check would be wrong:
 | `"gradient":"x"` | `has-x-gradient-background has-background` |
 | `"fontSize":"x"` | `has-x-font-size` |
 | `"fontFamily":"x"` | `has-x-font-family` |
-| `"align":"center"` on text blocks | `has-text-align-center` |
+| `"style":{"typography":{"textAlign":"center"}}` on text blocks | `has-text-align-center` |
 | `"align":"wide"` on containers | `alignwide` |
 | `"align":"full"` on containers | `alignfull` |
 | `"style":{"color":{"background":"…"}}` | `has-background` + an inline `style` |
 | `"className":"is-style-x"` | `is-style-x` |
+
+Text alignment is the row that has already moved once, and the move is
+complete: on a current install `core/heading` has no `textAlign` attribute at
+all, and `{"align":"center"}` on a `core/paragraph` serializes with no
+`has-text-align-center` class. Both now carry it under
+`style.typography.textAlign`. The older spellings are what the "attribute core
+relocated" exemption below is about — the validator will not report them, so
+this table is the only thing that will.
 
 Custom values go in an inline `style` attribute *as well as* the attribute
 JSON, and the two use different spellings of a preset:
