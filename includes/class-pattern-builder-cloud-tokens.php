@@ -336,11 +336,26 @@ class Pattern_Builder_Cloud_Tokens {
 				if ( isset( $slugs[ $token['slug'] ] ) ) {
 					continue;
 				}
-				$existing[] = array(
+				$preset = array(
 					'slug'     => $token['slug'],
 					'name'     => $token['name'],
 					$value_key => $token['value'],
 				);
+
+				/*
+				 * A preset occasionally carries more than its value. The one
+				 * case is a `fontFamily` naming a self-hosted font, which
+				 * needs the `fontFace` descriptors beside the stack or the
+				 * browser has nothing to load — see
+				 * `Pattern_Builder_Fonts`. Kept as a merge rather than a
+				 * second write path so there is still one implementation of
+				 * "put a preset in theme.json or in Global Styles".
+				 */
+				if ( isset( $token['extra'] ) && is_array( $token['extra'] ) ) {
+					$preset = array_merge( $preset, $token['extra'] );
+				}
+
+				$existing[] = $preset;
 			}
 
 			$config['settings'][ $path[0] ][ $path[1] ] = $existing;

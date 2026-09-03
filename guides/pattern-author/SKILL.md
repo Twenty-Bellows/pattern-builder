@@ -402,9 +402,36 @@ nearest palette entry and the nearest spacing step. If nothing is close, say
 so rather than hard-coding a hex value — a missing token is a design-system
 decision for the user to make, not something to paper over.
 
-For images, use a placeholder and leave the real asset to the user. An
-`<img>` pointing at a URL you invented will 404, and a pattern carrying a
-data-URI image is unusable.
+For images, never invent a URL — an `<img>` pointing at a plausible-looking
+path will 404 on a page the user thinks is finished, and a data-URI image
+bloats the markup past what an editor handles comfortably. Either put the
+file on the site or use a placeholder; `references/assets.md` covers both.
+
+## When a pattern needs an image or a typeface
+
+A pattern is markup plus the files it points at, and a reference that does not
+resolve fails quietly — a dead `src` shows a broken image, a `fontFamily`
+naming no preset renders in the default face with nothing to say why. So the
+files come first, and the reference you write is the one the site hands back.
+
+On a running site, `pattern-builder/find-media` lists what is already here —
+the media library *and* the theme's own `assets/images`, which no core route
+reports — and every result carries the exact `reference` to put in the markup.
+Use it verbatim: a theme pattern is a PHP file, so its own assets are composed
+at render, and a hard-coded URL breaks as soon as the theme moves.
+
+What to reach for depends on what you are holding:
+
+| You have | Use |
+| --- | --- |
+| A file (JPEG, PNG, WebP, AVIF) | `POST /pattern-builder/v1/assets` — the bytes are the request body. An ability cannot carry binary |
+| A URL the user pointed you at | `add-asset` with `url`; the site fetches it |
+| Something you can draw | `add-asset` with `svg`, or `add-placeholder-image` for a plain one |
+| Nothing yet | `add-placeholder-image`. Never a remote placeholder service — that makes every page view fetch from somebody else's server |
+| A typeface | `add-font`, which installs the files *and* registers the preset that makes them render |
+
+`references/assets.md` has the requests, the parameters, the 2400px resize on
+the way in, and why a font needs both halves.
 
 ## When a pattern needs something the design system lacks
 
@@ -432,5 +459,6 @@ renders as no styling at all, silently.
 - `references/block-vocabulary.md` — which blocks are allowed where (core-only vs theme vs plugin), the core vocabulary by purpose, and composition guidance
 - `references/block-markup.md` — the attribute-to-markup contract per block, and the mistakes that produce invalid markup
 - `references/design-content-split.md` — Pattern Overrides slots, `core/pattern` `content`, synced patterns, and the silent failures
+- `references/assets.md` — images and fonts: finding what the site has, adding what it lacks, and the reference to write for each
 - `references/keeping-current.md` — how to bring these guides up to a new WordPress release, and what to re-check
 - `references/abilities.md` — asking a running site for its design system, block types and patterns, storing results, and the guides the site itself carries

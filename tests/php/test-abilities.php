@@ -26,6 +26,13 @@ class Test_Abilities extends WP_UnitTestCase {
 	 */
 	private $theme_json = '';
 
+	/**
+	 * A throwaway theme directory, for the tests that write files into one.
+	 *
+	 * @var string
+	 */
+	private $theme_dir = '';
+
 	public function set_up() {
 		parent::set_up();
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
@@ -45,8 +52,41 @@ class Test_Abilities extends WP_UnitTestCase {
 			unlink( $this->theme_json );
 			$this->theme_json = '';
 		}
+		if ( '' !== $this->theme_dir ) {
+			remove_filter( 'stylesheet_directory', array( $this, 'theme_dir' ) );
+			remove_filter( 'template_directory', array( $this, 'theme_dir' ) );
+			foreach ( (array) glob( $this->theme_dir . '/assets/images/*' ) as $file ) {
+				unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			}
+			$this->theme_dir = '';
+		}
 		wp_clean_theme_json_cache();
 		parent::tear_down();
+	}
+
+	/**
+	 * The throwaway theme directory, as a filter.
+	 *
+	 * @return string
+	 */
+	public function theme_dir() {
+		return $this->theme_dir;
+	}
+
+	/**
+	 * Point the active theme at a directory this test may write into. The
+	 * storage mechanics are covered in Test_Assets; here it only has to be
+	 * somewhere the write can land.
+	 */
+	private function use_a_writable_theme() {
+		$this->theme_dir = sys_get_temp_dir() . '/pattern-builder-abilities-theme';
+
+		if ( ! is_dir( $this->theme_dir . '/assets/images' ) ) {
+			mkdir( $this->theme_dir . '/assets/images', 0777, true );
+		}
+
+		add_filter( 'stylesheet_directory', array( $this, 'theme_dir' ) );
+		add_filter( 'template_directory', array( $this, 'theme_dir' ) );
 	}
 
 	/**
@@ -88,6 +128,12 @@ class Test_Abilities extends WP_UnitTestCase {
 			'pattern-builder/create-pattern',
 			'pattern-builder/update-pattern',
 			'pattern-builder/add-design-tokens',
+			// Media and fonts: what a pattern points at.
+			'pattern-builder/find-media',
+			'pattern-builder/add-asset',
+			'pattern-builder/add-placeholder-image',
+			'pattern-builder/list-fonts',
+			'pattern-builder/add-font',
 			// The cloud, through this site's connection.
 			'pattern-builder/list-collections',
 			'pattern-builder/get-collection',
@@ -113,13 +159,13 @@ class Test_Abilities extends WP_UnitTestCase {
 	public function test_annotations_map_to_the_methods_we_intend() {
 		$this->require_abilities_api();
 
-		foreach ( array( 'get-design-system', 'list-block-types', 'list-patterns', 'get-pattern', 'render-pattern', 'get-authoring-guide', 'get-validator', 'get-editor-scripts' ) as $read ) {
+		foreach ( array( 'get-design-system', 'list-block-types', 'list-patterns', 'get-pattern', 'render-pattern', 'get-authoring-guide', 'get-validator', 'get-editor-scripts', 'find-media', 'list-fonts' ) as $read ) {
 			$meta = wp_get_ability( 'pattern-builder/' . $read )->get_meta();
 			$this->assertTrue( $meta['annotations']['readonly'], $read . ' should be readonly (GET).' );
 			$this->assertTrue( $meta['show_in_rest'], $read . ' must be reachable over REST.' );
 		}
 
-		foreach ( array( 'create-pattern', 'update-pattern', 'add-design-tokens' ) as $write ) {
+		foreach ( array( 'create-pattern', 'update-pattern', 'add-design-tokens', 'add-asset', 'add-placeholder-image', 'add-font' ) as $write ) {
 			$meta = wp_get_ability( 'pattern-builder/' . $write )->get_meta();
 			$this->assertFalse( $meta['annotations']['readonly'], $write . ' is not a read.' );
 			$this->assertFalse(
@@ -243,13 +289,41 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'guides', $index );
 		$names = wp_list_pluck( $index['guides'], 'name' );
 
-		foreach ( array( 'authoring', 'pattern-kinds', 'block-vocabulary', 'block-markup', 'design-content-split' ) as $expected ) {
+		foreach ( array( 'authoring', 'pattern-kinds', 'block-vocabulary', 'block-markup', 'design-content-split', 'assets', 'keeping-current', 'abilities' ) as $expected ) {
 			$this->assertContains( $expected, $names, $expected . ' is missing from the index.' );
 		}
 
 		foreach ( $index['guides'] as $guide ) {
 			$this->assertNotEmpty( $guide['title'], $guide['name'] . ' has no title.' );
 			$this->assertGreaterThan( 100, $guide['words'], $guide['name'] . ' looks empty.' );
+		}
+	}
+
+	/**
+	 * A guide the index cannot serve is worse than one that does not exist:
+	 * the skill tells the reader to go and read it, and over the wire there
+	 * is nothing there. So every reference the index document makes to
+	 * another guide has to name one this ability will actually hand over.
+	 *
+	 * This is not hypothetical — `keeping-current.md` shipped in the
+	 * directory, was named in the References list, and was never registered.
+	 */
+	public function test_every_guide_the_index_points_at_can_be_served() {
+		$authoring = $this->abilities->execute_authoring_guide( array( 'guide' => 'authoring' ) );
+		$names     = wp_list_pluck( $this->abilities->execute_authoring_guide()['guides'], 'name' );
+
+		$this->assertGreaterThan(
+			0,
+			preg_match_all( '#references/([a-z-]+)\.md#', $authoring['content'], $matches ),
+			'The index names no other guides, which cannot be right.'
+		);
+
+		foreach ( array_unique( $matches[1] ) as $referenced ) {
+			$this->assertContains(
+				$referenced,
+				$names,
+				'The authoring guide points at references/' . $referenced . '.md, which get-authoring-guide cannot serve. Add it to guide_files().'
+			);
 		}
 	}
 
@@ -739,6 +813,161 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertWPError( $result );
 		$this->assertSame( 'pb_cloud_no_theme_json', $result->get_error_code() );
 		$this->assertStringContainsString( 'Site styles', $result->get_error_message() );
+	}
+
+	/**
+	 * The one thing an ability cannot do is take a file, so the route that
+	 * can has to be discoverable from inside the abilities — otherwise every
+	 * agent works it out again, or gives up and inlines a remote URL.
+	 * `find-media` is where an agent looking for an image arrives, so the
+	 * instructions ride along with the answer.
+	 */
+	public function test_find_media_says_how_to_send_a_file() {
+		$this->require_abilities_api();
+
+		$found = wp_get_ability( 'pattern-builder/find-media' )->execute( array() );
+
+		$this->assertArrayHasKey( 'upload', $found );
+		$this->assertSame( 'POST', $found['upload']['method'] );
+		$this->assertStringContainsString( '/pattern-builder/v1/assets', $found['upload']['route'] );
+		$this->assertStringContainsString( 'Content-Disposition', wp_json_encode( $found['upload']['headers'] ) );
+		// An example an agent can run, rather than a shape to infer.
+		$this->assertStringContainsString( '--data-binary', $found['upload']['example'] );
+		$this->assertStringContainsString( 'destination', wp_json_encode( $found['upload']['query'] ) );
+	}
+
+	/**
+	 * The upload limits are reported rather than discovered by a failure: the
+	 * resize cap and the server's own ceiling both change the answer.
+	 */
+	public function test_find_media_reports_the_upload_limits() {
+		$this->require_abilities_api();
+
+		$found = wp_get_ability( 'pattern-builder/find-media' )->execute( array() );
+
+		$this->assertStringContainsString( '2400', $found['upload']['limits'] );
+	}
+
+	/**
+	 * An agent that reaches `add-asset` with a JPEG in hand must be told
+	 * where to send it, in the description it has already been given.
+	 */
+	public function test_add_asset_names_the_route_in_its_description() {
+		$this->require_abilities_api();
+
+		$description = wp_get_ability( 'pattern-builder/add-asset' )->get_description();
+
+		$this->assertStringContainsString( '/pattern-builder/v1/assets', $description );
+		$this->assertStringContainsString( 'Content-Disposition', $description );
+	}
+
+	/**
+	 * Neither form given is an error that says what to do, including the
+	 * route for the case an ability cannot serve.
+	 */
+	public function test_add_asset_refuses_with_nothing_to_store() {
+		$this->require_abilities_api();
+
+		$result = wp_get_ability( 'pattern-builder/add-asset' )->execute( array() );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_asset_nothing_given', $result->get_error_code() );
+		$this->assertStringContainsString( '/pattern-builder/v1/assets', $result->get_error_message() );
+	}
+
+	/**
+	 * Both forms given is ambiguous rather than a silent preference.
+	 */
+	public function test_add_asset_refuses_both_forms_at_once() {
+		$this->require_abilities_api();
+
+		$result = wp_get_ability( 'pattern-builder/add-asset' )->execute(
+			array(
+				'svg' => '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>',
+				'url' => 'https://example.org/hero.png',
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_asset_ambiguous', $result->get_error_code() );
+	}
+
+	/**
+	 * An SVG an agent authored is stored, and the answer is the reference to
+	 * put in the markup rather than a path to work one out from.
+	 */
+	public function test_add_asset_stores_an_authored_svg() {
+		$this->require_abilities_api();
+		$this->use_a_writable_theme();
+
+		$result = wp_get_ability( 'pattern-builder/add-asset' )->execute(
+			array(
+				'svg'      => '<svg xmlns="http://www.w3.org/2000/svg"><circle r="4"/></svg>',
+				'filename' => 'dot',
+			)
+		);
+
+		$this->assertNotWPError( $result );
+		// The extension is added rather than the file stored without one.
+		$this->assertSame( 'dot.svg', $result['filename'] );
+		$this->assertStringContainsString( 'get_stylesheet_directory_uri', $result['reference'] );
+	}
+
+	/**
+	 * A placeholder is drawn and stored, so a pattern under construction has
+	 * something local in its image slots rather than a remote service's URL.
+	 */
+	public function test_a_placeholder_is_drawn_and_stored() {
+		$this->require_abilities_api();
+		$this->use_a_writable_theme();
+
+		$result = wp_get_ability( 'pattern-builder/add-placeholder-image' )->execute(
+			array(
+				'width'  => 1400,
+				'height' => 700,
+			)
+		);
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( 'placeholder-1400x700.svg', $result['filename'] );
+		$this->assertStringContainsString( 'get_stylesheet_directory_uri', $result['reference'] );
+	}
+
+	/**
+	 * `add-font` is idempotent and says so: installing a family twice leaves
+	 * the same files and the same preset, so core may accept a repeat.
+	 */
+	public function test_add_font_is_marked_idempotent() {
+		$this->require_abilities_api();
+
+		$meta = wp_get_ability( 'pattern-builder/add-font' )->get_meta();
+
+		$this->assertTrue( $meta['annotations']['idempotent'] );
+	}
+
+	/**
+	 * Storing an asset is not idempotent — a second call stores a second
+	 * copy — and must not claim to be, since the annotation is behaviour.
+	 */
+	public function test_add_asset_is_not_marked_idempotent() {
+		$this->require_abilities_api();
+
+		$meta = wp_get_ability( 'pattern-builder/add-asset' )->get_meta();
+
+		$this->assertFalse( $meta['annotations']['idempotent'] );
+	}
+
+	/**
+	 * A font family needs naming; an empty call is an error rather than an
+	 * arbitrary choice.
+	 */
+	public function test_add_font_needs_a_family() {
+		$this->require_abilities_api();
+
+		$result = wp_get_ability( 'pattern-builder/add-font' )->execute( array( 'family' => '' ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_font_no_family', $result->get_error_code() );
 	}
 
 	/**

@@ -76,6 +76,36 @@ input and output schema.
 | `pattern-builder/create-pattern` | POST | store finished markup. `title` and `content` required; `source` is `theme` (default) or `user`; also `name`, `description`, `categories`, `keywords`, `synced`, `viewportWidth` |
 | `pattern-builder/update-pattern` | POST | replace an existing pattern. `id` and `content` required |
 | `pattern-builder/add-design-tokens` | POST | add presets to the design system. `input[tokens]` is a list of `{type, slug, name, value}`; `input[destination]` is `theme` (default) or `user` |
+| `pattern-builder/find-media` | GET | images the site already has, in the media library and in the theme's `assets/images`, each with the reference to write. Optional `input[search]`, `input[source]=all\|media\|theme`. The answer also carries how to upload a file |
+| `pattern-builder/add-asset` | POST | store an image: `svg` markup you authored (with `filename`), or a `url` for the site to fetch. `destination` is `theme` (default) or `media`. **A file you hold goes to the route below instead** |
+| `pattern-builder/add-placeholder-image` | POST | draw a plain placeholder into the theme: `width`, `height`, optional `label` |
+| `pattern-builder/list-fonts` | GET | font families installable from the collection WordPress ships. Optional `input[search]`, `input[category]` |
+| `pattern-builder/add-font` | POST | install a family and register its preset: `family`, optional `weights`, `styles`, `destination` (`theme` default, or `user`) |
+
+### The one route that is not an ability
+
+Abilities are JSON in and JSON out, so **no ability can accept a file**. A
+JPEG, PNG, WebP or AVIF goes to a plain REST route instead, shaped exactly
+like core's `POST /wp/v2/media` — the bytes are the request body and the
+filename rides in a `Content-Disposition` header:
+
+```bash
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  -H 'Content-Disposition: attachment; filename="hero.webp"' \
+  -H 'Content-Type: image/webp' \
+  --data-binary @hero.webp \
+  "$WP_URL/?rest_route=/pattern-builder/v1/assets&destination=theme"
+```
+
+The file goes from disk to the site without passing through your context —
+nothing is base64-encoded and nothing is read into a prompt. `destination` is
+`theme` (default) or `media`; `alt` sets alternative text on a media library
+attachment. An image over 2400px on its longest edge is resized down to it, so
+use the `width` and `height` the answer reports rather than the ones you sent.
+
+`find-media` returns these instructions in an `upload` key, so the route is
+discoverable from inside the abilities rather than something to remember.
+`references/assets.md` has the whole picture, fonts included.
 
 ### Adding to the design system
 

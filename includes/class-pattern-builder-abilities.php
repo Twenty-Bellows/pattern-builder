@@ -79,6 +79,11 @@ class Pattern_Builder_Abilities {
 		$this->register_create_pattern();
 		$this->register_update_pattern();
 		$this->register_add_design_tokens();
+		$this->register_find_media();
+		$this->register_add_asset();
+		$this->register_add_placeholder_image();
+		$this->register_list_fonts();
+		$this->register_add_font();
 	}
 
 	/**
@@ -579,6 +584,8 @@ class Pattern_Builder_Abilities {
 			'block-vocabulary'     => 'references/block-vocabulary.md',
 			'block-markup'         => 'references/block-markup.md',
 			'design-content-split' => 'references/design-content-split.md',
+			'assets'               => 'references/assets.md',
+			'keeping-current'      => 'references/keeping-current.md',
 			'abilities'            => 'references/abilities.md',
 		);
 	}
@@ -1394,6 +1401,524 @@ class Pattern_Builder_Abilities {
 			'written'     => $written,
 			'skipped'     => $skipped,
 			'destination' => $destination,
+		);
+	}
+
+	/**
+	 * How to send bytes, in a shape an agent can act on without being told
+	 * twice.
+	 *
+	 * Returned by `find-media` and `add-asset` alike, because the one thing
+	 * an ability cannot do is take a file: abilities are JSON in and JSON out,
+	 * so a JPEG would have to be base64 inside that JSON — which means the
+	 * agent reading the bytes into its own context and paying for them there.
+	 * Naming the route in the *output* of the abilities that deal in media is
+	 * what stops it being rediscovered on every task: an agent looking for an
+	 * image is told, in the same answer, how to add one.
+	 *
+	 * @return array
+	 */
+	private function upload_instructions() {
+		return array(
+			'note'      => __( 'To add a JPEG, PNG, WebP, AVIF or GIF, POST the file to this route. Abilities cannot carry binary, and this route takes the bytes as the request body — so the file goes straight from disk to the site and never has to be read into your context or base64-encoded.', 'pattern-builder' ),
+			'route'     => rest_url( Pattern_Builder_Assets::REST_NAMESPACE . '/assets' ),
+			'method'    => 'POST',
+			'headers'   => array(
+				'Content-Disposition' => 'attachment; filename="hero.webp"',
+				'Content-Type'        => __( 'the file\'s own mime type, e.g. image/webp', 'pattern-builder' ),
+			),
+			'query'     => array(
+				'destination' => __( '"theme" (default) writes the active theme\'s assets/images; "media" adds a media library attachment.', 'pattern-builder' ),
+				'alt'         => __( 'Alternative text. Recorded on a media library attachment.', 'pattern-builder' ),
+			),
+			'example'   => 'curl -u "$WP_USER:$WP_APP_PASSWORD" '
+				. '-H \'Content-Disposition: attachment; filename="hero.webp"\' '
+				. '-H \'Content-Type: image/webp\' '
+				. '--data-binary @hero.webp '
+				. '"' . rest_url( Pattern_Builder_Assets::REST_NAMESPACE . '/assets' ) . '?destination=theme"',
+			'returns'   => __( 'The stored file, with a "reference" holding exactly what to put in the pattern markup — a PHP template tag for a theme asset, a URL for a media library one.', 'pattern-builder' ),
+			'limits'    => sprintf(
+				/* translators: 1: the longest edge kept, 2: the server's upload limit. */
+				__( 'Images over %1$dpx on the longest edge are resized down to it. The server accepts uploads up to %2$s.', 'pattern-builder' ),
+				(int) apply_filters( 'pattern_builder_max_asset_dimension', Pattern_Builder_Assets::MAX_DIMENSION ),
+				size_format( wp_max_upload_size() )
+			),
+			'multipart' => __( 'A multipart form works too — the first file field is taken, whatever it is named.', 'pattern-builder' ),
+		);
+	}
+
+	/**
+	 * What this site already has to illustrate a pattern with.
+	 *
+	 * Two places, because a pattern can reference either and only one of them
+	 * has a core route: the media library, and the files already sitting in
+	 * the theme's own `assets/images` — which is where every image a theme
+	 * pattern points at lives, since saving a theme pattern localises its
+	 * images into the theme.
+	 */
+	private function register_find_media() {
+		wp_register_ability(
+			'pattern-builder/find-media',
+			array(
+				'label'               => __( 'Find media', 'pattern-builder' ),
+				'description'         => __( 'Lists the images this site can already illustrate a pattern with: media library attachments, and the files in the active theme\'s assets/images directory. Each result carries the exact reference to put in pattern markup. Call this before adding an image — the site usually already has one — and read the "upload" block in the answer for how to add a file that it does not.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'search'   => array(
+							'type'        => 'string',
+							'description' => 'Match against title, filename and alt text.',
+						),
+						'type'     => array(
+							'type'        => 'string',
+							'description' => 'A mime type or prefix, e.g. "image" (default) or "image/webp". "any" for everything in the media library.',
+						),
+						'source'   => array(
+							'type'        => 'string',
+							'enum'        => array( 'all', 'media', 'theme' ),
+							'description' => 'Where to look. Defaults to both.',
+						),
+						'per_page' => array(
+							'type'        => 'integer',
+							'description' => 'How many media library items to return. Defaults to 20.',
+						),
+					),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'media'  => array(
+							'type'        => 'array',
+							'description' => 'Media library attachments.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'theme'  => array(
+							'type'        => 'array',
+							'description' => 'Files in the theme\'s assets/images directory.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'upload' => array(
+							'type'        => 'object',
+							'description' => 'How to add a file this site does not have.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_find_media' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * List the site's images.
+	 *
+	 * @param array $input Ability input.
+	 * @return array
+	 */
+	public function execute_find_media( $input = array() ) {
+		$found = Pattern_Builder_Assets::find(
+			array(
+				'search'   => isset( $input['search'] ) ? (string) $input['search'] : '',
+				'type'     => isset( $input['type'] ) ? (string) $input['type'] : 'image',
+				'source'   => isset( $input['source'] ) ? (string) $input['source'] : 'all',
+				'per_page' => isset( $input['per_page'] ) ? (int) $input['per_page'] : 20,
+			)
+		);
+
+		$found['upload'] = $this->upload_instructions();
+
+		return $found;
+	}
+
+	/**
+	 * Add an image a pattern needs, in the two forms that fit in JSON.
+	 *
+	 * An SVG is text, so an agent can author one outright and it arrives
+	 * here whole. A URL is a fetch the site performs, which covers everything
+	 * already published somewhere. Bytes are the third case and cannot come
+	 * this way at all, so the description and the answer both name the route
+	 * that takes them.
+	 */
+	private function register_add_asset() {
+		wp_register_ability(
+			'pattern-builder/add-asset',
+			array(
+				'label'               => __( 'Add an asset', 'pattern-builder' ),
+				'description'         => __( 'Stores an image for a pattern to reference, either as SVG markup you supply or by fetching a URL, and answers with the exact reference to put in the pattern. Writes to the active theme\'s assets/images, or to the media library. A JPEG, PNG, WebP or AVIF you hold as a file cannot travel through an ability — POST it to /pattern-builder/v1/assets instead, with the bytes as the request body and a Content-Disposition header naming the file; call find-media for the full instructions and an example.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'svg'         => array(
+							'type'        => 'string',
+							'description' => 'SVG markup. Scripts, external references and event handlers are stripped.',
+						),
+						'url'         => array(
+							'type'        => 'string',
+							'description' => 'A URL for this site to fetch. Use for an image already published somewhere.',
+						),
+						'filename'    => array(
+							'type'        => 'string',
+							'description' => 'The filename to store under. Required with "svg"; taken from the URL otherwise.',
+						),
+						'destination' => array(
+							'type'        => 'string',
+							'enum'        => array( 'theme', 'media' ),
+							'description' => '"theme" (default) writes the active theme\'s assets/images, so the file travels with the theme — which is what a theme pattern needs. "media" adds a media library attachment. SVG can only go to the theme, because WordPress does not accept SVG uploads.',
+						),
+						'alt'         => array(
+							'type'        => 'string',
+							'description' => 'Alternative text, recorded on a media library attachment.',
+						),
+					),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'destination' => array( 'type' => 'string' ),
+						'filename'    => array( 'type' => 'string' ),
+						'url'         => array( 'type' => 'string' ),
+						'reference'   => array(
+							'type'        => 'string',
+							'description' => 'What to put in the pattern markup.',
+						),
+						'width'       => array( 'type' => 'integer' ),
+						'height'      => array( 'type' => 'integer' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_add_asset' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						// A second call with the same file stores a second
+						// copy rather than replacing the first, so this is
+						// not idempotent and must not be marked so.
+						'idempotent'  => false,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Store an SVG or a fetched URL.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_add_asset( $input ) {
+		$svg         = isset( $input['svg'] ) ? (string) $input['svg'] : '';
+		$url         = isset( $input['url'] ) ? (string) $input['url'] : '';
+		$filename    = isset( $input['filename'] ) ? (string) $input['filename'] : '';
+		$destination = ( isset( $input['destination'] ) && 'media' === $input['destination'] ) ? 'media' : 'theme';
+
+		if ( '' === $svg && '' === $url ) {
+			return new \WP_Error(
+				'pb_asset_nothing_given',
+				sprintf(
+					/* translators: %s: the upload route. */
+					__( 'Give either "svg" markup or a "url" to fetch. To send a file you hold, POST its bytes to %s instead.', 'pattern-builder' ),
+					rest_url( Pattern_Builder_Assets::REST_NAMESPACE . '/assets' )
+				),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( '' !== $svg && '' !== $url ) {
+			return new \WP_Error(
+				'pb_asset_ambiguous',
+				__( 'Give "svg" or "url", not both.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( '' !== $url ) {
+			return Pattern_Builder_Assets::store_from_url( $url, $destination, $filename );
+		}
+
+		if ( '' === $filename ) {
+			return new \WP_Error(
+				'pb_asset_no_filename',
+				__( 'An SVG needs a "filename" to store it under.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		// Give it the extension it is, whatever the caller called it.
+		if ( 'svg' !== strtolower( (string) pathinfo( $filename, PATHINFO_EXTENSION ) ) ) {
+			$filename .= '.svg';
+		}
+
+		return Pattern_Builder_Assets::store( $filename, $svg, $destination );
+	}
+
+	/**
+	 * Draw a placeholder rather than shipping a pattern with no image.
+	 *
+	 * A pattern under construction needs something in its image slots, and
+	 * the alternatives are both bad: a remote placeholder service means the
+	 * pattern renders a request to somebody else's server on every view, and
+	 * an empty image block reads as broken. This draws an SVG locally, which
+	 * costs no bytes over the wire and scales to whatever the layout asks.
+	 */
+	private function register_add_placeholder_image() {
+		wp_register_ability(
+			'pattern-builder/add-placeholder-image',
+			array(
+				'label'               => __( 'Add a placeholder image', 'pattern-builder' ),
+				'description'         => __( 'Draws a plain placeholder image at the size you ask for and stores it in the active theme\'s assets/images, answering with the reference to put in the pattern. Use it to fill a pattern\'s image slots without pointing at a remote placeholder service, which would make every page view fetch from somebody else\'s server. The file is an SVG, so it costs nothing to transfer and scales to any layout.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'width'    => array(
+							'type'        => 'integer',
+							'description' => 'Width in pixels. Defaults to 1200.',
+						),
+						'height'   => array(
+							'type'        => 'integer',
+							'description' => 'Height in pixels. Defaults to 800.',
+						),
+						'label'    => array(
+							'type'        => 'string',
+							'description' => 'Text drawn in the middle. Defaults to the dimensions.',
+						),
+						'filename' => array(
+							'type'        => 'string',
+							'description' => 'Filename to store under. Defaults to placeholder-{width}x{height}.svg.',
+						),
+					),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'filename'  => array( 'type' => 'string' ),
+						'url'       => array( 'type' => 'string' ),
+						'reference' => array(
+							'type'        => 'string',
+							'description' => 'What to put in the pattern markup.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_add_placeholder_image' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => false,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Draw and store a placeholder.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_add_placeholder_image( $input = array() ) {
+		$width  = isset( $input['width'] ) ? (int) $input['width'] : 1200;
+		$height = isset( $input['height'] ) ? (int) $input['height'] : 800;
+
+		$svg = Pattern_Builder_Assets::placeholder_svg(
+			array(
+				'width'  => $width,
+				'height' => $height,
+				'label'  => isset( $input['label'] ) ? (string) $input['label'] : '',
+			)
+		);
+
+		$filename = isset( $input['filename'] ) && '' !== (string) $input['filename']
+			? (string) $input['filename']
+			: 'placeholder-' . $width . 'x' . $height . '.svg';
+
+		if ( 'svg' !== strtolower( (string) pathinfo( $filename, PATHINFO_EXTENSION ) ) ) {
+			$filename .= '.svg';
+		}
+
+		// Theme only: WordPress does not accept SVG in the media library, and
+		// a placeholder belongs with the pattern that uses it in any case.
+		return Pattern_Builder_Assets::store( $filename, $svg, 'theme' );
+	}
+
+	/**
+	 * What typefaces can be installed, so `add-font` is not a guess.
+	 */
+	private function register_list_fonts() {
+		wp_register_ability(
+			'pattern-builder/list-fonts',
+			array(
+				'label'               => __( 'List installable fonts', 'pattern-builder' ),
+				'description'         => __( 'Lists the font families available to install from the Google Fonts collection WordPress ships, filtered by name or category. Call this to confirm a family exists and how its name is spelled before calling add-font.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'search'   => array(
+							'type'        => 'string',
+							'description' => 'Substring of the family name.',
+						),
+						'category' => array(
+							'type'        => 'string',
+							'description' => 'A category slug: sans-serif, serif, display, handwriting, monospace.',
+						),
+						'limit'    => array(
+							'type'        => 'integer',
+							'description' => 'How many to return. Defaults to 20.',
+						),
+					),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'families' => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'object' ),
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_list_fonts' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * Search the font collection.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_list_fonts( $input = array() ) {
+		$families = Pattern_Builder_Fonts::search(
+			isset( $input['search'] ) ? (string) $input['search'] : '',
+			isset( $input['category'] ) ? (string) $input['category'] : '',
+			isset( $input['limit'] ) ? (int) $input['limit'] : 20
+		);
+
+		if ( is_wp_error( $families ) ) {
+			return $families;
+		}
+
+		return array( 'families' => $families );
+	}
+
+	/**
+	 * Install a typeface and register it as a preset.
+	 *
+	 * Both halves matter and only one is obvious. The files make the font
+	 * available; the `fontFamily` preset is what actually renders it, since
+	 * `wp_print_font_faces()` builds its `@font-face` rules from the merged
+	 * theme.json rather than from the font library's own posts. A font
+	 * installed without the preset is a font nothing can use.
+	 */
+	private function register_add_font() {
+		wp_register_ability(
+			'pattern-builder/add-font',
+			array(
+				'label'               => __( 'Add a font', 'pattern-builder' ),
+				'description'         => __( 'Installs a font family from the Google Fonts collection WordPress ships — the files are copied to this site and served from it, never fetched from Google at render time — and registers it as a fontFamily preset so a pattern can reference it by slug. Writes to the active theme (theme.json plus assets/fonts, so the font travels with the theme) or to this site (Global Styles plus the font library). Call list-fonts first to confirm the family name. Font files can only be installed from the collection this way; to self-host a licensed font you hold, add the files to the theme and register the preset with add-design-tokens.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'family'      => array(
+							'type'        => 'string',
+							'description' => 'The family name as the collection lists it, e.g. "Fraunces".',
+						),
+						'weights'     => array(
+							'type'        => 'array',
+							'description' => 'Weights to install, e.g. ["400","700"]. Defaults to 400 and 700. A variable font covering the weight is installed once and serves the range.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'styles'      => array(
+							'type'        => 'array',
+							'description' => 'Styles to install. Defaults to ["normal"].',
+							'items'       => array(
+								'type' => 'string',
+								'enum' => array( 'normal', 'italic' ),
+							),
+						),
+						'destination' => array(
+							'type'        => 'string',
+							'enum'        => array( 'theme', 'user' ),
+							'description' => '"theme" (default) writes theme.json and assets/fonts, so the font is part of the theme; "user" writes Global Styles and the site\'s font library, which stays in the database and is manageable in the editor.',
+						),
+					),
+					'required'             => array( 'family' ),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'family'      => array( 'type' => 'string' ),
+						'slug'        => array( 'type' => 'string' ),
+						'fontFamily'  => array( 'type' => 'string' ),
+						'destination' => array( 'type' => 'string' ),
+						'faces'       => array(
+							'type'        => 'array',
+							'description' => 'The files installed.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'reference'   => array(
+							'type'        => 'object',
+							'description' => 'How to reference the font: the block attribute, the class, and the CSS custom property.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_add_font' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						// Installing the same family twice leaves the same
+						// files and the same preset: the preset is never
+						// overwritten and a duplicate library face is skipped.
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Install a font family.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_add_font( $input ) {
+		$family = isset( $input['family'] ) ? trim( (string) $input['family'] ) : '';
+
+		if ( '' === $family ) {
+			return new \WP_Error(
+				'pb_font_no_family',
+				__( 'Name the font family to install.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return Pattern_Builder_Fonts::install(
+			$family,
+			isset( $input['weights'] ) ? (array) $input['weights'] : array(),
+			isset( $input['styles'] ) ? (array) $input['styles'] : array(),
+			( isset( $input['destination'] ) && 'user' === $input['destination'] ) ? 'user' : 'theme'
 		);
 	}
 
