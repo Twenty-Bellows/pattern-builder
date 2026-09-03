@@ -170,6 +170,68 @@ whatever you like:
 The same applies to colour. A palette wanting a semantic name for its body text
 should call it `contrast` with `"name": "Text"`, not `text-default`.
 
+## What the site already styles
+
+A preset is a value a pattern *references*. A **style** is something a pattern
+*inherits* — the root font size, the heading typeface, the link colour, the way
+buttons look. `get-design-system` returns those too, under `styles`, and
+reading them is what turns "set nothing and inherit" from a hope into a
+decision.
+
+The failure it prevents is over-specification. A theme that sets
+`styles.elements.heading.typography.fontFamily` gives every heading its face
+with nothing in the pattern saying so. A pattern that sets `fontFamily` on each
+heading anyway looks identical on that site and stops adapting everywhere else:
+it will keep the authoring site's typeface on a site with a perfectly good one
+of its own, forever.
+
+So: **read `styles` first, and set only what it does not already cover.**
+
+Buttons are the sharpest case, because `core/button` renders
+`wp-element-button` and `styles.elements.button` is what paints every button on
+the site. A pattern that sets background, radius, padding, weight and size has
+re-specified the whole control, and none of it will follow the site when its
+buttons change. Worse, a *partial* override — a background and nothing else —
+takes the fill and leaves the shape, producing a button that belongs to neither
+design.
+
+Two overrides are legitimate:
+
+1. **The pattern knows something the theme cannot.** `styles.elements.button`
+   is one rule for every button on the site and has no idea what any of them
+   sits on. A secondary button on a dark band needs its colours set or it
+   vanishes. That is context, not taste.
+2. **Nothing on the site covers it** — see block style variations below.
+
+And a rule that follows from the partial-override problem: **set background and
+text colour together or set neither.** Setting one leaves the other at the
+theme's value, and the contrast failure is invisible to a pattern that never
+read it.
+
+## Block style variations, and which of them travel
+
+`get-design-system` also returns `blockStyles` — the variations registered
+here, keyed by block, each with the `class` to apply and a `portable` flag.
+
+That flag is the whole point. A variation is applied by putting
+`is-style-{name}` in the markup, and **the class travels with a pattern while
+the definition does not.**
+
+- `portable: true` — declared in the block's own `block.json`, so it ships with
+  WordPress itself. `is-style-outline` on a button, `is-style-wide` on a
+  separator. Use these freely; hand-rolling what one of them already does is
+  the mistake.
+- `portable: false` — registered by this site, in a theme partial or a
+  `register_block_style()` call. It works here and renders as **nothing at
+  all** anywhere else, which is the same silent failure an undefined preset
+  gives you, with no value shipped to rescue it.
+
+Which inverts the advice for tokens. There, referencing a slug beats inlining a
+value, because tokens travel. Here, reaching for a variation this site invented
+is *worse* than setting the attributes — at least an attribute renders. If the
+design needs something core has no variation for and the pattern has to travel,
+set the attributes and accept that they are fixed.
+
 ## The rules, in short
 
 1. **Colours** — `base` and `contrast` freely, the tier-2 roles by agreement;
@@ -182,6 +244,10 @@ should call it `contrast` with `"name": "Text"`, not `text-default`.
 6. **Whatever you reference must exist on the site you are writing on.** A slug
    that does not resolve renders as no styling at all, with no error anywhere,
    and ships no value — so the pattern arrives broken as well.
+7. **Read `styles` and set only what it does not cover.** What the site already
+   styles, the pattern inherits; restating it is how a pattern stops adapting.
+8. **Block style variations: `portable: true` freely, `portable: false` never**
+   in a pattern meant to travel.
 
 ### The one case where the evidence above *is* a breakage map
 

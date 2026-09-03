@@ -138,7 +138,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/get-design-system',
 			array(
 				'label'               => __( 'Get the design system', 'pattern-builder' ),
-				'description'         => __( 'Returns this site’s resolved design tokens — color palette and gradients, spacing scale, typography (font families and sizes), and layout widths — as WordPress merges them from core, the parent theme, the child theme and the active style variation. Use these values when writing pattern markup instead of inventing colors or sizes.', 'pattern-builder' ),
+				'description'         => __( 'Returns this site’s resolved design system — the color palette and gradients, the spacing scale, typography, layout widths, the global styles already applied to the root, elements and blocks, and the block style variations registered here — as WordPress merges them from core, the parent theme, the child theme and the active style variation. Read this before writing markup: a pattern should reference these values rather than invent them, and should leave alone anything the site already styles.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'output_schema'       => array(
 					'type'       => 'object',
@@ -172,8 +172,16 @@ class Pattern_Builder_Abilities {
 						),
 						'variations'   => array(
 							'type'        => 'array',
-							'description' => 'Style variations the theme offers, by title.',
+							'description' => 'Whole-site style variations the theme offers, by title.',
 							'items'       => array( 'type' => 'string' ),
+						),
+						'styles'       => array(
+							'type'        => 'object',
+							'description' => 'The global styles in effect: the root, per-element (heading, link, button) and per-block styling this site already applies. A pattern inherits all of it, so anything set here is something the pattern should not restate.',
+						),
+						'blockStyles'  => array(
+							'type'        => 'object',
+							'description' => 'Block style variations registered on this site, keyed by block name. Apply one with the given class. `portable` is false for a variation this site registered: the class travels with a pattern but the definition does not, so it renders unstyled anywhere else.',
 						),
 					),
 				),
@@ -199,6 +207,8 @@ class Pattern_Builder_Abilities {
 			}
 		}
 
+		$merged = \WP_Theme_JSON_Resolver::get_merged_data()->get_raw_data();
+
 		return array(
 			'palette'      => $this->preset( $settings, array( 'color', 'palette' ) ),
 			'gradients'    => $this->preset( $settings, array( 'color', 'gradients' ) ),
@@ -207,7 +217,74 @@ class Pattern_Builder_Abilities {
 			'fontFamilies' => $this->preset( $settings, array( 'typography', 'fontFamilies' ) ),
 			'layout'       => isset( $settings['layout'] ) ? $settings['layout'] : array(),
 			'variations'   => $variations,
+			'styles'       => isset( $merged['styles'] ) && is_array( $merged['styles'] ) ? $merged['styles'] : array(),
+			'blockStyles'  => $this->block_styles(),
 		);
+	}
+
+	/**
+	 * The block style variations available here, and which of them travel.
+	 *
+	 * Two registries answer half the question each. A style declared in a
+	 * block's own `block.json` lands on `WP_Block_Type::$styles` and ships
+	 * with the block, so `is-style-outline` resolves on every WordPress there
+	 * is. Everything else — a theme's `styles/*.json` partial, a
+	 * `register_block_style()` call — lives only in
+	 * `WP_Block_Styles_Registry`, and exists only here.
+	 *
+	 * The distinction is the whole point of reporting them. A variation is
+	 * applied by putting a class in the markup, and the class travels with a
+	 * pattern while the definition does not, so a pattern reaching for a
+	 * variation this site invented arrives somewhere else with the class
+	 * intact and nothing styling it — the same silent nothing an undefined
+	 * preset renders as.
+	 *
+	 * @return array Block name => list of variations.
+	 */
+	private function block_styles() {
+		$found = array();
+
+		foreach ( \WP_Block_Type_Registry::get_instance()->get_all_registered() as $block_name => $type ) {
+			if ( empty( $type->styles ) || ! is_array( $type->styles ) ) {
+				continue;
+			}
+			foreach ( $type->styles as $style ) {
+				if ( empty( $style['name'] ) ) {
+					continue;
+				}
+				$found[ $block_name ][ (string) $style['name'] ] = array(
+					'label'  => isset( $style['label'] ) ? (string) $style['label'] : (string) $style['name'],
+					'source' => 'block',
+				);
+			}
+		}
+
+		foreach ( \WP_Block_Styles_Registry::get_instance()->get_all_registered() as $block_name => $styles ) {
+			foreach ( $styles as $name => $style ) {
+				if ( isset( $found[ $block_name ][ (string) $name ] ) ) {
+					continue;
+				}
+				$found[ $block_name ][ (string) $name ] = array(
+					'label'  => isset( $style['label'] ) ? (string) $style['label'] : (string) $name,
+					'source' => 'site',
+				);
+			}
+		}
+
+		$answer = array();
+		foreach ( $found as $block_name => $styles ) {
+			foreach ( $styles as $name => $style ) {
+				$answer[ $block_name ][] = array(
+					'name'     => (string) $name,
+					'label'    => $style['label'],
+					'class'    => 'is-style-' . $name,
+					'source'   => $style['source'],
+					'portable' => 'block' === $style['source'],
+				);
+			}
+		}
+
+		return $answer;
 	}
 
 	/**

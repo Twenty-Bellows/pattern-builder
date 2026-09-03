@@ -197,6 +197,62 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A pattern inherits the site's global styles, so an agent that cannot
+	 * read them over-specifies: it restates the heading font on every
+	 * heading because it has no way to know the theme already set one.
+	 */
+	public function test_design_system_reports_the_styles_a_pattern_inherits() {
+		$result = $this->abilities->execute_design_system();
+
+		$this->assertArrayHasKey( 'styles', $result );
+		$this->assertIsArray( $result['styles'] );
+		// Core's own theme.json styles the elements, so this is never empty.
+		$this->assertArrayHasKey( 'elements', $result['styles'] );
+	}
+
+	/**
+	 * The class travels with a pattern and the definition does not, so which
+	 * registry a variation came from decides whether a pattern using it
+	 * survives the trip. `is-style-outline` is declared in core/button's own
+	 * block.json and resolves everywhere; anything this site registered
+	 * resolves only here.
+	 */
+	public function test_block_styles_say_which_variations_travel() {
+		$result = $this->abilities->execute_design_system();
+
+		$this->assertArrayHasKey( 'blockStyles', $result );
+		$this->assertArrayHasKey( 'core/button', $result['blockStyles'] );
+
+		$by_name = array();
+		foreach ( $result['blockStyles']['core/button'] as $style ) {
+			$by_name[ $style['name'] ] = $style;
+		}
+
+		$this->assertArrayHasKey( 'outline', $by_name );
+		$this->assertSame( 'is-style-outline', $by_name['outline']['class'] );
+		$this->assertSame( 'block', $by_name['outline']['source'] );
+		$this->assertTrue( $by_name['outline']['portable'] );
+	}
+
+	public function test_a_variation_registered_here_is_marked_as_not_travelling() {
+		register_block_style( 'core/button', array( 'name' => 'pbtest-pill', 'label' => 'Pill' ) );
+
+		try {
+			$result  = $this->abilities->execute_design_system();
+			$by_name = array();
+			foreach ( $result['blockStyles']['core/button'] as $style ) {
+				$by_name[ $style['name'] ] = $style;
+			}
+
+			$this->assertArrayHasKey( 'pbtest-pill', $by_name );
+			$this->assertSame( 'site', $by_name['pbtest-pill']['source'] );
+			$this->assertFalse( $by_name['pbtest-pill']['portable'] );
+		} finally {
+			unregister_block_style( 'core/button', 'pbtest-pill' );
+		}
+	}
+
+	/**
 	 * Presets arrive keyed by origin and a later origin wins by slug, which
 	 * is what the editor shows — so a slug must appear once, not once per
 	 * origin that defines it.
