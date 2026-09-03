@@ -107,6 +107,25 @@ class Test_Cloud_Tokens extends WP_UnitTestCase {
 		$this->assertSame( array( 'dusk' ), $refs['gradient'] );
 	}
 
+	/**
+	 * core/button renders `has-custom-font-size` beside its preset class
+	 * whenever a font size is set at all. That word is core's marker for "an
+	 * explicit value, not a preset", so reading it as a slug reports a token
+	 * this site does not define and never could.
+	 */
+	public function test_referenced_ignores_core_custom_marker_classes() {
+		$markup = '<!-- wp:buttons -->
+<div class="wp-block-buttons"><!-- wp:button {"backgroundColor":"brand","fontSize":"mega"} -->
+<div class="wp-block-button"><a class="wp-block-button__link has-brand-background-color has-background has-mega-font-size has-custom-font-size wp-element-button">Go</a></div>
+<!-- /wp:button --></div>
+<!-- /wp:buttons -->';
+
+		$refs = Pattern_Builder_Cloud_Tokens::referenced( $markup );
+
+		$this->assertSame( array( 'mega' ), $refs['fontSize'], 'The preset is the reference; the marker is not.' );
+		$this->assertSame( array( 'brand' ), $refs['color'] );
+	}
+
 	public function test_collect_resolves_against_merged_settings() {
 		$tokens = Pattern_Builder_Cloud_Tokens::collect( $this->sample_markup() );
 

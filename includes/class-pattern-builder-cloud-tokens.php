@@ -153,6 +153,13 @@ class Pattern_Builder_Cloud_Tokens {
 		$found = array();
 		$note  = function ( $type, $slug ) use ( &$found ) {
 			$slug = strtolower( (string) $slug );
+			// `custom` is core's word for "not a preset": a block carrying an
+			// explicit value renders `has-custom-font-size` beside whatever
+			// preset class it also has, so reading it as a slug reports a
+			// token nothing defines and nothing ever will.
+			if ( 'custom' === $slug ) {
+				return;
+			}
 			if ( preg_match( '/^[a-z0-9-]{1,64}$/', $slug ) ) {
 				$found[ $type ][ $slug ] = true;
 			}
