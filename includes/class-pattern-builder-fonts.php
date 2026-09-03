@@ -210,6 +210,12 @@ class Pattern_Builder_Fonts {
 			$entry_slug = isset( $settings['slug'] ) ? strtolower( (string) $settings['slug'] ) : sanitize_title( $settings['name'] );
 
 			if ( strtolower( (string) $settings['name'] ) === $wanted || $entry_slug === $slug ) {
+				// The collection files categories on the entry rather than on
+				// the settings, and describe() reports them.
+				if ( isset( $entry['categories'] ) ) {
+					$settings['categories'] = array_values( (array) $entry['categories'] );
+				}
+
 				return $settings;
 			}
 		}
@@ -222,6 +228,72 @@ class Pattern_Builder_Fonts {
 				$name
 			),
 			array( 'status' => 404 )
+		);
+	}
+
+	/**
+	 * One family described in full: what it is called, and what it actually
+	 * offers to install.
+	 *
+	 * An agent choosing a typeface can otherwise only find out which weights
+	 * exist by asking for one and reading the refusal, and cannot find out at
+	 * all whether the family has a variable face — which decides whether an
+	 * axis like optical size is available or whether the design has to live
+	 * with fixed instances.
+	 *
+	 * @param string $name Family name or slug.
+	 * @return array|\WP_Error
+	 */
+	public static function describe( $name ) {
+		$family = self::family( $name );
+
+		if ( is_wp_error( $family ) ) {
+			return $family;
+		}
+
+		$available = isset( $family['fontFace'] ) && is_array( $family['fontFace'] ) ? $family['fontFace'] : array();
+		$weights   = array();
+		$styles    = array();
+		$variable  = false;
+
+		foreach ( $available as $face ) {
+			$weight = isset( $face['fontWeight'] ) ? trim( (string) $face['fontWeight'] ) : '400';
+			$style  = isset( $face['fontStyle'] ) ? strtolower( (string) $face['fontStyle'] ) : 'normal';
+
+			// A variable face states its range as "100 900" rather than one number.
+			if ( preg_match( '/^\d+\s+\d+$/', $weight ) ) {
+				$variable = true;
+			}
+
+			$weights[] = $weight;
+			$styles[]  = $style;
+		}
+
+		$weights = array_values( array_unique( $weights ) );
+		$styles  = array_values( array_unique( $styles ) );
+		sort( $weights, SORT_NATURAL );
+		sort( $styles );
+
+		return array(
+			'name'       => (string) $family['name'],
+			'slug'       => isset( $family['slug'] ) ? (string) $family['slug'] : sanitize_title( (string) $family['name'] ),
+			'categories' => isset( $family['categories'] ) ? array_values( (array) $family['categories'] ) : array(),
+			'fontFamily' => isset( $family['fontFamily'] ) ? (string) $family['fontFamily'] : '',
+			'weights'    => $weights,
+			'styles'     => $styles,
+			'variable'   => $variable,
+
+			/*
+			 * Google serves most families as one static file per weight, cut at
+			 * the family's default optical size. A design built on a variable
+			 * axis — optical sizing especially, which retunes a face as it grows
+			 * — cannot be reproduced from those, and the difference shows up as
+			 * text that sets wider or narrower than the original rather than as
+			 * anything an agent would recognise as a missing feature.
+			 */
+			'note'       => $variable
+				? __( 'This family has a variable face, so its axes are available.', 'pattern-builder' )
+				: __( 'Only fixed instances are available for this family, one file per weight. A design that relies on a variable axis such as optical sizing cannot be reproduced from them.', 'pattern-builder' ),
 		);
 	}
 
@@ -261,11 +333,14 @@ class Pattern_Builder_Fonts {
 			return $installed;
 		}
 
+		$offered = self::describe( (string) $family['name'] );
+
 		return array(
 			'family'      => (string) $family['name'],
 			'slug'        => $slug,
 			'fontFamily'  => $stack,
 			'destination' => 'user' === $destination ? 'user' : 'theme',
+			'variable'    => ! is_wp_error( $offered ) && $offered['variable'],
 			'faces'       => $installed['faces'],
 			'preset'      => $installed['preset'],
 			// The whole point of installing it: what a pattern writes to use it.
@@ -338,7 +413,7 @@ class Pattern_Builder_Fonts {
 				'pb_font_no_match',
 				sprintf(
 					/* translators: 1: the font family name, 2: the weights asked for, 3: the styles asked for. */
-					__( '"%1$s" has no files for weight %2$s in %3$s. Call get-font to see which weights it offers.', 'pattern-builder' ),
+					__( '"%1$s" has no files for weight %2$s in %3$s. Call list-fonts with a "family" of this name to see the weights and styles it offers.', 'pattern-builder' ),
 					isset( $family['name'] ) ? $family['name'] : '',
 					implode( ', ', $weights ),
 					implode( ', ', $styles )

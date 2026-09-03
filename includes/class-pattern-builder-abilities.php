@@ -80,6 +80,7 @@ class Pattern_Builder_Abilities {
 		$this->register_update_pattern();
 		$this->register_add_design_tokens();
 		$this->register_set_global_styles();
+		$this->register_set_layout();
 		$this->register_add_block_style_variation();
 		$this->register_find_media();
 		$this->register_add_asset();
@@ -170,7 +171,7 @@ class Pattern_Builder_Abilities {
 						),
 						'layout'       => array(
 							'type'        => 'object',
-							'description' => 'contentSize and wideSize — the widths a constrained layout uses.',
+							'description' => 'contentSize and wideSize — the widths a constrained layout caps its children at — plus useRootPaddingAwareAlignments, which decides whether a full-width band escapes the root padding. Change them with set-layout; a pattern whose bands do not match these has to restate the width on every band.',
 						),
 						'variations'   => array(
 							'type'        => 'array',
@@ -217,7 +218,17 @@ class Pattern_Builder_Abilities {
 			'spacing'      => $this->preset( $settings, array( 'spacing', 'spacingSizes' ) ),
 			'fontSizes'    => $this->preset( $settings, array( 'typography', 'fontSizes' ) ),
 			'fontFamilies' => $this->preset( $settings, array( 'typography', 'fontFamilies' ) ),
-			'layout'       => isset( $settings['layout'] ) ? $settings['layout'] : array(),
+
+			/*
+			 * The root padding flag lives beside `layout` in settings rather
+			 * than inside it, but it decides the same question — how wide a
+			 * band ends up — so it is reported together with the widths and set
+			 * by the same ability.
+			 */
+			'layout'       => array_merge(
+				isset( $settings['layout'] ) && is_array( $settings['layout'] ) ? $settings['layout'] : array(),
+				array( 'useRootPaddingAwareAlignments' => ! empty( $settings['useRootPaddingAwareAlignments'] ) )
+			),
 			'variations'   => $variations,
 			'styles'       => isset( $merged['styles'] ) && is_array( $merged['styles'] ) ? $merged['styles'] : array(),
 			'blockStyles'  => $this->block_styles(),
@@ -1729,6 +1740,105 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
+	 * Set the widths a constrained layout measures against.
+	 *
+	 * A size is checked with the same grammar a spacing preset goes through,
+	 * because it lands in the same place: core writes it straight into a
+	 * `max-width` declaration. Core would quietly substitute `initial` for a
+	 * value it thinks unsafe, which reads as a layout that simply did not take,
+	 * so a bad value is refused here where the caller can see why.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_set_layout( $input ) {
+		$destination = ( isset( $input['destination'] ) && 'user' === $input['destination'] ) ? 'user' : 'theme';
+		$layout      = array();
+		$written     = array();
+
+		foreach ( array( 'contentSize', 'wideSize' ) as $key ) {
+			if ( ! isset( $input[ $key ] ) || '' === $input[ $key ] ) {
+				continue;
+			}
+
+			$value = Pattern_Builder_Cloud_Tokens::sanitize_value( 'spacing', $input[ $key ] );
+			if ( false === $value ) {
+				return new \WP_Error(
+					'pb_layout_value',
+					sprintf(
+						/* translators: 1: setting name, 2: the value given. */
+						__( '%1$s must be a plain CSS length such as "46rem" or a clamp() of them; "%2$s" is not one.', 'pattern-builder' ),
+						$key,
+						(string) $input[ $key ]
+					),
+					array( 'status' => 400 )
+				);
+			}
+
+			$layout[ $key ] = $value;
+			$written[]      = 'layout.' . $key;
+		}
+
+		$root_padding = null;
+		if ( isset( $input['useRootPaddingAwareAlignments'] ) ) {
+			$root_padding = (bool) $input['useRootPaddingAwareAlignments'];
+			$written[]    = 'useRootPaddingAwareAlignments';
+		}
+
+		if ( ! $written ) {
+			return new \WP_Error(
+				'pb_layout_empty',
+				__( 'Nothing to set: give contentSize, wideSize or useRootPaddingAwareAlignments.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		/*
+		 * What was written, captured on the way past. Reading it back through
+		 * wp_get_global_settings() would report the values from before this
+		 * call: `WP_Theme_JSON_Resolver` keys parsed theme.json files by path
+		 * and `clean_cached_data()` does not clear that cache, so within one
+		 * request the file it already read is the file it keeps.
+		 */
+		$applied = array();
+
+		$result = Pattern_Builder_Theme_Json::edit(
+			$destination,
+			function ( $config ) use ( $layout, $root_padding, &$applied ) {
+				if ( ! isset( $config['settings'] ) || ! is_array( $config['settings'] ) ) {
+					$config['settings'] = array();
+				}
+
+				if ( $layout ) {
+					$existing                     = isset( $config['settings']['layout'] ) && is_array( $config['settings']['layout'] ) ? $config['settings']['layout'] : array();
+					$config['settings']['layout'] = array_merge( $existing, $layout );
+				}
+
+				if ( null !== $root_padding ) {
+					$config['settings']['useRootPaddingAwareAlignments'] = $root_padding;
+				}
+
+				$applied = array_merge(
+					isset( $config['settings']['layout'] ) ? $config['settings']['layout'] : array(),
+					array( 'useRootPaddingAwareAlignments' => ! empty( $config['settings']['useRootPaddingAwareAlignments'] ) )
+				);
+
+				return $config;
+			}
+		);
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return array(
+			'written'     => $written,
+			'layout'      => $applied,
+			'destination' => $destination,
+		);
+	}
+
+	/**
 	 * Merge the given styles into the destination.
 	 *
 	 * @param array $input Ability input.
@@ -1739,6 +1849,70 @@ class Pattern_Builder_Abilities {
 		$destination = ( isset( $input['destination'] ) && 'user' === $input['destination'] ) ? 'user' : 'theme';
 
 		return Pattern_Builder_Theme_Styles::apply( $styles, $destination );
+	}
+
+	/**
+	 * Register the ability that sets the widths a constrained layout measures
+	 * against.
+	 */
+	private function register_set_layout() {
+		wp_register_ability(
+			'pattern-builder/set-layout',
+			array(
+				'label'               => __( 'Set the layout widths', 'pattern-builder' ),
+				'description'         => __( 'Sets settings.layout — the content width a constrained block caps its children at, and the wider width an "alignwide" block gets — plus whether the root padding is applied in a way that lets a full-width block still escape it. These are settings rather than styles or presets, so neither add-design-tokens nor set-global-styles can reach them, and a pattern whose bands do not match the site\'s measure has to restate the width on every band instead. Replaces the values it names and leaves the rest; call get-design-system first to see what they are now. Writes the active theme\'s theme.json by default.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'contentSize'                   => array(
+							'type'        => 'string',
+							'description' => 'The width a constrained layout caps ordinary children at, as a CSS length — for example "46rem" or "clamp(20rem, 60vw, 50rem)". This is the measure body copy is set to.',
+						),
+						'wideSize'                      => array(
+							'type'        => 'string',
+							'description' => 'The width an "alignwide" child gets, as a CSS length — for example "80rem". Usually wider than contentSize.',
+						),
+						'useRootPaddingAwareAlignments' => array(
+							'type'        => 'boolean',
+							'description' => 'When true, the root padding moves off the body and onto the blocks that honour it, so a full-width band still reaches the edges of the window instead of being inset by it. Turn this on before setting a root padding in set-global-styles, or every alignfull band will be inset.',
+						),
+						'destination'                   => array(
+							'type'        => 'string',
+							'enum'        => array( 'theme', 'user' ),
+							'description' => '"theme" (default) writes the active theme\'s theme.json, so the layout travels with the theme; "user" writes Global Styles, which stays in this site\'s database.',
+						),
+					),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'written'     => array(
+							'type'        => 'array',
+							'description' => 'The settings that were set.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'layout'      => array(
+							'type'        => 'object',
+							'description' => 'The layout as it now stands.',
+						),
+						'destination' => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_set_layout' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
 	}
 
 	/**
@@ -2170,11 +2344,15 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/list-fonts',
 			array(
 				'label'               => __( 'List installable fonts', 'pattern-builder' ),
-				'description'         => __( 'Lists the font families available to install from the Google Fonts collection WordPress ships, filtered by name or category. Call this to confirm a family exists and how its name is spelled before calling add-font.', 'pattern-builder' ),
+				'description'         => __( 'Lists the font families available to install from the Google Fonts collection WordPress ships, filtered by name or category. Call this to confirm a family exists and how its name is spelled before calling add-font. Naming one family instead reports what that family actually offers — its weights, its styles, and whether it has a variable face, which is what decides whether an axis such as optical sizing is available or whether the design has to live with fixed instances.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
 					'properties'           => array(
+						'family'   => array(
+							'type'        => 'string',
+							'description' => 'One family by name or slug. Answers with that family alone, described in full: the weights and styles it offers and whether it has a variable face. The other filters are ignored when this is given.',
+						),
 						'search'   => array(
 							'type'        => 'string',
 							'description' => 'Substring of the family name.',
@@ -2214,6 +2392,22 @@ class Pattern_Builder_Abilities {
 	 * @return array|\WP_Error
 	 */
 	public function execute_list_fonts( $input = array() ) {
+		/*
+		 * Naming a family is what turns on the detail, the same way naming
+		 * blocks turns on their supports in list-block-types: a browse stays a
+		 * catalogue, and the answer grows only where somebody has narrowed to
+		 * the one family they are about to install.
+		 */
+		if ( isset( $input['family'] ) && '' !== $input['family'] ) {
+			$family = Pattern_Builder_Fonts::describe( (string) $input['family'] );
+
+			if ( is_wp_error( $family ) ) {
+				return $family;
+			}
+
+			return array( 'families' => array( $family ) );
+		}
+
 		$families = Pattern_Builder_Fonts::search(
 			isset( $input['search'] ) ? (string) $input['search'] : '',
 			isset( $input['category'] ) ? (string) $input['category'] : '',
@@ -2413,6 +2607,19 @@ class Pattern_Builder_Abilities {
 
 		$store   = new Pattern_File_Store();
 		$pattern = $store->find_theme_pattern( $id );
+
+		/*
+		 * A theme pattern is stored under `{theme}/{slug}`, but an agent that
+		 * created one by its bare slug will ask for it the same way. Answering
+		 * the namespaced form costs nothing and saves a lookup that fails for a
+		 * reason nothing on the wire explains.
+		 */
+		if ( ! $pattern ) {
+			$namespaced = Pattern_File_Store::namespaced_name( $id );
+			if ( $namespaced !== $id ) {
+				$pattern = $store->find_theme_pattern( $namespaced );
+			}
+		}
 
 		if ( ! $pattern ) {
 			return new \WP_Error(

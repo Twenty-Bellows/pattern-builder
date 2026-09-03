@@ -11,6 +11,7 @@
  * @package PatternBuilder
  */
 
+use TwentyBellows\PatternBuilder\Pattern_Builder_Abilities;
 use TwentyBellows\PatternBuilder\Pattern_Builder_Fonts;
 
 class Test_Fonts extends WP_UnitTestCase {
@@ -363,5 +364,85 @@ class Test_Fonts extends WP_UnitTestCase {
 		$this->assertCount( 1, $config['settings']['typography']['fontFamilies'] );
 		$this->assertSame( 'Georgia, serif', $preset['fontFamily'] );
 		$this->assertArrayNotHasKey( 'fontFace', $preset );
+	}
+
+	/**
+	 * Which weights a family offers is the first thing an agent needs and the
+	 * one thing a listing did not say, so it could only find out by asking for
+	 * a weight and reading the refusal.
+	 */
+	public function test_a_named_family_reports_its_weights_and_styles() {
+		$described = Pattern_Builder_Fonts::describe( 'Testerly' );
+
+		$this->assertNotWPError( $described );
+		$this->assertSame( 'Testerly', $described['name'] );
+		$this->assertSame( array( '400', '700' ), $described['weights'] );
+		$this->assertSame( array( 'italic', 'normal' ), $described['styles'] );
+		$this->assertSame( array( 'sans-serif' ), $described['categories'] );
+	}
+
+	/**
+	 * A family served as one file per weight cannot supply a variable axis, and
+	 * a design built on one — optical sizing especially — will set wider or
+	 * narrower than the original with nothing to say why. The answer says so
+	 * rather than leaving it to be discovered by measuring.
+	 */
+	public function test_a_family_says_whether_it_has_a_variable_face() {
+		$fixed = Pattern_Builder_Fonts::describe( 'Testerly' );
+		$this->assertFalse( $fixed['variable'] );
+		$this->assertStringContainsString( 'fixed instances', $fixed['note'] );
+
+		$variable = Pattern_Builder_Fonts::describe( 'Variabilia' );
+		$this->assertTrue( $variable['variable'] );
+		$this->assertSame( array( '100 900' ), $variable['weights'] );
+	}
+
+	public function test_describing_an_unknown_family_is_refused() {
+		$result = Pattern_Builder_Fonts::describe( 'Nothingface' );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_font_not_found', $result->get_error_code() );
+	}
+
+	/**
+	 * The refusal has to name something that exists: it used to send the caller
+	 * to a `get-font` ability that was never registered.
+	 */
+	public function test_a_refused_weight_names_a_real_ability() {
+		$result = Pattern_Builder_Fonts::install( 'Testerly', array( '900' ) );
+
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'list-fonts', $result->get_error_message() );
+		$this->assertStringNotContainsString( 'get-font', $result->get_error_message() );
+	}
+
+	/**
+	 * An install reports what kind of faces landed, for the same reason the
+	 * listing does.
+	 */
+	public function test_an_install_says_whether_the_faces_are_variable() {
+		$installed = Pattern_Builder_Fonts::install( 'Testerly', array( '400' ) );
+
+		$this->assertNotWPError( $installed );
+		$this->assertFalse( $installed['variable'] );
+	}
+
+	/**
+	 * The listing is where an agent looks, so the detail has to be reachable
+	 * from it — naming a family turns it on, the way naming blocks turns on
+	 * their supports in list-block-types.
+	 */
+	public function test_list_fonts_describes_one_named_family() {
+		$abilities = new Pattern_Builder_Abilities();
+		remove_action( 'wp_abilities_api_categories_init', array( $abilities, 'register_category' ) );
+		remove_action( 'wp_abilities_api_init', array( $abilities, 'register_abilities' ) );
+
+		$listed = $abilities->execute_list_fonts( array() );
+		$this->assertArrayNotHasKey( 'weights', $listed['families'][0], 'A browse should stay a catalogue.' );
+
+		$named = $abilities->execute_list_fonts( array( 'family' => 'Variabilia' ) );
+		$this->assertCount( 1, $named['families'] );
+		$this->assertSame( 'Variabilia', $named['families'][0]['name'] );
+		$this->assertTrue( $named['families'][0]['variable'] );
 	}
 }

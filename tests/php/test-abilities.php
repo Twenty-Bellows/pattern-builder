@@ -58,13 +58,29 @@ class Test_Abilities extends WP_UnitTestCase {
 			foreach ( (array) glob( $this->theme_dir . '/assets/images/*' ) as $file ) {
 				unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 			}
-			foreach ( (array) glob( $this->theme_dir . '/patterns/*' ) as $file ) {
-				unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-			}
+			// A namespaced name writes `patterns/{handle}/{collection}/{slug}.php`,
+			// so this has to come back down through directories as well as files.
+			$this->remove_tree( $this->theme_dir . '/patterns' );
 			$this->theme_dir = '';
 		}
 		wp_clean_theme_json_cache();
 		parent::tear_down();
+	}
+
+	/**
+	 * Empty a directory, nested files and all, leaving the directory itself.
+	 *
+	 * @param string $dir Directory to empty.
+	 */
+	private function remove_tree( $dir ) {
+		foreach ( (array) glob( $dir . '/*' ) as $path ) {
+			if ( is_dir( $path ) ) {
+				$this->remove_tree( $path );
+				rmdir( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.rmdir_rmdir
+				continue;
+			}
+			unlink( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+		}
 	}
 
 	/**
@@ -137,6 +153,7 @@ class Test_Abilities extends WP_UnitTestCase {
 			'pattern-builder/add-design-tokens',
 			'pattern-builder/set-global-styles',
 			'pattern-builder/add-block-style-variation',
+			'pattern-builder/set-layout',
 			// Media and fonts: what a pattern points at.
 			'pattern-builder/find-media',
 			'pattern-builder/add-asset',
@@ -174,7 +191,7 @@ class Test_Abilities extends WP_UnitTestCase {
 			$this->assertTrue( $meta['show_in_rest'], $read . ' must be reachable over REST.' );
 		}
 
-		foreach ( array( 'create-pattern', 'update-pattern', 'add-design-tokens', 'set-global-styles', 'add-block-style-variation', 'add-asset', 'add-placeholder-image', 'add-font' ) as $write ) {
+		foreach ( array( 'create-pattern', 'update-pattern', 'add-design-tokens', 'set-global-styles', 'add-block-style-variation', 'set-layout', 'add-asset', 'add-placeholder-image', 'add-font' ) as $write ) {
 			$meta = wp_get_ability( 'pattern-builder/' . $write )->get_meta();
 			$this->assertFalse( $meta['annotations']['readonly'], $write . ' is not a read.' );
 			$this->assertFalse(
@@ -432,6 +449,82 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'Block Types: core/post-content', $header );
 		$this->assertStringContainsString( 'Post Types: page', $header );
 		$this->assertStringContainsString( 'Viewport Width: 1400', $header );
+	}
+
+	/**
+	 * WordPress registers a theme pattern under whatever its `Slug:` header
+	 * says, and every `core/pattern` reference is written against the
+	 * documented `{theme}/{slug}`. A bare name therefore used to register a
+	 * pattern nothing could refer to — and an unresolved reference renders as
+	 * nothing at all, so a page assembled from references came out empty with
+	 * no error anywhere.
+	 */
+	public function test_a_bare_name_is_namespaced_with_the_theme() {
+		$this->use_a_writable_theme();
+
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Agent Bare Name',
+				'name'    => 'agent-bare-name',
+				'content' => '<!-- wp:paragraph --><p>Named without a namespace.</p><!-- /wp:paragraph -->',
+				'source'  => 'theme',
+			)
+		);
+
+		$this->assertSame( get_stylesheet() . '/agent-bare-name', $created['pattern']['name'] );
+
+		// The file keeps the flat layout; only the header is namespaced.
+		$file = get_stylesheet_directory() . '/patterns/agent-bare-name.php';
+		$this->assertFileExists( $file );
+		$this->assertStringContainsString(
+			'Slug: ' . get_stylesheet() . '/agent-bare-name',
+			file_get_contents( $file ) // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test assertion.
+		);
+	}
+
+	/**
+	 * A name that already carries a namespace is left exactly as it is: the
+	 * theme's own, and a cloud pattern's permanent `{handle}/{collection}/{slug}`,
+	 * which nothing may rewrite.
+	 */
+	public function test_a_namespaced_name_is_left_alone() {
+		$this->use_a_writable_theme();
+
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Agent Kept Name',
+				'name'    => 'studio-a/heroes/agent-kept-name',
+				'content' => '<!-- wp:paragraph --><p>From somebody else.</p><!-- /wp:paragraph -->',
+				'source'  => 'theme',
+			)
+		);
+
+		$this->assertSame( 'studio-a/heroes/agent-kept-name', $created['pattern']['name'] );
+	}
+
+	/**
+	 * An agent that created a pattern by its bare slug asks for it the same
+	 * way, so the lookup answers the namespaced form rather than a 404 whose
+	 * reason nothing on the wire explains.
+	 */
+	public function test_a_pattern_created_bare_is_found_either_way() {
+		$this->use_a_writable_theme();
+
+		$this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Agent Findable',
+				'name'    => 'agent-findable',
+				'content' => '<!-- wp:paragraph --><p>Findable.</p><!-- /wp:paragraph -->',
+				'source'  => 'theme',
+			)
+		);
+
+		foreach ( array( 'agent-findable', get_stylesheet() . '/agent-findable' ) as $id ) {
+			$found = $this->abilities->execute_get_pattern( array( 'id' => $id ) );
+
+			$this->assertArrayHasKey( 'pattern', $found, 'Looking up by "' . $id . '" found nothing.' );
+			$this->assertSame( get_stylesheet() . '/agent-findable', $found['pattern']['name'] );
+		}
 	}
 
 	/**

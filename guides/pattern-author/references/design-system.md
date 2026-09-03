@@ -125,11 +125,22 @@ face**, and if it does, install it with `add-font`, which registers the preset
 and returns the slug. A pattern that sets no font family inherits the site's,
 which is almost always what you want.
 
-### Layout: assume about 620px
+### Layout: assume about 620px, or set it
 
 The default themes sit between 620px and 650px of content width, and 1200px to
 1340px wide. A pattern that needs more should declare its own `contentSize` on
 its outermost group rather than assume the theme is generous.
+
+When the design is yours to set, set it once with **`set-layout`** instead —
+`contentSize` and `wideSize` are settings rather than presets or styles, so
+neither `add-design-tokens` nor `set-global-styles` reaches them, and a site
+left on the wrong measure makes every band restate its own width. This is the
+quietest thing in the whole design system to get wrong: nothing errors, the
+copy simply wraps somewhere else than it did in the design you were copying.
+
+`set-layout` also carries `useRootPaddingAwareAlignments`. Turn it on before
+giving the root a left/right padding, or every `alignfull` band is inset by
+that padding instead of reaching the edges of the window.
 
 ## Two tiers, and why a theme wants both
 
@@ -347,8 +358,13 @@ read it.
 3. **Spacing** — numeric slugs, `40`–`60` for preference. Semantics go in
    `name`.
 4. **Font families** — set none unless the design needs one; `add-font` if it
-   does.
-5. **Layout** — assume ~620px of content; declare your own if you need more.
+   does. Ask `list-fonts` for that `family` first: it says which weights exist,
+   and whether the family has a variable face. Most do not — the collection
+   serves one fixed file per weight, cut at the family's default optical size —
+   and a design leaning on a variable axis will set wider or narrower than the
+   original with nothing to say why.
+5. **Layout** — assume ~620px of content; declare your own if you need more,
+   or set the site's with `set-layout` when the design is yours to set.
 6. **Whatever you reference must exist on the site you are writing on.** A slug
    that does not resolve renders as no styling at all, with no error anywhere,
    and ships no value — so the pattern arrives broken as well.
