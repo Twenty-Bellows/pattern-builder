@@ -276,6 +276,15 @@ class Pattern_Builder_Abilities {
 							'type'        => 'string',
 							'description' => 'Optional: only return blocks in this namespace, e.g. "core".',
 						),
+						'blocks'    => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'description' => 'Optional: return only these blocks, by name. Naming blocks also returns their supports, since that is usually why you are asking about particular ones. A name this site does not have comes back under "unknown" rather than silently missing.',
+						),
+						'supports'  => array(
+							'type'        => 'boolean',
+							'description' => 'Include each block\'s supports: the contract that decides which classes its saved markup must carry, which no validator can check for you. Defaults to true when "blocks" names any and false otherwise, because supports is around two and a half times the size of everything else in a listing and a browse rarely needs it.',
+						),
 					),
 					'additionalProperties' => false,
 					'default'              => array(),
@@ -304,14 +313,29 @@ class Pattern_Builder_Abilities {
 	 */
 	public function execute_block_types( $input = array() ) {
 		$namespace = isset( $input['namespace'] ) ? (string) $input['namespace'] : '';
-		$blocks    = array();
+		$wanted    = isset( $input['blocks'] ) ? array_map( 'strval', (array) $input['blocks'] ) : array();
 
-		foreach ( \WP_Block_Type_Registry::get_instance()->get_all_registered() as $name => $type ) {
+		/*
+		 * Supports is the larger half of a block's definition — about two and a
+		 * half times the size of its attributes across the core library — and a
+		 * browse of everything registered rarely needs it. Naming blocks is how
+		 * you ask for detail, so that is what turns it on.
+		 */
+		$with_supports = isset( $input['supports'] ) ? (bool) $input['supports'] : ! empty( $wanted );
+
+		$registry = \WP_Block_Type_Registry::get_instance();
+		$blocks   = array();
+
+		foreach ( $registry->get_all_registered() as $name => $type ) {
+			if ( $wanted && ! in_array( $name, $wanted, true ) ) {
+				continue;
+			}
+
 			if ( '' !== $namespace && 0 !== strpos( $name, $namespace . '/' ) ) {
 				continue;
 			}
 
-			$blocks[] = array(
+			$entry = array(
 				'name'        => $name,
 				'title'       => isset( $type->title ) ? $type->title : '',
 				'category'    => isset( $type->category ) ? $type->category : '',
@@ -319,9 +343,36 @@ class Pattern_Builder_Abilities {
 				'usesContext' => is_array( $type->uses_context ) ? $type->uses_context : array(),
 				'dynamic'     => $type->is_dynamic(),
 			);
+
+			if ( $with_supports ) {
+				$entry['supports'] = is_array( $type->supports ) ? $type->supports : array();
+			}
+
+			$blocks[] = $entry;
 		}
 
-		return array( 'blocks' => $blocks );
+		$answer = array( 'blocks' => $blocks );
+
+		/*
+		 * A name that matches nothing would otherwise come back as a shorter
+		 * list, which reads as an answer. It is the question this ability exists
+		 * to settle — markup naming a block this site lacks parses to
+		 * core/missing — so say so.
+		 */
+		$unknown = array_values(
+			array_filter(
+				$wanted,
+				function ( $name ) use ( $registry ) {
+					return null === $registry->get_registered( $name );
+				}
+			)
+		);
+
+		if ( $unknown ) {
+			$answer['unknown'] = $unknown;
+		}
+
+		return $answer;
 	}
 
 	/**
@@ -457,7 +508,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/render-pattern',
 			array(
 				'label'               => __( 'Render a pattern', 'pattern-builder' ),
-				'description'         => __( 'Returns the front-end HTML a stored pattern produces, with blocks resolved. Use it to check that a pattern renders the way it was intended — note that HTML rendering correctly says nothing about whether the block markup is valid in the editor, which only a JavaScript block validator can decide.', 'pattern-builder' ),
+				'description'         => __( 'Returns the front-end HTML a stored pattern produces, with blocks resolved, and two URLs that render it as a whole page with this site\'s stylesheets — one standalone, one inside the page template. Open those in a browser to see what the pattern looks like; the HTML alone only shows which classes landed where, not what the CSS then does with them. Note that rendering correctly says nothing about whether the block markup is valid in the editor, which only a JavaScript block validator can decide.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -475,7 +526,11 @@ class Pattern_Builder_Abilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'html' => array( 'type' => 'string' ),
+						'html'    => array( 'type' => 'string' ),
+						'preview' => array(
+							'type'        => 'object',
+							'description' => 'URLs that render the pattern as a page with this site\'s styles: "standalone" for the pattern by itself, "page" for it inside the page template.',
+						),
 					),
 				),
 				'execute_callback'    => array( $this, 'execute_render_pattern' ),
@@ -497,7 +552,21 @@ class Pattern_Builder_Abilities {
 			return $pattern;
 		}
 
-		return array( 'html' => do_blocks( $pattern->content ) );
+		/*
+		 * The HTML settles which classes are on which elements and nothing
+		 * else: what a band actually looks like is decided by stylesheets this
+		 * answer does not carry. So hand over the two URLs that do — one
+		 * showing the pattern by itself, one showing it where a page would put
+		 * it, which is the only way to see the theme's own layout act on it.
+		 */
+		return array(
+			'html'    => do_blocks( $pattern->content ),
+			'preview' => array(
+				'standalone' => Pattern_Builder_Preview::url_for( $pattern->id, 'standalone' ),
+				'page'       => Pattern_Builder_Preview::url_for( $pattern->id, 'page' ),
+				'note'       => __( 'Open either URL in a browser, authenticated as you are here, to see the pattern with this site\'s styles. "page" renders it inside the page template, which is where an alignfull band either escapes the content width or does not.', 'pattern-builder' ),
+			),
+		);
 	}
 
 	/**

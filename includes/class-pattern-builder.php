@@ -24,6 +24,7 @@ require_once __DIR__ . '/class-pattern-builder-cloud-porter.php';
 require_once __DIR__ . '/class-pattern-builder-cloud-controller.php';
 require_once __DIR__ . '/class-pattern-builder-cloud-abilities.php';
 require_once __DIR__ . '/class-pattern-builder-assets.php';
+require_once __DIR__ . '/class-pattern-builder-preview.php';
 require_once __DIR__ . '/class-pattern-builder-fonts.php';
 require_once __DIR__ . '/class-pattern-builder-telemetry.php';
 require_once __DIR__ . '/class-pattern-builder-abilities.php';
@@ -64,6 +65,7 @@ class Pattern_Builder {
 		Pattern_Builder_Cloud::register();
 		new Pattern_Builder_Cloud_Controller();
 		new Pattern_Builder_Assets();
+		new Pattern_Builder_Preview();
 		new Pattern_Builder_Telemetry();
 		new Pattern_Builder_Abilities();
 		new Pattern_Builder_Cloud_Abilities();

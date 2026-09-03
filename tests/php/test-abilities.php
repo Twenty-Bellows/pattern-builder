@@ -250,6 +250,66 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Naming blocks returns their supports, which is the half no validator checks.
+	 *
+	 * A block's supports decide which classes its saved markup must carry —
+	 * `"backgroundColor":"x"` obliging `has-x-background-color has-background` —
+	 * and those classes come from filters that only run inside a real editor, so
+	 * the validator is documented as unable to see them. The site knows, and had
+	 * no way to say.
+	 */
+	public function test_naming_blocks_returns_their_supports() {
+		$listed = $this->abilities->execute_block_types( array( 'blocks' => array( 'core/image', 'core/group' ) ) );
+
+		$this->assertCount( 2, $listed['blocks'] );
+
+		$by_name = wp_list_pluck( $listed['blocks'], 'supports', 'name' );
+		$this->assertArrayHasKey( 'core/image', $by_name );
+		$this->assertArrayHasKey( 'core/group', $by_name );
+		$this->assertArrayHasKey( 'shadow', $by_name['core/image'] );
+		$this->assertTrue( ( $by_name['core/group']['color']['gradients'] ) );
+	}
+
+	/**
+	 * A browse stays a catalogue: supports is the larger half of a definition.
+	 */
+	public function test_a_browse_omits_supports_unless_asked() {
+		$browsed = $this->abilities->execute_block_types( array( 'namespace' => 'core' ) );
+		$this->assertNotEmpty( $browsed['blocks'] );
+		foreach ( $browsed['blocks'] as $block ) {
+			$this->assertArrayNotHasKey( 'supports', $block );
+		}
+
+		$asked = $this->abilities->execute_block_types( array( 'namespace' => 'core', 'supports' => true ) );
+		$this->assertArrayHasKey( 'supports', $asked['blocks'][0] );
+	}
+
+	/**
+	 * A block this site does not have is named, not silently absent.
+	 *
+	 * Markup naming an unregistered block parses to core/missing and renders as
+	 * a grey box, which is the question this ability exists to settle — so a
+	 * shorter list would be the one answer it must not give.
+	 */
+	public function test_an_unregistered_block_is_reported() {
+		$listed = $this->abilities->execute_block_types(
+			array( 'blocks' => array( 'core/paragraph', 'core/imgae', 'acme/nope' ) )
+		);
+
+		$this->assertCount( 1, $listed['blocks'] );
+		$this->assertSame( 'core/paragraph', $listed['blocks'][0]['name'] );
+		$this->assertSame( array( 'core/imgae', 'acme/nope' ), $listed['unknown'] );
+	}
+
+	/**
+	 * Nothing unknown means no key at all, rather than an empty one to check.
+	 */
+	public function test_no_unknown_key_when_every_name_resolves() {
+		$listed = $this->abilities->execute_block_types( array( 'blocks' => array( 'core/paragraph' ) ) );
+		$this->assertArrayNotHasKey( 'unknown', $listed );
+	}
+
+	/**
 	 * A page pattern needs its placement headers, and they only live in the file.
 	 *
 	 * `Block Types: core/post-content` plus `Post Types` is what makes a pattern
@@ -361,6 +421,32 @@ class Test_Abilities extends WP_UnitTestCase {
 		foreach ( $listed['patterns'] as $pattern ) {
 			$this->assertArrayNotHasKey( 'content', $pattern );
 		}
+	}
+
+	/**
+	 * Rendering hands back somewhere to look, not just markup.
+	 *
+	 * The HTML says which classes landed where; it cannot say that a band meant
+	 * to span the viewport is rendering at the content width, because that is
+	 * the stylesheets' doing. The URLs are the part an agent over HTTP has no
+	 * other way to get.
+	 */
+	public function test_rendering_offers_somewhere_to_look() {
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Previewable Pattern',
+				'content' => '<!-- wp:paragraph --><p>Look at me.</p><!-- /wp:paragraph -->',
+				'source'  => 'user',
+			)
+		);
+
+		$rendered = $this->abilities->execute_render_pattern( array( 'id' => (string) $created['pattern']['id'] ) );
+
+		$this->assertArrayHasKey( 'preview', $rendered );
+		$this->assertArrayHasKey( 'standalone', $rendered['preview'] );
+		$this->assertArrayHasKey( 'page', $rendered['preview'] );
+		$this->assertStringContainsString( 'context=standalone', $rendered['preview']['standalone'] );
+		$this->assertStringContainsString( 'context=page', $rendered['preview']['page'] );
 	}
 
 	public function test_rendering_resolves_blocks() {
