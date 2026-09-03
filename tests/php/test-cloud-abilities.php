@@ -277,10 +277,12 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 		$this->assertSame( 'Fresh', get_post( $result['local']['id'] )->post_title );
 		$this->assertStringContainsString( 'name="collection"' . "\r\n\r\npersonal", end( $this->seen )['body'] );
 
-		// Into a named collection, by a local pattern's id.
+		// A second upload updates the cloud copy in place. Naming a
+		// collection does nothing: a pattern's collection is part of its
+		// permanent name, decided when it was first uploaded (D38).
 		$again = $this->abilities->execute_upload_pattern( array( 'id' => (string) $result['local']['id'], 'collection' => '31' ) );
 		$this->assertTrue( $again['updated'] );
-		$this->assertStringContainsString( 'name="collection"' . "\r\n\r\n31", end( $this->seen )['body'] );
+		$this->assertStringNotContainsString( 'name="collection"', end( $this->seen )['body'] );
 	}
 
 	public function test_create_collection_is_always_private_and_relays_the_refusal() {

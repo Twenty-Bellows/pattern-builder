@@ -1,5 +1,5 @@
 import apiFetch from '@wordpress/api-fetch';
-import { __, sprintf } from '@wordpress/i18n';
+import { __, _n, sprintf } from '@wordpress/i18n';
 import { useState, useEffect, useCallback, useMemo } from '@wordpress/element';
 import {
 	Button,
@@ -26,6 +26,7 @@ import {
 	setLocalStorageValue,
 } from '../utils/localStorage';
 import { CollectionPicker } from '../cloud/CollectionPicker';
+import { referencesOf } from '../utils/patternTree';
 import {
 	pickDefaultCollection,
 	shouldAskForCollection,
@@ -123,7 +124,6 @@ export function PatternCloudControls( {
 	const [ busy, setBusy ] = useState( false );
 	const [ error, setError ] = useState( '' );
 	const [ collectionId, setCollectionId ] = useState( 0 );
-	const [ moveTo, setMoveTo ] = useState( 0 );
 	const { createSuccessNotice } = useDispatch( noticesStore );
 
 	const { collections, reload: reloadCollections } = useCloudCollections(
@@ -146,9 +146,50 @@ export function PatternCloudControls( {
 		}
 	}, [ collections, collectionId ] );
 
+	/*
+	 * A pattern that references others brings them with it (D38), so the
+	 * panel says so before the upload and checks every member, not just
+	 * this one. The cheap local read decides whether to ask at all: a
+	 * pattern that references nothing costs no request.
+	 */
+	const [ tree, setTree ] = useState( null );
+	const hasReferences = useMemo(
+		() => referencesOf( content ).length > 0,
+		[ content ]
+	);
+
+	useEffect( () => {
+		if ( ! hasReferences || ! state?.connected ) {
+			setTree( null );
+			return;
+		}
+
+		let live = true;
+		apiFetch( {
+			path: addQueryArgs( `${ BASE }/pattern-tree`, {
+				patternType,
+				patternId,
+			} ),
+		} )
+			.then( ( answer ) => live && setTree( answer ) )
+			.catch( () => live && setTree( null ) );
+
+		return () => {
+			live = false;
+		};
+	}, [ hasReferences, state?.connected, patternType, patternId ] );
+
 	// The saved markup is what the server uploads, so that is what gets
-	// checked — not whatever is unsaved in the canvas.
-	const invalid = useMemo( () => findInvalidBlocks( content ), [ content ] );
+	// checked — not whatever is unsaved in the canvas. Every member of the
+	// tree is checked, because every member is uploaded.
+	const invalid = useMemo( () => {
+		if ( ! tree?.members?.length ) {
+			return findInvalidBlocks( content );
+		}
+		return tree.members.flatMap( ( member ) =>
+			findInvalidBlocks( member.content )
+		);
+	}, [ content, tree ] );
 
 	// Not a fault the service will refuse, and not one an editor complains
 	// about either — which is exactly why it is worth saying here.
@@ -212,40 +253,6 @@ export function PatternCloudControls( {
 							'The upload failed. Try again.',
 							'pattern-builder'
 						) ) + details
-				);
-			} );
-	};
-
-	// Move the cloud copy into another collection; nothing is re-uploaded.
-	const move = () => {
-		if ( busy || ! moveTo || ! state.cloudId ) {
-			return;
-		}
-		setBusy( true );
-		setError( '' );
-		apiFetch( {
-			path: `${ BASE }/library/${ state.cloudId }`,
-			method: 'PUT',
-			data: { collection: moveTo },
-		} )
-			.then( ( updated ) => {
-				setBusy( false );
-				setMoveTo( 0 );
-				createSuccessNotice(
-					sprintf(
-						/* translators: %s: collection title. */
-						__( 'Moved to %s.', 'pattern-builder' ),
-						updated.collection?.title || ''
-					),
-					{ type: 'snackbar' }
-				);
-				onRefresh();
-			} )
-			.catch( ( err ) => {
-				setBusy( false );
-				setError(
-					err.message ||
-						__( 'The move failed. Try again.', 'pattern-builder' )
 				);
 			} );
 	};
@@ -334,34 +341,43 @@ export function PatternCloudControls( {
 				</Text>
 			) }
 
-			{ state.linked && state.owned && asks && (
-				<VStack spacing={ 2 }>
-					<Text variant="muted" size="12px">
-						{ state.collection?.title
-							? sprintf(
-									/* translators: %s: collection title. */
-									__( 'In %s.', 'pattern-builder' ),
-									state.collection.title
-							  )
-							: '' }
-					</Text>
-					<CollectionPicker
-						label={ __( 'Move to…', 'pattern-builder' ) }
-						collections={ collections }
-						value={ moveTo || 0 }
-						onChange={ setMoveTo }
-						onCreated={ reloadCollections }
-						disabled={ busy }
-					/>
-					<Button
-						variant="secondary"
-						isBusy={ busy }
-						disabled={ busy || ! moveTo }
-						onClick={ move }
-					>
-						{ __( 'Move', 'pattern-builder' ) }
-					</Button>
-				</VStack>
+			{ state.linked && state.owned && state.collection?.title && (
+				<Text variant="muted" size="12px">
+					{ sprintf(
+						/* translators: %s: collection title. */
+						__( 'In %s.', 'pattern-builder' ),
+						state.collection.title
+					) }
+				</Text>
+			) }
+
+			{ tree?.problem && (
+				<Notice status="warning" isDismissible={ false }>
+					{ tree.problem }
+				</Notice>
+			) }
+
+			{ ! tree?.problem && tree?.members?.length > 1 && (
+				<Text variant="muted" size="12px">
+					{ sprintf(
+						/* translators: 1: number of patterns, 2: comma-separated pattern titles. */
+						_n(
+							'Uploads %1$d pattern: %2$s.',
+							'Uploads %1$d patterns: %2$s.',
+							tree.members.length,
+							'pattern-builder'
+						),
+						tree.members.length,
+						tree.members
+							.map( ( member ) => member.title )
+							.reverse()
+							.join( ', ' )
+					) }{ ' ' }
+					{ __(
+						'A pattern that uses others takes them along, and updates the ones already in the collection — which changes every pattern there that uses them.',
+						'pattern-builder'
+					) }
+				</Text>
 			) }
 
 			{ blockedByInvalidBlocks && (

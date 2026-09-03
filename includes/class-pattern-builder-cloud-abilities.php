@@ -558,7 +558,7 @@ class Pattern_Builder_Cloud_Abilities {
 			'pattern-builder/upload-pattern',
 			array(
 				'label'               => __( 'Upload a pattern to the cloud', 'pattern-builder' ),
-				'description'         => __( 'Uploads a pattern from this site into one of the connected account’s collections on patternbuilderwp.com, images included — an existing local pattern by id, or finished markup as title and content, which is stored here as a user pattern first. The collection defaults to Personal (private). A pattern already uploaded updates its cloud copy. Validate the markup first: the same rule as create-pattern, and the service refuses what its checks catch.', 'pattern-builder' ),
+				'description'         => __( 'Uploads a pattern from this site into one of the connected account’s collections on patternbuilderwp.com, images included — an existing local pattern by id, or finished markup as title and content, which is stored here as a user pattern first. The collection defaults to Personal (private). A pattern that references other patterns brings them with it: they are uploaded into the same collection, every reference is rewritten to name it, and the result lists everything that went up under “members” — a reference to a pattern this site does not have refuses the whole upload by name. A pattern already uploaded updates its cloud copy, and naming a collection then does nothing, since a pattern’s collection is part of its permanent name and is decided the first time it is uploaded. Validate the markup first: the same rule as create-pattern, and the service refuses what its checks catch.', 'pattern-builder' ),
 				'category'            => Pattern_Builder_Abilities::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -574,7 +574,7 @@ class Pattern_Builder_Cloud_Abilities {
 						),
 						'collection' => array(
 							'type'        => 'string',
-							'description' => 'A collection id from list-collections (scope mine), or "personal". Defaults to personal.',
+							'description' => 'A collection id from list-collections (scope mine), or "personal". Defaults to personal. Read on a pattern’s first upload only; a pattern cannot change collection afterwards.',
 						),
 					),
 					'additionalProperties' => false,
@@ -587,6 +587,11 @@ class Pattern_Builder_Cloud_Abilities {
 							'description' => 'The cloud pattern as the service summarizes it, its collection included.',
 						),
 						'updated' => array( 'type' => 'boolean' ),
+						'members' => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'description' => 'Every pattern that went up, the one asked for last: a pattern brings the patterns it references with it.',
+						),
 						'local'   => array(
 							'type'        => 'object',
 							'description' => 'The local pattern that was uploaded: type and id.',
@@ -656,6 +661,9 @@ class Pattern_Builder_Cloud_Abilities {
 		return array(
 			'pattern' => $result['pattern'],
 			'updated' => (bool) $result['updated'],
+			// Everything that went up, the pattern itself last. One name
+			// for a pattern that references nothing; several for a page.
+			'members' => isset( $result['members'] ) ? $result['members'] : array(),
 			'local'   => array(
 				'type' => $type,
 				'id'   => $id,

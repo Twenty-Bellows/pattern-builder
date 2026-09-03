@@ -42,9 +42,11 @@ class Pattern_Builder_Cloud_Porter {
 	 *
 	 * @param string     $type 'theme' or 'user'.
 	 * @param string|int $id   Theme pattern name or wp_block post ID.
+	 * @param string     $target_namespace  Target `{handle}/{collection}` to point this
+	 *                               pattern's references at, or '' to leave them.
 	 * @return array|WP_Error { pbp: array, files: array (key => path), localKey: string, contentHash: string }
 	 */
-	public function export_local( $type, $id ) {
+	public function export_local( $type, $id, $target_namespace = '' ) {
 		$pattern = $this->load_local( $type, $id );
 		if ( is_wp_error( $pattern ) ) {
 			return $pattern;
@@ -73,6 +75,16 @@ class Pattern_Builder_Cloud_Porter {
 
 		$content = $this->strip_attachment_identity( $content );
 
+		/*
+		 * The pattern's references have to name the collection it is going
+		 * into, because that is where its dependencies are being uploaded
+		 * to. The hash above is of the local content, so "changed since
+		 * upload?" still compares like with like.
+		 */
+		if ( '' !== $target_namespace ) {
+			$content = self::rewrite_references( $content, $target_namespace );
+		}
+
 		$slug = $pattern->name ? basename( (string) $pattern->name ) : sanitize_title( $pattern->title );
 
 		$pbp = array(
@@ -94,8 +106,11 @@ class Pattern_Builder_Cloud_Porter {
 			'assets'             => array_values( $assets ),
 			'tokens'             => Pattern_Builder_Cloud_Tokens::collect( (string) $pattern->content ),
 			'origin'             => array(
-				'site' => home_url(),
-				'kind' => $type,
+				'site'    => home_url(),
+				'kind'    => $type,
+				// Whose work this started as, if it started as somebody
+				// else's. Carried, never invented here (D38).
+				'pattern' => (string) $pattern->origin,
 			),
 		);
 
@@ -108,6 +123,196 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
+	 * A local pattern, by type and identifier.
+	 *
+	 * The porter loads these for its own work; the tree route needs the
+	 * same lookup to hand each member's markup to the panel.
+	 *
+	 * @param string     $type 'theme' or 'user'.
+	 * @param string|int $id   Local identifier.
+	 * @return Abstract_Pattern|WP_Error
+	 */
+	public function local_pattern( $type, $id ) {
+		return $this->load_local( $type, $id );
+	}
+
+	/**
+	 * The patterns a piece of markup references, at any depth.
+	 *
+	 * The browser has this too (`src/utils/patternTree.js`), because the
+	 * upload panel has to show the tree and run the block-validity gate over
+	 * every member before anything is sent. This copy is the one that
+	 * decides what actually goes up.
+	 *
+	 * @param string $content Block markup.
+	 * @return string[] Referenced pattern names, deduplicated, in document order.
+	 */
+	public static function references_of( $content ) {
+		if ( ! is_string( $content ) || '' === trim( $content ) ) {
+			return array();
+		}
+
+		return array_values( array_unique( self::reference_slugs( parse_blocks( $content ) ) ) );
+	}
+
+	/**
+	 * Walk a parsed tree collecting `core/pattern` slugs.
+	 *
+	 * @param array $blocks Parsed blocks.
+	 * @return string[]
+	 */
+	private static function reference_slugs( $blocks ) {
+		$found = array();
+
+		foreach ( $blocks as $block ) {
+			if ( isset( $block['blockName'], $block['attrs']['slug'] ) && 'core/pattern' === $block['blockName'] ) {
+				$slug = trim( (string) $block['attrs']['slug'] );
+				if ( '' !== $slug ) {
+					$found[] = $slug;
+				}
+			}
+
+			if ( ! empty( $block['innerBlocks'] ) ) {
+				$found = array_merge( $found, self::reference_slugs( $block['innerBlocks'] ) );
+			}
+		}
+
+		return $found;
+	}
+
+	/**
+	 * A local pattern and everything it references, leaves first.
+	 *
+	 * Leaves first because that is the order the service can accept: a
+	 * collection is a closed world (D38), so a pattern naming another is
+	 * refused until the other is stored. There is no batch and no
+	 * transaction — the ordering is the transaction.
+	 *
+	 * Every dependency is a theme pattern, and not by choice: `core/pattern`
+	 * resolves against the block-pattern registry and a `wp_block` post is
+	 * not in it, so a user pattern can be the root of a tree but never a
+	 * member of one.
+	 *
+	 * @param string     $type 'theme' or 'user'.
+	 * @param string|int $id   Local identifier.
+	 * @return array|WP_Error { order: array of { type, id, name }, missing: string[] }
+	 */
+	public function local_tree( $type, $id ) {
+		$root = $this->load_local( $type, $id );
+		if ( is_wp_error( $root ) ) {
+			return $root;
+		}
+
+		$order   = array();
+		$missing = array();
+		$seen    = array();
+
+		/*
+		 * Depth-first, pushing each pattern after everything it needs. The
+		 * closure recurses through a variable because PHP has no name for an
+		 * anonymous function inside itself.
+		 */
+		$walk = function ( $pattern, $member_type, $member_id, $path ) use ( &$walk, &$order, &$missing, &$seen ) {
+			foreach ( self::references_of( (string) $pattern->content ) as $reference ) {
+				if ( in_array( $reference, $path, true ) ) {
+					return new WP_Error(
+						'pb_cloud_reference_cycle',
+						sprintf(
+							/* translators: %s: the chain of pattern names that loops. */
+							__( 'These patterns reference each other in a loop, so there is no order to upload them in: %s', 'pattern-builder' ),
+							implode( ' → ', array_merge( $path, array( $reference ) ) )
+						),
+						array( 'status' => 400 )
+					);
+				}
+
+				if ( isset( $seen[ $reference ] ) ) {
+					continue;
+				}
+				$seen[ $reference ] = true;
+
+				$dependency = $this->store->find_theme_pattern( $reference );
+				if ( ! $dependency ) {
+					$missing[] = $reference;
+					continue;
+				}
+
+				$deeper = $walk( $dependency, 'theme', $reference, array_merge( $path, array( $reference ) ) );
+				if ( is_wp_error( $deeper ) ) {
+					return $deeper;
+				}
+			}
+
+			$order[] = array(
+				'type' => $member_type,
+				'id'   => $member_id,
+				'name' => (string) $pattern->name,
+			);
+
+			return true;
+		};
+
+		$walked = $walk( $root, $type, $id, array( (string) $root->name ) );
+		if ( is_wp_error( $walked ) ) {
+			return $walked;
+		}
+
+		if ( $missing ) {
+			return new WP_Error(
+				'pb_cloud_reference_missing',
+				sprintf(
+					/* translators: %s: comma-separated list of pattern names. */
+					__( 'This pattern uses patterns that are not on this site: %s', 'pattern-builder' ),
+					implode( ', ', $missing )
+				),
+				array(
+					'status'  => 400,
+					'missing' => $missing,
+				)
+			);
+		}
+
+		return array(
+			'order'   => $order,
+			'missing' => $missing,
+		);
+	}
+
+	/**
+	 * Point a pattern's references at a namespace.
+	 *
+	 * Uploading never renames a pattern; the namespace it hangs under is
+	 * what changes, so `mytheme/hero` becomes `{handle}/{collection}/hero`
+	 * and the last segment is carried across untouched.
+	 *
+	 * The `slug` attribute is rewritten in the markup as a string rather
+	 * than by reserializing the parsed tree: a round trip through
+	 * `parse_blocks()` and `serialize_blocks()` rewrites nothing it
+	 * understands, but it does normalize whitespace and attribute order,
+	 * and changing markup nobody asked to change is how a pattern quietly
+	 * stops matching what its `save()` writes.
+	 *
+	 * @param string $content   Block markup.
+	 * @param string $target_namespace The target `{handle}/{collection}`.
+	 * @return string
+	 */
+	public static function rewrite_references( $content, $target_namespace ) {
+		foreach ( self::references_of( $content ) as $reference ) {
+			$segments = explode( '/', $reference );
+			$slug     = end( $segments );
+
+			$content = preg_replace(
+				'/("slug"\s*:\s*)"' . preg_quote( $reference, '/' ) . '"/',
+				'$1"' . $target_namespace . '/' . $slug . '"',
+				$content
+			);
+		}
+
+		return $content;
+	}
+
+	/**
+	 * Hash of a local pattern's raw content    /**
 	 * Hash of a local pattern's raw content — the "has it changed since
 	 * upload?" fingerprint stored in the cloud-link map.
 	 *
@@ -1013,9 +1218,9 @@ class Pattern_Builder_Cloud_Porter {
 	 * @return string
 	 */
 	private function install_name( $pbp, $slug ) {
-		$namespace = isset( $pbp['namespace'] ) ? (string) $pbp['namespace'] : '';
+		$target_namespace = isset( $pbp['namespace'] ) ? (string) $pbp['namespace'] : '';
 
-		$segments = array_values( array_filter( explode( '/', $namespace ), 'strlen' ) );
+		$segments = array_values( array_filter( explode( '/', $target_namespace ), 'strlen' ) );
 		$segments = array_map(
 			static function ( $segment ) {
 				return preg_replace( '/[^a-z0-9_-]/', '', strtolower( $segment ) );
@@ -1058,21 +1263,21 @@ class Pattern_Builder_Cloud_Porter {
 			return $carried;
 		}
 
-		$namespace = isset( $pbp['namespace'] ) ? trim( (string) $pbp['namespace'] ) : '';
-		if ( '' === $namespace || substr_count( $namespace, '/' ) !== 2 ) {
+		$target_namespace = isset( $pbp['namespace'] ) ? trim( (string) $pbp['namespace'] ) : '';
+		if ( '' === $target_namespace || substr_count( $target_namespace, '/' ) !== 2 ) {
 			return '';
 		}
 
 		$handle = Pattern_Builder_Cloud::account_handle();
-		if ( '' === $handle || 0 === strpos( $namespace, $handle . '/' ) ) {
+		if ( '' === $handle || 0 === strpos( $target_namespace, $handle . '/' ) ) {
 			return '';
 		}
 
-		return $namespace;
+		return $target_namespace;
 	}
 
 	/**
-	 * Land a package as a theme pattern file.	/**
+	 * Land a package as a theme pattern file.  /**
 	 * Land a package as a theme pattern file.
 	 *
 	 * @param array    $pbp         Package (for viewport/keywords extras).
