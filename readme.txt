@@ -84,11 +84,13 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 
 == External services ==
 
-Everything local works without an account and without sending anything anywhere. Two services are involved only when you choose to use them:
+Everything local works without an account and without sending anything anywhere. Three services are involved only when you choose to use them:
 
 **patternbuilderwp.com** — the cloud library and community directory, and the account behind them. When you sign in or create an account from Appearance → Pattern Builder, your email and password are relayed once, server-side, to patternbuilderwp.com; only the returned access token is stored, on this site, for your WordPress user. Browsing the Uploaded and Community tabs, managing your collections, uploading patterns and installing patterns or whole collections, starting a password reset, and confirming a purchase all talk to patternbuilderwp.com through this site. Pattern Builder is the only way to install anything from patternbuilderwp.com: the website shows collections and sends people here. Anonymous usage reporting, if you allow it, goes there too (see below). Terms: https://patternbuilderwp.com/terms/ — Privacy: https://patternbuilderwp.com/privacy/
 
 **Freemius** — the checkout for Pattern Builder Pro. Choosing Go Pro loads Freemius's checkout script (https://checkout.freemius.com/js/v1/) on the Pattern Builder screen and opens their checkout; nothing from Freemius loads anywhere else or before that click. Terms: https://freemius.com/terms/ — Privacy: https://freemius.com/privacy/
+
+**Google Fonts, through WordPress.org** — installing a font. Adding a font family (from the pattern authoring tools, or by an agent using the add-font ability) fetches the list of available families from WordPress.org (https://s.w.org/), which is the same list WordPress core's own Manage Fonts screen uses, and then downloads the font files you chose from Google's font server (https://fonts.gstatic.com/). The files are saved to your site and served from it, so your visitors' browsers never request anything from Google. No request is made until you install a font. Google Fonts terms: https://developers.google.com/fonts/terms — Privacy: https://policies.google.com/privacy
 
 = Usage reporting (opt-in) =
 
@@ -109,12 +111,15 @@ Yes, Pattern Builder provides a unified interface to manage both theme patterns 
 == Changelog ==
 
 = 2.1.0 =
+* Patterns can carry images and fonts: find what the site already has, add a file, draw a placeholder, or install a self-hosted font family — and get back the exact reference to use
+* Font families install from the collection WordPress ships, with the files copied to your site and served from it rather than fetched from Google on every page view
 * Collections: every pattern on patternbuilderwp.com lives in exactly one collection. Every account has a private Personal; free accounts share the rest publicly, Pro builds collections in private
 * The Community tab is collections first: open one, save a single pattern, or save the whole collection to this site in one action, with one design-tokens step and a progress count
 * The Uploaded tab manages your collections — create, rename, describe, set the visibility, delete with everything in it — and uploads ask which collection when there is more than Personal
 * A page pattern brings the patterns it uses: uploading one uploads its sections into the same collection, installing one installs them first, and a pattern copied from somebody else's collection records where it came from
 * Patterns installed from a collection land under a local pattern category named for it
 * Seven new abilities for agents: list and search collections and patterns, install a pattern or a collection, upload into a collection, create a private collection — all through the WordPress user's own connection
+* Agents can extend the design system rather than hard-code values into a pattern: a new ability adds colors, gradients, spacing sizes, font sizes and font families to the active theme's theme.json or to Site styles, leaving any token you already define alone
 * Community patterns are browsed as an account: the Community tab asks you to sign in or create a free account first
 * Creating an account from wp-admin now asks for a stronger password (eight characters, with an upper-case letter, a number and a symbol), asks whether we may email you news and offers, and sends a confirmation email
 * Forgot your password? The connect panel starts a reset; the link in the email finishes it on patternbuilderwp.com

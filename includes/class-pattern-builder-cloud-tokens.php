@@ -3,7 +3,6 @@
 namespace TwentyBellows\PatternBuilder;
 
 use WP_Error;
-use WP_Theme_JSON_Resolver;
 
 /**
  * Design tokens: the preset references a pattern carries between sites.
@@ -49,6 +48,74 @@ class Pattern_Builder_Cloud_Tokens {
 				'value_key' => 'fontFamily',
 			),
 		);
+	}
+
+	/**
+	 * Collect a pattern's tokens and everything its references need.
+	 *
+	 * A page pattern is mostly `core/pattern` references, and almost none of the
+	 * presets it depends on appear in its own markup — they are in the sections
+	 * it composes. Collecting only the top level under-reports what the page
+	 * uses and, worse, renders it against another theme carrying a fraction of
+	 * what it needs. An upload does not have this problem, because it sends the
+	 * whole tree and each member brings its own; anything that looks at one
+	 * composed pattern does.
+	 *
+	 * @param string $content The pattern's markup.
+	 * @param array  $seen    Slugs already walked, against a reference loop.
+	 * @return array Tokens, one entry per type and slug.
+	 */
+	public static function collect_tree( $content, $seen = array() ) {
+		$tokens = self::collect( $content );
+
+		/*
+		 * A block style variation is the other place a preset reference hides.
+		 * The markup carries `is-style-{slug}` and no colour at all; the
+		 * `var:preset|color|accent` the variation resolves to lives in its
+		 * definition. Collecting only the markup ships the variation with a
+		 * token it references and nothing defining it at the far end.
+		 */
+		foreach ( Pattern_Builder_Block_Style_Variations::used_in( $content ) as $variation_slug ) {
+			$definition = Pattern_Builder_Block_Style_Variations::definition( $variation_slug );
+			if ( null === $definition || empty( $definition['styles'] ) ) {
+				continue;
+			}
+			$tokens = array_merge( $tokens, self::collect( (string) wp_json_encode( $definition['styles'] ) ) );
+		}
+
+		if ( preg_match_all( '/<!--\s*wp:pattern\s+(\{.*?\})\s*\/-->/s', (string) $content, $matches ) ) {
+			foreach ( $matches[1] as $json ) {
+				$attrs = json_decode( $json, true );
+
+				if ( ! is_array( $attrs ) || empty( $attrs['slug'] ) ) {
+					continue;
+				}
+
+				$slug = (string) $attrs['slug'];
+
+				if ( isset( $seen[ $slug ] ) ) {
+					continue;
+				}
+
+				$seen[ $slug ] = true;
+
+				$registered = \WP_Block_Patterns_Registry::get_instance()->get_registered( $slug );
+
+				if ( ! $registered || empty( $registered['content'] ) ) {
+					continue;
+				}
+
+				$tokens = array_merge( $tokens, self::collect_tree( $registered['content'], $seen ) );
+			}
+		}
+
+		$unique = array();
+
+		foreach ( $tokens as $token ) {
+			$unique[ $token['type'] . '|' . $token['slug'] ] = $token;
+		}
+
+		return array_values( $unique );
 	}
 
 	/**
@@ -100,6 +167,13 @@ class Pattern_Builder_Cloud_Tokens {
 		$found = array();
 		$note  = function ( $type, $slug ) use ( &$found ) {
 			$slug = strtolower( (string) $slug );
+			// `custom` is core's word for "not a preset": a block carrying an
+			// explicit value renders `has-custom-font-size` beside whatever
+			// preset class it also has, so reading it as a slug reports a
+			// token nothing defines and nothing ever will.
+			if ( 'custom' === $slug ) {
+				return;
+			}
 			if ( preg_match( '/^[a-z0-9-]{1,64}$/', $slug ) ) {
 				$found[ $type ][ $slug ] = true;
 			}
@@ -212,9 +286,10 @@ class Pattern_Builder_Cloud_Tokens {
 				return new WP_Error(
 					'pb_cloud_bad_token',
 					sprintf(
-						/* translators: %s: token slug. */
-						__( 'The pattern carries an invalid value for the "%s" token.', 'pattern-builder' ),
-						$token['slug']
+						/* translators: 1: token slug, 2: token type such as color or spacing. */
+						__( 'The value given for the "%1$s" %2$s token is not one this site will store.', 'pattern-builder' ),
+						$token['slug'],
+						$token['type']
 					),
 					array( 'status' => 400 )
 				);
@@ -227,84 +302,22 @@ class Pattern_Builder_Cloud_Tokens {
 			return array();
 		}
 
-		$result = 'theme' === $destination
-			? self::write_theme_json( $to_write )
-			: self::write_user_styles( $to_write );
+		$result = Pattern_Builder_Theme_Json::edit(
+			$destination,
+			function ( $config ) use ( $to_write ) {
+				return self::merge_settings( $config, $to_write );
+			}
+		);
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
-
-		wp_clean_theme_json_cache();
 
 		$written = array();
 		foreach ( $to_write as $type => $list ) {
 			$written[ $type ] = wp_list_pluck( $list, 'slug' );
 		}
 		return $written;
-	}
-
-	/**
-	 * Merge tokens into the theme's user Global Styles post.
-	 *
-	 * @param array $to_write type => token[].
-	 * @return true|WP_Error
-	 */
-	private static function write_user_styles( $to_write ) {
-		$post_id = WP_Theme_JSON_Resolver::get_user_global_styles_post_id();
-		if ( ! $post_id ) {
-			return new WP_Error( 'pb_cloud_no_global_styles', __( 'This site has no Global Styles storage for the active theme.', 'pattern-builder' ), array( 'status' => 500 ) );
-		}
-
-		$post   = get_post( $post_id );
-		$config = $post ? json_decode( (string) $post->post_content, true ) : null;
-		if ( ! is_array( $config ) ) {
-			$config = array();
-		}
-		$config['version']                     = isset( $config['version'] ) ? $config['version'] : 3;
-		$config['isGlobalStylesUserThemeJSON'] = true;
-
-		$config = self::merge_settings( $config, $to_write );
-
-		$updated = wp_update_post(
-			array(
-				'ID'           => $post_id,
-				'post_content' => wp_slash( wp_json_encode( $config ) ),
-			),
-			true
-		);
-
-		return is_wp_error( $updated ) ? $updated : true;
-	}
-
-	/**
-	 * Merge tokens into the active theme's theme.json file.
-	 *
-	 * @param array $to_write type => token[].
-	 * @return true|WP_Error
-	 */
-	private static function write_theme_json( $to_write ) {
-		$path = get_stylesheet_directory() . '/theme.json';
-		if ( ! file_exists( $path ) ) {
-			return new WP_Error( 'pb_cloud_no_theme_json', __( 'The active theme has no theme.json — add these tokens to Site styles instead.', 'pattern-builder' ), array( 'status' => 400 ) );
-		}
-		if ( ! wp_is_writable( $path ) ) {
-			return new WP_Error( 'pb_cloud_theme_json_readonly', __( 'theme.json is not writable — add these tokens to Site styles instead.', 'pattern-builder' ), array( 'status' => 400 ) );
-		}
-
-		$config = json_decode( (string) file_get_contents( $path ), true ); // phpcs:ignore WordPressVIPMinimum.Performance.FetchingRemoteData.FileGetContentsUnknown, WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local theme file.
-		if ( ! is_array( $config ) ) {
-			return new WP_Error( 'pb_cloud_theme_json_invalid', __( 'theme.json could not be parsed.', 'pattern-builder' ), array( 'status' => 500 ) );
-		}
-
-		$config = self::merge_settings( $config, $to_write );
-
-		$written = file_put_contents( $path, wp_json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . "\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Same direct write path Pattern_File_Store uses for theme files.
-		if ( false === $written ) {
-			return new WP_Error( 'pb_cloud_theme_json_write', __( 'theme.json could not be written.', 'pattern-builder' ), array( 'status' => 500 ) );
-		}
-
-		return true;
 	}
 
 	/**
@@ -336,11 +349,26 @@ class Pattern_Builder_Cloud_Tokens {
 				if ( isset( $slugs[ $token['slug'] ] ) ) {
 					continue;
 				}
-				$existing[] = array(
+				$preset = array(
 					'slug'     => $token['slug'],
 					'name'     => $token['name'],
 					$value_key => $token['value'],
 				);
+
+				/*
+				 * A preset occasionally carries more than its value. The one
+				 * case is a `fontFamily` naming a self-hosted font, which
+				 * needs the `fontFace` descriptors beside the stack or the
+				 * browser has nothing to load — see
+				 * `Pattern_Builder_Fonts`. Kept as a merge rather than a
+				 * second write path so there is still one implementation of
+				 * "put a preset in theme.json or in Global Styles".
+				 */
+				if ( isset( $token['extra'] ) && is_array( $token['extra'] ) ) {
+					$preset = array_merge( $preset, $token['extra'] );
+				}
+
+				$existing[] = $preset;
 			}
 
 			$config['settings'][ $path[0] ][ $path[1] ] = $existing;

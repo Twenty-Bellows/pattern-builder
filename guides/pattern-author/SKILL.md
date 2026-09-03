@@ -41,6 +41,17 @@ Never invent colors, spacing, or font sizes. A pattern that hard-codes
 else, and it silently opts out of the site's dark mode, style variations, and
 future redesigns.
 
+Referencing a preset the site does not define fails the same way and just as
+quietly — a slug that does not resolve renders as no styling at all.
+`references/design-system.md` covers all three layers a pattern leans on — the
+tokens it references, the styles it inherits and the block style variations it
+applies — and which names are actually safe, measured against core and the
+three most recent default themes: the short version is `base` and `contrast`
+for colour, the `small`…`xx-large` ladder for type, and the numeric spacing
+steps `40`–`60`. Everything else, check before you use it. It also says the
+thing hardest to see from the markup: what the site already styles is what the
+pattern inherits, so restating it is how a pattern stops adapting.
+
 Get the real values. In order of preference:
 
 **If the site is running and has Pattern Builder,** ask it — this resolves
@@ -192,6 +203,55 @@ Note the two spellings. Inside a block's attribute JSON, WordPress uses its
 own `var:preset|spacing|large` shorthand; in the actual CSS of the `style`
 attribute it must be the real custom property. Patterns that get this backwards
 render with no spacing at all.
+
+**For anything outside the common blocks, do not hand-write it — generate it.**
+`references/block-markup.md` carries the contract for the dozen or so blocks
+patterns are mostly made of. Outside that set, the shape is guesswork: the
+accordion family saves a `role="group"`, an `has-icon has-icon-right` pair, a
+`__toggle-title` span and an icon span, and nothing short of the block's own
+`save()` will tell you that. No documentation carries it — see
+`references/block-vocabulary.md` on what the handbook does and does not cover.
+
+The block library the validator already loads will write it for you, correctly
+and for the version you are targeting:
+
+```js
+import { loadWordPressBlocksFromUrls } from '<skill>/scripts/wp-core.mjs';
+const core = await loadWordPressBlocksFromUrls( urls, { version } );
+const { createBlock, serialize } = core.window.wp.blocks;
+
+console.log( serialize( [
+        createBlock( 'core/accordion', {}, [
+                createBlock( 'core/accordion-item', {}, [
+                        createBlock( 'core/accordion-heading', { title: 'A question' } ),
+                        createBlock( 'core/accordion-panel', {}, [
+                                createBlock( 'core/paragraph', { content: 'An answer.' } ),
+                        ] ),
+                ] ),
+        ] ),
+] ) );
+```
+
+`urls` comes from `pattern-builder/get-editor-scripts` (or
+`loadWordPressBlocks( wpRoot )` against a local install). Markup produced this
+way is valid by construction — it is the editor's own output — so this is
+faster and more reliable than writing a draft and iterating on validator
+errors. Validate it anyway: the run is cached and it costs a second.
+
+Two things the serializer will do that you have to allow for:
+
+- **It escapes a PHP tag.** A theme asset's reference is
+  `<?php echo get_stylesheet_directory_uri() . '…'; ?>`, and passing that as an
+  attribute value serializes it as `&lt;?php …&gt;`, which lands in the file as
+  text and renders as a broken image. Serialize with a plain marker in its
+  place and substitute the PHP afterwards:
+  `serialize( … ).replace( /HERO_SRC/g, reference )`.
+- **It drops an attribute the block does not have**, silently, which is the
+  behaviour you want — it is the same answer the editor would give — but it
+  means a setting can vanish without a word. `textAlign` on `core/heading` is
+  the one to know: on block library 10.5 it belongs under
+  `style.typography.textAlign`, and passed at the top level it is simply gone,
+  along with the `has-text-align-center` class you were expecting.
 
 Write real placeholder copy, not lorem ipsum. Copy of a plausible length is
 what tells you the layout works, and in a design pattern the placeholder is
@@ -368,9 +428,36 @@ nearest palette entry and the nearest spacing step. If nothing is close, say
 so rather than hard-coding a hex value — a missing token is a design-system
 decision for the user to make, not something to paper over.
 
-For images, use a placeholder and leave the real asset to the user. An
-`<img>` pointing at a URL you invented will 404, and a pattern carrying a
-data-URI image is unusable.
+For images, never invent a URL — an `<img>` pointing at a plausible-looking
+path will 404 on a page the user thinks is finished, and a data-URI image
+bloats the markup past what an editor handles comfortably. Either put the
+file on the site or use a placeholder; `references/assets.md` covers both.
+
+## When a pattern needs an image or a typeface
+
+A pattern is markup plus the files it points at, and a reference that does not
+resolve fails quietly — a dead `src` shows a broken image, a `fontFamily`
+naming no preset renders in the default face with nothing to say why. So the
+files come first, and the reference you write is the one the site hands back.
+
+On a running site, `pattern-builder/find-media` lists what is already here —
+the media library *and* the theme's own `assets/images`, which no core route
+reports — and every result carries the exact `reference` to put in the markup.
+Use it verbatim: a theme pattern is a PHP file, so its own assets are composed
+at render, and a hard-coded URL breaks as soon as the theme moves.
+
+What to reach for depends on what you are holding:
+
+| You have | Use |
+| --- | --- |
+| A file (JPEG, PNG, WebP, AVIF) | `POST /pattern-builder/v1/assets` — the bytes are the request body. An ability cannot carry binary |
+| A URL the user pointed you at | `add-asset` with `url`; the site fetches it |
+| Something you can draw | `add-asset` with `svg`, or `add-placeholder-image` for a plain one |
+| Nothing yet | `add-placeholder-image`. Never a remote placeholder service — that makes every page view fetch from somebody else's server |
+| A typeface | `add-font`, which installs the files *and* registers the preset that makes them render |
+
+`references/assets.md` has the requests, the parameters, the 2400px resize on
+the way in, and why a font needs both halves.
 
 ## When a pattern needs something the design system lacks
 
@@ -378,13 +465,27 @@ Propose it; don't quietly add it. Say which token is missing, what you'd call
 it, and what value you'd give it, then let the user decide. Silent additions
 are how a design system becomes forty near-identical greys.
 
-The exception is when the user has already said to extend the system — then
-add the token to `theme.json` and mention what you added.
+The exception is when the user has already said to extend the system. Then add
+the token and mention what you added — never inline the value in the markup,
+which opts the pattern out of the site's palette, its dark mode and every
+future restyle. On a running site that is `pattern-builder/add-design-tokens`
+(`references/abilities.md`); editing files directly, it is `theme.json`'s
+`settings.color.palette`, `settings.spacing.spacingSizes`,
+`settings.typography.fontSizes` or `settings.typography.fontFamilies`.
+
+Whichever route, add the token **before** the pattern that references it, and
+reference it by slug — `{"backgroundColor":"kiln-red"}` with the
+`has-kiln-red-background-color has-background` classes, or
+`var:preset|spacing|band` in a style attribute. A slug that does not resolve
+renders as no styling at all, silently.
 
 ## References
 
 - `references/pattern-kinds.md` — the six kinds, what each is for, and the headers each one writes
 - `references/block-vocabulary.md` — which blocks are allowed where (core-only vs theme vs plugin), the core vocabulary by purpose, and composition guidance
+- `references/design-system.md` — the three layers a pattern leans on: the tokens it references, the styles it inherits, the block style variations it applies, and which names travel
 - `references/block-markup.md` — the attribute-to-markup contract per block, and the mistakes that produce invalid markup
 - `references/design-content-split.md` — Pattern Overrides slots, `core/pattern` `content`, synced patterns, and the silent failures
+- `references/assets.md` — images and fonts: finding what the site has, adding what it lacks, and the reference to write for each
+- `references/keeping-current.md` — how to bring these guides up to a new WordPress release, and what to re-check
 - `references/abilities.md` — asking a running site for its design system, block types and patterns, storing results, and the guides the site itself carries

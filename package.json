@@ -67,8 +67,11 @@
 	"files": [
 		"build",
 		"includes",
+		"themes",
+		"guides",
 		"index.php",
 		"pattern-builder.php",
-		"readme.md"
+		"readme.md",
+		"!guides/pattern-author/evals"
 	]
 }

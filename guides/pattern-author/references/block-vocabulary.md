@@ -71,6 +71,30 @@ WordPress core has grown; some of what follows may be newer than you expect.
 The list below is core as registered on a current install. Check what a
 specific site has rather than trusting this to be current.
 
+### Where each question is answered
+
+Four different sources, and using the wrong one is how patterns break:
+
+| Question | Ask |
+|---|---|
+| Which blocks exist, what each is for, what may nest in what | The [core blocks reference](https://developer.wordpress.org/block-editor/reference-guides/core-blocks/) |
+| What attributes a block takes — types, defaults, selectors | `pattern-builder/list-block-types` on the target site |
+| What the saved markup must look like | The site's own block library, via `createBlock`/`serialize` |
+| Whether the markup you have is right | `scripts/validate-pattern.mjs` |
+
+The handbook is the best answer to the first and no answer at all to the
+third. It is generated from each block's `block.json`, so it carries the name,
+category, supports, attribute names, and — usefully — the nesting rules, as
+`Parent: core/accordion-item` or `Allowed Blocks: core/accordion-item`. It
+carries **no markup**: not one `<!-- wp:` example, not one class name. Saved
+markup is `save()`'s output, which is JavaScript and is not declared anywhere
+a document generator can read.
+
+It also documents whichever WordPress is current, while a pattern is destined
+for whatever version the target site runs. Where the two disagree the site
+wins, every time, which is why the last three rows of that table all point at
+the site rather than at a page.
+
 ### Layout and structure
 
 | Need | Block |

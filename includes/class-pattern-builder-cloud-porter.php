@@ -76,6 +76,17 @@ class Pattern_Builder_Cloud_Porter {
 		$content = $this->strip_attachment_identity( $content );
 
 		/*
+		 * The variations this markup applies, gathered under their local
+		 * slugs — the definitions live in the theme, not in the file, so a
+		 * pattern that travels without them arrives with the class intact and
+		 * nothing styling it.
+		 */
+		$variations = Pattern_Builder_Block_Style_Variations::carried_by( $content );
+		if ( is_wp_error( $variations ) ) {
+			return $variations;
+		}
+
+		/*
 		 * The pattern's references have to name the collection it is going
 		 * into, because that is where its dependencies are being uploaded
 		 * to. The hash above is of the local content, so "changed since
@@ -83,6 +94,17 @@ class Pattern_Builder_Cloud_Porter {
 		 */
 		if ( '' !== $target_namespace ) {
 			$content = self::rewrite_references( $content, $target_namespace );
+
+			/*
+			 * A variation slug is a name in a shared namespace, exactly as a
+			 * preset slug is, so two designs that both call something
+			 * `button-secondary` would collide at any site holding both. The
+			 * collection is the unit that travels together, so that is what
+			 * the name hangs under — and, like an origin, it is stamped once
+			 * and never rewritten: renaming on a re-upload would install a
+			 * second identical variation beside the first.
+			 */
+			list( $content, $variations ) = self::rewrite_variations( $content, $variations, $target_namespace );
 		}
 
 		$slug = $pattern->name ? basename( (string) $pattern->name ) : sanitize_title( $pattern->title );
@@ -104,7 +126,8 @@ class Pattern_Builder_Cloud_Porter {
 			'templateTypes'      => array_values( (array) $pattern->templateTypes ), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 			'content'            => $content,
 			'assets'             => array_values( $assets ),
-			'tokens'             => Pattern_Builder_Cloud_Tokens::collect( (string) $pattern->content ),
+			'tokens'             => Pattern_Builder_Cloud_Tokens::collect_tree( (string) $pattern->content ),
+			'variations'         => $variations,
 			'origin'             => array(
 				'site'    => home_url(),
 				'kind'    => $type,
@@ -312,7 +335,51 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * Hash of a local pattern's raw content    /**
+	 * Point a pattern's block style variations at the collection carrying it.
+	 *
+	 * Both halves have to move together: the `is-style-{slug}` class in the
+	 * markup — which appears in the block comment's `className` and again in
+	 * the saved HTML — and the `slug` of the definition travelling beside it.
+	 * By string substitution rather than a reserialize, for the same reason
+	 * `rewrite_references()` is: reserializing would normalize markup nobody
+	 * asked to change.
+	 *
+	 * The namespace is `{handle}/{collection}` and a variation slug may hold
+	 * no slash, so it is flattened. That makes the result unparseable back
+	 * into its parts, which is fine — it is a unique name, not a path.
+	 *
+	 * @param string $content          Block markup.
+	 * @param array  $variations       The definitions travelling with it.
+	 * @param string $target_namespace The target `{handle}/{collection}`.
+	 * @return array [ $content, $variations ]
+	 */
+	public static function rewrite_variations( $content, $variations, $target_namespace ) {
+		$prefix = str_replace( '/', '-', trim( $target_namespace, '/' ) );
+		if ( '' === $prefix || ! $variations ) {
+			return array( $content, $variations );
+		}
+
+		$renamed = array();
+		foreach ( $variations as $variation ) {
+			$from = (string) $variation['slug'];
+			$to   = $prefix . '-' . $from;
+
+			// The negative lookahead keeps `is-style-card` from matching
+			// inside `is-style-card-wide`, which is a different variation.
+			$content = preg_replace(
+				'/\bis-style-' . preg_quote( $from, '/' ) . '(?![a-z0-9-])/',
+				'is-style-' . $to,
+				$content
+			);
+
+			$variation['slug'] = $to;
+			$renamed[]         = $variation;
+		}
+
+		return array( $content, $renamed );
+	}
+
+	/**
 	 * Hash of a local pattern's raw content — the "has it changed since
 	 * upload?" fingerprint stored in the cloud-link map.
 	 *
@@ -1247,6 +1314,27 @@ class Pattern_Builder_Cloud_Porter {
 		}
 
 		/*
+		 * The looks the markup applies by class. Always into the theme, since
+		 * a variation is registered by a `styles/*.json` partial and Global
+		 * Styles has no partials mechanism to put one in — the same reason a
+		 * dependency always lands as a theme pattern. A name already here is
+		 * left alone: a pattern arriving from somewhere else must not repaint
+		 * what this site already calls by that name.
+		 */
+		$variations_written = array();
+		if ( ! empty( $pbp['variations'] ) && is_array( $pbp['variations'] ) ) {
+			foreach ( $pbp['variations'] as $variation ) {
+				$installed = Pattern_Builder_Block_Style_Variations::install( $variation );
+				if ( is_wp_error( $installed ) ) {
+					return $installed;
+				}
+				if ( 'written' === $installed ) {
+					$variations_written[] = (string) $variation['slug'];
+				}
+			}
+		}
+
+		/*
 		 * The sections this pattern places, first. A collection is a closed
 		 * world (D38), so every one of them is in this same collection and
 		 * the service guarantees they exist; installing them first is what
@@ -1279,7 +1367,8 @@ class Pattern_Builder_Cloud_Porter {
 			$collection
 		);
 
-		$result['tokensWritten'] = $tokens_written;
+		$result['tokensWritten']     = $tokens_written;
+		$result['variationsWritten'] = $variations_written;
 		return $result;
 	}
 

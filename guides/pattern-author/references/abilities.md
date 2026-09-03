@@ -75,6 +75,136 @@ input and output schema.
 | `pattern-builder/get-editor-scripts` | GET | this site's own block editor script URLs, in load order, for that validator |
 | `pattern-builder/create-pattern` | POST | store finished markup. `title` and `content` required; `source` is `theme` (default) or `user`; also `name`, `description`, `categories`, `keywords`, `synced`, `viewportWidth` |
 | `pattern-builder/update-pattern` | POST | replace an existing pattern. `id` and `content` required |
+| `pattern-builder/add-design-tokens` | POST | add presets to the design system. `input[tokens]` is a list of `{type, slug, name, value}`; `input[destination]` is `theme` (default) or `user`. Only ever **adds** — a slug already here is skipped |
+| `pattern-builder/set-global-styles` | POST | set what a block looks like before any pattern speaks: `input[styles]` is a theme.json `styles` subtree, `input[destination]` is `theme` (default) or `user`. **Replaces** at each property it names and changes the whole site, so read `get-design-system`'s `styles` first |
+| `pattern-builder/add-block-style-variation` | POST | register a named look a pattern applies with a class: `slug`, `blockTypes`, `styles`, optional `title` and `description`. Answers with the `class` to put on the block |
+| `pattern-builder/find-media` | GET | images the site already has, in the media library and in the theme's `assets/images`, each with the reference to write. Optional `input[search]`, `input[source]=all\|media\|theme`. The answer also carries how to upload a file |
+| `pattern-builder/add-asset` | POST | store an image: `svg` markup you authored (with `filename`), or a `url` for the site to fetch. `destination` is `theme` (default) or `media`. **A file you hold goes to the route below instead** |
+| `pattern-builder/add-placeholder-image` | POST | draw a plain placeholder into the theme: `width`, `height`, optional `label` |
+| `pattern-builder/list-fonts` | GET | font families installable from the collection WordPress ships. Optional `input[search]`, `input[category]` |
+| `pattern-builder/add-font` | POST | install a family and register its preset: `family`, optional `weights`, `styles`, `destination` (`theme` default, or `user`) |
+
+### The one route that is not an ability
+
+Abilities are JSON in and JSON out, so **no ability can accept a file**. A
+JPEG, PNG, WebP or AVIF goes to a plain REST route instead, shaped exactly
+like core's `POST /wp/v2/media` — the bytes are the request body and the
+filename rides in a `Content-Disposition` header:
+
+```bash
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  -H 'Content-Disposition: attachment; filename="hero.webp"' \
+  -H 'Content-Type: image/webp' \
+  --data-binary @hero.webp \
+  "$WP_URL/?rest_route=/pattern-builder/v1/assets&destination=theme"
+```
+
+The file goes from disk to the site without passing through your context —
+nothing is base64-encoded and nothing is read into a prompt. `destination` is
+`theme` (default) or `media`; `alt` sets alternative text on a media library
+attachment. An image over 2400px on its longest edge is resized down to it, so
+use the `width` and `height` the answer reports rather than the ones you sent.
+
+`find-media` returns these instructions in an `upload` key, so the route is
+discoverable from inside the abilities rather than something to remember.
+`references/assets.md` has the whole picture, fonts included.
+
+### Adding to the design system
+
+`add-design-tokens` is the answer to "this pattern needs a colour the theme
+doesn't have". Inlining the value in the markup is the wrong answer: it opts
+the pattern out of the site's palette, its dark mode and every future
+restyle. Add the preset, then reference it by slug.
+
+```bash
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  -H 'Content-Type: application/json' \
+  -d '{"input":{"destination":"theme","tokens":[
+        {"type":"color","slug":"kiln-red","name":"Kiln Red","value":"#b3391f"},
+        {"type":"spacing","slug":"band","name":"Band","value":"clamp(3rem, 8vw, 7rem)"}
+      ]}}' \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/add-design-tokens/run"
+```
+
+Five types, each landing where the editor looks for it:
+
+| `type` | Referenced as | Value |
+|---|---|---|
+| `color` | `{"backgroundColor":"kiln-red"}` + `has-kiln-red-background-color has-background` | a hex, `rgb()`/`hsl()`, `transparent`, `currentColor` |
+| `gradient` | `{"gradient":"dusk"}` + `has-dusk-gradient-background` | a `linear-`, `radial-` or `conic-gradient()` |
+| `spacing` | `var:preset\|spacing\|band` in a style attribute | a length, or `clamp()`/`calc()`/`min()`/`max()` of lengths |
+| `fontSize` | `{"fontSize":"display"}` + `has-display-font-size` | as above |
+| `fontFamily` | `{"fontFamily":"display-face"}` + `has-display-face-font-family` | a stack of family names |
+
+**Two destinations.** `theme` (the default) writes the active theme's
+`theme.json`, so the token travels with the theme and is versioned with it;
+`user` writes Global Styles, which stays in the site's database and a person
+can revert in the editor. A classic theme with no `theme.json` refuses the
+first and names the second.
+
+**It never overwrites.** A slug the site already defines keeps its own value
+and comes back under `skipped`. That is the site telling you it already has an
+answer — reference that slug rather than inventing `accent-2` beside it, and
+call `get-design-system` first so you know what is there. `written` lists what
+actually landed, by type, with the slugs as they were stored: a slug is put
+through WordPress's own slug rules, so `Kiln Red!` becomes `kiln-red`, and
+that is the name your markup has to use.
+
+**No font files.** A `fontFamily` is a stack of names. Installing a webfont is
+a different job, and this is not it — name families the site can already
+serve, or say what needs installing.
+
+### The other two design writes
+
+`add-design-tokens` gives a pattern a vocabulary to *reference*. Two siblings
+cover the rest of the design system, and `references/design-system.md` is the
+long form.
+
+`set-global-styles` decides what a block looks like when the pattern says
+nothing — the root font size, the heading face, the link colour,
+`elements.button`. It is the opposite of the tokens in every way that matters:
+there is one `elements.link.color.text`, so setting it **replaces** what was
+there and repaints every page at once, including ones you have not seen. Right
+when the design is yours to set — recreating a site, establishing a look on a
+blank theme, filling a gap. Wrong when you are writing a pattern for somebody's
+existing site: there, read `get-design-system`'s `styles` and conform to them.
+
+```bash
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  -H 'Content-Type: application/json' \
+  -d '{"input":{"styles":{
+        "typography":{"fontSize":"var:preset|font-size|medium"},
+        "elements":{"link":{"color":{"text":"var:preset|color|primary"}}}
+      }}}' \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/set-global-styles/run"
+```
+
+`add-block-style-variation` registers a **named look applied with a class** —
+a second kind of button, a card treatment. It answers with the `class` to put
+on the block, and that class is all the markup carries. Reach for it whenever
+you catch yourself about to set the same five attributes on every button: the
+styling lives in one place, the editor offers it by name, and it applies only
+where the class is.
+
+```bash
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  -H 'Content-Type: application/json' \
+  -d '{"input":{"slug":"button-secondary","title":"Secondary",
+        "blockTypes":["core/button"],
+        "styles":{"border":{"radius":"999px"},
+                  "color":{"background":"var:preset|color|accent"}}}}' \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/add-block-style-variation/run"
+```
+
+Check `get-design-system`'s `blockStyles` first. A variation with
+`portable: true` is one WordPress itself ships — `is-style-outline` and the
+rest — and hand-rolling what one of those already does is the mistake.
+
+**Neither accepts raw CSS.** WordPress does not sanitize a theme.json `css`
+property; it gates it on the `edit_css` capability instead, because a string
+that closes its own selector writes rules for the whole document. Both refuse
+it, and the service will not store one either, so a variation carrying CSS
+cannot travel with a pattern.
 
 ## The cloud, through the site's connection
 

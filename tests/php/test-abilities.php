@@ -19,6 +19,20 @@ class Test_Abilities extends WP_UnitTestCase {
 	 */
 	private $abilities;
 
+	/**
+	 * A theme.json this class wrote, to be removed again.
+	 *
+	 * @var string
+	 */
+	private $theme_json = '';
+
+	/**
+	 * A throwaway theme directory, for the tests that write files into one.
+	 *
+	 * @var string
+	 */
+	private $theme_dir = '';
+
 	public function set_up() {
 		parent::set_up();
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
@@ -31,6 +45,55 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->abilities = new Pattern_Builder_Abilities();
 		remove_action( 'wp_abilities_api_categories_init', array( $this->abilities, 'register_category' ) );
 		remove_action( 'wp_abilities_api_init', array( $this->abilities, 'register_abilities' ) );
+	}
+
+	public function tear_down() {
+		if ( '' !== $this->theme_json && file_exists( $this->theme_json ) ) {
+			unlink( $this->theme_json );
+			$this->theme_json = '';
+		}
+		if ( '' !== $this->theme_dir ) {
+			remove_filter( 'stylesheet_directory', array( $this, 'theme_dir' ) );
+			remove_filter( 'template_directory', array( $this, 'theme_dir' ) );
+			foreach ( (array) glob( $this->theme_dir . '/assets/images/*' ) as $file ) {
+				unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			}
+			foreach ( (array) glob( $this->theme_dir . '/patterns/*' ) as $file ) {
+				unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			}
+			$this->theme_dir = '';
+		}
+		wp_clean_theme_json_cache();
+		parent::tear_down();
+	}
+
+	/**
+	 * The throwaway theme directory, as a filter.
+	 *
+	 * @return string
+	 */
+	public function theme_dir() {
+		return $this->theme_dir;
+	}
+
+	/**
+	 * Point the active theme at a directory this test may write into. The
+	 * storage mechanics are covered in Test_Assets; here it only has to be
+	 * somewhere the write can land.
+	 */
+	private function use_a_writable_theme() {
+		$this->theme_dir = sys_get_temp_dir() . '/pattern-builder-abilities-theme';
+
+		if ( ! is_dir( $this->theme_dir . '/assets/images' ) ) {
+			mkdir( $this->theme_dir . '/assets/images', 0777, true );
+		}
+
+		if ( ! is_dir( $this->theme_dir . '/patterns' ) ) {
+			mkdir( $this->theme_dir . '/patterns', 0777, true );
+		}
+
+		add_filter( 'stylesheet_directory', array( $this, 'theme_dir' ) );
+		add_filter( 'template_directory', array( $this, 'theme_dir' ) );
 	}
 
 	/**
@@ -71,6 +134,15 @@ class Test_Abilities extends WP_UnitTestCase {
 			'pattern-builder/get-editor-scripts',
 			'pattern-builder/create-pattern',
 			'pattern-builder/update-pattern',
+			'pattern-builder/add-design-tokens',
+			'pattern-builder/set-global-styles',
+			'pattern-builder/add-block-style-variation',
+			// Media and fonts: what a pattern points at.
+			'pattern-builder/find-media',
+			'pattern-builder/add-asset',
+			'pattern-builder/add-placeholder-image',
+			'pattern-builder/list-fonts',
+			'pattern-builder/add-font',
 			// The cloud, through this site's connection.
 			'pattern-builder/list-collections',
 			'pattern-builder/get-collection',
@@ -96,13 +168,13 @@ class Test_Abilities extends WP_UnitTestCase {
 	public function test_annotations_map_to_the_methods_we_intend() {
 		$this->require_abilities_api();
 
-		foreach ( array( 'get-design-system', 'list-block-types', 'list-patterns', 'get-pattern', 'render-pattern', 'get-authoring-guide', 'get-validator', 'get-editor-scripts' ) as $read ) {
+		foreach ( array( 'get-design-system', 'list-block-types', 'list-patterns', 'get-pattern', 'render-pattern', 'get-authoring-guide', 'get-validator', 'get-editor-scripts', 'find-media', 'list-fonts' ) as $read ) {
 			$meta = wp_get_ability( 'pattern-builder/' . $read )->get_meta();
 			$this->assertTrue( $meta['annotations']['readonly'], $read . ' should be readonly (GET).' );
 			$this->assertTrue( $meta['show_in_rest'], $read . ' must be reachable over REST.' );
 		}
 
-		foreach ( array( 'create-pattern', 'update-pattern' ) as $write ) {
+		foreach ( array( 'create-pattern', 'update-pattern', 'add-design-tokens', 'set-global-styles', 'add-block-style-variation', 'add-asset', 'add-placeholder-image', 'add-font' ) as $write ) {
 			$meta = wp_get_ability( 'pattern-builder/' . $write )->get_meta();
 			$this->assertFalse( $meta['annotations']['readonly'], $write . ' is not a read.' );
 			$this->assertFalse(
@@ -124,6 +196,94 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertNotEmpty( $result['palette'] );
 		$slugs = wp_list_pluck( $result['palette'], 'slug' );
 		$this->assertContains( 'black', $slugs );
+	}
+
+	/**
+	 * The pair only works as a pair: an agent sets a style and then reads it
+	 * back to decide what its patterns still have to say for themselves.
+	 */
+	public function test_a_style_set_through_the_ability_is_read_back_by_get_design_system() {
+		$path = get_stylesheet_directory() . '/theme.json';
+		file_put_contents( $path, wp_json_encode( array( 'version' => 3 ) ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test fixture.
+
+		try {
+			$written = $this->abilities->execute_set_global_styles(
+				array(
+					'styles' => array(
+						'elements' => array(
+							'button' => array( 'border' => array( 'radius' => '999px' ) ),
+						),
+					),
+				)
+			);
+
+			$this->assertNotWPError( $written );
+			$this->assertSame( 'theme', $written['destination'] );
+
+			$system = $this->abilities->execute_design_system();
+			$this->assertSame( '999px', $system['styles']['elements']['button']['border']['radius'] );
+		} finally {
+			if ( file_exists( $path ) ) {
+				unlink( $path );
+			}
+			wp_clean_theme_json_cache();
+		}
+	}
+
+	/**
+	 * A pattern inherits the site's global styles, so an agent that cannot
+	 * read them over-specifies: it restates the heading font on every
+	 * heading because it has no way to know the theme already set one.
+	 */
+	public function test_design_system_reports_the_styles_a_pattern_inherits() {
+		$result = $this->abilities->execute_design_system();
+
+		$this->assertArrayHasKey( 'styles', $result );
+		$this->assertIsArray( $result['styles'] );
+		// Core's own theme.json styles the elements, so this is never empty.
+		$this->assertArrayHasKey( 'elements', $result['styles'] );
+	}
+
+	/**
+	 * The class travels with a pattern and the definition does not, so which
+	 * registry a variation came from decides whether a pattern using it
+	 * survives the trip. `is-style-outline` is declared in core/button's own
+	 * block.json and resolves everywhere; anything this site registered
+	 * resolves only here.
+	 */
+	public function test_block_styles_say_which_variations_travel() {
+		$result = $this->abilities->execute_design_system();
+
+		$this->assertArrayHasKey( 'blockStyles', $result );
+		$this->assertArrayHasKey( 'core/button', $result['blockStyles'] );
+
+		$by_name = array();
+		foreach ( $result['blockStyles']['core/button'] as $style ) {
+			$by_name[ $style['name'] ] = $style;
+		}
+
+		$this->assertArrayHasKey( 'outline', $by_name );
+		$this->assertSame( 'is-style-outline', $by_name['outline']['class'] );
+		$this->assertSame( 'block', $by_name['outline']['source'] );
+		$this->assertTrue( $by_name['outline']['portable'] );
+	}
+
+	public function test_a_variation_registered_here_is_marked_as_not_travelling() {
+		register_block_style( 'core/button', array( 'name' => 'pbtest-pill', 'label' => 'Pill' ) );
+
+		try {
+			$result  = $this->abilities->execute_design_system();
+			$by_name = array();
+			foreach ( $result['blockStyles']['core/button'] as $style ) {
+				$by_name[ $style['name'] ] = $style;
+			}
+
+			$this->assertArrayHasKey( 'pbtest-pill', $by_name );
+			$this->assertSame( 'site', $by_name['pbtest-pill']['source'] );
+			$this->assertFalse( $by_name['pbtest-pill']['portable'] );
+		} finally {
+			unregister_block_style( 'core/button', 'pbtest-pill' );
+		}
 	}
 
 	/**
@@ -180,6 +340,159 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Naming blocks returns their supports, which is the half no validator checks.
+	 *
+	 * A block's supports decide which classes its saved markup must carry —
+	 * `"backgroundColor":"x"` obliging `has-x-background-color has-background` —
+	 * and those classes come from filters that only run inside a real editor, so
+	 * the validator is documented as unable to see them. The site knows, and had
+	 * no way to say.
+	 */
+	public function test_naming_blocks_returns_their_supports() {
+		$listed = $this->abilities->execute_block_types( array( 'blocks' => array( 'core/image', 'core/group' ) ) );
+
+		$this->assertCount( 2, $listed['blocks'] );
+
+		$by_name = wp_list_pluck( $listed['blocks'], 'supports', 'name' );
+		$this->assertArrayHasKey( 'core/image', $by_name );
+		$this->assertArrayHasKey( 'core/group', $by_name );
+		$this->assertArrayHasKey( 'shadow', $by_name['core/image'] );
+		$this->assertTrue( ( $by_name['core/group']['color']['gradients'] ) );
+	}
+
+	/**
+	 * A browse stays a catalogue: supports is the larger half of a definition.
+	 */
+	public function test_a_browse_omits_supports_unless_asked() {
+		$browsed = $this->abilities->execute_block_types( array( 'namespace' => 'core' ) );
+		$this->assertNotEmpty( $browsed['blocks'] );
+		foreach ( $browsed['blocks'] as $block ) {
+			$this->assertArrayNotHasKey( 'supports', $block );
+		}
+
+		$asked = $this->abilities->execute_block_types( array( 'namespace' => 'core', 'supports' => true ) );
+		$this->assertArrayHasKey( 'supports', $asked['blocks'][0] );
+	}
+
+	/**
+	 * A block this site does not have is named, not silently absent.
+	 *
+	 * Markup naming an unregistered block parses to core/missing and renders as
+	 * a grey box, which is the question this ability exists to settle — so a
+	 * shorter list would be the one answer it must not give.
+	 */
+	public function test_an_unregistered_block_is_reported() {
+		$listed = $this->abilities->execute_block_types(
+			array( 'blocks' => array( 'core/paragraph', 'core/imgae', 'acme/nope' ) )
+		);
+
+		$this->assertCount( 1, $listed['blocks'] );
+		$this->assertSame( 'core/paragraph', $listed['blocks'][0]['name'] );
+		$this->assertSame( array( 'core/imgae', 'acme/nope' ), $listed['unknown'] );
+	}
+
+	/**
+	 * Nothing unknown means no key at all, rather than an empty one to check.
+	 */
+	public function test_no_unknown_key_when_every_name_resolves() {
+		$listed = $this->abilities->execute_block_types( array( 'blocks' => array( 'core/paragraph' ) ) );
+		$this->assertArrayNotHasKey( 'unknown', $listed );
+	}
+
+	/**
+	 * A page pattern needs its placement headers, and they only live in the file.
+	 *
+	 * `Block Types: core/post-content` plus `Post Types` is what makes a pattern
+	 * a starting layout WordPress offers for new pages; without them the same
+	 * markup is an ordinary theme pattern. The file store always wrote them —
+	 * only the ability had no way to ask for them, so an agent could not create
+	 * a page template at all.
+	 */
+	public function test_create_writes_the_placement_headers() {
+		$this->use_a_writable_theme();
+
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'         => 'Agent Page Starter',
+				'name'          => 'agent-page-starter',
+				'content'       => '<!-- wp:paragraph --><p>A page opens here.</p><!-- /wp:paragraph -->',
+				'source'        => 'theme',
+				'blockTypes'    => array( 'core/post-content' ),
+				'postTypes'     => array( 'page' ),
+				'viewportWidth' => 1400,
+			)
+		);
+
+		$this->assertArrayHasKey( 'pattern', $created );
+
+		$file = get_stylesheet_directory() . '/patterns/agent-page-starter.php';
+		$this->assertFileExists( $file );
+
+		$header = file_get_contents( $file );
+		$this->assertStringContainsString( 'Block Types: core/post-content', $header );
+		$this->assertStringContainsString( 'Post Types: page', $header );
+		$this->assertStringContainsString( 'Viewport Width: 1400', $header );
+	}
+
+	/**
+	 * A template pattern keeps itself out of the inserter.
+	 */
+	public function test_create_can_keep_a_pattern_out_of_the_inserter() {
+		$this->use_a_writable_theme();
+
+		$this->abilities->execute_create_pattern(
+			array(
+				'title'         => 'Agent Template',
+				'name'          => 'agent-template',
+				'content'       => '<!-- wp:paragraph --><p>Template body.</p><!-- /wp:paragraph -->',
+				'source'        => 'theme',
+				'templateTypes' => array( 'front-page' ),
+				'inserter'      => false,
+			)
+		);
+
+		$header = file_get_contents( get_stylesheet_directory() . '/patterns/agent-template.php' );
+		$this->assertStringContainsString( 'Template Types: front-page', $header );
+		$this->assertStringContainsString( 'Inserter: no', $header );
+	}
+
+	/**
+	 * An update that does not mention a header must not be what removes it.
+	 *
+	 * Every header is optional on an update, so the naive read — take what the
+	 * input carries — silently strips a page pattern's placement the first time
+	 * an agent edits its markup.
+	 */
+	public function test_update_preserves_headers_it_was_not_given() {
+		$this->use_a_writable_theme();
+
+		$this->abilities->execute_create_pattern(
+			array(
+				'title'         => 'Agent Kept Headers',
+				'name'          => 'agent-kept-headers',
+				'content'       => '<!-- wp:paragraph --><p>First.</p><!-- /wp:paragraph -->',
+				'source'        => 'theme',
+				'blockTypes'    => array( 'core/post-content' ),
+				'postTypes'     => array( 'page' ),
+				'viewportWidth' => 1400,
+			)
+		);
+
+		$this->abilities->execute_update_pattern(
+			array(
+				'id'      => 'agent-kept-headers',
+				'content' => '<!-- wp:paragraph --><p>Second.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$header = file_get_contents( get_stylesheet_directory() . '/patterns/agent-kept-headers.php' );
+		$this->assertStringContainsString( 'Second.', $header );
+		$this->assertStringContainsString( 'Block Types: core/post-content', $header );
+		$this->assertStringContainsString( 'Post Types: page', $header );
+		$this->assertStringContainsString( 'Viewport Width: 1400', $header );
+	}
+
+	/**
 	 * A listing is a catalogue, not a payload: an agent choosing between
 	 * patterns should not have to receive every one's markup to do it.
 	 */
@@ -198,6 +511,76 @@ class Test_Abilities extends WP_UnitTestCase {
 		foreach ( $listed['patterns'] as $pattern ) {
 			$this->assertArrayNotHasKey( 'content', $pattern );
 		}
+	}
+
+	/**
+	 * Rendering hands back somewhere to look, not just markup.
+	 *
+	 * The HTML says which classes landed where; it cannot say that a band meant
+	 * to span the viewport is rendering at the content width, because that is
+	 * the stylesheets' doing. The URLs are the part an agent over HTTP has no
+	 * other way to get.
+	 */
+	public function test_rendering_offers_somewhere_to_look() {
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Previewable Pattern',
+				'content' => '<!-- wp:paragraph --><p>Look at me.</p><!-- /wp:paragraph -->',
+				'source'  => 'user',
+			)
+		);
+
+		$rendered = $this->abilities->execute_render_pattern( array( 'id' => (string) $created['pattern']['id'] ) );
+
+		$this->assertArrayHasKey( 'preview', $rendered );
+		$this->assertArrayHasKey( 'standalone', $rendered['preview'] );
+		$this->assertArrayHasKey( 'page', $rendered['preview'] );
+		$this->assertStringContainsString( 'context=standalone', $rendered['preview']['standalone'] );
+		$this->assertStringContainsString( 'context=page', $rendered['preview']['page'] );
+	}
+
+	/**
+	 * Rendering says which tokens this site is missing, before an upload can be.
+	 *
+	 * An upload looks every referenced preset up here and skips what it cannot
+	 * find, so a pattern naming a token the authoring site lacks ships no value
+	 * for it and arrives referencing nothing. Both ends are silent about it;
+	 * this is where it can still be caught.
+	 */
+	public function test_rendering_reports_tokens_this_site_does_not_define() {
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Token Probe',
+				'content' => '<!-- wp:paragraph {"backgroundColor":"nothing-defines-this"} --><p class="has-nothing-defines-this-background-color has-background">Copy.</p><!-- /wp:paragraph -->',
+				'source'  => 'user',
+			)
+		);
+
+		$rendered = $this->abilities->execute_render_pattern( array( 'id' => (string) $created['pattern']['id'] ) );
+
+		$this->assertArrayHasKey( 'tokens', $rendered );
+
+		$undefined = wp_list_pluck( $rendered['tokens']['undefined'], 'slug' );
+		$this->assertContains( 'nothing-defines-this', $undefined );
+		$this->assertArrayHasKey( 'note', $rendered['tokens'] );
+	}
+
+	/**
+	 * And says nothing when every reference resolves.
+	 */
+	public function test_rendering_reports_no_undefined_tokens_for_a_clean_pattern() {
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Clean Token Pattern',
+				'content' => '<!-- wp:paragraph --><p>No presets at all.</p><!-- /wp:paragraph -->',
+				'source'  => 'user',
+			)
+		);
+
+		$rendered = $this->abilities->execute_render_pattern( array( 'id' => (string) $created['pattern']['id'] ) );
+
+		$this->assertSame( array(), $rendered['tokens']['undefined'] );
+		$this->assertArrayNotHasKey( 'note', $rendered['tokens'] );
 	}
 
 	public function test_rendering_resolves_blocks() {
@@ -226,13 +609,41 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'guides', $index );
 		$names = wp_list_pluck( $index['guides'], 'name' );
 
-		foreach ( array( 'authoring', 'pattern-kinds', 'block-vocabulary', 'block-markup', 'design-content-split' ) as $expected ) {
+		foreach ( array( 'authoring', 'pattern-kinds', 'block-vocabulary', 'block-markup', 'design-content-split', 'assets', 'keeping-current', 'abilities' ) as $expected ) {
 			$this->assertContains( $expected, $names, $expected . ' is missing from the index.' );
 		}
 
 		foreach ( $index['guides'] as $guide ) {
 			$this->assertNotEmpty( $guide['title'], $guide['name'] . ' has no title.' );
 			$this->assertGreaterThan( 100, $guide['words'], $guide['name'] . ' looks empty.' );
+		}
+	}
+
+	/**
+	 * A guide the index cannot serve is worse than one that does not exist:
+	 * the skill tells the reader to go and read it, and over the wire there
+	 * is nothing there. So every reference the index document makes to
+	 * another guide has to name one this ability will actually hand over.
+	 *
+	 * This is not hypothetical — `keeping-current.md` shipped in the
+	 * directory, was named in the References list, and was never registered.
+	 */
+	public function test_every_guide_the_index_points_at_can_be_served() {
+		$authoring = $this->abilities->execute_authoring_guide( array( 'guide' => 'authoring' ) );
+		$names     = wp_list_pluck( $this->abilities->execute_authoring_guide()['guides'], 'name' );
+
+		$this->assertGreaterThan(
+			0,
+			preg_match_all( '#references/([a-z-]+)\.md#', $authoring['content'], $matches ),
+			'The index names no other guides, which cannot be right.'
+		);
+
+		foreach ( array_unique( $matches[1] ) as $referenced ) {
+			$this->assertContains(
+				$referenced,
+				$names,
+				'The authoring guide points at references/' . $referenced . '.md, which get-authoring-guide cannot serve. Add it to guide_files().'
+			);
 		}
 	}
 
@@ -499,5 +910,393 @@ class Test_Abilities extends WP_UnitTestCase {
 
 		$this->assertFalse( $this->abilities->can_read() );
 		$this->assertFalse( $this->abilities->can_write() );
+	}
+
+	/**
+	 * A pattern that hard-codes `#4f46e5` opts out of the site's palette, its
+	 * dark mode and every future restyle. This is the way an agent puts the
+	 * value in the design system instead and references it by slug, and it
+	 * has to reach both homes a preset can live in.
+	 */
+	public function test_tokens_land_in_global_styles() {
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'destination' => 'user',
+				'tokens'      => array(
+					array(
+						'type'  => 'color',
+						'slug'  => 'kiln-red',
+						'name'  => 'Kiln Red',
+						'value' => '#b3391f',
+					),
+					array(
+						'type'  => 'spacing',
+						'slug'  => 'band',
+						'name'  => 'Band',
+						'value' => 'clamp(3rem, 8vw, 7rem)',
+					),
+					array(
+						'type'  => 'fontFamily',
+						'slug'  => 'display-face',
+						'name'  => 'Display Face',
+						'value' => 'Fraunces, Georgia, serif',
+					),
+				),
+			)
+		);
+
+		$this->assertSame(
+			array(
+				'color'      => array( 'kiln-red' ),
+				'spacing'    => array( 'band' ),
+				'fontFamily' => array( 'display-face' ),
+			),
+			$result['written']
+		);
+		$this->assertSame( array(), $result['skipped'] );
+		$this->assertSame( 'user', $result['destination'] );
+
+		// The point of writing them: the editor, and the next pattern, see them.
+		$system = $this->abilities->execute_design_system();
+		$this->assertContains( 'kiln-red', wp_list_pluck( $system['palette'], 'slug' ) );
+		$this->assertContains( 'band', wp_list_pluck( $system['spacing'], 'slug' ) );
+		$this->assertContains( 'display-face', wp_list_pluck( $system['fontFamilies'], 'slug' ) );
+	}
+
+	/**
+	 * The default destination, because a token written here travels with the
+	 * theme and is versioned with it.
+	 */
+	public function test_tokens_land_in_theme_json_by_default() {
+		$this->give_the_theme_a_theme_json();
+
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'tokens' => array(
+					array(
+						'type'  => 'fontSize',
+						'slug'  => 'display',
+						'name'  => 'Display',
+						'value' => '3.5rem',
+					),
+				),
+			)
+		);
+
+		$this->assertSame( 'theme', $result['destination'] );
+		$this->assertSame( array( 'fontSize' => array( 'display' ) ), $result['written'] );
+
+		$config = json_decode( file_get_contents( $this->theme_json ), true );
+		$this->assertSame( 'display', $config['settings']['typography']['fontSizes'][0]['slug'] );
+		$this->assertSame( '3.5rem', $config['settings']['typography']['fontSizes'][0]['size'] );
+	}
+
+	/**
+	 * Never an overwrite. A slug this site already answers for keeps its own
+	 * value, and the agent is told so rather than left to assume its value
+	 * landed — otherwise it would go on to invent `accent-2` beside it.
+	 */
+	public function test_an_existing_slug_is_reported_not_overwritten() {
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'destination' => 'user',
+				'tokens'      => array(
+					array(
+						'type'  => 'color',
+						'slug'  => 'black',
+						'name'  => 'Not Black',
+						'value' => '#ff0000',
+					),
+					array(
+						'type'  => 'color',
+						'slug'  => 'kiln-red',
+						'name'  => 'Kiln Red',
+						'value' => '#b3391f',
+					),
+				),
+			)
+		);
+
+		$this->assertSame( array( 'color' => array( 'kiln-red' ) ), $result['written'] );
+		$this->assertSame(
+			array(
+				array(
+					'type' => 'color',
+					'slug' => 'black',
+				),
+			),
+			$result['skipped']
+		);
+
+		// Core's own black is still black.
+		$palette = wp_list_pluck( $this->abilities->execute_design_system()['palette'], 'color', 'slug' );
+		$this->assertNotSame( '#ff0000', $palette['black'] );
+	}
+
+	/**
+	 * The cloud path can trust the service's token types; agent input has
+	 * been through nothing. A near miss like "typography" must be refused,
+	 * not dropped: `missing()` skips a type it does not know, so a silent
+	 * drop would answer "wrote nothing" and the agent would go on to
+	 * reference a preset that was never created.
+	 */
+	public function test_an_unknown_token_type_is_refused() {
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'tokens' => array(
+					array(
+						'type'  => 'typography',
+						'slug'  => 'display',
+						'value' => '3.5rem',
+					),
+				),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_bad_token_type', $result->get_error_code() );
+		$this->assertStringContainsString( 'fontSize', $result->get_error_message() );
+	}
+
+	/**
+	 * The same grammar the service enforces, re-run here — an agent's value
+	 * is as untrusted as the wire's.
+	 */
+	public function test_a_value_that_is_not_a_value_is_refused() {
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'destination' => 'user',
+				'tokens'      => array(
+					array(
+						'type'  => 'color',
+						'slug'  => 'sneaky',
+						'value' => 'red; background:url(javascript:alert(1))',
+					),
+				),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_cloud_bad_token', $result->get_error_code() );
+	}
+
+	/**
+	 * Core derives the CSS custom property from the slug, so a slug with a
+	 * space in it lands in the file and resolves to nothing. And a preset
+	 * with no label reads as a blank swatch in the editor, so the name is
+	 * filled in from the slug rather than written empty.
+	 */
+	public function test_a_slug_is_normalized_and_a_name_is_optional() {
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'destination' => 'user',
+				'tokens'      => array(
+					array(
+						'type'  => 'color',
+						'slug'  => 'Kiln Red!',
+						'value' => '#b3391f',
+					),
+				),
+			)
+		);
+
+		$this->assertSame( array( 'color' => array( 'kiln-red' ) ), $result['written'] );
+
+		$palette = wp_list_pluck( $this->abilities->execute_design_system()['palette'], 'name', 'slug' );
+		$this->assertSame( 'Kiln Red', $palette['kiln-red'] );
+	}
+
+	public function test_nothing_to_add_is_an_error_not_a_silent_no_op() {
+		$result = $this->abilities->execute_add_design_tokens( array( 'tokens' => array() ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_no_tokens', $result->get_error_code() );
+	}
+
+	/**
+	 * A classic theme has no theme.json to write into, and the refusal has to
+	 * name the way through rather than just failing.
+	 */
+	public function test_a_theme_without_a_theme_json_says_where_else_to_put_them() {
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'tokens' => array(
+					array(
+						'type'  => 'color',
+						'slug'  => 'kiln-red',
+						'value' => '#b3391f',
+					),
+				),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_cloud_no_theme_json', $result->get_error_code() );
+		$this->assertStringContainsString( 'Site styles', $result->get_error_message() );
+	}
+
+	/**
+	 * The one thing an ability cannot do is take a file, so the route that
+	 * can has to be discoverable from inside the abilities — otherwise every
+	 * agent works it out again, or gives up and inlines a remote URL.
+	 * `find-media` is where an agent looking for an image arrives, so the
+	 * instructions ride along with the answer.
+	 */
+	public function test_find_media_says_how_to_send_a_file() {
+		$this->require_abilities_api();
+
+		$found = wp_get_ability( 'pattern-builder/find-media' )->execute( array() );
+
+		$this->assertArrayHasKey( 'upload', $found );
+		$this->assertSame( 'POST', $found['upload']['method'] );
+		$this->assertStringContainsString( '/pattern-builder/v1/assets', $found['upload']['route'] );
+		$this->assertStringContainsString( 'Content-Disposition', wp_json_encode( $found['upload']['headers'] ) );
+		// An example an agent can run, rather than a shape to infer.
+		$this->assertStringContainsString( '--data-binary', $found['upload']['example'] );
+		$this->assertStringContainsString( 'destination', wp_json_encode( $found['upload']['query'] ) );
+	}
+
+	/**
+	 * The upload limits are reported rather than discovered by a failure: the
+	 * resize cap and the server's own ceiling both change the answer.
+	 */
+	public function test_find_media_reports_the_upload_limits() {
+		$this->require_abilities_api();
+
+		$found = wp_get_ability( 'pattern-builder/find-media' )->execute( array() );
+
+		$this->assertStringContainsString( '2400', $found['upload']['limits'] );
+	}
+
+	/**
+	 * An agent that reaches `add-asset` with a JPEG in hand must be told
+	 * where to send it, in the description it has already been given.
+	 */
+	public function test_add_asset_names_the_route_in_its_description() {
+		$this->require_abilities_api();
+
+		$description = wp_get_ability( 'pattern-builder/add-asset' )->get_description();
+
+		$this->assertStringContainsString( '/pattern-builder/v1/assets', $description );
+		$this->assertStringContainsString( 'Content-Disposition', $description );
+	}
+
+	/**
+	 * Neither form given is an error that says what to do, including the
+	 * route for the case an ability cannot serve.
+	 */
+	public function test_add_asset_refuses_with_nothing_to_store() {
+		$this->require_abilities_api();
+
+		$result = wp_get_ability( 'pattern-builder/add-asset' )->execute( array() );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_asset_nothing_given', $result->get_error_code() );
+		$this->assertStringContainsString( '/pattern-builder/v1/assets', $result->get_error_message() );
+	}
+
+	/**
+	 * Both forms given is ambiguous rather than a silent preference.
+	 */
+	public function test_add_asset_refuses_both_forms_at_once() {
+		$this->require_abilities_api();
+
+		$result = wp_get_ability( 'pattern-builder/add-asset' )->execute(
+			array(
+				'svg' => '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>',
+				'url' => 'https://example.org/hero.png',
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_asset_ambiguous', $result->get_error_code() );
+	}
+
+	/**
+	 * An SVG an agent authored is stored, and the answer is the reference to
+	 * put in the markup rather than a path to work one out from.
+	 */
+	public function test_add_asset_stores_an_authored_svg() {
+		$this->require_abilities_api();
+		$this->use_a_writable_theme();
+
+		$result = wp_get_ability( 'pattern-builder/add-asset' )->execute(
+			array(
+				'svg'      => '<svg xmlns="http://www.w3.org/2000/svg"><circle r="4"/></svg>',
+				'filename' => 'dot',
+			)
+		);
+
+		$this->assertNotWPError( $result );
+		// The extension is added rather than the file stored without one.
+		$this->assertSame( 'dot.svg', $result['filename'] );
+		$this->assertStringContainsString( 'get_stylesheet_directory_uri', $result['reference'] );
+	}
+
+	/**
+	 * A placeholder is drawn and stored, so a pattern under construction has
+	 * something local in its image slots rather than a remote service's URL.
+	 */
+	public function test_a_placeholder_is_drawn_and_stored() {
+		$this->require_abilities_api();
+		$this->use_a_writable_theme();
+
+		$result = wp_get_ability( 'pattern-builder/add-placeholder-image' )->execute(
+			array(
+				'width'  => 1400,
+				'height' => 700,
+			)
+		);
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( 'placeholder-1400x700.svg', $result['filename'] );
+		$this->assertStringContainsString( 'get_stylesheet_directory_uri', $result['reference'] );
+	}
+
+	/**
+	 * `add-font` is idempotent and says so: installing a family twice leaves
+	 * the same files and the same preset, so core may accept a repeat.
+	 */
+	public function test_add_font_is_marked_idempotent() {
+		$this->require_abilities_api();
+
+		$meta = wp_get_ability( 'pattern-builder/add-font' )->get_meta();
+
+		$this->assertTrue( $meta['annotations']['idempotent'] );
+	}
+
+	/**
+	 * Storing an asset is not idempotent — a second call stores a second
+	 * copy — and must not claim to be, since the annotation is behaviour.
+	 */
+	public function test_add_asset_is_not_marked_idempotent() {
+		$this->require_abilities_api();
+
+		$meta = wp_get_ability( 'pattern-builder/add-asset' )->get_meta();
+
+		$this->assertFalse( $meta['annotations']['idempotent'] );
+	}
+
+	/**
+	 * A font family needs naming; an empty call is an error rather than an
+	 * arbitrary choice.
+	 */
+	public function test_add_font_needs_a_family() {
+		$this->require_abilities_api();
+
+		$result = wp_get_ability( 'pattern-builder/add-font' )->execute( array( 'family' => '' ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_font_no_family', $result->get_error_code() );
+	}
+
+	/**
+	 * Give the active theme a minimal theme.json for the duration of one
+	 * test, and remember it so tear_down takes it away again.
+	 */
+	private function give_the_theme_a_theme_json() {
+		$this->theme_json = get_stylesheet_directory() . '/theme.json';
+		file_put_contents( $this->theme_json, wp_json_encode( array( 'version' => 3 ) ) );
+		wp_clean_theme_json_cache();
 	}
 }

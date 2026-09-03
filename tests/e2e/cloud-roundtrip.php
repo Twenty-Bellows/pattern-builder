@@ -148,6 +148,32 @@ if ( 'install' === $pattern_id ) {
 		WP_CLI::error( 'Installed patterns reference patterns that are not here: ' . implode( ', ', array_unique( $dangling ) ) );
 	}
 
+	/*
+	 * And the looks they apply, for the same reason: `is-style-{slug}` in the
+	 * markup with no partial defining it renders as nothing at all (D43).
+	 */
+	$variations = \TwentyBellows\PatternBuilder\Pattern_Builder_Block_Style_Variations::class;
+	$unstyled   = array();
+	foreach ( $landed as $r ) {
+		$content = 'user' === $r['type']
+			? (string) get_post_field( 'post_content', $r['id'] )
+			: (string) ( $store->find_theme_pattern( $r['id'] )->content ?? '' );
+
+		foreach ( $variations::used_in( $content ) as $slug ) {
+			// Core's own ship with WordPress and need no partial here.
+			if ( \WP_Block_Styles_Registry::get_instance()->is_registered( 'core/button', $slug ) ) {
+				continue;
+			}
+			if ( null === $variations::definition( $slug ) ) {
+				$unstyled[] = $slug;
+			}
+		}
+	}
+
+	if ( $unstyled ) {
+		WP_CLI::error( 'Installed patterns apply block styles that are not here: ' . implode( ', ', array_unique( $unstyled ) ) );
+	}
+
 	WP_CLI::success( sprintf( 'Collection installed: %d landed, %d already here, all under %s, every reference resolves.', $install['installed'], $install['skipped'], $category ) );
 	return;
 }
@@ -286,6 +312,67 @@ if ( $store->find_theme_pattern( $tree_pattern ) ) {
 		'members'   => $members,
 		'namespace' => $namespace,
 	);
+}
+
+/*
+ * 6. A block style variation (D43). The markup carries `is-style-{slug}` and
+ * the definition lives in the theme, so a pattern that travels without it
+ * arrives with the class intact and nothing styling it. The name is stamped
+ * with the collection on the way up, in the markup and in the definition
+ * together. Skipped rather than failed where the theme is not writable.
+ */
+$variations = \TwentyBellows\PatternBuilder\Pattern_Builder_Block_Style_Variations::class;
+$made       = $variations::add(
+	array(
+		'slug'       => 'e2e-inset',
+		'title'      => 'E2E Inset',
+		'blockTypes' => array( 'core/group' ),
+		'styles'     => array( 'border' => array( 'radius' => '999px' ) ),
+	)
+);
+
+if ( ! is_wp_error( $made ) ) {
+	$styled = $store->update_theme_pattern(
+		new \TwentyBellows\PatternBuilder\Abstract_Pattern(
+			array(
+				'id'      => 'simple-theme/e2e-styled',
+				'name'    => 'simple-theme/e2e-styled',
+				'title'   => 'E2E Styled',
+				'source'  => 'theme',
+				'content' => '<!-- wp:group {"className":"is-style-e2e-inset"} -->' . "\n"
+					. '<div class="wp-block-group is-style-e2e-inset"></div>' . "\n" . '<!-- /wp:group -->',
+			)
+		)
+	);
+
+	if ( ! is_wp_error( $styled ) ) {
+		$out['variation'] = $attempt(
+			'Upload styled',
+			$controller->upload(
+				$request(
+					'upload',
+					array(
+						'patternType' => 'theme',
+						'patternId'   => 'simple-theme/e2e-styled',
+						'collection'  => $e2e['id'],
+					)
+				)
+			)
+		);
+
+		$stored_styled = Pattern_Builder_Cloud::request( 'GET', '/library/patterns/' . (int) ( $out['variation']['pattern']['id'] ?? 0 ) );
+		$carried       = is_wp_error( $stored_styled ) ? array() : (array) ( $stored_styled['variations'] ?? array() );
+		$markup        = is_wp_error( $stored_styled ) ? '' : (string) ( $stored_styled['content'] ?? '' );
+
+		// `{handle}/{collection}` off the pattern's own name, flattened —
+		// the tree step above may not have run, so nothing is borrowed from it.
+		$own      = is_wp_error( $stored_styled ) ? '' : (string) ( $stored_styled['namespace'] ?? '' );
+		$expected = implode( '-', array_slice( explode( '/', $own ), 0, 2 ) ) . '-e2e-inset';
+
+		$checks['variation travelled']    = 1 === count( $carried ) && ( $carried[0]['slug'] ?? '' ) === $expected;
+		$checks['its class was rewritten'] = false !== strpos( $markup, 'is-style-' . $expected )
+			&& false === strpos( $markup, '"is-style-e2e-inset"' );
+	}
 }
 
 $out['checks'] = $checks;
