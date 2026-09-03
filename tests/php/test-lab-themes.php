@@ -23,7 +23,7 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 	 * @return array
 	 */
 	private function theme_json( $slug ) {
-		$path = dirname( __DIR__, 2 ) . '/dev-assets/themes/' . $slug . '/theme.json';
+		$path = dirname( __DIR__, 2 ) . '/themes/' . $slug . '/theme.json';
 		$this->assertFileExists( $path );
 		$data = json_decode( file_get_contents( $path ), true );
 		$this->assertIsArray( $data, 'theme.json must parse.' );
@@ -68,7 +68,7 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 	 * content width — the failure that reads as a broken pattern and is not one.
 	 */
 	public function test_blank_theme_templates_impose_no_layout() {
-		$dir = dirname( __DIR__, 2 ) . '/dev-assets/themes/blank-theme/templates/';
+		$dir = dirname( __DIR__, 2 ) . '/themes/blank-theme/templates/';
 
 		foreach ( array( 'index.html', 'page.html', 'single.html' ) as $file ) {
 			$markup = file_get_contents( $dir . $file );
@@ -113,7 +113,7 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 	 */
 	public function test_opinionated_theme_still_lets_a_band_go_full_bleed() {
 		$markup = file_get_contents(
-			dirname( __DIR__, 2 ) . '/dev-assets/themes/opinionated-theme/templates/page.html'
+			dirname( __DIR__, 2 ) . '/themes/opinionated-theme/templates/page.html'
 		);
 
 		$this->assertStringContainsString( '"type":"constrained"', $markup );
@@ -148,7 +148,7 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 	 * this is the test that says whether it worked.
 	 */
 	public function test_blank_theme_really_resolves_to_nothing() {
-		register_theme_directory( dirname( __DIR__, 2 ) . '/dev-assets/themes' );
+		register_theme_directory( dirname( __DIR__, 2 ) . '/themes' );
 		delete_site_transient( 'theme_roots' );
 
 		if ( ! wp_get_theme( 'blank-theme' )->exists() ) {
@@ -159,7 +159,7 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 
 		// The test harness does not load a theme's functions.php on
 		// switch_theme(), so apply what it registers.
-		require_once dirname( __DIR__, 2 ) . '/dev-assets/themes/blank-theme/functions.php';
+		require_once dirname( __DIR__, 2 ) . '/themes/blank-theme/functions.php';
 		wp_clean_theme_json_cache();
 
 		$css = wp_get_global_stylesheet( array( 'variables' ) );
@@ -188,7 +188,7 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 	 */
 	public function test_both_themes_are_well_formed() {
 		foreach ( array( 'blank-theme', 'opinionated-theme' ) as $slug ) {
-			$dir = dirname( __DIR__, 2 ) . '/dev-assets/themes/' . $slug;
+			$dir = dirname( __DIR__, 2 ) . '/themes/' . $slug;
 
 			$this->assertFileExists( $dir . '/style.css' );
 			$this->assertFileExists( $dir . '/theme.json' );

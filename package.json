@@ -67,6 +67,7 @@
 	"files": [
 		"build",
 		"includes",
+		"themes",
 		"guides",
 		"index.php",
 		"pattern-builder.php",
