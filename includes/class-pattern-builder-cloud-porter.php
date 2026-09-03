@@ -1137,9 +1137,10 @@ class Pattern_Builder_Cloud_Porter {
 	 * @param array  $collection { owner, slug, title } or empty.
 	 * @param bool   $mine       Whether the cloud copy is this account's, as the service said.
 	 * @param string $source     'directory' or 'library'.
-	 * @return array|WP_Error { type, id, title, tokensWritten }
+	 * @param array  $seen       Cloud ids already being installed, for the recursion.
+	 * @return array|WP_Error { type, id, title, tokensWritten, dependencies }
 	 */
-	public function install_cloud_pattern( $cloud_id, $destination, $add_tokens, $collection = array(), $mine = false, $source = 'directory' ) {
+	public function install_cloud_pattern( $cloud_id, $destination, $add_tokens, $collection = array(), $mine = false, $source = 'directory', $seen = array() ) {
 		$cloud_id    = (int) $cloud_id;
 		$destination = 'theme' === $destination ? 'theme' : 'user';
 		$source      = 'library' === $source ? 'library' : 'directory';
@@ -1177,10 +1178,23 @@ class Pattern_Builder_Cloud_Porter {
 			}
 		}
 
+		/*
+		 * The sections this pattern places, first. A collection is a closed
+		 * world (D38), so every one of them is in this same collection and
+		 * the service guarantees they exist; installing them first is what
+		 * keeps the page from rendering its sections' placeholder copy.
+		 */
+		$dependencies = $this->install_dependencies( $pbp, $collection, $add_tokens, $source, $seen );
+		if ( is_wp_error( $dependencies ) ) {
+			return $dependencies;
+		}
+
 		$result = $this->import_pbp( $pbp, $destination, $collection );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
+
+		$result['dependencies'] = $dependencies;
 
 		$hash = $this->content_hash( $result['type'], $result['id'] );
 
@@ -1202,6 +1216,116 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
+	 * Install the patterns a downloaded package references, first.
+	 *
+	 * Dependencies are always installed as **theme** patterns, and not by
+	 * choice: `core/pattern` resolves against the block-pattern registry
+	 * and a `wp_block` post is not in it, so a page installed as a user
+	 * pattern still needs its sections in the theme. The page can be
+	 * whatever the person asked for; its sections cannot.
+	 *
+	 * A dependency already on this site under that name is left alone, so
+	 * installing two pages that share a hero installs the hero once.
+	 * Installs are idempotent by name, which is what namespacing bought.
+	 *
+	 * @param array  $pbp        The package being installed.
+	 * @param array  $collection { owner, slug, title } the pattern came from.
+	 * @param bool   $add_tokens Whether to write missing design tokens.
+	 * @param string $source     'directory' or 'library'.
+	 * @param array  $seen       Cloud ids already being installed.
+	 * @return array|WP_Error Names installed, leaves first.
+	 */
+	private function install_dependencies( $pbp, $collection, $add_tokens, $source, $seen ) {
+		$references = self::references_of( isset( $pbp['content'] ) ? (string) $pbp['content'] : '' );
+		if ( ! $references ) {
+			return array();
+		}
+
+		if ( empty( $collection['slug'] ) ) {
+			return new WP_Error(
+				'pb_cloud_dependencies_unknown',
+				__( 'This pattern uses other patterns, but the service did not say which collection they are in.', 'pattern-builder' ),
+				array( 'status' => 502 )
+			);
+		}
+
+		$members = $this->collection_members( $collection, $source );
+		if ( is_wp_error( $members ) ) {
+			return $members;
+		}
+
+		$installed = array();
+
+		foreach ( $references as $reference ) {
+			// Already here under that name: the same pattern, by definition.
+			if ( $this->store->find_theme_pattern( $reference ) ) {
+				continue;
+			}
+
+			if ( empty( $members[ $reference ] ) ) {
+				return new WP_Error(
+					'pb_cloud_dependency_missing',
+					sprintf(
+						/* translators: %s: pattern name. */
+						__( 'This pattern uses %s, which is not in the collection it came from.', 'pattern-builder' ),
+						$reference
+					),
+					array( 'status' => 502 )
+				);
+			}
+
+			$dependency_id = (int) $members[ $reference ];
+			if ( isset( $seen[ $dependency_id ] ) ) {
+				continue;
+			}
+			$seen[ $dependency_id ] = true;
+
+			$outcome = $this->install_cloud_pattern( $dependency_id, 'theme', $add_tokens, $collection, false, $source, $seen );
+			if ( is_wp_error( $outcome ) ) {
+				return $outcome;
+			}
+
+			$installed = array_merge( $installed, isset( $outcome['dependencies'] ) ? $outcome['dependencies'] : array() );
+			$installed[] = $reference;
+		}
+
+		return $installed;
+	}
+
+	/**
+	 * A collection's patterns, as name => cloud id.
+	 *
+	 * One request per install, whatever the tree's shape: every dependency
+	 * is in the same collection, so one listing answers all of them.
+	 *
+	 * @param array  $collection { owner, slug }.
+	 * @param string $source     'directory' or 'library'.
+	 * @return array|WP_Error
+	 */
+	private function collection_members( $collection, $source ) {
+		$path = 'library' === $source
+			? sprintf( '/library/patterns?collection=%s', rawurlencode( (string) $collection['slug'] ) )
+			: sprintf( '/directory/collections/%d/%s', (int) $collection['owner'], rawurlencode( (string) $collection['slug'] ) );
+
+		$answer = Pattern_Builder_Cloud::request( 'GET', $path );
+		if ( is_wp_error( $answer ) ) {
+			return $answer;
+		}
+
+		$patterns = isset( $answer['patterns'] ) ? $answer['patterns'] : ( isset( $answer['items'] ) ? $answer['items'] : array() );
+
+		$members = array();
+		foreach ( (array) $patterns as $pattern ) {
+			if ( ! empty( $pattern['namespace'] ) && ! empty( $pattern['id'] ) ) {
+				$members[ (string) $pattern['namespace'] ] = (int) $pattern['id'];
+			}
+		}
+
+		return $members;
+	}
+
+	/**
+	 * The name a downloaded pattern is installed under.	/**
 	 * The name a downloaded pattern is installed under.
 	 *
 	 * The package carries the name the pattern has on the service —
