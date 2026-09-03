@@ -19,6 +19,13 @@ class Test_Abilities extends WP_UnitTestCase {
 	 */
 	private $abilities;
 
+	/**
+	 * A theme.json this class wrote, to be removed again.
+	 *
+	 * @var string
+	 */
+	private $theme_json = '';
+
 	public function set_up() {
 		parent::set_up();
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
@@ -31,6 +38,15 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->abilities = new Pattern_Builder_Abilities();
 		remove_action( 'wp_abilities_api_categories_init', array( $this->abilities, 'register_category' ) );
 		remove_action( 'wp_abilities_api_init', array( $this->abilities, 'register_abilities' ) );
+	}
+
+	public function tear_down() {
+		if ( '' !== $this->theme_json && file_exists( $this->theme_json ) ) {
+			unlink( $this->theme_json );
+			$this->theme_json = '';
+		}
+		wp_clean_theme_json_cache();
+		parent::tear_down();
 	}
 
 	/**
@@ -71,6 +87,7 @@ class Test_Abilities extends WP_UnitTestCase {
 			'pattern-builder/get-editor-scripts',
 			'pattern-builder/create-pattern',
 			'pattern-builder/update-pattern',
+			'pattern-builder/add-design-tokens',
 			// The cloud, through this site's connection.
 			'pattern-builder/list-collections',
 			'pattern-builder/get-collection',
@@ -102,7 +119,7 @@ class Test_Abilities extends WP_UnitTestCase {
 			$this->assertTrue( $meta['show_in_rest'], $read . ' must be reachable over REST.' );
 		}
 
-		foreach ( array( 'create-pattern', 'update-pattern' ) as $write ) {
+		foreach ( array( 'create-pattern', 'update-pattern', 'add-design-tokens' ) as $write ) {
 			$meta = wp_get_ability( 'pattern-builder/' . $write )->get_meta();
 			$this->assertFalse( $meta['annotations']['readonly'], $write . ' is not a read.' );
 			$this->assertFalse(
@@ -499,5 +516,238 @@ class Test_Abilities extends WP_UnitTestCase {
 
 		$this->assertFalse( $this->abilities->can_read() );
 		$this->assertFalse( $this->abilities->can_write() );
+	}
+
+	/**
+	 * A pattern that hard-codes `#4f46e5` opts out of the site's palette, its
+	 * dark mode and every future restyle. This is the way an agent puts the
+	 * value in the design system instead and references it by slug, and it
+	 * has to reach both homes a preset can live in.
+	 */
+	public function test_tokens_land_in_global_styles() {
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'destination' => 'user',
+				'tokens'      => array(
+					array(
+						'type'  => 'color',
+						'slug'  => 'kiln-red',
+						'name'  => 'Kiln Red',
+						'value' => '#b3391f',
+					),
+					array(
+						'type'  => 'spacing',
+						'slug'  => 'band',
+						'name'  => 'Band',
+						'value' => 'clamp(3rem, 8vw, 7rem)',
+					),
+					array(
+						'type'  => 'fontFamily',
+						'slug'  => 'display-face',
+						'name'  => 'Display Face',
+						'value' => 'Fraunces, Georgia, serif',
+					),
+				),
+			)
+		);
+
+		$this->assertSame(
+			array(
+				'color'      => array( 'kiln-red' ),
+				'spacing'    => array( 'band' ),
+				'fontFamily' => array( 'display-face' ),
+			),
+			$result['written']
+		);
+		$this->assertSame( array(), $result['skipped'] );
+		$this->assertSame( 'user', $result['destination'] );
+
+		// The point of writing them: the editor, and the next pattern, see them.
+		$system = $this->abilities->execute_design_system();
+		$this->assertContains( 'kiln-red', wp_list_pluck( $system['palette'], 'slug' ) );
+		$this->assertContains( 'band', wp_list_pluck( $system['spacing'], 'slug' ) );
+		$this->assertContains( 'display-face', wp_list_pluck( $system['fontFamilies'], 'slug' ) );
+	}
+
+	/**
+	 * The default destination, because a token written here travels with the
+	 * theme and is versioned with it.
+	 */
+	public function test_tokens_land_in_theme_json_by_default() {
+		$this->give_the_theme_a_theme_json();
+
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'tokens' => array(
+					array(
+						'type'  => 'fontSize',
+						'slug'  => 'display',
+						'name'  => 'Display',
+						'value' => '3.5rem',
+					),
+				),
+			)
+		);
+
+		$this->assertSame( 'theme', $result['destination'] );
+		$this->assertSame( array( 'fontSize' => array( 'display' ) ), $result['written'] );
+
+		$config = json_decode( file_get_contents( $this->theme_json ), true );
+		$this->assertSame( 'display', $config['settings']['typography']['fontSizes'][0]['slug'] );
+		$this->assertSame( '3.5rem', $config['settings']['typography']['fontSizes'][0]['size'] );
+	}
+
+	/**
+	 * Never an overwrite. A slug this site already answers for keeps its own
+	 * value, and the agent is told so rather than left to assume its value
+	 * landed — otherwise it would go on to invent `accent-2` beside it.
+	 */
+	public function test_an_existing_slug_is_reported_not_overwritten() {
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'destination' => 'user',
+				'tokens'      => array(
+					array(
+						'type'  => 'color',
+						'slug'  => 'black',
+						'name'  => 'Not Black',
+						'value' => '#ff0000',
+					),
+					array(
+						'type'  => 'color',
+						'slug'  => 'kiln-red',
+						'name'  => 'Kiln Red',
+						'value' => '#b3391f',
+					),
+				),
+			)
+		);
+
+		$this->assertSame( array( 'color' => array( 'kiln-red' ) ), $result['written'] );
+		$this->assertSame(
+			array(
+				array(
+					'type' => 'color',
+					'slug' => 'black',
+				),
+			),
+			$result['skipped']
+		);
+
+		// Core's own black is still black.
+		$palette = wp_list_pluck( $this->abilities->execute_design_system()['palette'], 'color', 'slug' );
+		$this->assertNotSame( '#ff0000', $palette['black'] );
+	}
+
+	/**
+	 * The cloud path can trust the service's token types; agent input has
+	 * been through nothing. A near miss like "typography" must be refused,
+	 * not dropped: `missing()` skips a type it does not know, so a silent
+	 * drop would answer "wrote nothing" and the agent would go on to
+	 * reference a preset that was never created.
+	 */
+	public function test_an_unknown_token_type_is_refused() {
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'tokens' => array(
+					array(
+						'type'  => 'typography',
+						'slug'  => 'display',
+						'value' => '3.5rem',
+					),
+				),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_bad_token_type', $result->get_error_code() );
+		$this->assertStringContainsString( 'fontSize', $result->get_error_message() );
+	}
+
+	/**
+	 * The same grammar the service enforces, re-run here — an agent's value
+	 * is as untrusted as the wire's.
+	 */
+	public function test_a_value_that_is_not_a_value_is_refused() {
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'destination' => 'user',
+				'tokens'      => array(
+					array(
+						'type'  => 'color',
+						'slug'  => 'sneaky',
+						'value' => 'red; background:url(javascript:alert(1))',
+					),
+				),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_cloud_bad_token', $result->get_error_code() );
+	}
+
+	/**
+	 * Core derives the CSS custom property from the slug, so a slug with a
+	 * space in it lands in the file and resolves to nothing. And a preset
+	 * with no label reads as a blank swatch in the editor, so the name is
+	 * filled in from the slug rather than written empty.
+	 */
+	public function test_a_slug_is_normalized_and_a_name_is_optional() {
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'destination' => 'user',
+				'tokens'      => array(
+					array(
+						'type'  => 'color',
+						'slug'  => 'Kiln Red!',
+						'value' => '#b3391f',
+					),
+				),
+			)
+		);
+
+		$this->assertSame( array( 'color' => array( 'kiln-red' ) ), $result['written'] );
+
+		$palette = wp_list_pluck( $this->abilities->execute_design_system()['palette'], 'name', 'slug' );
+		$this->assertSame( 'Kiln Red', $palette['kiln-red'] );
+	}
+
+	public function test_nothing_to_add_is_an_error_not_a_silent_no_op() {
+		$result = $this->abilities->execute_add_design_tokens( array( 'tokens' => array() ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_no_tokens', $result->get_error_code() );
+	}
+
+	/**
+	 * A classic theme has no theme.json to write into, and the refusal has to
+	 * name the way through rather than just failing.
+	 */
+	public function test_a_theme_without_a_theme_json_says_where_else_to_put_them() {
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'tokens' => array(
+					array(
+						'type'  => 'color',
+						'slug'  => 'kiln-red',
+						'value' => '#b3391f',
+					),
+				),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_cloud_no_theme_json', $result->get_error_code() );
+		$this->assertStringContainsString( 'Site styles', $result->get_error_message() );
+	}
+
+	/**
+	 * Give the active theme a minimal theme.json for the duration of one
+	 * test, and remember it so tear_down takes it away again.
+	 */
+	private function give_the_theme_a_theme_json() {
+		$this->theme_json = get_stylesheet_directory() . '/theme.json';
+		file_put_contents( $this->theme_json, wp_json_encode( array( 'version' => 3 ) ) );
+		wp_clean_theme_json_cache();
 	}
 }

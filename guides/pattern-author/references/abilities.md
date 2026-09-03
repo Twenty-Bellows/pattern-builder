@@ -75,6 +75,52 @@ input and output schema.
 | `pattern-builder/get-editor-scripts` | GET | this site's own block editor script URLs, in load order, for that validator |
 | `pattern-builder/create-pattern` | POST | store finished markup. `title` and `content` required; `source` is `theme` (default) or `user`; also `name`, `description`, `categories`, `keywords`, `synced`, `viewportWidth` |
 | `pattern-builder/update-pattern` | POST | replace an existing pattern. `id` and `content` required |
+| `pattern-builder/add-design-tokens` | POST | add presets to the design system. `input[tokens]` is a list of `{type, slug, name, value}`; `input[destination]` is `theme` (default) or `user` |
+
+### Adding to the design system
+
+`add-design-tokens` is the answer to "this pattern needs a colour the theme
+doesn't have". Inlining the value in the markup is the wrong answer: it opts
+the pattern out of the site's palette, its dark mode and every future
+restyle. Add the preset, then reference it by slug.
+
+```bash
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  -H 'Content-Type: application/json' \
+  -d '{"input":{"destination":"theme","tokens":[
+        {"type":"color","slug":"kiln-red","name":"Kiln Red","value":"#b3391f"},
+        {"type":"spacing","slug":"band","name":"Band","value":"clamp(3rem, 8vw, 7rem)"}
+      ]}}' \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/add-design-tokens/run"
+```
+
+Five types, each landing where the editor looks for it:
+
+| `type` | Referenced as | Value |
+|---|---|---|
+| `color` | `{"backgroundColor":"kiln-red"}` + `has-kiln-red-background-color has-background` | a hex, `rgb()`/`hsl()`, `transparent`, `currentColor` |
+| `gradient` | `{"gradient":"dusk"}` + `has-dusk-gradient-background` | a `linear-`, `radial-` or `conic-gradient()` |
+| `spacing` | `var:preset\|spacing\|band` in a style attribute | a length, or `clamp()`/`calc()`/`min()`/`max()` of lengths |
+| `fontSize` | `{"fontSize":"display"}` + `has-display-font-size` | as above |
+| `fontFamily` | `{"fontFamily":"display-face"}` + `has-display-face-font-family` | a stack of family names |
+
+**Two destinations.** `theme` (the default) writes the active theme's
+`theme.json`, so the token travels with the theme and is versioned with it;
+`user` writes Global Styles, which stays in the site's database and a person
+can revert in the editor. A classic theme with no `theme.json` refuses the
+first and names the second.
+
+**It never overwrites.** A slug the site already defines keeps its own value
+and comes back under `skipped`. That is the site telling you it already has an
+answer — reference that slug rather than inventing `accent-2` beside it, and
+call `get-design-system` first so you know what is there. `written` lists what
+actually landed, by type, with the slugs as they were stored: a slug is put
+through WordPress's own slug rules, so `Kiln Red!` becomes `kiln-red`, and
+that is the name your markup has to use.
+
+**No font files.** A `fontFamily` is a stack of names. Installing a webfont is
+a different job, and this is not it — name families the site can already
+serve, or say what needs installing.
 
 ## The cloud, through the site's connection
 

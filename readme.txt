@@ -115,6 +115,7 @@ Yes, Pattern Builder provides a unified interface to manage both theme patterns 
 * A page pattern brings the patterns it uses: uploading one uploads its sections into the same collection, installing one installs them first, and a pattern copied from somebody else's collection records where it came from
 * Patterns installed from a collection land under a local pattern category named for it
 * Seven new abilities for agents: list and search collections and patterns, install a pattern or a collection, upload into a collection, create a private collection — all through the WordPress user's own connection
+* Agents can extend the design system rather than hard-code values into a pattern: a new ability adds colors, gradients, spacing sizes, font sizes and font families to the active theme's theme.json or to Site styles, leaving any token you already define alone
 * Community patterns are browsed as an account: the Community tab asks you to sign in or create a free account first
 * Creating an account from wp-admin now asks for a stronger password (eight characters, with an upper-case letter, a number and a symbol), asks whether we may email you news and offers, and sends a confirmation email
 * Forgot your password? The connect panel starts a reset; the link in the email finishes it on patternbuilderwp.com

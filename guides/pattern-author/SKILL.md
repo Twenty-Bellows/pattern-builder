@@ -412,8 +412,19 @@ Propose it; don't quietly add it. Say which token is missing, what you'd call
 it, and what value you'd give it, then let the user decide. Silent additions
 are how a design system becomes forty near-identical greys.
 
-The exception is when the user has already said to extend the system — then
-add the token to `theme.json` and mention what you added.
+The exception is when the user has already said to extend the system. Then add
+the token and mention what you added — never inline the value in the markup,
+which opts the pattern out of the site's palette, its dark mode and every
+future restyle. On a running site that is `pattern-builder/add-design-tokens`
+(`references/abilities.md`); editing files directly, it is `theme.json`'s
+`settings.color.palette`, `settings.spacing.spacingSizes`,
+`settings.typography.fontSizes` or `settings.typography.fontFamilies`.
+
+Whichever route, add the token **before** the pattern that references it, and
+reference it by slug — `{"backgroundColor":"kiln-red"}` with the
+`has-kiln-red-background-color has-background` classes, or
+`var:preset|spacing|band` in a style attribute. A slug that does not resolve
+renders as no styling at all, silently.
 
 ## References
 

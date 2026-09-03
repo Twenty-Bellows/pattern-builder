@@ -78,6 +78,7 @@ class Pattern_Builder_Abilities {
 		$this->register_editor_scripts();
 		$this->register_create_pattern();
 		$this->register_update_pattern();
+		$this->register_add_design_tokens();
 	}
 
 	/**
@@ -1200,6 +1201,200 @@ class Pattern_Builder_Abilities {
 		}
 
 		return array( 'pattern' => $this->summarize( $pattern ) );
+	}
+
+	/**
+	 * Adding a token is how a pattern's design ends up in the design system
+	 * rather than hard-coded into its markup.
+	 *
+	 * An agent turning a screenshot into a pattern has colors, sizes and a
+	 * type stack in hand and two places to put them: inline in the markup,
+	 * where they opt the pattern out of the site's palette, its dark mode and
+	 * every future restyle; or in the design system, where they become presets
+	 * every block can reference by slug. The second is right and until now
+	 * there was no way to do it over the wire — `theme.json` is a file with no
+	 * REST route, and Global Styles took raw JSON with nothing validating it.
+	 *
+	 * The writing itself is `Pattern_Builder_Cloud_Tokens::apply()`, which a
+	 * cloud download has always used: it writes only the slugs this site does
+	 * not already define, so a definition here always wins over an incoming
+	 * one, and it puts every value through the per-type grammar before it
+	 * lands anywhere near a stylesheet.
+	 */
+	private function register_add_design_tokens() {
+		wp_register_ability(
+			'pattern-builder/add-design-tokens',
+			array(
+				'label'               => __( 'Add design tokens', 'pattern-builder' ),
+				'description'         => __( 'Adds colors, gradients, spacing sizes, font sizes and font families to this site\'s design system, so a pattern can reference them by slug instead of hard-coding values. Writes to the active theme\'s theme.json, or to the site\'s Global Styles. A slug this site already defines is left alone and reported as skipped — this never overwrites an existing token. Call get-design-system first to see what exists.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'tokens'      => array(
+							'type'        => 'array',
+							'description' => 'The tokens to add.',
+							'items'       => array(
+								'type'                 => 'object',
+								'properties'           => array(
+									'type'  => array(
+										'type'        => 'string',
+										'enum'        => array( 'color', 'gradient', 'spacing', 'fontSize', 'fontFamily' ),
+										'description' => 'Which part of the design system this belongs to.',
+									),
+									'slug'  => array(
+										'type'        => 'string',
+										'description' => 'The slug a pattern references it by, e.g. "accent" for var:preset|color|accent.',
+									),
+									'name'  => array(
+										'type'        => 'string',
+										'description' => 'The human-readable label shown in the editor.',
+									),
+									'value' => array(
+										'type'        => 'string',
+										'description' => 'The value: a CSS color, a gradient, a length, or a font-family stack. Font files are never carried — a fontFamily is a stack of names only.',
+									),
+								),
+								'required'             => array( 'type', 'slug', 'value' ),
+								'additionalProperties' => false,
+							),
+						),
+						'destination' => array(
+							'type'        => 'string',
+							'enum'        => array( 'theme', 'user' ),
+							'description' => '"theme" writes the active theme\'s theme.json, so the tokens travel with the theme and are versioned with it; "user" writes Global Styles, which stays in this site\'s database and is revertable in the editor. Defaults to "theme".',
+						),
+					),
+					'required'             => array( 'tokens' ),
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'written'     => array(
+							'type'        => 'object',
+							'description' => 'The slugs added, by token type.',
+						),
+						'skipped'     => array(
+							'type'        => 'array',
+							'description' => 'Tokens this site already defines, which were left as they are.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'destination' => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_add_design_tokens' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Write the tokens this site does not already define.
+	 *
+	 * The cloud download path hands `apply()` a package the service built and
+	 * validated, so it can take `type`, `slug` and `name` on trust. An agent's
+	 * input has been through nothing, so it is normalized first: an unknown
+	 * type is refused rather than dropped (an agent that wrote "typography"
+	 * for "fontSize" would otherwise get an empty result and go on to
+	 * reference a preset that was never created), and a slug is put through
+	 * `sanitize_title()` because core derives the CSS custom property from it
+	 * — `My Colour!` would land in the file and resolve to nothing.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_add_design_tokens( $input ) {
+		$tokens      = isset( $input['tokens'] ) ? (array) $input['tokens'] : array();
+		$destination = ( isset( $input['destination'] ) && 'user' === $input['destination'] ) ? 'user' : 'theme';
+		$known       = array_keys( Pattern_Builder_Cloud_Tokens::types() );
+
+		if ( ! $tokens ) {
+			return new \WP_Error(
+				'pb_no_tokens',
+				__( 'No tokens to add.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$normalized = array();
+		foreach ( $tokens as $token ) {
+			$token = (array) $token;
+			$type  = isset( $token['type'] ) ? (string) $token['type'] : '';
+			$slug  = isset( $token['slug'] ) ? sanitize_title( (string) $token['slug'] ) : '';
+
+			if ( ! in_array( $type, $known, true ) ) {
+				return new \WP_Error(
+					'pb_bad_token_type',
+					sprintf(
+						/* translators: 1: the type given, 2: the accepted types. */
+						__( '"%1$s" is not a design token type. Use one of: %2$s.', 'pattern-builder' ),
+						$type,
+						implode( ', ', $known )
+					),
+					array( 'status' => 400 )
+				);
+			}
+
+			if ( '' === $slug ) {
+				return new \WP_Error(
+					'pb_bad_token_slug',
+					__( 'Every token needs a slug of lower-case letters, digits and hyphens — it is the name a pattern references it by.', 'pattern-builder' ),
+					array( 'status' => 400 )
+				);
+			}
+
+			$normalized[] = array(
+				'type'  => $type,
+				'slug'  => $slug,
+				// merge_settings() writes the name unconditionally, and a
+				// preset with no label reads as an empty swatch in the editor.
+				'name'  => isset( $token['name'] ) && '' !== trim( (string) $token['name'] )
+					? sanitize_text_field( (string) $token['name'] )
+					: ucwords( str_replace( '-', ' ', $slug ) ),
+				'value' => isset( $token['value'] ) ? (string) $token['value'] : '',
+			);
+		}
+
+		/*
+		 * Reported rather than silently dropped. An agent that proposed a
+		 * token which turns out to exist needs to know the site already had
+		 * an answer, so it references that slug instead of inventing a
+		 * near-duplicate beside it.
+		 */
+		$missing_keys = array();
+		foreach ( Pattern_Builder_Cloud_Tokens::missing( $normalized ) as $token ) {
+			$missing_keys[] = $token['type'] . '|' . $token['slug'];
+		}
+
+		$skipped = array();
+		foreach ( $normalized as $token ) {
+			if ( ! in_array( $token['type'] . '|' . $token['slug'], $missing_keys, true ) ) {
+				$skipped[] = array(
+					'type' => $token['type'],
+					'slug' => $token['slug'],
+				);
+			}
+		}
+
+		$written = Pattern_Builder_Cloud_Tokens::apply( $normalized, $destination );
+		if ( is_wp_error( $written ) ) {
+			return $written;
+		}
+
+		return array(
+			'written'     => $written,
+			'skipped'     => $skipped,
+			'destination' => $destination,
+		);
 	}
 
 	/**
