@@ -1,6 +1,6 @@
 # Collections in Pattern Builder
 
-*Agreed 2026-09-02 with Jason, and kept current since. How collections work in the plugin. The service side — definitions, tiers, data model, REST contract, decisions D30–D36 — is in the [patternbuilderwp.com repository's `docs/collections.md`](https://github.com/Twenty-Bellows/patternbuilderwp.com/blob/main/docs/collections.md); this document is what the plugin builds on top of that contract.*
+*Decided 2026-09-02, and kept current since. How collections work in the plugin. The service side — definitions, tiers, data model, REST contract, decisions D30–D36 — is in the [patternbuilderwp.com repository's `docs/collections.md`](https://github.com/Twenty-Bellows/patternbuilderwp.com/blob/main/docs/collections.md); this document is what the plugin builds on top of that contract.*
 
 ## 1. What changes for the user
 

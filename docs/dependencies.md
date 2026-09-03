@@ -1,6 +1,6 @@
 # Pattern dependencies and attribution
 
-*Agreed 2026-09-02 with Jason, and kept current since. How the plugin carries a pattern's dependencies and its attribution. The service side — the closed-world rule, the `origin` field, the validation and the removal of move (D38) — is in the [patternbuilderwp.com repository's `docs/dependencies.md`](https://github.com/Twenty-Bellows/patternbuilderwp.com/blob/main/docs/dependencies.md); this document is what the plugin builds on top of that contract.*
+*Decided 2026-09-02, and kept current since. How the plugin carries a pattern's dependencies and its attribution. The service side — the closed-world rule, the `origin` field, the validation and the removal of move (D38) — is in the [patternbuilderwp.com repository's `docs/dependencies.md`](https://github.com/Twenty-Bellows/patternbuilderwp.com/blob/main/docs/dependencies.md); this document is what the plugin builds on top of that contract.*
 
 ## 1. What changes for the user
 
