@@ -166,6 +166,104 @@ class Pattern_Builder_Block_Style_Variations {
 	}
 
 	/**
+	 * Install a variation that arrived with a pattern.
+	 *
+	 * Never overwrites, which is the opposite of what `add()` does and right
+	 * for the same reason a downloaded pattern's tokens never overwrite: a
+	 * pattern arriving from somewhere else must not repaint what is already
+	 * here. A name that is taken is left alone and reported, so installing the
+	 * same collection twice is idempotent.
+	 *
+	 * @param array $variation A variation from a package.
+	 * @return string|WP_Error 'written' or 'skipped'.
+	 */
+	public static function install( $variation ) {
+		$slug = isset( $variation['slug'] ) ? sanitize_title( (string) $variation['slug'] ) : '';
+		if ( '' === $slug ) {
+			return new WP_Error( 'pb_variation_no_slug', __( 'A block style variation arrived without a slug.', 'pattern-builder' ), array( 'status' => 400 ) );
+		}
+
+		if ( file_exists( self::path_for( $slug ) ) || null !== self::definition( $slug ) ) {
+			return 'skipped';
+		}
+
+		$block_types = isset( $variation['blockTypes'] ) ? (array) $variation['blockTypes'] : array();
+		if ( self::registered_for( $slug, $block_types ) ) {
+			return 'skipped';
+		}
+
+		$written = self::add( $variation );
+		if ( is_wp_error( $written ) ) {
+			return $written;
+		}
+
+		return 'written';
+	}
+
+	/**
+	 * The variation slugs a pattern's markup applies.
+	 *
+	 * Reads the class rather than any attribute, because that is the only
+	 * place a variation appears: `is-style-{slug}` in the block comment's
+	 * `className` and in the saved HTML, and nothing else in the file says
+	 * which look was chosen.
+	 *
+	 * @param string $content Block markup.
+	 * @return string[] Slugs, deduplicated.
+	 */
+	public static function used_in( $content ) {
+		if ( ! preg_match_all( '/\bis-style-([a-z0-9-]+)/', (string) $content, $matches ) ) {
+			return array();
+		}
+
+		return array_values( array_unique( $matches[1] ) );
+	}
+
+	/**
+	 * The definitions a pattern's markup needs carrying with it.
+	 *
+	 * Only the ones this site defines. A variation declared in a block's own
+	 * `block.json` — `is-style-outline` and the rest — ships with WordPress
+	 * and resolves at the far end without help, so carrying it would be
+	 * redundant at best and would collide with core's at worst.
+	 *
+	 * @param string $content Block markup.
+	 * @return array|WP_Error Package-shaped variation list.
+	 */
+	public static function carried_by( $content ) {
+		$carried = array();
+
+		foreach ( self::used_in( $content ) as $slug ) {
+			$definition = self::definition( $slug );
+			if ( null === $definition || empty( $definition['styles'] ) ) {
+				continue;
+			}
+
+			$css = Pattern_Builder_Theme_Styles::check_css( $definition['styles'] );
+			if ( is_wp_error( $css ) ) {
+				return new WP_Error(
+					'pb_variation_css_cannot_travel',
+					sprintf(
+						/* translators: %s: variation slug. */
+						__( 'The block style variation "%s" carries raw CSS, which cannot travel with a pattern — the service will not store unsanitised CSS. Express it with the styles properties instead.', 'pattern-builder' ),
+						$slug
+					),
+					array( 'status' => 400 )
+				);
+			}
+
+			$carried[] = array(
+				'slug'       => $slug,
+				'title'      => isset( $definition['title'] ) ? (string) $definition['title'] : $slug,
+				'blockTypes' => array_values( (array) $definition['blockTypes'] ),
+				'styles'     => $definition['styles'],
+			);
+		}
+
+		return $carried;
+	}
+
+	/**
 	 * A variation's definition, by slug.
 	 *
 	 * Reads the same partials core registers from, so what comes back is what

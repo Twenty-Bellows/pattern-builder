@@ -68,6 +68,21 @@ class Pattern_Builder_Cloud_Tokens {
 	public static function collect_tree( $content, $seen = array() ) {
 		$tokens = self::collect( $content );
 
+		/*
+		 * A block style variation is the other place a preset reference hides.
+		 * The markup carries `is-style-{slug}` and no colour at all; the
+		 * `var:preset|color|accent` the variation resolves to lives in its
+		 * definition. Collecting only the markup ships the variation with a
+		 * token it references and nothing defining it at the far end.
+		 */
+		foreach ( Pattern_Builder_Block_Style_Variations::used_in( $content ) as $variation_slug ) {
+			$definition = Pattern_Builder_Block_Style_Variations::definition( $variation_slug );
+			if ( null === $definition || empty( $definition['styles'] ) ) {
+				continue;
+			}
+			$tokens = array_merge( $tokens, self::collect( (string) wp_json_encode( $definition['styles'] ) ) );
+		}
+
 		if ( preg_match_all( '/<!--\s*wp:pattern\s+(\{.*?\})\s*\/-->/s', (string) $content, $matches ) ) {
 			foreach ( $matches[1] as $json ) {
 				$attrs = json_decode( $json, true );
