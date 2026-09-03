@@ -257,6 +257,57 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A resized image is left readable by the web server.
+	 *
+	 * The image editor chmods its output from the temporary directory's own
+	 * mode, so a resize in a 0777 temp directory produces a world-writable
+	 * file; moving that into the theme carried the mode across and suEXEC
+	 * hosts answer 403 for it. Nothing about the stored image's dimensions
+	 * or content shows the problem, so the mode is what has to be asserted.
+	 */
+	public function test_a_resized_image_is_stored_with_a_servable_mode() {
+		$image = imagecreatetruecolor( 3200, 400 );
+		ob_start();
+		imagepng( $image );
+		$png = ob_get_clean();
+		imagedestroy( $image );
+
+		$stored = Pattern_Builder_Assets::store( 'perms-resized.png', $png, 'theme' );
+
+		$this->assertNotWPError( $stored );
+
+		$path = get_stylesheet_directory() . '/assets/images/' . $stored['filename'];
+		$this->assertFileExists( $path );
+
+		$mode = fileperms( $path ) & 0777;
+		$this->assertSame(
+			0,
+			$mode & 0022,
+			sprintf( 'A stored image must not be group- or world-writable; got %04o.', $mode )
+		);
+		$this->assertSame( 0044, $mode & 0044, 'A stored image must be readable by the web server.' );
+	}
+
+	/**
+	 * An unresized image is stored with the same servable mode.
+	 */
+	public function test_an_unresized_image_is_stored_with_a_servable_mode() {
+		$image = imagecreatetruecolor( 400, 300 );
+		ob_start();
+		imagepng( $image );
+		$png = ob_get_clean();
+		imagedestroy( $image );
+
+		$stored = Pattern_Builder_Assets::store( 'perms-plain.png', $png, 'theme' );
+
+		$this->assertNotWPError( $stored );
+
+		$path = get_stylesheet_directory() . '/assets/images/' . $stored['filename'];
+		$mode = fileperms( $path ) & 0777;
+		$this->assertSame( 0, $mode & 0022, sprintf( 'Got %04o.', $mode ) );
+	}
+
+	/**
 	 * An image inside the cap is stored as it is.
 	 */
 	public function test_an_image_within_the_cap_is_untouched() {
@@ -271,6 +322,69 @@ class Test_Assets extends WP_UnitTestCase {
 		$this->assertNotWPError( $stored );
 		$this->assertSame( 800, $stored['width'] );
 		$this->assertSame( 600, $stored['height'] );
+	}
+
+	/**
+	 * The add-asset ability records alt text, as the upload route does.
+	 *
+	 * Both surfaces advertise an `alt`, and the ability used to accept it and
+	 * drop it — which reads as success while leaving the attachment with no
+	 * alt text at all, so find-media could not match on it either.
+	 */
+	public function test_alt_text_is_recorded_on_a_media_attachment() {
+		$image = imagecreatetruecolor( 400, 300 );
+		ob_start();
+		imagepng( $image );
+		$png = ob_get_clean();
+		imagedestroy( $image );
+
+		$stored = Pattern_Builder_Assets::apply_alt(
+			Pattern_Builder_Assets::store( 'alt-probe.png', $png, 'media' ),
+			'A wood-fired kiln at dusk'
+		);
+
+		$this->assertNotWPError( $stored );
+		$this->assertArrayHasKey( 'id', $stored );
+		$this->assertSame( 'A wood-fired kiln at dusk', $stored['alt'] );
+		$this->assertSame(
+			'A wood-fired kiln at dusk',
+			get_post_meta( $stored['id'], '_wp_attachment_image_alt', true )
+		);
+	}
+
+	/**
+	 * A theme asset has nowhere to keep alt text, and says so by omission.
+	 */
+	public function test_alt_text_on_a_theme_asset_is_not_claimed() {
+		$stored = Pattern_Builder_Assets::apply_alt(
+			Pattern_Builder_Assets::store( 'alt-theme.svg', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"/>', 'theme' ),
+			'Ignored for a theme file'
+		);
+
+		$this->assertNotWPError( $stored );
+		$this->assertArrayNotHasKey( 'alt', $stored );
+	}
+
+	/**
+	 * Alt text is searchable once it is actually stored.
+	 */
+	public function test_find_matches_on_recorded_alt_text() {
+		$image = imagecreatetruecolor( 400, 300 );
+		ob_start();
+		imagepng( $image );
+		$png = ob_get_clean();
+		imagedestroy( $image );
+
+		$stored = Pattern_Builder_Assets::apply_alt(
+			Pattern_Builder_Assets::store( 'unmatchable-name.png', $png, 'media' ),
+			'Glaze tests on a wire rack'
+		);
+		$this->assertNotWPError( $stored );
+
+		$found = Pattern_Builder_Assets::find( array( 'search' => 'wire rack' ) );
+		$ids   = wp_list_pluck( $found['media'], 'id' );
+
+		$this->assertContains( $stored['id'], $ids );
 	}
 
 	/**

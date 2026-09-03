@@ -212,9 +212,10 @@ class Pattern_Builder_Cloud_Tokens {
 				return new WP_Error(
 					'pb_cloud_bad_token',
 					sprintf(
-						/* translators: %s: token slug. */
-						__( 'The pattern carries an invalid value for the "%s" token.', 'pattern-builder' ),
-						$token['slug']
+						/* translators: 1: token slug, 2: token type such as color or spacing. */
+						__( 'The value given for the "%1$s" %2$s token is not one this site will store.', 'pattern-builder' ),
+						$token['slug'],
+						$token['type']
 					),
 					array( 'status' => 400 )
 				);

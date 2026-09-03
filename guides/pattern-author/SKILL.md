@@ -227,6 +227,21 @@ way is valid by construction — it is the editor's own output — so this is
 faster and more reliable than writing a draft and iterating on validator
 errors. Validate it anyway: the run is cached and it costs a second.
 
+Two things the serializer will do that you have to allow for:
+
+- **It escapes a PHP tag.** A theme asset's reference is
+  `<?php echo get_stylesheet_directory_uri() . '…'; ?>`, and passing that as an
+  attribute value serializes it as `&lt;?php …&gt;`, which lands in the file as
+  text and renders as a broken image. Serialize with a plain marker in its
+  place and substitute the PHP afterwards:
+  `serialize( … ).replace( /HERO_SRC/g, reference )`.
+- **It drops an attribute the block does not have**, silently, which is the
+  behaviour you want — it is the same answer the editor would give — but it
+  means a setting can vanish without a word. `textAlign` on `core/heading` is
+  the one to know: on block library 10.5 it belongs under
+  `style.typography.textAlign`, and passed at the top level it is simply gone,
+  along with the `has-text-align-center` class you were expecting.
+
 Write real placeholder copy, not lorem ipsum. Copy of a plausible length is
 what tells you the layout works, and in a design pattern the placeholder is
 what shows in the inserter preview.

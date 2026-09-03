@@ -297,6 +297,16 @@ class Pattern_Builder_Security {
 			);
 		}
 
+		/*
+		 * A move carries the source file's permissions across, and a moved-in
+		 * file can arrive with a mode no web server will serve: an image the
+		 * image editor wrote is chmodded from the temporary directory's own
+		 * mode, so a resize in /tmp (0777) lands the result world-writable,
+		 * which suEXEC hosts refuse with a 403. Normalise to the same mode
+		 * every other write in this plugin uses.
+		 */
+		$wp_filesystem->chmod( $destination, FS_CHMOD_FILE );
+
 		return true;
 	}
 }

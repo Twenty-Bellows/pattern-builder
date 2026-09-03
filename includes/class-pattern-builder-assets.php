@@ -189,11 +189,30 @@ class Pattern_Builder_Assets {
 			return $stored;
 		}
 
-		$alt = (string) $request->get_param( 'alt' );
-		if ( '' !== $alt && isset( $stored['id'] ) ) {
-			update_post_meta( $stored['id'], '_wp_attachment_image_alt', sanitize_text_field( $alt ) );
-			$stored['alt'] = sanitize_text_field( $alt );
+		return self::apply_alt( $stored, $request->get_param( 'alt' ) );
+	}
+
+	/**
+	 * Record alternative text on a stored attachment.
+	 *
+	 * Only the media library has somewhere to keep it: a file in the theme
+	 * carries no metadata, so for a theme asset the pattern's own `alt`
+	 * attribute is the only place alt text lives. Shared by the upload route
+	 * and the add-asset ability so both behave the same way.
+	 *
+	 * @param array|\WP_Error $stored What store() returned.
+	 * @param string          $alt    Alternative text, if any was given.
+	 * @return array|\WP_Error The stored array, with alt recorded where it could be.
+	 */
+	public static function apply_alt( $stored, $alt ) {
+		$alt = sanitize_text_field( (string) $alt );
+
+		if ( '' === $alt || ! is_array( $stored ) || empty( $stored['id'] ) ) {
+			return $stored;
 		}
+
+		update_post_meta( $stored['id'], '_wp_attachment_image_alt', $alt );
+		$stored['alt'] = $alt;
 
 		return $stored;
 	}

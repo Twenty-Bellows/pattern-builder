@@ -409,6 +409,7 @@ class Pattern_Builder_Abilities {
 					),
 					'required'             => array( 'id' ),
 					'additionalProperties' => false,
+					'default'              => array(),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
@@ -469,6 +470,7 @@ class Pattern_Builder_Abilities {
 					),
 					'required'             => array( 'id' ),
 					'additionalProperties' => false,
+					'default'              => array(),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
@@ -1126,6 +1128,7 @@ class Pattern_Builder_Abilities {
 			'properties'           => $properties,
 			'required'             => array( 'id', 'content' ),
 			'additionalProperties' => false,
+			'default'              => array(),
 		);
 	}
 
@@ -1274,6 +1277,7 @@ class Pattern_Builder_Abilities {
 					),
 					'required'             => array( 'tokens' ),
 					'additionalProperties' => false,
+					'default'              => array(),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
@@ -1485,6 +1489,7 @@ class Pattern_Builder_Abilities {
 						),
 					),
 					'additionalProperties' => false,
+					'default'              => array(),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
@@ -1575,6 +1580,7 @@ class Pattern_Builder_Abilities {
 						),
 					),
 					'additionalProperties' => false,
+					'default'              => array(),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
@@ -1618,6 +1624,7 @@ class Pattern_Builder_Abilities {
 		$url         = isset( $input['url'] ) ? (string) $input['url'] : '';
 		$filename    = isset( $input['filename'] ) ? (string) $input['filename'] : '';
 		$destination = ( isset( $input['destination'] ) && 'media' === $input['destination'] ) ? 'media' : 'theme';
+		$alt         = isset( $input['alt'] ) ? (string) $input['alt'] : '';
 
 		if ( '' === $svg && '' === $url ) {
 			return new \WP_Error(
@@ -1640,7 +1647,10 @@ class Pattern_Builder_Abilities {
 		}
 
 		if ( '' !== $url ) {
-			return Pattern_Builder_Assets::store_from_url( $url, $destination, $filename );
+			return Pattern_Builder_Assets::apply_alt(
+				Pattern_Builder_Assets::store_from_url( $url, $destination, $filename ),
+				$alt
+			);
 		}
 
 		if ( '' === $filename ) {
@@ -1656,7 +1666,10 @@ class Pattern_Builder_Abilities {
 			$filename .= '.svg';
 		}
 
-		return Pattern_Builder_Assets::store( $filename, $svg, $destination );
+		return Pattern_Builder_Assets::apply_alt(
+			Pattern_Builder_Assets::store( $filename, $svg, $destination ),
+			$alt
+		);
 	}
 
 	/**
@@ -1696,6 +1709,7 @@ class Pattern_Builder_Abilities {
 						),
 					),
 					'additionalProperties' => false,
+					'default'              => array(),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
@@ -1780,6 +1794,7 @@ class Pattern_Builder_Abilities {
 						),
 					),
 					'additionalProperties' => false,
+					'default'              => array(),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
@@ -1861,6 +1876,7 @@ class Pattern_Builder_Abilities {
 					),
 					'required'             => array( 'family' ),
 					'additionalProperties' => false,
+					'default'              => array(),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
