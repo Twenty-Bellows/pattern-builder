@@ -371,4 +371,59 @@ class Test_Cloud_Tokens extends WP_UnitTestCase {
 		$this->assertContains( 'jumbo', $slugs );
 		$this->assertContains( 'mega', $slugs );
 	}
+
+	/**
+	 * A composed pattern's tokens include the ones its references need.
+	 *
+	 * A page pattern is mostly `core/pattern` references, so almost none of the
+	 * presets it depends on are in its own markup. Collecting only the top level
+	 * under-reports it, and renders it against another theme carrying a fraction
+	 * of what it needs — which is how a blank preview came back missing two of
+	 * the three colours the page actually uses.
+	 */
+	public function test_collect_tree_follows_pattern_references() {
+		register_block_pattern(
+			'probe/leaf',
+			array(
+				'title'   => 'Leaf',
+				'content' => '<!-- wp:paragraph {"textColor":"pale-pink"} --><p class="has-pale-pink-color has-text-color">Leaf.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$page = '<!-- wp:group {"backgroundColor":"vivid-red"} --><div class="wp-block-group has-vivid-red-background-color has-background">'
+			. '<!-- wp:pattern {"slug":"probe/leaf"} /-->'
+			. '</div><!-- /wp:group -->';
+
+		$shallow = wp_list_pluck( Pattern_Builder_Cloud_Tokens::referenced( $page ), 0 );
+		$this->assertNotContains( 'pale-pink', (array) $shallow, 'The top level alone cannot see it.' );
+
+		$slugs = wp_list_pluck( Pattern_Builder_Cloud_Tokens::collect_tree( $page ), 'slug' );
+
+		$this->assertContains( 'vivid-red', $slugs );
+		$this->assertContains( 'pale-pink', $slugs, 'The referenced pattern\'s tokens are part of what this page needs.' );
+
+		unregister_block_pattern( 'probe/leaf' );
+	}
+
+	/**
+	 * A reference loop is walked once, not for ever.
+	 */
+	public function test_collect_tree_survives_a_reference_loop() {
+		register_block_pattern( 'probe/a', array( 'title' => 'A', 'content' => '<!-- wp:pattern {"slug":"probe/b"} /-->' ) );
+		register_block_pattern( 'probe/b', array( 'title' => 'B', 'content' => '<!-- wp:pattern {"slug":"probe/a"} /-->' ) );
+
+		$this->assertIsArray( Pattern_Builder_Cloud_Tokens::collect_tree( '<!-- wp:pattern {"slug":"probe/a"} /-->' ) );
+
+		unregister_block_pattern( 'probe/a' );
+		unregister_block_pattern( 'probe/b' );
+	}
+
+	/**
+	 * A reference to a pattern nothing registered is skipped, not fatal.
+	 */
+	public function test_collect_tree_tolerates_an_unresolvable_reference() {
+		$tokens = Pattern_Builder_Cloud_Tokens::collect_tree( '<!-- wp:pattern {"slug":"probe/never-registered"} /-->' );
+
+		$this->assertSame( array(), $tokens );
+	}
 }

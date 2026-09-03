@@ -59,6 +59,59 @@ class Pattern_Builder_Cloud_Tokens {
 	 * @param string $content Serialized block markup.
 	 * @return array PBP token list.
 	 */
+	/**
+	 * Collect a pattern's tokens and everything its references need.
+	 *
+	 * A page pattern is mostly `core/pattern` references, and almost none of the
+	 * presets it depends on appear in its own markup — they are in the sections
+	 * it composes. Collecting only the top level under-reports what the page
+	 * uses and, worse, renders it against another theme carrying a fraction of
+	 * what it needs. An upload does not have this problem, because it sends the
+	 * whole tree and each member brings its own; anything that looks at one
+	 * composed pattern does.
+	 *
+	 * @param string $content The pattern's markup.
+	 * @param array  $seen    Slugs already walked, against a reference loop.
+	 * @return array Tokens, one entry per type and slug.
+	 */
+	public static function collect_tree( $content, $seen = array() ) {
+		$tokens = self::collect( $content );
+
+		if ( preg_match_all( '/<!--\s*wp:pattern\s+(\{.*?\})\s*\/-->/s', (string) $content, $matches ) ) {
+			foreach ( $matches[1] as $json ) {
+				$attrs = json_decode( $json, true );
+
+				if ( ! is_array( $attrs ) || empty( $attrs['slug'] ) ) {
+					continue;
+				}
+
+				$slug = (string) $attrs['slug'];
+
+				if ( isset( $seen[ $slug ] ) ) {
+					continue;
+				}
+
+				$seen[ $slug ] = true;
+
+				$registered = \WP_Block_Patterns_Registry::get_instance()->get_registered( $slug );
+
+				if ( ! $registered || empty( $registered['content'] ) ) {
+					continue;
+				}
+
+				$tokens = array_merge( $tokens, self::collect_tree( $registered['content'], $seen ) );
+			}
+		}
+
+		$unique = array();
+
+		foreach ( $tokens as $token ) {
+			$unique[ $token['type'] . '|' . $token['slug'] ] = $token;
+		}
+
+		return array_values( $unique );
+	}
+
 	public static function collect( $content ) {
 		$tokens = array();
 

@@ -566,7 +566,7 @@ class Pattern_Builder_Abilities {
 		 * silent at both ends and it is made here, not there.
 		 */
 		$referenced = Pattern_Builder_Cloud_Tokens::referenced( $pattern->content );
-		$defined    = Pattern_Builder_Cloud_Tokens::collect( $pattern->content );
+		$defined    = Pattern_Builder_Cloud_Tokens::collect_tree( $pattern->content );
 		$has        = array();
 
 		foreach ( $defined as $token ) {

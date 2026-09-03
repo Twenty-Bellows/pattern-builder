@@ -187,7 +187,7 @@ class Pattern_Builder_Preview {
 			 */
 			$carry = $request->get_param( 'tokens' );
 			$carry = null === $carry ? true : (bool) $carry;
-			$bring = $carry ? Pattern_Builder_Cloud_Tokens::collect( (string) $pattern->content ) : array();
+			$bring = $carry ? Pattern_Builder_Cloud_Tokens::collect_tree( (string) $pattern->content ) : array();
 
 			$wearing = $this->wear_theme( $theme );
 
