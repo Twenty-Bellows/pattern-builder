@@ -838,7 +838,7 @@ class Pattern_Builder_Abilities {
 				// Which skill this document belongs to, from where it lives.
 				// A guide a theme supplies belongs to neither and says so by
 				// carrying no skill at all.
-				'skill'   => strtok( $relative, '/' ),
+				'skill'   => (string) strstr( $relative, '/', true ),
 			);
 		}
 
