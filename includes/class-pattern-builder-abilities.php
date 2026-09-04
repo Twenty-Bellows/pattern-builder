@@ -184,7 +184,7 @@ class Pattern_Builder_Abilities {
 						),
 						'blockStyles'  => array(
 							'type'        => 'object',
-							'description' => 'Block style variations registered on this site, keyed by block name. Apply one with the given class. `portable` is false for a variation this site registered: the class travels with a pattern but the definition does not, so it renders unstyled anywhere else.',
+							'description' => 'Block style variations registered on this site, keyed by block name. Apply one with the given class. `portable` is true for one declared in a block\'s own block.json, which ships with WordPress; false for one this site registered, whose definition is this site\'s — an upload to patternbuilderwp.com carries it with the pattern, a copy made by hand arrives with the class and nothing styling it. A variation this theme defines as a styles/*.json partial also carries its `styles`, so you can tell whether an existing look already does what you want before adding another.',
 						),
 					),
 				),
@@ -284,16 +284,31 @@ class Pattern_Builder_Abilities {
 			}
 		}
 
+		/*
+		 * The definition, where this theme holds it as a partial. A name and a
+		 * label say a look exists; only the styles say what it does, and an
+		 * agent deciding between reusing `is-style-card` and adding a second
+		 * card needs the second thing. A variation registered from PHP has no
+		 * definition anywhere theme.json can read, so it carries none.
+		 */
+		$partials = Pattern_Builder_Block_Style_Variations::all();
+
 		$answer = array();
 		foreach ( $found as $block_name => $styles ) {
 			foreach ( $styles as $name => $style ) {
-				$answer[ $block_name ][] = array(
+				$entry = array(
 					'name'     => (string) $name,
 					'label'    => $style['label'],
 					'class'    => 'is-style-' . $name,
 					'source'   => $style['source'],
 					'portable' => 'block' === $style['source'],
 				);
+
+				if ( 'site' === $style['source'] && isset( $partials[ $name ]['styles'] ) && is_array( $partials[ $name ]['styles'] ) ) {
+					$entry['styles'] = $partials[ $name ]['styles'];
+				}
+
+				$answer[ $block_name ][] = $entry;
 			}
 		}
 
@@ -473,7 +488,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/list-patterns',
 			array(
 				'label'               => __( 'List patterns', 'pattern-builder' ),
-				'description'         => __( 'Returns the patterns on this site: theme patterns (PHP files in the theme) and user patterns (reusable blocks in the database), with their names, titles, categories and synced status. Content is omitted; use get-pattern for one pattern\'s markup.', 'pattern-builder' ),
+				'description'         => __( 'Returns the patterns on this site: theme patterns (PHP files in the theme) and user patterns (reusable blocks in the database), with their names, titles, categories, placement headers and synced status. Content is omitted; use get-pattern for one pattern\'s markup. Also returns the pattern categories registered here, which are the only ones the inserter files a pattern under — a category slug nothing registered lands the pattern in Uncategorized.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -490,9 +505,14 @@ class Pattern_Builder_Abilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'patterns' => array(
+						'patterns'   => array(
 							'type'  => 'array',
 							'items' => array( 'type' => 'object' ),
+						),
+						'categories' => array(
+							'type'        => 'array',
+							'description' => 'The pattern categories registered on this site: name (the slug a Categories header or a categories input uses) and label. Use one of these, or the pattern is filed under Uncategorized.',
+							'items'       => array( 'type' => 'object' ),
 						),
 					),
 				),
@@ -526,7 +546,83 @@ class Pattern_Builder_Abilities {
 			$patterns[] = $this->summarize( $pattern );
 		}
 
-		return array( 'patterns' => $patterns );
+		return array(
+			'patterns'   => $patterns,
+			'categories' => $this->registered_categories(),
+		);
+	}
+
+	/**
+	 * The pattern categories this site has registered.
+	 *
+	 * A theme pattern's `Categories:` header and a user pattern's terms are
+	 * only names; what the inserter shows are the categories registered with
+	 * `register_block_pattern_category()`, and a pattern whose category is
+	 * not among them is filed under Uncategorized. The guides tell an agent to
+	 * use the site's own categories, which means being able to see them.
+	 *
+	 * @return array Each with name and label.
+	 */
+	private function registered_categories() {
+		$categories = array();
+
+		foreach ( \WP_Block_Pattern_Categories_Registry::get_instance()->get_all_registered() as $category ) {
+			if ( empty( $category['name'] ) ) {
+				continue;
+			}
+			$categories[] = array(
+				'name'  => (string) $category['name'],
+				'label' => isset( $category['label'] ) ? (string) $category['label'] : (string) $category['name'],
+			);
+		}
+
+		return $categories;
+	}
+
+	/**
+	 * The category slugs among these that nothing on this site registered.
+	 *
+	 * @param array $slugs Category slugs.
+	 * @return string[]
+	 */
+	private function unregistered_categories( $slugs ) {
+		$registry = \WP_Block_Pattern_Categories_Registry::get_instance();
+
+		return array_values(
+			array_filter(
+				array_map( 'strval', (array) $slugs ),
+				function ( $slug ) use ( $registry ) {
+					return '' !== $slug && ! $registry->is_registered( $slug );
+				}
+			)
+		);
+	}
+
+	/**
+	 * Say when a stored pattern's categories will not show in the inserter.
+	 *
+	 * The write succeeds either way — a category is a header, and headers are
+	 * the author's — but a pattern filed under Uncategorized is one nobody
+	 * finds, so the answer says which slugs need registering.
+	 *
+	 * @param array $answer  The write's answer.
+	 * @param array $pattern The stored pattern's summary.
+	 * @return array
+	 */
+	private function with_category_note( $answer, $pattern ) {
+		$unregistered = $this->unregistered_categories( isset( $pattern['categories'] ) ? $pattern['categories'] : array() );
+		if ( ! $unregistered ) {
+			return $answer;
+		}
+
+		$answer['unregisteredCategories'] = $unregistered;
+		$answer['note']                   = sprintf(
+			/* translators: %s: category slugs, comma separated. */
+			__( 'Stored, but no pattern category named %s is registered on this site, so the inserter files this pattern under Uncategorized. Use a category list-patterns reports, or have the theme register this one with register_block_pattern_category().', 'pattern-builder' ),
+			implode( ', ', $unregistered )
+		);
+
+		return $answer;
 	}
 
 	/**
@@ -623,7 +719,7 @@ class Pattern_Builder_Abilities {
 						),
 						'preview' => array(
 							'type'        => 'object',
-							'description' => 'URLs that render the pattern as a page with this site\'s styles: "standalone" for the pattern by itself, "page" for it inside the page template.',
+							'description' => 'URLs that render the pattern as a page: "standalone" for the pattern by itself with this site\'s styles, "page" for it inside this site\'s page template, and under "themes" the same page render against each theme this plugin carries for the purpose — "blank-theme", which defines nothing so the pattern shows only what it brings, and "opinionated-theme", a design system of somebody else\'s that the pattern has to survive. A pattern that looks right in both travels.',
 						),
 					),
 				),
@@ -692,13 +788,28 @@ class Pattern_Builder_Abilities {
 		 * showing the pattern by itself, one showing it where a page would put
 		 * it, which is the only way to see the theme's own layout act on it.
 		 */
+
+		/*
+		 * The two worlds a portable pattern has to survive, one call away.
+		 * The preview route wears a theme for one request without activating
+		 * it, carrying the pattern's own presets in where that theme has none
+		 * — the rule a download follows — so blank-theme shows the pattern's
+		 * intent and nothing else, and opinionated-theme shows whether it
+		 * adapts to a design system that is not the one it was written on.
+		 */
+		$themes = array();
+		foreach ( array_keys( Pattern_Builder_Preview::bundled_themes() ) as $slug ) {
+			$themes[ $slug ] = Pattern_Builder_Preview::url_for( $pattern->id, 'page', $slug );
+		}
+
 		return array(
 			'html'    => do_blocks( $pattern->content ),
 			'tokens'  => $tokens,
 			'preview' => array(
 				'standalone' => Pattern_Builder_Preview::url_for( $pattern->id, 'standalone' ),
 				'page'       => Pattern_Builder_Preview::url_for( $pattern->id, 'page' ),
-				'note'       => __( 'Open either URL in a browser, authenticated as you are here, to see the pattern with this site\'s styles. "page" renders it inside the page template, which is where an alignfull band either escapes the content width or does not.', 'pattern-builder' ),
+				'themes'     => $themes,
+				'note'       => __( 'Open any URL in a browser, authenticated as you are here. "page" renders the pattern inside this site\'s page template, which is where an alignfull band either escapes the content width or does not. "themes" renders it the same way against a theme that defines nothing (what the pattern itself brings) and against one with a design system of its own (whether the pattern adapts); nothing on this site is changed by either.', 'pattern-builder' ),
 			),
 		);
 	}
@@ -1250,7 +1361,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/create-pattern',
 			array(
 				'label'               => __( 'Create a pattern', 'pattern-builder' ),
-				'description'         => __( 'Stores finished block markup as a new pattern — either a PHP file in the active theme, or a reusable block in the database. This does not generate anything: supply markup you have already written and validated with a JavaScript block validator, because invalid markup renders correctly on the front end and only fails once an editor opens it.', 'pattern-builder' ),
+				'description'         => __( 'Stores finished block markup as a new pattern — either a PHP file in the active theme, or a reusable block in the database. This does not generate anything: supply markup you have already written and validated with a JavaScript block validator, because invalid markup renders correctly on the front end and only fails once an editor opens it, and no server can run a block\'s save(). What the site does refuse, by name, is what PHP can see: attribute JSON that does not parse, a heading or list contradicting its attributes, a block this site has not registered, a core/pattern reference that resolves to nothing or to the pattern itself, and a Pattern Overrides slot nothing can fill — a content key naming no slot, a binding with no metadata.name, or a binding on a block core cannot bind. Store the patterns a pattern references before it.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => $this->write_schema( true ),
 				'output_schema'       => array(
@@ -1281,7 +1392,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/update-pattern',
 			array(
 				'label'               => __( 'Update a pattern', 'pattern-builder' ),
-				'description'         => __( 'Replaces an existing pattern’s markup and metadata. Overwrites whatever is there, so read the pattern first if you mean to preserve part of it. As with create-pattern, validate the markup before sending it.', 'pattern-builder' ),
+				'description'         => __( 'Replaces an existing pattern’s markup and metadata. Overwrites whatever is there, so read the pattern first if you mean to preserve part of it. As with create-pattern, validate the markup before sending it; the same checks as create-pattern refuse what PHP can see (malformed attribute JSON, contradictions, unregistered blocks, unresolved references, unfillable slots).', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => $this->write_schema( false ),
 				'output_schema'       => array(
@@ -1356,7 +1467,7 @@ class Pattern_Builder_Abilities {
 			),
 			'synced'        => array(
 				'type'        => 'boolean',
-				'description' => 'Whether the pattern is synced. A synced theme pattern can be referenced with core/pattern and have its slots filled.',
+				'description' => 'Whether the pattern is synced. Defaults to false for either source: a theme pattern gets no Synced header, a user pattern is marked unsynced. A synced pattern is the one a core/pattern reference keeps pointing at, so a design pattern whose slots pages fill should be synced.',
 			),
 			'blockTypes'    => array(
 				'type'        => 'array',
@@ -1416,6 +1527,23 @@ class Pattern_Builder_Abilities {
 	public function execute_create_pattern( $input ) {
 		$source = isset( $input['source'] ) ? (string) $input['source'] : 'theme';
 
+		/*
+		 * The name the markup will be stored under, so a reference to itself
+		 * is refused as the loop core would drop it as. A user pattern has no
+		 * name a core/pattern could reach, so nothing to compare there.
+		 */
+		$self = '';
+		if ( 'theme' === $source ) {
+			$self = Pattern_File_Store::namespaced_name(
+				isset( $input['name'] ) && '' !== $input['name'] ? (string) $input['name'] : sanitize_title( (string) $input['title'] )
+			);
+		}
+
+		$checked = Pattern_Builder_Markup_Checks::check( (string) $input['content'], $self );
+		if ( is_wp_error( $checked ) ) {
+			return $checked;
+		}
+
 		if ( 'user' === $source ) {
 			$post_id = wp_insert_post(
 				array(
@@ -1423,6 +1551,7 @@ class Pattern_Builder_Abilities {
 					'post_status'  => 'publish',
 					'post_title'   => (string) $input['title'],
 					'post_content' => (string) $input['content'],
+					'post_excerpt' => isset( $input['description'] ) ? (string) $input['description'] : '',
 				),
 				true
 			);
@@ -1431,7 +1560,11 @@ class Pattern_Builder_Abilities {
 				return $post_id;
 			}
 
-			return array( 'pattern' => $this->summarize( Abstract_Pattern::from_post( get_post( $post_id ) ) ) );
+			$this->write_user_pattern_meta( $post_id, $input );
+
+			$summary = $this->summarize( Abstract_Pattern::from_post( get_post( $post_id ) ) );
+
+			return $this->with_category_note( array( 'pattern' => $summary ), $summary );
 		}
 
 		$pattern = new Abstract_Pattern( $this->pattern_args( $input ) );
@@ -1442,7 +1575,9 @@ class Pattern_Builder_Abilities {
 			return $result;
 		}
 
-		return array( 'pattern' => $this->summarize( $pattern ) );
+		$summary = $this->summarize( $pattern );
+
+		return $this->with_category_note( array( 'pattern' => $summary ), $summary );
 	}
 
 	/**
@@ -1457,12 +1592,21 @@ class Pattern_Builder_Abilities {
 			return $existing;
 		}
 
+		$checked = Pattern_Builder_Markup_Checks::check(
+			(string) $input['content'],
+			'theme' === $existing->source ? (string) $existing->name : ''
+		);
+		if ( is_wp_error( $checked ) ) {
+			return $checked;
+		}
+
 		if ( 'user' === $existing->source ) {
 			$post_id = wp_update_post(
 				array(
 					'ID'           => (int) $existing->id,
 					'post_title'   => isset( $input['title'] ) ? (string) $input['title'] : $existing->title,
 					'post_content' => (string) $input['content'],
+					'post_excerpt' => isset( $input['description'] ) ? (string) $input['description'] : $existing->description,
 				),
 				true
 			);
@@ -1471,7 +1615,11 @@ class Pattern_Builder_Abilities {
 				return $post_id;
 			}
 
-			return array( 'pattern' => $this->summarize( Abstract_Pattern::from_post( get_post( $post_id ) ) ) );
+			$this->write_user_pattern_meta( $post_id, $input, $existing );
+
+			$summary = $this->summarize( Abstract_Pattern::from_post( get_post( $post_id ) ) );
+
+			return $this->with_category_note( array( 'pattern' => $summary ), $summary );
 		}
 
 		$args         = $this->pattern_args( $input, $existing );
@@ -1485,7 +1633,9 @@ class Pattern_Builder_Abilities {
 			return $result;
 		}
 
-		return array( 'pattern' => $this->summarize( $pattern ) );
+		$summary = $this->summarize( $pattern );
+
+		return $this->with_category_note( array( 'pattern' => $summary ), $summary );
 	}
 
 	/**
@@ -1981,7 +2131,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/add-block-style-variation',
 			array(
 				'label'               => __( 'Add a block style variation', 'pattern-builder' ),
-				'description'         => __( 'Registers a named block style — a second kind of button, a card treatment, an inset quote — that a pattern applies by putting the returned class on a block. Use this instead of setting the same attributes on every block: the styling lives in one place, the editor offers it by name, and it applies only where the class is, so it changes nothing else on the site. Writes a theme.json partial into the active theme\'s styles directory, which is what registers a variation without PHP. Call get-design-system first: its blockStyles lists what is already here, and reusing one of WordPress\'s own (is-style-outline and the like) beats defining a new one. Raw CSS is refused.', 'pattern-builder' ),
+				'description'         => __( 'Registers a named block style — a second kind of button, a card treatment, an inset quote — that a pattern applies by putting the returned class on a block. Use this instead of setting the same attributes on every block: the styling lives in one place, the editor offers it by name, and it applies only where the class is, so it changes nothing else on the site. Writes a theme.json partial into the active theme\'s styles directory, which is what registers a variation without PHP. Call get-design-system first: its blockStyles lists what is already here, and reusing one of WordPress\'s own (is-style-outline and the like) beats defining a new one. Raw CSS is refused. A partial can carry style properties, elements and inner blocks but not a block state: WordPress reads it as a whole-theme styles tree, so a button variation\'s :hover goes in theme.json under styles.blocks.core/button.variations.{slug} through set-global-styles once the variation exists, and the answer says so when a state was given.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -2035,8 +2185,12 @@ class Pattern_Builder_Abilities {
 						),
 						'skipped'    => array(
 							'type'        => 'array',
-							'description' => 'Style paths WordPress does not recognise, which were dropped.',
+							'description' => 'Style paths WordPress does not recognise in a partial, which were dropped. A block state such as ":hover" lands here, with the note saying where it belongs.',
 							'items'       => array( 'type' => 'string' ),
+						),
+						'note'       => array(
+							'type'        => 'string',
+							'description' => 'Present when a block state was given: the set-global-styles call that sets it, since a partial cannot hold one.',
 						),
 					),
 				),
@@ -2580,6 +2734,54 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
+	 * The part of a user pattern that is not a post field.
+	 *
+	 * A `wp_block` carries its description as the excerpt, its categories as
+	 * `wp_pattern_category` terms, its keywords as a meta and its sync status
+	 * as another — where *absence* means synced, so an agent that asked for
+	 * an unsynced design pattern and was given a synced one would never have
+	 * been told. This writes the same fields
+	 * `Pattern_File_Store::convert_theme_pattern_to_user()` does, from the
+	 * same input the theme path takes, so the two sources answer `synced`,
+	 * `categories` and `keywords` alike. On an update, a field the input does
+	 * not mention keeps what the post already had.
+	 *
+	 * @param int                   $post_id  The wp_block post.
+	 * @param array                 $input    Ability input.
+	 * @param Abstract_Pattern|null $existing The pattern being replaced, on an update.
+	 */
+	private function write_user_pattern_meta( $post_id, $input, $existing = null ) {
+		if ( isset( $input['synced'] ) ) {
+			$synced = (bool) $input['synced'];
+		} elseif ( $existing ) {
+			$synced = (bool) $existing->synced;
+		} else {
+			// The same default the theme path takes: a pattern is unsynced
+			// unless it is asked for as synced.
+			$synced = false;
+		}
+
+		if ( $synced ) {
+			delete_post_meta( $post_id, 'wp_pattern_sync_status' );
+		} else {
+			update_post_meta( $post_id, 'wp_pattern_sync_status', 'unsynced' );
+		}
+
+		if ( isset( $input['categories'] ) ) {
+			wp_set_object_terms( $post_id, array_map( 'sanitize_title', (array) $input['categories'] ), 'wp_pattern_category', false );
+		}
+
+		if ( isset( $input['keywords'] ) ) {
+			$keywords = array_filter( array_map( 'sanitize_text_field', (array) $input['keywords'] ) );
+			if ( $keywords ) {
+				update_post_meta( $post_id, 'wp_pattern_keywords', implode( ', ', $keywords ) );
+			} else {
+				delete_post_meta( $post_id, 'wp_pattern_keywords' );
+			}
+		}
+	}
+
+	/**
 	 * Build constructor args, falling back to an existing pattern's values.
 	 *
 	 * @param array                 $input    Ability input.
@@ -2692,15 +2894,30 @@ class Pattern_Builder_Abilities {
 	 * @return array
 	 */
 	private function summarize( $pattern ) {
-		return array(
-			'id'          => $pattern->id,
-			'name'        => $pattern->name,
-			'title'       => $pattern->title,
-			'description' => $pattern->description,
-			'categories'  => is_array( $pattern->categories ) ? $pattern->categories : array(),
-			'keywords'    => is_array( $pattern->keywords ) ? $pattern->keywords : array(),
-			'source'      => $pattern->source,
-			'synced'      => (bool) $pattern->synced,
+		$summary = array(
+			'id'            => $pattern->id,
+			'name'          => $pattern->name,
+			'title'         => $pattern->title,
+			'description'   => $pattern->description,
+			'categories'    => is_array( $pattern->categories ) ? $pattern->categories : array(),
+			'keywords'      => is_array( $pattern->keywords ) ? $pattern->keywords : array(),
+			'source'        => $pattern->source,
+			'synced'        => (bool) $pattern->synced,
+			// The placement headers are what make a pattern a page starter, a
+			// block starter or a template rather than a section — the *kind*
+			// an agent reading the site's existing patterns is trying to see.
+			'blockTypes'    => is_array( $pattern->blockTypes ) ? array_values( $pattern->blockTypes ) : array(), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			'postTypes'     => is_array( $pattern->postTypes ) ? array_values( $pattern->postTypes ) : array(), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			'templateTypes' => is_array( $pattern->templateTypes ) ? array_values( $pattern->templateTypes ) : array(), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			'inserter'      => (bool) $pattern->inserter,
+			'viewportWidth' => $pattern->viewportWidth ? (int) $pattern->viewportWidth : null, // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 		);
+
+		if ( ! empty( $pattern->origin ) ) {
+			// Attribution: the cloud pattern this one was first copied from.
+			$summary['origin'] = (string) $pattern->origin;
+		}
+
+		return $summary;
 	}
 }

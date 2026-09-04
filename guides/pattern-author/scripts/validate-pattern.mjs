@@ -41,6 +41,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import {
+	addPatternContentAttribute,
 	findWordPress,
 	loadWordPressBlocks,
 	loadWordPressBlocksFromUrls,
@@ -291,9 +292,11 @@ function attributeLosses( authored, parsed, out = [] ) {
 			( key ) => {
 				/*
 				 * `content` on core/pattern is the synced-pattern runtime's, supplied
-				 * by Pattern Builder rather than core. Core drops it here exactly as
-				 * it would on a site without the runtime, which is a real failure but
-				 * a different one, and not this file's to report.
+				 * by Pattern Builder rather than core, and the loaders declare it the
+				 * way the runtime does so it survives parsing here. Should a loader
+				 * ever not (a `core/pattern` registered before the filter), its loss
+				 * is a fact about this environment rather than about the file, and
+				 * not this file's to report.
 				 */
 				if ( got[ i ].name === 'core/pattern' && key === 'content' ) {
 					return false;
@@ -496,6 +499,14 @@ async function loadCore() {
 		);
 		process.exit( 2 );
 	}
+
+	// The `content` attribute Pattern Builder adds to core/pattern, declared
+	// before the core blocks register so a reference keeps its slot values.
+	require( '@wordpress/hooks' ).addFilter(
+		'blocks.registerBlockType',
+		'pattern-builder/pattern-content-attribute',
+		addPatternContentAttribute
+	);
 
 	const { registerCoreBlocks } = require( '@wordpress/block-library' );
 	quietly( () => registerCoreBlocks() );

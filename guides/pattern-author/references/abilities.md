@@ -65,19 +65,19 @@ input and output schema.
 
 | Name | Method | Purpose |
 |---|---|---|
-| `pattern-builder/get-design-system` | GET | palette, gradients, spacing, font sizes and families, layout widths, style variations — resolved across core, parent theme, child theme and the active variation |
+| `pattern-builder/get-design-system` | GET | the three layers a pattern leans on, resolved across core, parent theme, child theme and the active variation: the presets it may reference (palette, gradients, spacing, font sizes and families), the `styles` it inherits (root, elements, blocks), the `blockStyles` it may apply (each with its class, whether it ships with WordPress, and — for one this theme defines as a partial — its definition), plus the `layout` widths and the site's whole-site style `variations` |
 | `pattern-builder/list-block-types` | GET | every block registered here, with attribute schemas. Optional `input[namespace]=core` |
-| `pattern-builder/list-patterns` | GET | patterns on the site, without markup. Optional `input[source]=theme\|user\|all` |
+| `pattern-builder/list-patterns` | GET | patterns on the site, without markup but with their placement headers (`blockTypes`, `postTypes`, `templateTypes`, `inserter`, `viewportWidth`) and any `origin`, plus the pattern `categories` registered here — the only ones the inserter files a pattern under. Optional `input[source]=theme\|user\|all` |
 | `pattern-builder/get-pattern` | GET | one pattern with its markup. `input[id]` is a namespaced name or a `wp_block` post ID |
-| `pattern-builder/render-pattern` | GET | the front-end HTML a stored pattern produces. `input[id]` as above |
+| `pattern-builder/render-pattern` | GET | the front-end HTML a stored pattern produces, which presets it references and whether this site defines them, and preview URLs: `standalone`, `page`, and under `themes` the page render against `blank-theme` and `opinionated-theme`. `input[id]` as above |
 | `pattern-builder/get-authoring-guide` | GET | these documents, as Markdown. No input for an index; `input[guide]` by name, or `all`. The index also carries a `validate` block naming what to run before storing anything |
 | `pattern-builder/get-validator` | GET | the source of the markup validator, as files to write and run with Node |
 | `pattern-builder/get-editor-scripts` | GET | this site's own block editor script URLs, in load order, for that validator |
-| `pattern-builder/create-pattern` | POST | store finished markup. `title` and `content` required; `source` is `theme` (default) or `user`; also `name`, `description`, `categories`, `keywords`, `synced`, `viewportWidth` |
+| `pattern-builder/create-pattern` | POST | store finished markup. `title` and `content` required; `source` is `theme` (default) or `user`; also `name`, `description`, `categories`, `keywords`, `synced`, `blockTypes`, `postTypes`, `templateTypes`, `inserter`, `viewportWidth`. Refuses what PHP can see (below); a category nothing registered comes back under `unregisteredCategories` |
 | `pattern-builder/update-pattern` | POST | replace an existing pattern. `id` and `content` required |
 | `pattern-builder/add-design-tokens` | POST | add presets to the design system. `input[tokens]` is a list of `{type, slug, name, value}`; `input[destination]` is `theme` (default) or `user`. Only ever **adds** — a slug already here is skipped |
 | `pattern-builder/set-global-styles` | POST | set what a block looks like before any pattern speaks: `input[styles]` is a theme.json `styles` subtree, `input[destination]` is `theme` (default) or `user`. **Replaces** at each property it names and changes the whole site, so read `get-design-system`'s `styles` first |
-| `pattern-builder/add-block-style-variation` | POST | register a named look a pattern applies with a class: `slug`, `blockTypes`, `styles`, optional `title` and `description`. Answers with the `class` to put on the block |
+| `pattern-builder/add-block-style-variation` | POST | register a named look a pattern applies with a class: `slug`, `blockTypes`, `styles`, optional `title` and `description`. Answers with the `class` to put on the block. A block state (`:hover`) cannot live in the partial it writes; the answer's `note` gives the `set-global-styles` call that sets one |
 | `pattern-builder/set-layout` | POST | set the widths every constrained band measures against: `contentSize`, `wideSize`, `useRootPaddingAwareAlignments`, `input[destination]` `theme` (default) or `user`. **Replaces** what it names |
 | `pattern-builder/find-media` | GET | images the site already has, in the media library and in the theme's `assets/images`, each with the reference to write. Optional `input[search]`, `input[source]=all\|media\|theme`. The answer also carries how to upload a file |
 | `pattern-builder/add-asset` | POST | store an image: `svg` markup you authored (with `filename`), or a `url` for the site to fetch. `destination` is `theme` (default) or `media`. **A file you hold goes to the route below instead** |
@@ -313,13 +313,29 @@ without `content` is dropped rather than served empty.
 take markup you have already composed — the judgement of what to build is
 yours, and this is only somewhere to put the result.
 
-**Nothing here validates markup for you.** Block validity is decided by
+**Nothing here decides whether a block is valid.** That is decided by
 re-running the block's `save()`, which is JavaScript; no PHP endpoint can
 answer it, and this one does not pretend to. What the site can do is hand you
 the tool and its own block code — `get-validator` and `get-editor-scripts`,
 described under **Validating from here** below. Run that before calling
 `create-pattern`, or you will store markup that renders correctly and breaks
 the moment anyone opens it in the editor.
+
+**What the writes do refuse** is the set of failures PHP *can* see, every one
+of them silent at render, each named in the error's `problems`:
+
+| Refused | Because otherwise |
+|---|---|
+| attribute JSON that does not parse | WordPress reads it as *no* attributes; a slot that lost a brace is quietly no longer a slot |
+| a heading whose tag disagrees with `level`, a list whose element disagrees with `ordered` | valid nowhere; every editor reports it |
+| a block this site has not registered | it parses to `core/missing` and renders as a grey box |
+| a `core/pattern` reference to nothing, or to the pattern itself | an unresolved reference renders as nothing at all; a self-reference is dropped as a loop |
+| a `content` key naming no slot in the referenced pattern | an unknown key is ignored and the placeholder copy ships |
+| a Pattern Overrides binding with no `metadata.name`, or on a block core cannot bind | the binding never fills |
+
+So the order the guides prescribe is enforced: a page that references a
+section cannot be stored before the section is. A pattern written earlier in
+the same session counts, even before WordPress has registered it.
 
 `render-pattern` is the nearest thing to a check the site can offer, and it
 answers a different question: what HTML comes out. That is genuinely useful for

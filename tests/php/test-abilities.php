@@ -304,6 +304,47 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A name and a label say a look exists; only its styles say what it does,
+	 * and an agent deciding between reusing `is-style-card` and adding a
+	 * second card needs the second thing. A partial this theme holds is the
+	 * one place a definition can be read from.
+	 */
+	public function test_a_partial_defined_variation_carries_its_definition() {
+		$this->use_a_writable_theme();
+
+		$added = \TwentyBellows\PatternBuilder\Pattern_Builder_Block_Style_Variations::add(
+			array(
+				'slug'       => 'agent-inset',
+				'title'      => 'Inset',
+				'blockTypes' => array( 'core/group' ),
+				'styles'     => array( 'border' => array( 'radius' => '12px' ) ),
+			)
+		);
+		$this->assertNotWPError( $added );
+
+		try {
+			$result  = $this->abilities->execute_design_system();
+			$by_name = array();
+			foreach ( $result['blockStyles']['core/group'] as $style ) {
+				$by_name[ $style['name'] ] = $style;
+			}
+
+			$this->assertArrayHasKey( 'agent-inset', $by_name );
+			$this->assertFalse( $by_name['agent-inset']['portable'] );
+			$this->assertSame( '12px', $by_name['agent-inset']['styles']['border']['radius'] );
+		} finally {
+			if ( WP_Block_Styles_Registry::get_instance()->is_registered( 'core/group', 'agent-inset' ) ) {
+				unregister_block_style( 'core/group', 'agent-inset' );
+			}
+			$dir = \TwentyBellows\PatternBuilder\Pattern_Builder_Block_Style_Variations::directory();
+			if ( file_exists( $dir . '/agent-inset.json' ) ) {
+				unlink( $dir . '/agent-inset.json' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+				rmdir( $dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions.rmdir_rmdir
+			}
+		}
+	}
+
+	/**
 	 * Presets arrive keyed by origin and a later origin wins by slug, which
 	 * is what the editor shows — so a slug must appear once, not once per
 	 * origin that defines it.
@@ -354,6 +395,241 @@ class Test_Abilities extends WP_UnitTestCase {
 		$again = $this->abilities->execute_get_pattern( array( 'id' => (string) $id ) );
 		$this->assertStringContainsString( 'Replaced.', $again['pattern']['content'] );
 		$this->assertStringNotContainsString( 'From an agent.', $again['pattern']['content'] );
+	}
+
+	/**
+	 * A `wp_block` records its description as the excerpt, its categories as
+	 * terms, its keywords as a meta and its sync status as a meta whose
+	 * *absence* means synced. Every one of those used to be dropped on the
+	 * user path, so an agent asking for an unsynced, categorised design
+	 * pattern got a synced, uncategorised one and was told nothing.
+	 */
+	public function test_a_user_pattern_keeps_its_metadata() {
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'       => 'Described User Pattern',
+				'description' => 'One card, unsynced.',
+				'content'     => '<!-- wp:paragraph --><p>Card.</p><!-- /wp:paragraph -->',
+				'source'      => 'user',
+				'synced'      => false,
+				'categories'  => array( 'featured', 'Text' ),
+				'keywords'    => array( 'card', 'testimonial' ),
+			)
+		);
+
+		$this->assertArrayHasKey( 'pattern', $created );
+		$this->assertFalse( $created['pattern']['synced'] );
+		$this->assertSame( 'One card, unsynced.', $created['pattern']['description'] );
+		$this->assertSame( array( 'featured', 'text' ), $created['pattern']['categories'] );
+		$this->assertSame( array( 'card', 'testimonial' ), $created['pattern']['keywords'] );
+		$this->assertSame( 'unsynced', get_post_meta( (int) $created['pattern']['id'], 'wp_pattern_sync_status', true ) );
+
+		// An update that says nothing about them leaves them as they are.
+		$updated = $this->abilities->execute_update_pattern(
+			array(
+				'id'      => (string) $created['pattern']['id'],
+				'content' => '<!-- wp:paragraph --><p>Card, revised.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$this->assertFalse( $updated['pattern']['synced'] );
+		$this->assertSame( 'One card, unsynced.', $updated['pattern']['description'] );
+		$this->assertSame( array( 'featured', 'text' ), $updated['pattern']['categories'] );
+
+		// And one that asks for synced gets it: the meta whose absence means synced goes.
+		$synced = $this->abilities->execute_update_pattern(
+			array(
+				'id'      => (string) $created['pattern']['id'],
+				'content' => '<!-- wp:paragraph --><p>Card, synced.</p><!-- /wp:paragraph -->',
+				'synced'  => true,
+			)
+		);
+
+		$this->assertTrue( $synced['pattern']['synced'] );
+		$this->assertSame( '', get_post_meta( (int) $created['pattern']['id'], 'wp_pattern_sync_status', true ) );
+	}
+
+	/**
+	 * Both sources answer the same question the same way: a pattern is
+	 * unsynced unless asked for as synced.
+	 */
+	public function test_a_user_pattern_is_unsynced_unless_asked() {
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Default Sync User Pattern',
+				'content' => '<!-- wp:paragraph --><p>Plain.</p><!-- /wp:paragraph -->',
+				'source'  => 'user',
+			)
+		);
+
+		$this->assertFalse( $created['pattern']['synced'] );
+	}
+
+	/**
+	 * The failures PHP can see are refused before anything is written, each
+	 * by name. None of these is block validity — that stays JavaScript's —
+	 * and every one of them is silent at render: WordPress reads attribute
+	 * JSON it cannot parse as no attributes, an unregistered block draws a
+	 * grey box, an unresolved reference draws nothing, and a slot nothing
+	 * can fill ships its placeholder as though it were the copy.
+	 */
+	public function test_markup_php_can_see_is_wrong_is_refused_by_name() {
+		$this->use_a_writable_theme();
+
+		$cases = array(
+			'malformed attribute JSON' => array(
+				'<!-- wp:heading {"level":2,"metadata":{"name":"headline","bindings":{"__default":{"source":"core/pattern-overrides"}} --><h2 class="wp-block-heading">Lost a brace</h2><!-- /wp:heading -->',
+				'not valid JSON',
+			),
+			'heading contradicts its level' => array(
+				'<!-- wp:heading {"level":2} --><h3 class="wp-block-heading">Wrong tag</h3><!-- /wp:heading -->',
+				'level 2',
+			),
+			'list contradicts ordered' => array(
+				'<!-- wp:list {"ordered":true} --><ul class="wp-block-list"><!-- wp:list-item --><li>One</li><!-- /wp:list-item --></ul><!-- /wp:list -->',
+				'marked ordered',
+			),
+			'unregistered block' => array(
+				'<!-- wp:acme/carousel --><div>Nope</div><!-- /wp:acme/carousel -->',
+				'acme/carousel',
+			),
+			'reference to nothing' => array(
+				'<!-- wp:pattern {"slug":"' . get_stylesheet() . '/never-written"} /-->',
+				get_stylesheet() . '/never-written',
+			),
+			'reference to itself' => array(
+				'<!-- wp:pattern {"slug":"' . get_stylesheet() . '/agent-loop"} /-->',
+				'references itself',
+			),
+			'slot without a name' => array(
+				'<!-- wp:paragraph {"metadata":{"bindings":{"__default":{"source":"core/pattern-overrides"}}}} --><p>Nameless</p><!-- /wp:paragraph -->',
+				'no metadata.name',
+			),
+			'slot on a block core cannot bind' => array(
+				'<!-- wp:group {"metadata":{"name":"band","bindings":{"__default":{"source":"core/pattern-overrides"}}},"layout":{"type":"constrained"}} --><div class="wp-block-group"></div><!-- /wp:group -->',
+				'cannot take a Pattern Overrides slot',
+			),
+		);
+
+		foreach ( $cases as $label => $case ) {
+			$result = $this->abilities->execute_create_pattern(
+				array(
+					'title'   => 'Agent Loop',
+					'name'    => 'agent-loop',
+					'content' => $case[0],
+					'source'  => 'theme',
+				)
+			);
+
+			$this->assertWPError( $result, $label . ' should have been refused.' );
+			$this->assertSame( 'pb_markup_refused', $result->get_error_code(), $label );
+			$this->assertStringContainsString( $case[1], $result->get_error_message(), $label );
+			$this->assertNotEmpty( $result->get_error_data()['problems'], $label );
+		}
+
+		$this->assertFileDoesNotExist( get_stylesheet_directory() . '/patterns/agent-loop.php' );
+	}
+
+	/**
+	 * The one check that needs the other half: a page pattern's content keys
+	 * have to name slots the design pattern declares. A misspelt key is
+	 * simply ignored by core, and the placeholder copy ships in its place.
+	 */
+	public function test_a_content_key_naming_no_slot_is_refused_and_the_slots_are_named() {
+		$this->use_a_writable_theme();
+
+		$element = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Agent FAQ Entry',
+				'name'    => 'agent-faq-entry',
+				'synced'  => true,
+				'content' => '<!-- wp:group {"layout":{"type":"constrained"}} --><div class="wp-block-group"><!-- wp:heading {"level":3,"metadata":{"name":"question","bindings":{"__default":{"source":"core/pattern-overrides"}}}} --><h3 class="wp-block-heading">A question</h3><!-- /wp:heading --><!-- wp:paragraph {"metadata":{"name":"answer","bindings":{"__default":{"source":"core/pattern-overrides"}}}} --><p>An answer.</p><!-- /wp:paragraph --></div><!-- /wp:group -->',
+				'source'  => 'theme',
+			)
+		);
+		$this->assertArrayHasKey( 'pattern', $element );
+
+		$typo = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Agent FAQ Page',
+				'name'    => 'agent-faq-page',
+				'content' => '<!-- wp:pattern {"slug":"' . get_stylesheet() . '/agent-faq-entry","content":{"quesiton":{"content":"Can I?"},"answer":{"content":"Yes."}}} /-->',
+				'source'  => 'theme',
+			)
+		);
+
+		$this->assertWPError( $typo );
+		$this->assertStringContainsString( 'quesiton', $typo->get_error_message() );
+		$this->assertStringContainsString( 'question, answer', $typo->get_error_message() );
+
+		// The same page with the keys spelled as the slots are, referencing a
+		// pattern written in this very process — the registry has not seen
+		// it yet, so the files are what answer.
+		$page = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Agent FAQ Page',
+				'name'    => 'agent-faq-page',
+				'content' => '<!-- wp:pattern {"slug":"' . get_stylesheet() . '/agent-faq-entry","content":{"question":{"content":"Can I?"},"answer":{"content":"Yes."}}} /-->',
+				'source'  => 'theme',
+			)
+		);
+
+		$this->assertArrayHasKey( 'pattern', $page );
+		$this->assertFileExists( get_stylesheet_directory() . '/patterns/agent-faq-page.php' );
+	}
+
+	/**
+	 * Content for a pattern that declares no slots would be ignored whole.
+	 */
+	public function test_content_for_a_pattern_with_no_slots_is_refused() {
+		$this->use_a_writable_theme();
+
+		$this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Agent Plain Section',
+				'name'    => 'agent-plain-section',
+				'content' => '<!-- wp:paragraph --><p>Nothing to fill.</p><!-- /wp:paragraph -->',
+				'source'  => 'theme',
+			)
+		);
+
+		$result = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Agent Plain Page',
+				'name'    => 'agent-plain-page',
+				'content' => '<!-- wp:pattern {"slug":"' . get_stylesheet() . '/agent-plain-section","content":{"body":{"content":"Filled?"}}} /-->',
+				'source'  => 'theme',
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'declares no Pattern Overrides slots', $result->get_error_message() );
+	}
+
+	/**
+	 * An update is held to the same checks, and a user pattern too.
+	 */
+	public function test_an_update_is_refused_for_the_same_reasons() {
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Agent Updated User Pattern',
+				'content' => '<!-- wp:paragraph --><p>Fine.</p><!-- /wp:paragraph -->',
+				'source'  => 'user',
+			)
+		);
+
+		$result = $this->abilities->execute_update_pattern(
+			array(
+				'id'      => (string) $created['pattern']['id'],
+				'content' => '<!-- wp:paragraph {"fontSize":"large" --><p>Broken.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_markup_refused', $result->get_error_code() );
+
+		$still = $this->abilities->execute_get_pattern( array( 'id' => (string) $created['pattern']['id'] ) );
+		$this->assertStringContainsString( 'Fine.', $still['pattern']['content'] );
 	}
 
 	/**
@@ -630,6 +906,85 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'page', $rendered['preview'] );
 		$this->assertStringContainsString( 'context=standalone', $rendered['preview']['standalone'] );
 		$this->assertStringContainsString( 'context=page', $rendered['preview']['page'] );
+	}
+
+	/**
+	 * The two worlds a portable pattern has to survive are one call away: the
+	 * preview route wears a bundled theme for one request, and the answer
+	 * carries a URL for each so nothing has to be composed from a guide.
+	 */
+	public function test_rendering_offers_the_two_lab_themes() {
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Two Worlds Pattern',
+				'content' => '<!-- wp:paragraph --><p>Portable?</p><!-- /wp:paragraph -->',
+				'source'  => 'user',
+			)
+		);
+
+		$rendered = $this->abilities->execute_render_pattern( array( 'id' => (string) $created['pattern']['id'] ) );
+
+		$this->assertArrayHasKey( 'themes', $rendered['preview'] );
+		$this->assertArrayHasKey( 'blank-theme', $rendered['preview']['themes'] );
+		$this->assertArrayHasKey( 'opinionated-theme', $rendered['preview']['themes'] );
+		$this->assertStringContainsString( 'theme=blank-theme', $rendered['preview']['themes']['blank-theme'] );
+		$this->assertStringContainsString( 'context=page', $rendered['preview']['themes']['opinionated-theme'] );
+	}
+
+	/**
+	 * The inserter files a pattern under a registered category or under
+	 * Uncategorized, so the listing says which categories exist, a summary
+	 * says what kind of pattern each is, and a write says when its category
+	 * will not show.
+	 */
+	public function test_listing_reports_registered_categories_and_the_placement_headers() {
+		$this->use_a_writable_theme();
+
+		$created = $this->abilities->execute_create_pattern(
+			array(
+				'title'      => 'Agent Categorised Starter',
+				'name'       => 'agent-categorised-starter',
+				'content'    => '<!-- wp:paragraph --><p>Start here.</p><!-- /wp:paragraph -->',
+				'source'     => 'theme',
+				'categories' => array( 'featured', 'agent-invented' ),
+				'blockTypes' => array( 'core/post-content' ),
+				'postTypes'  => array( 'page' ),
+			)
+		);
+
+		$this->assertArrayHasKey( 'pattern', $created );
+		$this->assertSame( array( 'agent-invented' ), $created['unregisteredCategories'] );
+		$this->assertStringContainsString( 'Uncategorized', $created['note'] );
+
+		$listed = $this->abilities->execute_list_patterns( array( 'source' => 'theme' ) );
+
+		$this->assertContains( 'featured', wp_list_pluck( $listed['categories'], 'name' ) );
+		$this->assertNotContains( 'agent-invented', wp_list_pluck( $listed['categories'], 'name' ) );
+
+		$mine = null;
+		foreach ( $listed['patterns'] as $pattern ) {
+			if ( get_stylesheet() . '/agent-categorised-starter' === $pattern['name'] ) {
+				$mine = $pattern;
+			}
+		}
+		$this->assertNotNull( $mine );
+		$this->assertSame( array( 'core/post-content' ), $mine['blockTypes'] );
+		$this->assertSame( array( 'page' ), $mine['postTypes'] );
+		$this->assertTrue( $mine['inserter'] );
+		$this->assertArrayNotHasKey( 'origin', $mine );
+
+		// A registered category alone says nothing.
+		$plain = $this->abilities->execute_create_pattern(
+			array(
+				'title'      => 'Agent Plainly Categorised',
+				'name'       => 'agent-plainly-categorised',
+				'content'    => '<!-- wp:paragraph --><p>Filed.</p><!-- /wp:paragraph -->',
+				'source'     => 'theme',
+				'categories' => array( 'featured' ),
+			)
+		);
+		$this->assertArrayNotHasKey( 'unregisteredCategories', $plain );
+		$this->assertArrayNotHasKey( 'note', $plain );
 	}
 
 	/**

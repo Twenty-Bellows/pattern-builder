@@ -85,8 +85,42 @@ class Pattern_Builder_Block_Style_Variations {
 			return $css;
 		}
 
+		/*
+		 * A partial names blocks, and a variation for a block this site has
+		 * not registered would register a look for markup that parses to
+		 * core/missing. Refused by name rather than written as a file that
+		 * styles nothing.
+		 */
+		$unknown = array();
+		foreach ( $block_types as $name ) {
+			if ( null === \WP_Block_Type_Registry::get_instance()->get_registered( $name ) ) {
+				$unknown[] = $name;
+			}
+		}
+		if ( $unknown ) {
+			return new WP_Error(
+				'pb_variation_unknown_block',
+				sprintf(
+					/* translators: %s: block names, comma separated. */
+					__( 'No block named %s is registered on this site, so a style variation for it would style nothing. list-block-types says what is here.', 'pattern-builder' ),
+					implode( ', ', $unknown )
+				),
+				array( 'status' => 400 )
+			);
+		}
+
+		/*
+		 * Checked exactly as core will read the file. `get_style_variations()`
+		 * runs a partial through the whole-theme schema before it injects the
+		 * styles under the variation's node, so what a partial can carry is
+		 * what a root `styles` tree can carry: the style properties, `elements`
+		 * and inner `blocks` — and not a block state. A button variation's
+		 * `:hover` written here is dropped on read, silently; the note below
+		 * says where it goes instead.
+		 */
 		$clean   = Pattern_Builder_Theme_Styles::sanitize( $styles );
 		$skipped = Pattern_Builder_Theme_Styles::missing_paths( $styles, $clean );
+		$states  = self::states_in( $styles );
 		if ( ! $clean ) {
 			return new WP_Error(
 				'pb_variation_no_valid_styles',
@@ -154,7 +188,7 @@ class Pattern_Builder_Block_Style_Variations {
 
 		wp_clean_theme_json_cache();
 
-		return array(
+		$answer = array(
 			'slug'       => $slug,
 			'title'      => $title,
 			'class'      => 'is-style-' . $slug,
@@ -163,6 +197,39 @@ class Pattern_Builder_Block_Style_Variations {
 			'written'    => Pattern_Builder_Theme_Styles::paths( $clean ),
 			'skipped'    => $skipped,
 		);
+
+		if ( $states ) {
+			$answer['note'] = sprintf(
+				/* translators: 1: the state keys given, comma separated, 2: the variation slug, 3: the block names, comma separated. */
+				__( 'A block state (%1$s) cannot live in a styles partial: WordPress reads the partial as a whole-theme styles tree, which has no states, so it was dropped. The state goes in theme.json under styles.blocks.{block}.variations.%2$s — call set-global-styles with { "blocks": { "%3$s": { "variations": { "%2$s": { ":hover": { … } } } } } } now that the variation exists. Only core/button and core/navigation-link take states, and a state set that way stays with this theme rather than travelling with a pattern.', 'pattern-builder' ),
+				implode( ', ', $states ),
+				$slug,
+				implode( '", "', $block_types )
+			);
+		}
+
+		return $answer;
+	}
+
+	/**
+	 * The block-state keys at the top of a styles tree.
+	 *
+	 * A pseudo-selector such as `:hover`, or a custom state such as
+	 * `-current`, which core accepts under a variation's node in theme.json
+	 * and never in a partial.
+	 *
+	 * @param array $styles A variation's `styles` subtree.
+	 * @return string[]
+	 */
+	private static function states_in( $styles ) {
+		$states = array();
+		foreach ( array_keys( (array) $styles ) as $key ) {
+			$key = (string) $key;
+			if ( '' !== $key && ( ':' === $key[0] || '-' === $key[0] ) ) {
+				$states[] = $key;
+			}
+		}
+		return $states;
 	}
 
 	/**

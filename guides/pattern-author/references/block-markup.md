@@ -50,6 +50,12 @@ reports it. Custom values go the same way: `{"style":{"color":{"background":
 The common cause of all three is the same: **the attribute JSON and the HTML
 have to agree.** The table below is that correspondence.
 
+A running site refuses a narrower set on its own — attribute JSON that does
+not parse, a heading or list contradicting its attributes, an unregistered
+block, an unresolved reference, an unfillable slot — because PHP can see
+those. It cannot see any of the three above, which is why the validator is
+not optional.
+
 Two things the validator deliberately stays quiet about, because in both the
 markup is fine and only the check would be wrong:
 
@@ -72,7 +78,7 @@ saved markup is `save()`'s output rather than anything declared, and a list
 here would be wrong within two releases.
 
 **Outside those families, generate the markup instead of writing it** — the
-editor's own `createBlock`/`serialize`, as `SKILL.md` step 4 shows. That is
+editor's own `createBlock`/`serialize`, as `SKILL.md` step 5 shows. That is
 right by construction and right for the version you are targeting. The
 attribute-to-class table below still applies to whatever comes out, because
 block supports are shared across every block that opts into them.
@@ -104,13 +110,19 @@ Custom values go in an inline `style` attribute *as well as* the attribute
 JSON, and the two use different spellings of a preset:
 
 ```html
-<!-- wp:group {"style":{"spacing":{"padding":{"top":"var:preset|spacing|large"}}}} -->
-<div class="wp-block-group" style="padding-top:var(--wp--preset--spacing--large)">
+<!-- wp:group {"style":{"spacing":{"padding":{"top":"var:preset|spacing|50"}}},"layout":{"type":"constrained"}} -->
+<div class="wp-block-group" style="padding-top:var(--wp--preset--spacing--50)"></div>
+<!-- /wp:group -->
 ```
 
-`var:preset|spacing|large` in the JSON, `var(--wp--preset--spacing--large)` in
-the CSS. Writing the CSS form in the JSON, or the JSON form in the CSS,
-produces markup that validates and renders with no spacing.
+`var:preset|spacing|50` in the JSON, `var(--wp--preset--spacing--50)` in the
+CSS. Both mistakes validate, and they fail differently. The JSON form inside
+the CSS (`padding-top:var:preset|spacing|50`) is not CSS, so the browser drops
+the declaration and the block renders with no padding at all. The CSS form
+inside the JSON renders — the saved `style` attribute is what the front end
+prints — but it is not the spelling the editor writes, so the spacing control
+no longer shows the preset as chosen and the value stops following the design
+system in the editor's eyes. Use each spelling in its own place.
 
 ## Structural requirements per block
 
@@ -136,9 +148,12 @@ A column carrying an explicit width needs it in both places:
 A style variation goes on the button:
 `{"className":"is-style-outline"}`.
 
-**image** — `<figure class="wp-block-image">` around the `<img>`. Add size and
-link attributes when relevant (`{"sizeSlug":"large","linkDestination":"none"}`).
-Never invent a `src`; leave a placeholder for the user.
+**image** — `<figure class="wp-block-image">` around the `<img>`. A
+`sizeSlug` obliges a matching class on the figure —
+`{"sizeSlug":"large"}` with `<figure class="wp-block-image size-large">` —
+and without the class the migration drops the attribute outright, which the
+validator reports as DROPPED ATTRIBUTE. Never invent a `src`; find or add the
+file first (`assets.md`) and write the reference the site hands back.
 
 **list / list-item** — `core/list` wraps `<ul class="wp-block-list">`, and each
 item is its own `core/list-item` block. Writing bare `<li>` passes validation
@@ -153,8 +168,12 @@ cover rather than writing one from scratch; it has the most moving parts.
 `wp-block-media-text__content` children, and the grid template in an inline
 style when `mediaWidth` is not 50.
 
-**spacer / separator** — simple, but `spacer` needs its height in both the
-attribute and the inline style.
+**spacer / separator** — nearly simple. A `spacer` needs its height in both
+the attribute and the inline style (`{"height":"2rem"}` with
+`style="height:2rem"`, plus `aria-hidden="true"`). A plain `separator` is
+`<hr class="wp-block-separator has-alpha-channel-opacity"/>` — the second
+class is what the current block writes by default, and a bare
+`wp-block-separator` is an old form.
 
 ## Self-closing blocks
 
@@ -172,19 +191,25 @@ omitting `/` from one that needs it, produces a parse failure.
 ## A worked example
 
 ```html
-<!-- wp:group {"align":"full","style":{"spacing":{"padding":{"top":"var:preset|spacing|x-large","bottom":"var:preset|spacing|x-large"}}},"backgroundColor":"base-2","layout":{"type":"constrained"}} -->
-<div class="wp-block-group alignfull has-base-2-background-color has-background" style="padding-top:var(--wp--preset--spacing--x-large);padding-bottom:var(--wp--preset--spacing--x-large)">
-	<!-- wp:heading {"textAlign":"center","level":2,"fontSize":"xx-large"} -->
+<!-- wp:group {"align":"full","style":{"spacing":{"padding":{"top":"var:preset|spacing|60","bottom":"var:preset|spacing|60"}}},"backgroundColor":"contrast","textColor":"base","layout":{"type":"constrained"}} -->
+<div class="wp-block-group alignfull has-base-color has-contrast-background-color has-text-color has-background" style="padding-top:var(--wp--preset--spacing--60);padding-bottom:var(--wp--preset--spacing--60)">
+	<!-- wp:heading {"level":2,"style":{"typography":{"textAlign":"center"}},"fontSize":"xx-large"} -->
 	<h2 class="wp-block-heading has-text-align-center has-xx-large-font-size">What we do</h2>
 	<!-- /wp:heading -->
 
-	<!-- wp:paragraph {"align":"center","textColor":"contrast-2"} -->
-	<p class="has-text-align-center has-contrast-2-color has-text-color">A sentence that says it plainly.</p>
+	<!-- wp:paragraph {"style":{"typography":{"textAlign":"center"}}} -->
+	<p class="has-text-align-center">A sentence that says it plainly.</p>
 	<!-- /wp:paragraph -->
 </div>
 <!-- /wp:group -->
 ```
 
 Every attribute has its class; every preset appears in both spellings;
-`alignfull` accompanies `"align":"full"`. That correspondence is the whole
-discipline.
+`alignfull` accompanies `"align":"full"`; the alignment is spelled the way the
+current block writes it. And every slug is one `design-system.md` says is safe
+to assume — `base`, `contrast`, the numeric spacing scale, the font-size
+ladder — which is what lets this band land on another theme and take that
+theme's colours. That correspondence is the whole discipline.
+
+The example is checked, not just written: `keeping-current.md` runs the
+validator over every example in these documents at each release.

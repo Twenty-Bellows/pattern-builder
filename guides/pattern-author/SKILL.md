@@ -180,12 +180,16 @@ owns the markup and carries placeholder copy, the page pattern owns the words
 and fills the slots. Read `references/design-content-split.md` before writing
 either; the failure modes there are silent.
 
-Follow the project rather than imposing on it. If existing patterns are
-self-contained, write self-contained patterns — introducing the split unasked
-adds a dependency the project may not want, since `core/pattern`'s `content`
-attribute comes from Pattern Builder or Synced Patterns for Themes, not core.
-Without one of them, WordPress drops the attribute and every page renders
-placeholder copy.
+The split is the default wherever the runtime is present — and every site
+these abilities run on has Pattern Builder, so it is: `core/pattern`'s
+`content` attribute is declared by Pattern Builder and by Synced Patterns for
+Themes on the server and in the editor alike, and slot values persist through
+every save and render exactly as any attribute does. Match a project that
+already layers this way; where a project has no layering and the runtime is
+present, this is the one to introduce, and say so. The one case to weigh is a
+pattern destined for a site with neither plugin, where WordPress drops the
+attribute and every page renders placeholder copy — there, carry the copy
+inline and say why.
 
 ### 4. Factor before you write
 
@@ -245,10 +249,12 @@ out longhand.
 
 Two things bound how far this goes:
 
-- **Pattern Overrides binds only `core/paragraph`, `core/heading`,
-  `core/image` and `core/button`.** A slot must land on one of those four, so
-  boundaries fall where the varying content is text, a heading, an image or a
-  button. You cannot slot "some blocks".
+- **Pattern Overrides binds `core/paragraph`, `core/heading`, `core/image`
+  and `core/button`** — and, from WordPress 6.9, `core/list-item`, since the
+  list of overridable blocks is now the server's and includes it. A slot must
+  land on one of those, so boundaries fall where the varying content is text,
+  a heading, an image, a button or one item of a list. You cannot slot "some
+  blocks".
 - **Don't factor what does not repeat.** A band that appears once on one page
   is a section pattern because it is a named part of the page, not because it
   repeats. A wrapper that appears twice and has no name stays inline.
@@ -275,8 +281,9 @@ these wrong and the block is *invalid*: the editor offers to discard it. The
 validator catches all of these, which is why the validation step is not optional.
 
 **Classes contributed by block supports** — `"backgroundColor":"primary"`
-obliges `has-primary-background-color has-background`; `"align":"center"`
-obliges `has-text-align-center`; `"fontSize":"large"` obliges
+obliges `has-primary-background-color has-background`;
+`"style":{"typography":{"textAlign":"center"}}` obliges
+`has-text-align-center`; `"fontSize":"large"` obliges
 `has-large-font-size`. Get these wrong and the block stays *valid* — and the
 styling simply does not apply. No error anywhere; the pattern just renders
 wrong, usually in a way that looks like a design mistake rather than a bug.
@@ -290,13 +297,20 @@ list of what the validator does and does not see.
 Reference presets by slug, never by value:
 
 - Color: `"backgroundColor":"base"` (slug), or `var(--wp--preset--color--base)` in a style
-- Spacing: `"var:preset|spacing|large"` in attributes, `var(--wp--preset--spacing--large)` in the inline style
+- Spacing: `"var:preset|spacing|50"` in attributes, `var(--wp--preset--spacing--50)` in the inline style
 - Font size: `"fontSize":"large"`, or `var(--wp--preset--font-size--large)`
 
 Note the two spellings. Inside a block's attribute JSON, WordPress uses its
-own `var:preset|spacing|large` shorthand; in the actual CSS of the `style`
-attribute it must be the real custom property. Patterns that get this backwards
-render with no spacing at all.
+own `var:preset|spacing|50` shorthand; in the actual CSS of the `style`
+attribute it must be the real custom property. The shorthand inside the CSS
+is not CSS and renders as no spacing at all; the custom property inside the
+JSON renders, but the editor no longer recognises it as the preset.
+
+Use slugs the destination is likely to have — `base` and `contrast`, the
+numeric spacing steps, the `small`…`xx-large` ladder. `references/design-system.md`
+says which names are safe and why; the short answer is that a slug shared
+with the destination adapts to it and a slug it lacks arrives carrying its
+own value.
 
 **For anything outside the common blocks, do not hand-write it — generate it.**
 `references/block-markup.md` carries the contract for the dozen or so blocks
@@ -332,7 +346,15 @@ way is valid by construction — it is the editor's own output — so this is
 faster and more reliable than writing a draft and iterating on validator
 errors. Validate it anyway: the run is cached and it costs a second.
 
-Two things the serializer will do that you have to allow for:
+Three things the serializer will do that you have to allow for:
+
+- **It keeps `content` on `core/pattern` only because the loader declares
+  it.** The attribute is Pattern Builder's, not core's, and the block library
+  alone would drop it — from `parse()` and from `serialize()` both, silently.
+  `wp-core.mjs` registers it the way the plugin's runtime does before core's
+  blocks register, so a generated reference carries its slot values; a
+  scratch script using plain `@wordpress/blocks` does not, and a reference
+  serialized there comes out with the slots gone. Check the output.
 
 - **It escapes a PHP tag.** A theme asset's reference is
   `<?php echo get_stylesheet_directory_uri() . '…'; ?>`, and passing that as an
@@ -487,9 +509,20 @@ theme slug. Which of the other headers you need follows from the kind —
 `Post Types`, `Template Types`, `Viewport Width` and `Inserter` are the ones
 that appear.
 
+`Categories` names slugs the site has *registered* — core's own (`banner`,
+`call-to-action`, `text`, `featured`, `header`, `footer` and the rest) or the
+theme's, through `register_block_pattern_category()`. A slug nothing
+registered files the pattern under Uncategorized, where nobody looks.
+`list-patterns` reports the categories a running site has; in a theme
+repository, `functions.php` does.
+
 Write the file directly when you have filesystem access. When you're working
 against a running site instead, `pattern-builder/create-pattern` stores
-finished markup — but it stores what you give it, so validate first either way.
+finished markup. It refuses what PHP can see — attribute JSON that does not
+parse, a heading contradicting its level, a block the site lacks, a reference
+to nothing, a slot key naming no slot — and it cannot see block validity, so
+validate first either way. It also enforces the bottom-up order: a pattern
+that references another cannot be stored until that other exists.
 
 ### Placing a page pattern on an actual page
 

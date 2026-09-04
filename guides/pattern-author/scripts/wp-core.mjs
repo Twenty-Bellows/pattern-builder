@@ -52,6 +52,44 @@ const VENDOR_DEPS = {
 };
 
 /**
+ * Declare the `content` attribute on `core/pattern`, as the site does.
+ *
+ * `content` is not core's: Pattern Builder (and Synced Patterns for Themes)
+ * add it — on the server through `register_block_type_args`, in the editor
+ * through this same `blocks.registerBlockType` filter — and it is the whole
+ * design/content split: a page pattern fills a design pattern's Pattern
+ * Overrides slots through it. The scripts loaded here are core's, so without
+ * this the block type has no such attribute, `parse()` silently drops it,
+ * and `createBlock()`/`serialize()` would write a reference with the slot
+ * values gone. The site the pattern is destined for has the attribute; the
+ * check should see what the site sees.
+ *
+ * Mirrors `src/runtime/pattern-content-attribute.js`, minus the list-view
+ * label, which is editor UI.
+ *
+ * @param {Object} settings Block type settings.
+ * @param {string} name     Block type name.
+ * @return {Object} Filtered settings.
+ */
+export function addPatternContentAttribute( settings, name ) {
+	if ( name !== 'core/pattern' ) {
+		return settings;
+	}
+
+	return {
+		...settings,
+		attributes: {
+			...settings.attributes,
+			content: { type: 'object' },
+		},
+		providesContext: {
+			...settings.providesContext,
+			'pattern/overrides': 'content',
+		},
+	};
+}
+
+/**
  * Find a WordPress install.
  *
  * @param {string} [hint] A path to try before searching.
@@ -346,6 +384,13 @@ function bootBlocks( sources, missing ) {
 					: '' )
 		);
 	}
+
+	// Before the core blocks register, so the filter sees core/pattern go by.
+	wp.hooks.addFilter(
+		'blocks.registerBlockType',
+		'pattern-builder/pattern-content-attribute',
+		addPatternContentAttribute
+	);
 
 	wp.blockLibrary.registerCoreBlocks();
 

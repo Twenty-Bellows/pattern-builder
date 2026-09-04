@@ -70,14 +70,17 @@ install rather than anywhere a visitor will see.
 
 Nothing, as files. An agent reaching a site over HTTP cannot see a directory
 inside a plugin, cannot activate a theme, and authors against whatever theme
-happens to be active. These become useful in one of two ways, and both need
-something built on top of them:
+happens to be active. They are useful in two ways:
 
 - **Somebody activates one**, and the site becomes a place to author patterns
   against a known design system — `get-design-system` then answers with
   nothing, and the agent knows it has nothing to lean on.
-- **A preview renders against one without activating it.** `render-pattern`
-  already hands back preview URLs; rendering those against a named theme rather
-  than the active one would let an agent check a pattern in both worlds without
-  touching the site. That is the version that makes these themes worth carrying
-  for a remote agent, and it is not built yet.
+- **A preview renders against one without activating it.** The preview route
+  takes `theme=blank-theme` or `theme=opinionated-theme` (or any installed
+  theme's slug) and wears that theme for the length of one request, carrying
+  the pattern's own presets in where the theme has none — the same
+  never-overwrite rule a download follows. `render-pattern` hands those two
+  URLs back under `preview.themes`, so an agent checks a pattern in both
+  worlds without touching the site. `Pattern_Builder_Preview::wear_theme()`
+  is the swap; `Test_Preview` and `Test_Lab_Themes` are what hold it to the
+  claims above.
