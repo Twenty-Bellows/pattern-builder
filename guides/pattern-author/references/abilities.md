@@ -78,10 +78,11 @@ input and output schema.
 | `pattern-builder/add-design-tokens` | POST | add presets to the design system. `input[tokens]` is a list of `{type, slug, name, value}`; `input[destination]` is `theme` (default) or `user`. Only ever **adds** — a slug already here is skipped |
 | `pattern-builder/set-global-styles` | POST | set what a block looks like before any pattern speaks: `input[styles]` is a theme.json `styles` subtree, `input[destination]` is `theme` (default) or `user`. **Replaces** at each property it names and changes the whole site, so read `get-design-system`'s `styles` first |
 | `pattern-builder/add-block-style-variation` | POST | register a named look a pattern applies with a class: `slug`, `blockTypes`, `styles`, optional `title` and `description`. Answers with the `class` to put on the block |
+| `pattern-builder/set-layout` | POST | set the widths every constrained band measures against: `contentSize`, `wideSize`, `useRootPaddingAwareAlignments`, `input[destination]` `theme` (default) or `user`. **Replaces** what it names |
 | `pattern-builder/find-media` | GET | images the site already has, in the media library and in the theme's `assets/images`, each with the reference to write. Optional `input[search]`, `input[source]=all\|media\|theme`. The answer also carries how to upload a file |
 | `pattern-builder/add-asset` | POST | store an image: `svg` markup you authored (with `filename`), or a `url` for the site to fetch. `destination` is `theme` (default) or `media`. **A file you hold goes to the route below instead** |
 | `pattern-builder/add-placeholder-image` | POST | draw a plain placeholder into the theme: `width`, `height`, optional `label` |
-| `pattern-builder/list-fonts` | GET | font families installable from the collection WordPress ships. Optional `input[search]`, `input[category]` |
+| `pattern-builder/list-fonts` | GET | font families installable from the collection WordPress ships. Optional `input[search]`, `input[category]`; `input[family]` names one and answers with its weights, styles and whether it has a variable face |
 | `pattern-builder/add-font` | POST | install a family and register its preset: `family`, optional `weights`, `styles`, `destination` (`theme` default, or `user`) |
 
 ### The one route that is not an ability
@@ -154,9 +155,9 @@ that is the name your markup has to use.
 a different job, and this is not it — name families the site can already
 serve, or say what needs installing.
 
-### The other two design writes
+### The other three design writes
 
-`add-design-tokens` gives a pattern a vocabulary to *reference*. Two siblings
+`add-design-tokens` gives a pattern a vocabulary to *reference*. Three siblings
 cover the rest of the design system, and `references/design-system.md` is the
 long form.
 
@@ -199,6 +200,26 @@ curl -u "$WP_USER:$WP_APP_PASSWORD" \
 Check `get-design-system`'s `blockStyles` first. A variation with
 `portable: true` is one WordPress itself ships — `is-style-outline` and the
 rest — and hand-rolling what one of those already does is the mistake.
+
+`set-layout` sets the two widths every constrained band measures against —
+`contentSize` for ordinary children, `wideSize` for an `alignwide` one. These
+are *settings* rather than presets or styles, which is why neither of the
+other two can reach them, and they are the quietest thing to get wrong: a
+pattern built against a 46rem measure on a site set to 800px does not fail,
+it just wraps somewhere else, and the only alternative is restating the width
+on every band in the markup.
+
+```bash
+curl -u "$WP_USER:$WP_APP_PASSWORD" \
+  -H 'Content-Type: application/json' \
+  -d '{"input":{"contentSize":"46rem","wideSize":"80rem"}}' \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/set-layout/run"
+```
+
+It also carries `useRootPaddingAwareAlignments`. Turn that on **before** giving
+the root a left/right padding in `set-global-styles`: without it the padding
+sits on the body, and every `alignfull` band is inset by it instead of reaching
+the edges of the window.
 
 **Neither accepts raw CSS.** WordPress does not sanitize a theme.json `css`
 property; it gates it on the `edit_css` capability instead, because a string

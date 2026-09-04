@@ -139,6 +139,20 @@ class Pattern_File_Store {
 			);
 		}
 
+		/*
+		 * A theme pattern's name is what everything else refers to it by, and
+		 * WordPress reads it from the file's `Slug:` header, so a bare name
+		 * registers as `hero` while every `core/pattern` reference written
+		 * against the documented `{theme}/hero` resolves to nothing — silently,
+		 * because an unresolved reference renders as nothing rather than as an
+		 * error. Namespacing here rather than at each caller is what keeps the
+		 * name a caller passes and the name WordPress registers the same.
+		 */
+		$pattern->name = self::namespaced_name( $pattern->name );
+		if ( 'theme' === $pattern->source ) {
+			$pattern->id = $pattern->name;
+		}
+
 		// Import images unless explicitly disabled.
 		if ( ! isset( $options['import_images'] ) || true === $options['import_images'] ) {
 			$pattern = $this->import_pattern_image_assets( $pattern );
@@ -183,11 +197,7 @@ class Pattern_File_Store {
 			);
 		}
 
-		// Theme patterns are namespaced with the theme slug.
-		if ( false === strpos( $pattern->name, '/' ) ) {
-			$pattern->name = get_stylesheet() . '/' . $pattern->name;
-		}
-
+		$pattern->name     = self::namespaced_name( $pattern->name );
 		$pattern->source   = 'theme';
 		$pattern->id       = $pattern->name;
 		$pattern->filePath = null;
@@ -327,6 +337,26 @@ class Pattern_File_Store {
 			__( 'Pattern file not found.', 'pattern-builder' ),
 			array( 'status' => 404 )
 		);
+	}
+
+	/**
+	 * A theme pattern's fully namespaced name.
+	 *
+	 * A name that already carries a namespace is left alone — that covers the
+	 * theme's own `{theme}/hero` and a cloud pattern's permanent
+	 * `{handle}/{collection}/{slug}`, neither of which may be rewritten.
+	 *
+	 * @param string $name Pattern name, namespaced or bare.
+	 * @return string
+	 */
+	public static function namespaced_name( $name ) {
+		$name = (string) $name;
+
+		if ( '' === $name || false !== strpos( $name, '/' ) ) {
+			return $name;
+		}
+
+		return get_stylesheet() . '/' . $name;
 	}
 
 	/**
