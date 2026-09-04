@@ -103,6 +103,31 @@ Compare against what the document says is required. A block that has changed
 what `save()` writes is rare, but when it happens the documented shape becomes
 INVALID rather than merely stale, so it is worth the minute.
 
+### 3b. Whether the documents' own examples still pass
+
+The examples in these guides are markup, and markup goes stale the same way
+a pattern does. Pull every fenced block that carries a `<!-- wp:` out of the
+documents and run the validator over it — which is how the worked example in
+`block-markup.md` was once found carrying a deprecated alignment spelling on
+the same page that said the spelling had moved:
+
+```bash
+python3 - <<'EOF'
+import re, glob, os
+out = '/tmp/guide-examples'; os.makedirs(out, exist_ok=True)
+for f in glob.glob('guides/**/*.md', recursive=True):
+    for i, m in enumerate(re.finditer(r'```(html|php)\n(.*?)```', open(f).read(), re.S)):
+        if '<!-- wp:' in m.group(2):
+            open(f'{out}/{os.path.basename(f)[:-3]}-{i}.{m.group(1)}', 'w').write(m.group(2))
+EOF
+node guides/pattern-author/scripts/validate-pattern.mjs --wp /path/to/wordpress /tmp/guide-examples/*
+```
+
+A fragment written to illustrate one line (an unclosed group, a `…`) reports
+as INVALID and is fine; anything else the validator names is a claim in the
+prose that the block library no longer agrees with. Fix the example and the
+sentence beside it together.
+
 ### 4. Run the evals
 
 `evals/evals.json` carries three prompt-level cases that exercise the skill end

@@ -104,18 +104,23 @@ it is a diff.
 
 ## The constraint that decides where a boundary can fall
 
-**Pattern Overrides binds only four blocks:** `core/paragraph`,
-`core/heading`, `core/image` and `core/button`.
+**Pattern Overrides binds a short list of blocks:** `core/paragraph`,
+`core/heading`, `core/image` and `core/button`, and from WordPress 6.9
+`core/list-item` as well — the list is the server's
+(`get_block_bindings_supported_attributes()`), the runtime that fills slots
+reads it, and the editor offers *Enable overrides* on exactly those blocks.
 
-So a slot must land on one of those. You cannot slot "some blocks", a list, a
-group, or a table. This is not a limitation to work around — it is the thing
-that tells you where the boundary goes. The menu item decomposes cleanly
+So a slot must land on one of those. You cannot slot "some blocks", a whole
+list, a group, or a table. This is not a limitation to work around — it is the
+thing that tells you where the boundary goes. The menu item decomposes cleanly
 because its varying parts are three paragraphs and an image. A card whose
 varying part is *a different arrangement of blocks* is not one pattern with a
 slot; it is two patterns.
 
-When the varying content is a list of things, the answer is another level: the
-list becomes a section that references N elements, not a slot holding a list.
+When the varying content is a list of things whose *length* varies, the answer
+is another level: the list becomes a section that references N elements, not
+a slot holding a list. A list whose length is fixed and whose items vary can
+slot each `core/list-item` on a site new enough to bind it.
 
 `references/design-content-split.md` has the slot mechanics — the `metadata`
 block, the binding, and the silent failures.
@@ -157,7 +162,12 @@ Three things about that reference:
   by core. Without one of them WordPress drops the attribute silently and every
   reference renders the element's placeholder copy.
 
-The element must be **synced** (`Synced: yes`) for its slots to be fillable.
+The element should be **synced** (`Synced: yes`). The slots fill either way —
+the runtime renders any `core/pattern` that carries `content` — but only a
+synced reference *stays* a reference: the editor expands a reference to an
+unsynced pattern into a copy the moment it opens the page, and from then on a
+change to the element no longer reaches it. Synced is what makes "one file per
+component" true.
 
 ## When not to factor
 

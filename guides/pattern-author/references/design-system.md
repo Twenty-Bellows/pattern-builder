@@ -416,6 +416,19 @@ describes shape and not behaviour:
   (`:hover`, `:focus`, `:visited` and the rest), and nothing anywhere accepts
   `::before` or `::after`. A design that draws a rule or a leader with a
   pseudo-element has to be rebuilt from real blocks.
+- **A partial cannot carry a block state.** `core/button` and
+  `core/navigation-link` accept `:hover`, `:focus`, `:focus-visible` and
+  `:active` under their variation node in theme.json — but core reads a
+  `styles/*.json` partial through the whole-theme schema before it files the
+  styles under that node, and a whole-theme tree has no states, so a `:hover`
+  written in the partial is dropped on read with nothing said.
+  `add-block-style-variation` reports it as skipped and says where it goes:
+  `set-global-styles` with
+  `{"blocks":{"core/button":{"variations":{"<slug>":{":hover":{…}}}}}}`,
+  after the variation exists. A state set that way styles this theme's
+  buttons and does not travel with a pattern — the cloud carries the partial
+  and nothing else — so a design whose hover states matter should say so when
+  it ships.
 - **Core's flow layout beats a variation on margins.** A container with a block
   gap emits `> * { margin-block-end: 0 }` at the same specificity as a block
   style variation's rule, and wins on source order. So a variation's
@@ -483,9 +496,18 @@ plugin for exactly this:
   style variation of its own. A pattern that references the right slugs looks
   *different but correct*. A pattern that hard-codes looks wrong.
 
-```
-GET /pattern-builder/v1/preview?pattern=my-theme/hero&context=page&theme=blank-theme
-GET /pattern-builder/v1/preview?pattern=my-theme/hero&context=page&theme=opinionated-theme
+`render-pattern` hands both URLs back under `preview.themes`, so there is
+nothing to compose:
+
+```json
+"preview": {
+  "standalone": "…/pattern-builder/v1/preview?pattern=my-theme%2Fhero&context=standalone",
+  "page":       "…/pattern-builder/v1/preview?pattern=my-theme%2Fhero&context=page",
+  "themes": {
+    "blank-theme":       "…&context=page&theme=blank-theme",
+    "opinionated-theme": "…&context=page&theme=opinionated-theme"
+  }
+}
 ```
 
 A pattern that renders correctly in both travels. One that renders correctly in

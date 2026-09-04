@@ -168,11 +168,14 @@ attribute alone renders in the theme's default face, silently.
 
 `add-font` installs from the collection only, deliberately: every family in
 Google Fonts is open-licensed, and fetching a font file from an arbitrary URL
-is a licensing decision that is not an agent's to make. To self-host
-something you have bought, put the files in the theme's `assets/fonts/` (the
-asset route above, or directly) and register the preset yourself — the
-`fontFace` `src` uses `file:./assets/fonts/name.woff2`, which WordPress
-rewrites into a theme URI.
+is a licensing decision that is not an agent's to make. Nothing over the wire
+takes a font file either — the asset route accepts images, and
+`add-design-tokens` writes a `fontFamily` as a stack of names with no
+`fontFace`. So a licensed font is a job for somebody with the files and the
+theme: put them in `assets/fonts/`, and add the `fontFamily` preset to
+`theme.json` by hand with a `fontFace` whose `src` is
+`file:./assets/fonts/name.woff2`, which WordPress rewrites into a theme URI.
+Say so rather than substituting a look-alike from the collection unasked.
 
 ## Order of work
 

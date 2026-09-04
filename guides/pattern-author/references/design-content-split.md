@@ -50,10 +50,13 @@ with a `name` (the slot's key) and a `__default` binding:
 ```
 
 `__default` binds every overridable attribute of that block at once — for a
-heading or paragraph that is `content`; for an image, `url` and `alt`; for a
-button, `text` and `url`. Slot names are the keys a page pattern will use, so
-name them for what they hold (`question`, `headline`, `cta`), not for their
-block type.
+heading, paragraph or list item that is `content`; for an image, `id`, `url`,
+`title` and `alt` (and `caption` from WordPress 6.9); for a button, `url`,
+`text`, `linkTarget` and `rel`. The list is core's own,
+`get_block_bindings_supported_attributes()`, and the runtime reads it rather
+than carrying a copy. Slot names are the keys a page pattern will use, so name
+them for what they hold (`question`, `headline`, `cta`), not for their block
+type.
 
 Placeholder copy should be realistic and the right length. It is what shows in
 the inserter preview, and it is what ships if a page forgets to fill the slot.
@@ -73,8 +76,8 @@ The shape of each value depends on what is bound:
 
 | Bound block | Value shape |
 |---|---|
-| heading, paragraph | `{"content":"…"}` |
-| image | `{"url":"…","alt":"…"}` |
+| heading, paragraph, list item | `{"content":"…"}` |
+| image | `{"url":"…","alt":"…"}` — `id` too when the file is a media library attachment |
 | button | `{"text":"…","url":"…"}` |
 
 A `wp:pattern` block is **self-closing** — `/-->`, no closing comment.
@@ -103,6 +106,12 @@ it, and the entire section renders as nothing at all — a page with a hole in i
 So after writing either half, re-read the JSON by eye, and check that every key
 in a page pattern's `content` matches a `metadata.name` in the design pattern
 it references. Copy the names across rather than retyping them.
+
+Storing through `pattern-builder/create-pattern` catches all three: it
+refuses attribute JSON that does not parse, a `content` key that names no
+slot in the referenced pattern (and says which slots it has), a binding with
+no `metadata.name`, and a binding on a block core cannot bind. Writing files
+by hand, `scripts/check-slots.php` is the equivalent check, by rendering.
 
 ## Static copy in a design pattern
 

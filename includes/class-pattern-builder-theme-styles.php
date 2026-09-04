@@ -132,6 +132,22 @@ class Pattern_Builder_Theme_Styles {
 	 * @return array|WP_Error
 	 */
 	public static function sanitize( $styles ) {
+		/*
+		 * A `styles.blocks.{block}.variations.{slug}` node is kept only while
+		 * `{slug}` is in the block style registry, and a variation this theme
+		 * defines as a `styles/*.json` partial is registered lazily — by
+		 * `WP_Theme_JSON_Resolver::get_theme_data()`, the first time something
+		 * asks for the theme's data. Nothing may have asked yet in this
+		 * request, in which case the node would be dropped and reported as
+		 * unrecognised for a variation that plainly exists. This is also the
+		 * one way to give a variation a block *state*: a partial is read as a
+		 * whole-theme styles tree, which has no `:hover`, so a button
+		 * variation's hover colour lives here and nowhere else.
+		 */
+		if ( self::names_a_variation( $styles ) && class_exists( '\WP_Theme_JSON_Resolver' ) ) {
+			\WP_Theme_JSON_Resolver::get_theme_data();
+		}
+
 		$theme_json = new WP_Theme_JSON(
 			array(
 				'version' => WP_Theme_JSON::LATEST_SCHEMA,
@@ -143,6 +159,24 @@ class Pattern_Builder_Theme_Styles {
 		$raw = $theme_json->get_raw_data();
 
 		return isset( $raw['styles'] ) && is_array( $raw['styles'] ) ? $raw['styles'] : array();
+	}
+
+	/**
+	 * Whether a styles tree reaches into a block style variation.
+	 *
+	 * @param array $styles A theme.json `styles` subtree.
+	 * @return bool
+	 */
+	private static function names_a_variation( $styles ) {
+		if ( empty( $styles['blocks'] ) || ! is_array( $styles['blocks'] ) ) {
+			return false;
+		}
+		foreach ( $styles['blocks'] as $block ) {
+			if ( is_array( $block ) && ! empty( $block['variations'] ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
