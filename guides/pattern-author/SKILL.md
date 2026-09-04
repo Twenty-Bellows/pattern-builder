@@ -1,6 +1,6 @@
 ---
 name: pattern-author
-description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page, and also when turning a screenshot, a description, or a competitor's page into WordPress blocks. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme.
+description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 ---
 
 # Authoring block patterns
@@ -491,6 +491,27 @@ Write the file directly when you have filesystem access. When you're working
 against a running site instead, `pattern-builder/create-pattern` stores
 finished markup — but it stores what you give it, so validate first either way.
 
+### Placing a page pattern on an actual page
+
+A page pattern is not a page — it is what WordPress *offers* when somebody
+creates one. To make it a page yourself, create the page with a single
+reference as its content:
+
+```bash
+curl -u "$WP_USER:$WP_APP_PASSWORD" -H 'Content-Type: application/json' \
+  -d '{"title":"About","slug":"about","status":"publish",
+       "content":"<!-- wp:pattern {\"slug\":\"my-theme/page-about\"} /-->"}' \
+  "$WP_URL/?rest_route=/wp/v2/pages"
+```
+
+**To look at a pattern you do not need a page at all.**
+`pattern-builder/render-pattern` returns a `page` URL that renders it inside
+the resolved page template using a stand-in post primed into the object cache
+for one request and never written — which is also the only way to see whether
+an `alignfull` band escapes the content width. Create a real page only when
+the page is the deliverable, and if you do create anything to look at
+something, remove it again and say so if you could not.
+
 ## Composing patterns from other patterns
 
 A pattern references another with `core/pattern`:
@@ -526,6 +547,11 @@ composition; `references/design-content-split.md` covers the slots.
 Read the structure before the pixels: how many bands, how each is aligned,
 where the rhythm changes. Then map each band to a block — a full-width group,
 a `core/columns`, a `core/media-text`, a `core/cover`.
+
+For a whole page or a whole site rather than one section, load the
+`design-reproduction` skill — it covers reading the design system out of the
+source, what fidelity an image can honestly support, and how to check the
+result.
 
 Then factor it (step 4) before writing a line. A screenshot is the strongest
 invitation there is to transcribe rather than build, because everything in it
@@ -598,6 +624,7 @@ renders as no styling at all, silently.
 - `references/design-system.md` — the three layers a pattern leans on: the tokens it references, the styles it inherits, the block style variations it applies, and which names travel
 - `references/block-markup.md` — the attribute-to-markup contract per block, and the mistakes that produce invalid markup
 - `references/composition.md` — factoring a design into elements, sections and pages, and how patterns reference patterns
+- The `design-reproduction` skill — rebuilding a design that already exists (a site, a Figma file, a screenshot): classifying how faithfully it can be read, extracting its design system, and verifying the result
 - `references/design-content-split.md` — Pattern Overrides slots, `core/pattern` `content`, synced patterns, and the silent failures
 - `references/assets.md` — images and fonts: finding what the site has, adding what it lacks, and the reference to write for each
 - `references/keeping-current.md` — how to bring these guides up to a new WordPress release, and what to re-check

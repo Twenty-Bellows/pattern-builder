@@ -702,7 +702,7 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'guides', $index );
 		$names = wp_list_pluck( $index['guides'], 'name' );
 
-		foreach ( array( 'authoring', 'pattern-kinds', 'block-vocabulary', 'block-markup', 'design-content-split', 'assets', 'keeping-current', 'abilities' ) as $expected ) {
+		foreach ( array( 'authoring', 'pattern-kinds', 'block-vocabulary', 'block-markup', 'composition', 'design-content-split', 'assets', 'keeping-current', 'abilities', 'reproduction', 'reading-a-source', 'verifying' ) as $expected ) {
 			$this->assertContains( $expected, $names, $expected . ' is missing from the index.' );
 		}
 
@@ -722,22 +722,89 @@ class Test_Abilities extends WP_UnitTestCase {
 	 * directory, was named in the References list, and was never registered.
 	 */
 	public function test_every_guide_the_index_points_at_can_be_served() {
-		$authoring = $this->abilities->execute_authoring_guide( array( 'guide' => 'authoring' ) );
-		$names     = wp_list_pluck( $this->abilities->execute_authoring_guide()['guides'], 'name' );
+		$names = wp_list_pluck( $this->abilities->execute_authoring_guide()['guides'], 'name' );
 
-		$this->assertGreaterThan(
-			0,
-			preg_match_all( '#references/([a-z-]+)\.md#', $authoring['content'], $matches ),
-			'The index names no other guides, which cannot be right.'
-		);
+		// Both skills, since each carries references of its own and a
+		// dangling one costs the same either way.
+		foreach ( array( 'authoring', 'reproduction' ) as $skill ) {
+			$content = $this->abilities->execute_authoring_guide( array( 'guide' => $skill ) )['content'];
 
-		foreach ( array_unique( $matches[1] ) as $referenced ) {
-			$this->assertContains(
-				$referenced,
-				$names,
-				'The authoring guide points at references/' . $referenced . '.md, which get-authoring-guide cannot serve. Add it to guide_files().'
+			$this->assertGreaterThan(
+				0,
+				preg_match_all( '#references/([a-z-]+)\.md#', $content, $matches ),
+				'The ' . $skill . ' guide names no other guides, which cannot be right.'
 			);
+
+			foreach ( array_unique( $matches[1] ) as $referenced ) {
+				$this->assertContains(
+					$referenced,
+					$names,
+					'The ' . $skill . ' guide points at references/' . $referenced . '.md, which get-authoring-guide cannot serve. Add it to guide_files().'
+				);
+			}
 		}
+	}
+
+	/**
+	 * Two of the documents are whole skills and the other twelve are their
+	 * references, which a flat index gives no sign of. An agent handed
+	 * fourteen titles and no shape opens the first one, and the first one is
+	 * the wrong one for half the jobs that arrive.
+	 */
+	public function test_the_index_says_where_to_start() {
+		$index = $this->abilities->execute_authoring_guide();
+
+		$this->assertArrayHasKey( 'start', $index );
+		$this->assertCount( 2, $index['start'] );
+
+		$names = wp_list_pluck( $index['guides'], 'name' );
+		foreach ( $index['start'] as $entry ) {
+			$this->assertContains( $entry['guide'], $names, $entry['guide'] . ' is offered as a starting point but cannot be served.' );
+			$this->assertNotEmpty( $entry['when'], $entry['guide'] . ' says nothing about when to read it.' );
+		}
+
+		$this->assertSame( array( 'authoring', 'reproduction' ), wp_list_pluck( $index['start'], 'guide' ) );
+	}
+
+	/**
+	 * And every other document has to say which of the two it belongs to,
+	 * or the index is still a flat list.
+	 */
+	public function test_every_guide_names_its_skill() {
+		$index = $this->abilities->execute_authoring_guide();
+
+		$skills = array();
+		foreach ( $index['guides'] as $guide ) {
+			$this->assertNotEmpty( $guide['skill'], $guide['name'] . ' belongs to no skill.' );
+			$skills[ $guide['name'] ] = $guide['skill'];
+		}
+
+		$this->assertSame( 'pattern-author', $skills['authoring'] );
+		$this->assertSame( 'pattern-author', $skills['block-markup'] );
+		$this->assertSame( 'design-reproduction', $skills['reproduction'] );
+		$this->assertSame( 'design-reproduction', $skills['reading-a-source'] );
+		$this->assertSame( 'design-reproduction', $skills['verifying'] );
+	}
+
+	/**
+	 * The reproduction skill's whole first step is deciding whether the
+	 * source's values can be read or must be inferred, because that answer
+	 * decides both how exact the result may claim to be and whether it can
+	 * be checked at the end. A version of this guide that lost that step
+	 * would still read like advice about copying a design.
+	 */
+	public function test_the_reproduction_guide_classifies_its_source() {
+		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'reproduction' ) );
+
+		$this->assertSame( 'markdown', $guide['format'] );
+		$this->assertStringStartsNotWith( '---', $guide['content'] );
+
+		foreach ( array( 'inferred', 'readable', 'Figma', 'screenshot' ) as $expected ) {
+			$this->assertStringContainsString( $expected, $guide['content'], 'The reproduction guide never mentions ' . $expected . '.' );
+		}
+
+		// It builds on the authoring skill rather than restating it.
+		$this->assertStringContainsString( 'pattern-author', $guide['content'] );
 	}
 
 	/**

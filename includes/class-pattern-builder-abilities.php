@@ -774,7 +774,7 @@ class Pattern_Builder_Abilities {
 	 * @return string
 	 */
 	private function guide_dir() {
-		return plugin_dir_path( PATTERN_BUILDER_FILE ) . 'guides/pattern-author/';
+		return plugin_dir_path( PATTERN_BUILDER_FILE ) . 'guides/';
 	}
 
 	/**
@@ -784,16 +784,28 @@ class Pattern_Builder_Abilities {
 	 */
 	private function guide_files() {
 		return array(
-			'authoring'            => 'SKILL.md',
-			'pattern-kinds'        => 'references/pattern-kinds.md',
-			'block-vocabulary'     => 'references/block-vocabulary.md',
-			'block-markup'         => 'references/block-markup.md',
-			'design-system'        => 'references/design-system.md',
-			'composition'          => 'references/composition.md',
-			'design-content-split' => 'references/design-content-split.md',
-			'assets'               => 'references/assets.md',
-			'keeping-current'      => 'references/keeping-current.md',
-			'abilities'            => 'references/abilities.md',
+			// Authoring a pattern: what the plugin ships for everyday work.
+			'authoring'            => 'pattern-author/SKILL.md',
+			'pattern-kinds'        => 'pattern-author/references/pattern-kinds.md',
+			'block-vocabulary'     => 'pattern-author/references/block-vocabulary.md',
+			'block-markup'         => 'pattern-author/references/block-markup.md',
+			'design-system'        => 'pattern-author/references/design-system.md',
+			'composition'          => 'pattern-author/references/composition.md',
+			'design-content-split' => 'pattern-author/references/design-content-split.md',
+			'assets'               => 'pattern-author/references/assets.md',
+			'keeping-current'      => 'pattern-author/references/keeping-current.md',
+			'abilities'            => 'pattern-author/references/abilities.md',
+
+			/*
+			 * Reproducing a design that already exists. A different job with a
+			 * different posture — the values come from somewhere else and the
+			 * question is how faithfully they can be read — so it is its own
+			 * skill rather than a branch of the one above, which it builds on
+			 * rather than repeats.
+			 */
+			'reproduction'         => 'design-reproduction/SKILL.md',
+			'reading-a-source'     => 'design-reproduction/references/reading-a-source.md',
+			'verifying'            => 'design-reproduction/references/verifying.md',
 		);
 	}
 
@@ -823,6 +835,10 @@ class Pattern_Builder_Abilities {
 			$guides[ $name ] = array(
 				'title'   => $this->guide_title( $text, $name ),
 				'content' => $text,
+				// Which skill this document belongs to, from where it lives.
+				// A guide a theme supplies belongs to neither and says so by
+				// carrying no skill at all.
+				'skill'   => strtok( $relative, '/' ),
 			);
 		}
 
@@ -867,6 +883,7 @@ class Pattern_Builder_Abilities {
 					? $guide['title']
 					: $this->guide_title( $guide['content'], $key ),
 				'content' => $guide['content'],
+				'skill'   => isset( $guide['skill'] ) && is_string( $guide['skill'] ) ? $guide['skill'] : '',
 			);
 		}
 
@@ -890,6 +907,7 @@ class Pattern_Builder_Abilities {
 					'name'  => $name,
 					'title' => $guide['title'],
 					'words' => str_word_count( wp_strip_all_tags( $guide['content'] ) ),
+					'skill' => isset( $guide['skill'] ) ? $guide['skill'] : '',
 				);
 			}
 
@@ -899,6 +917,27 @@ class Pattern_Builder_Abilities {
 				'name'     => 'index',
 				// Say what this is for, since an index alone does not.
 				'content'  => __( 'Agent-facing instructions for writing WordPress block patterns. Request one by name with input[guide], or "all" for everything. Install the Markdown wherever your harness reads instructions from.', 'pattern-builder' ),
+
+				/*
+				 * Two of these documents are whole skills and the rest are
+				 * their references, which a flat list of fourteen titles
+				 * gives no sign of. Which one an agent opens with is decided
+				 * by the job rather than by the subject, so the index says
+				 * what each job is instead of leaving it to be inferred from
+				 * the names.
+				 */
+				'start'    => array(
+					array(
+						'guide' => 'authoring',
+						'skill' => 'pattern-author',
+						'when'  => __( 'Writing a pattern. Read this one either way: it owns the block vocabulary, the markup contract, the factor step and the validation this site cannot do for you.', 'pattern-builder' ),
+					),
+					array(
+						'guide' => 'reproduction',
+						'skill' => 'design-reproduction',
+						'when'  => __( 'The design already exists somewhere else and the job is to copy it — a live site, a Figma file, a screenshot, a PDF, a mockup. Read it alongside the one above, not instead of it.', 'pattern-builder' ),
+					),
+				),
 
 				/*
 				 * An agent that goes straight to create-pattern never reads a
@@ -1169,14 +1208,26 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
+	 * Where the validator and its loader live.
+	 *
+	 * Under `pattern-author` rather than under the guide root, which now
+	 * covers more than one skill: the validator is that skill's tool.
+	 *
+	 * @return string
+	 */
+	private function script_dir() {
+		return $this->guide_dir() . 'pattern-author/scripts/';
+	}
+
+	/**
 	 * Read one of the shipped scripts.
 	 *
-	 * @param string $name File name under the guide's scripts directory.
+	 * @param string $name File name under the scripts directory.
 	 * @return string|null Null when it is not there.
 	 */
 	private function read_script( $name ) {
-		$root = realpath( $this->guide_dir() . 'scripts' );
-		$path = realpath( $this->guide_dir() . 'scripts/' . $name );
+		$root = realpath( rtrim( $this->script_dir(), '/' ) );
+		$path = realpath( $this->script_dir() . $name );
 
 		// Nothing here takes a name from a caller, but keep the read inside
 		// the plugin regardless.
