@@ -182,9 +182,11 @@ than one cut too coarse.
 - **A whole page's worth of genuinely one-off copy** — an about page's three
   paragraphs are content. They belong in a section pattern's markup, or in the
   page pattern that fills a section's slots.
-- **When the project doesn't do this.** If the existing patterns in a theme are
-  self-contained, introducing references adds a dependency the project may not
-  want. Follow the house style; say what you would have done instead.
+- **When the pattern is bound for a site with neither runtime.** References
+  and `content` need Pattern Builder or Synced Patterns for Themes at the far
+  end; every site these abilities run on has one, and the service requires
+  one, so this is rare — but a pattern handed to a plain site should carry
+  its copy inline. Say what you would have factored otherwise.
 
 ## The two questions to finish on
 

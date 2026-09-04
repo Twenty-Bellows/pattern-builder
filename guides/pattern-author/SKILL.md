@@ -180,12 +180,16 @@ owns the markup and carries placeholder copy, the page pattern owns the words
 and fills the slots. Read `references/design-content-split.md` before writing
 either; the failure modes there are silent.
 
-Follow the project rather than imposing on it. If existing patterns are
-self-contained, write self-contained patterns — introducing the split unasked
-adds a dependency the project may not want, since `core/pattern`'s `content`
-attribute comes from Pattern Builder or Synced Patterns for Themes, not core.
-Without one of them, WordPress drops the attribute and every page renders
-placeholder copy.
+The split is the default wherever the runtime is present — and every site
+these abilities run on has Pattern Builder, so it is: `core/pattern`'s
+`content` attribute is declared by Pattern Builder and by Synced Patterns for
+Themes on the server and in the editor alike, and slot values persist through
+every save and render exactly as any attribute does. Match a project that
+already layers this way; where a project has no layering and the runtime is
+present, this is the one to introduce, and say so. The one case to weigh is a
+pattern destined for a site with neither plugin, where WordPress drops the
+attribute and every page renders placeholder copy — there, carry the copy
+inline and say why.
 
 ### 4. Factor before you write
 
@@ -342,7 +346,15 @@ way is valid by construction — it is the editor's own output — so this is
 faster and more reliable than writing a draft and iterating on validator
 errors. Validate it anyway: the run is cached and it costs a second.
 
-Two things the serializer will do that you have to allow for:
+Three things the serializer will do that you have to allow for:
+
+- **It keeps `content` on `core/pattern` only because the loader declares
+  it.** The attribute is Pattern Builder's, not core's, and the block library
+  alone would drop it — from `parse()` and from `serialize()` both, silently.
+  `wp-core.mjs` registers it the way the plugin's runtime does before core's
+  blocks register, so a generated reference carries its slot values; a
+  scratch script using plain `@wordpress/blocks` does not, and a reference
+  serialized there comes out with the slots gone. Check the output.
 
 - **It escapes a PHP tag.** A theme asset's reference is
   `<?php echo get_stylesheet_directory_uri() . '…'; ?>`, and passing that as an
