@@ -33,6 +33,7 @@
 /src
 /svn
 /tests
+/tools
 /vendor
 /webpack.config.js
 *.zip
