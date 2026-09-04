@@ -32,6 +32,31 @@ were a Pattern Overrides slot, the slot is simply gone, and the page that
 fills it ships the design pattern's placeholder copy as though it were real
 copy.
 
+## Order of operations
+
+Each scale contains the ones before it — a site is pages, a page is patterns,
+a pattern is markup. Working out of order is recoverable but expensive: every
+step settles values the steps after it reference, so a late change to an early
+one re-opens everything downstream.
+
+**One pattern:** orient → establish the vocabulary → decide the kind → factor →
+write → validate → place.
+
+**A page:** the design system first, then *elements*, then the *sections* that
+reference them, then the *page* that references those. Build bottom-up, because
+a section cannot be written until the elements it references exist by name.
+
+**A whole site:** settle the design system in this order — **layout** (the
+widths every band measures against) → **tokens** (the presets markup
+references) → **styles** (what a block looks like before a pattern speaks) →
+**block style variations** (named looks applied with a class). Then the
+patterns, bottom-up as above, then the pages that place them.
+
+Layout comes first because it is the one thing every band's markup has to
+agree with: settle it late and every pattern written before it has the wrong
+measure baked in. Tokens come before styles because a style references a
+preset by slug and a slug that does not resolve renders as nothing.
+
 ## Workflow
 
 ### 1. Orient before writing
@@ -162,7 +187,76 @@ attribute comes from Pattern Builder or Synced Patterns for Themes, not core.
 Without one of them, WordPress drops the attribute and every page renders
 placeholder copy.
 
-### 4. Write the markup
+### 4. Factor before you write
+
+This is the step whose absence produces the most wasted work, and skipping it
+does not look like a mistake — it looks like a finished page.
+
+A pattern's value is exactly its reusability. Markup that spells out one
+business's 146 menu items is that business's *content* wearing a pattern's
+clothes: nobody else installs it, and changing the design of a menu item means
+146 edits. The fix is not "write less markup"; it is to find the parts that
+repeat and make each one a pattern the others reference.
+
+So before writing anything, produce an **inventory**. Not a mental note — a
+table, because a step with an artifact is a step you can see was skipped:
+
+| shape | occurrences | leaves that differ | name | level |
+|---|---|---|---|---|
+| `group > columns > [image, group > [row > [p, p], p]]` | 146 | name, price, description, image | menu item | element |
+| `group > [rule, heading, p, group > columns…]` | 24 | heading, blurb | menu section | section |
+
+Three tests fill it in, and only the middle one needs judgement.
+
+**1. What repeats?** Reduce the markup you are about to write to a *shape* —
+the tree of block names and attributes with all text, URLs and IDs stripped.
+Any shape occurring more than once is a candidate. This is mechanical: if you
+are about to write the same subtree twice, you have found one.
+
+Where the design comes from an existing page, the repetition is already in
+front of you. Be especially alert to the output of a loop — a menu, a product
+grid, a card deck. A page that renders the same subtree fifty times was built
+from a template, and a template is what you are supposed to be writing.
+
+**2. Does it have a name?** A candidate becomes a pattern when you can name it
+with a domain noun phrase — *menu item*, *dish card*, *testimonial*, *hours
+row*. If the only name available is structural — *the group wrapper*, *the
+two-column row* — it is markup, not a pattern. This is the test that stops the
+first one shattering a page into confetti.
+
+**3. What are the slots?** Given N occurrences of one shape, the slots are
+exactly the leaves whose content differs between them. Name differs → slot.
+Price differs → slot. The wrapper's padding is identical everywhere → not a
+slot. You compute this rather than decide it.
+
+Then place each row at its level:
+
+| Level | What it is | What it contains |
+|---|---|---|
+| **Element** | the smallest named repeated thing | markup, with slots |
+| **Section** | a full-width band | a heading and *references to elements* |
+| **Page** | the whole page | *references to sections* |
+
+**A pattern at any level may reference patterns below it, and the nesting is
+not limited to one hop.** A page references sections; a section references
+elements; a section may reference other sections. The failure to avoid is
+stopping after one level — bands as patterns, everything inside them written
+out longhand.
+
+Two things bound how far this goes:
+
+- **Pattern Overrides binds only `core/paragraph`, `core/heading`,
+  `core/image` and `core/button`.** A slot must land on one of those four, so
+  boundaries fall where the varying content is text, a heading, an image or a
+  button. You cannot slot "some blocks".
+- **Don't factor what does not repeat.** A band that appears once on one page
+  is a section pattern because it is a named part of the page, not because it
+  repeats. A wrapper that appears twice and has no name stays inline.
+
+`references/composition.md` has the worked example, the mechanics of
+references and slots together, and where this goes wrong.
+
+### 5. Write the markup
 
 Block markup is HTML comments wrapping HTML:
 
@@ -257,7 +351,7 @@ Write real placeholder copy, not lorem ipsum. Copy of a plausible length is
 what tells you the layout works, and in a design pattern the placeholder is
 what shows in the inserter preview.
 
-### 5. Validate — every time, before placing the file
+### 6. Validate — every time, before placing the file
 
 This is the step that makes the difference, and it cannot be done by reading
 the markup or by looking at the front end.
@@ -369,7 +463,7 @@ If the pattern uses Pattern Overrides slots, also check the split rules in
 `references/design-content-split.md` — block validation cannot see those
 mistakes at all, because malformed attributes leave a *valid* block behind.
 
-### 6. Place it
+### 7. Place it
 
 A theme pattern is a PHP file in the theme's `patterns/` directory with a
 header comment:
@@ -399,28 +493,46 @@ finished markup — but it stores what you give it, so validate first either way
 
 ## Composing patterns from other patterns
 
-A pattern can reference another with `core/pattern`:
+A pattern references another with `core/pattern`:
 
 ```html
 <!-- wp:pattern {"slug":"my-theme/section-intro"} /-->
 ```
 
-Reach for this when a piece of design genuinely repeats — a section heading
-treatment, a card, a masthead — and you want one place to change it. Don't
-reach for it to avoid typing; a reference costs indirection, and a pattern
-assembled from six references nobody can read is worse than one that repeats a
-group wrapper twice.
+This is the normal way to build anything above the smallest scale, not an
+optimisation to apply afterwards. A page is references to its sections; a
+section is a heading and references to its elements. Step 4 is where you work
+out what those are.
 
-Two things to know. A referenced pattern must be registered on the site the
+The cost of a reference is one hop of indirection. The cost of *not* using one
+is a copy — and every copy is a place the design has to be changed again, a
+pattern nobody else can reuse, and markup an editor has to load. Where a part
+repeats and has a name, the reference is cheaper. Where it does neither, write
+it inline.
+
+Two mechanics to know. A referenced pattern must be registered on the site the
 pattern renders on, so a pattern that references others cannot travel alone —
-it needs its dependencies installed too. And a `wp:pattern` block is
+it needs its dependencies installed too, and **an unresolved reference renders
+as nothing at all**, with no error anywhere. And a `wp:pattern` block is
 self-closing (`/-->`), which is easy to get wrong.
+
+To fill a referenced pattern's slots, `core/pattern` takes a `content`
+attribute — that is the design/content split, and it needs Pattern Builder or
+Synced Patterns for Themes to resolve. `references/composition.md` covers the
+composition; `references/design-content-split.md` covers the slots.
 
 ## Turning a screenshot into a pattern
 
 Read the structure before the pixels: how many bands, how each is aligned,
 where the rhythm changes. Then map each band to a block — a full-width group,
 a `core/columns`, a `core/media-text`, a `core/cover`.
+
+Then factor it (step 4) before writing a line. A screenshot is the strongest
+invitation there is to transcribe rather than build, because everything in it
+is already spelled out — the six cards, the twelve rows, the forty menu items
+are all *there*, and copying them out feels like progress. Count the repeats
+first and name them; what you write afterwards is one card and a reference to
+it, not six cards.
 
 Match the screenshot to the theme's tokens rather than sampling its colors.
 The point is a pattern that belongs to *this* design system, so pick the
@@ -485,6 +597,7 @@ renders as no styling at all, silently.
 - `references/block-vocabulary.md` — which blocks are allowed where (core-only vs theme vs plugin), the core vocabulary by purpose, and composition guidance
 - `references/design-system.md` — the three layers a pattern leans on: the tokens it references, the styles it inherits, the block style variations it applies, and which names travel
 - `references/block-markup.md` — the attribute-to-markup contract per block, and the mistakes that produce invalid markup
+- `references/composition.md` — factoring a design into elements, sections and pages, and how patterns reference patterns
 - `references/design-content-split.md` — Pattern Overrides slots, `core/pattern` `content`, synced patterns, and the silent failures
 - `references/assets.md` — images and fonts: finding what the site has, adding what it lacks, and the reference to write for each
 - `references/keeping-current.md` — how to bring these guides up to a new WordPress release, and what to re-check

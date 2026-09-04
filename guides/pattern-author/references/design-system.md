@@ -1,18 +1,20 @@
-# The design system: tokens, styles and variations
+# The design system: layout, tokens, styles and variations
 
-A pattern is markup that leans on the site around it, and there are exactly
-three layers it can lean on. They are easy to confuse and they behave
-completely differently, so it is worth being precise about which is which:
+A pattern is markup that leans on the site around it. Three layers carry design
+decisions, and one setting decides the measure everything is drawn against.
+The three are easy to confuse and behave completely differently, so it is worth
+being precise about which is which:
 
 | | What it is | The question it answers |
 |---|---|---|
-| **Token** | A named value — `base`, `spacing|40`, `large` | *What is the site's blue?* |
+| **Token** | A named value — `base`, `spacing\|40`, `large` | *What is the site's blue?* |
 | **Style** | What a block looks like before any pattern speaks — the root font size, the heading face, the link colour, `elements.button` | *What does an unstyled heading look like here?* |
 | **Variation** | A named look applied with a class — `is-style-outline` | *How do I ask for a second kind of button?* |
 
 A pattern **references** a token, **inherits** a style, and **applies** a
 variation. `get-design-system` returns all three: `palette`/`spacing`/
-`fontSizes`/`fontFamilies`, then `styles`, then `blockStyles`.
+`fontSizes`/`fontFamilies`, then `styles`, then `blockStyles` — and `layout`,
+which is none of the three but decides how wide every band ends up.
 
 Miss any of them and the failure looks identical and is equally silent: the
 block renders with no styling at all, no error anywhere, and it reads as a
@@ -125,18 +127,43 @@ face**, and if it does, install it with `add-font`, which registers the preset
 and returns the slug. A pattern that sets no font family inherits the site's,
 which is almost always what you want.
 
-### Layout: assume about 620px, or set it
+### Layout: the site's widths are defaults, and a block may override them
 
-The default themes sit between 620px and 650px of content width, and 1200px to
-1340px wide. A pattern that needs more should declare its own `contentSize` on
-its outermost group rather than assume the theme is generous.
+`settings.layout.contentSize` is the max-width a constrained block gives its
+ordinary children; `wideSize` is what an `.alignwide` child gets. The default
+themes sit between 620px and 650px of content, and 1200px to 1340px wide.
 
-When the design is yours to set, set it once with **`set-layout`** instead —
-`contentSize` and `wideSize` are settings rather than presets or styles, so
-neither `add-design-tokens` nor `set-global-styles` reaches them, and a site
-left on the wrong measure makes every band restate its own width. This is the
-quietest thing in the whole design system to get wrong: nothing errors, the
-copy simply wraps somewhere else than it did in the design you were copying.
+**These are defaults, and any constrained block can override them for itself**
+by carrying its own `layout` in its attributes:
+
+```html
+<!-- wp:group {"layout":{"type":"constrained","contentSize":"38rem"}} -->
+```
+
+Core reads the block's own layout first and falls back to the global custom
+property only when the block says nothing (`block-supports/layout.php`, where
+`$used_layout = $block['attrs']['layout'] ?? $fallback_layout` and the max-width
+falls through to `var(--wp--style--global--content-size, none)`). When a block
+does override, core emits a per-block `wp-container-core-…-is-layout-{hash}`
+class carrying the value.
+
+`styles.spacing.blockGap` works the same way: it sets the site's default gap,
+and a block's own `style.spacing.blockGap` overrides it for that block's
+children.
+
+**This matters most when reproducing a design.** `get-design-system` tells you
+the site's defaults. It does not tell you where the design you are copying
+overrode them — that lives in the *block attributes* of the markup, so read
+those. If all you have is a rendered page, the overrides are exactly the
+generated `wp-container-…-is-layout-…` rules in its inline CSS; grep those
+before concluding the site's settings are what the page uses.
+
+A pattern that needs a different measure should declare its own `contentSize`
+on the group that needs it. When the whole design is yours to set, set the
+site's default once with **`set-layout`** — `contentSize` and `wideSize` are
+*settings* rather than presets or styles, so neither `add-design-tokens` nor
+`set-global-styles` reaches them. Do it before writing patterns: settle it late
+and every band written beforehand has the wrong measure baked into its markup.
 
 `set-layout` also carries `useRootPaddingAwareAlignments`. Turn it on before
 giving the root a left/right padding, or every `alignfull` band is inset by
@@ -349,6 +376,57 @@ read it.
 
 ---
 
+## What theme.json can express: read the schema, don't guess
+
+WordPress publishes the **official JSON Schema** for `theme.json`, and it is
+the authoritative answer to "is there a property for this?" — better than
+memory, better than reading core:
+
+```
+https://schemas.wp.org/trunk/theme.json          # the development version
+https://schemas.wp.org/wp/6.8/theme.json         # pinned to a release
+https://schemas.wp.org/wp/7.1/theme.json
+```
+
+Pin the version to the site you are writing for. You already know it:
+`pattern-builder/get-editor-scripts` reports it as `wordpress`. Reach for the
+schema whenever you are about to assume a property exists, and again whenever
+something you wrote did not take — a property theme.json does not have is
+dropped silently, which reads as a style that had no effect.
+
+The two facts most often guessed wrong, both confirmed there:
+
+- **`styles.dimensions`** is `aspectRatio`, `height`, `minHeight`, `minWidth`
+  and `width`. So a fixed-size decorative element — a 3rem rule under a
+  heading — *can* be a block style variation and travel with the pattern.
+- **There is no `max-width` in `styles` at all.** The only max-width in the
+  system is `settings.layout.contentSize` / `wideSize`. To cap a paragraph's
+  measure you wrap it in a constrained group with its own `contentSize`; there
+  is no property to set on the paragraph.
+
+### What the schema cannot tell you
+
+Three things verified by testing rather than by reading, because the schema
+describes shape and not behaviour:
+
+- **A block style variation may carry `elements`.** `styles.blocks.{block}.variations.{name}.elements.link` is valid, which is
+  how a variation inverts link colours on a dark band — something no element
+  style can do, because there is only one `elements.link` per site.
+- **There are no pseudo-*elements*.** Elements accept pseudo-*classes*
+  (`:hover`, `:focus`, `:visited` and the rest), and nothing anywhere accepts
+  `::before` or `::after`. A design that draws a rule or a leader with a
+  pseudo-element has to be rebuilt from real blocks.
+- **Core's flow layout beats a variation on margins.** A container with a block
+  gap emits `> * { margin-block-end: 0 }` at the same specificity as a block
+  style variation's rule, and wins on source order. So a variation's
+  `spacing.margin` is unreliable inside a flow container: put the *look* in the
+  variation and the *contextual spacing* in the block's own attributes, where
+  an inline style beats both.
+
+Also not expressible at all, so don't design around them: `list-style`,
+`object-fit` (use the block's own `scale` attribute), `display`, `flex`,
+transforms and transitions.
+
 # The rules, in short
 
 1. **Colours** — `base` and `contrast` freely, the tier-2 roles by agreement;
@@ -363,16 +441,19 @@ read it.
    serves one fixed file per weight, cut at the family's default optical size —
    and a design leaning on a variable axis will set wider or narrower than the
    original with nothing to say why.
-5. **Layout** — assume ~620px of content; declare your own if you need more,
-   or set the site's with `set-layout` when the design is yours to set.
-6. **Whatever you reference must exist on the site you are writing on.** A slug
+5. **Layout** — the site's widths are defaults; a block may override them on
+   its own `layout` attribute. Set the site's with `set-layout` when the design
+   is yours, and do it before writing patterns.
+6. **Check the schema before assuming a property exists** —
+   `https://schemas.wp.org/wp/{version}/theme.json`.
+7. **Whatever you reference must exist on the site you are writing on.** A slug
    that does not resolve renders as no styling at all, with no error anywhere,
    and ships no value — so the pattern arrives broken as well.
-7. **Read `styles` and set only what they do not cover.** What the site styles,
+8. **Read `styles` and set only what they do not cover.** What the site styles,
    the pattern inherits; restating it is how a pattern stops adapting.
-8. **A second kind of anything is a variation, not a pile of attributes.**
-9. **Write styles only when the design is yours to set** — recreating a design
-   or establishing one, not when writing a pattern for somebody's site.
+9. **A second kind of anything is a variation, not a pile of attributes.**
+10. **Write styles only when the design is yours to set** — recreating a design
+    or establishing one, not when writing a pattern for somebody's site.
 
 ## The one case where the evidence above *is* a breakage map
 

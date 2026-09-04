@@ -789,6 +789,7 @@ class Pattern_Builder_Abilities {
 			'block-vocabulary'     => 'references/block-vocabulary.md',
 			'block-markup'         => 'references/block-markup.md',
 			'design-system'        => 'references/design-system.md',
+			'composition'          => 'references/composition.md',
 			'design-content-split' => 'references/design-content-split.md',
 			'assets'               => 'references/assets.md',
 			'keeping-current'      => 'references/keeping-current.md',
