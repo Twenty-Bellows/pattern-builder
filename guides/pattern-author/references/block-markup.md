@@ -1,113 +1,106 @@
-# Block markup: the contract between attributes and HTML
+# Block markup: what nothing else can tell you
 
-Every block is an HTML comment carrying JSON attributes, wrapping the HTML
-that block's `save()` would produce. Validity means those two agree — and when
-they disagree, WordPress usually does not say so. It has three different ways
-of not saying so, which is what the first section is about.
+Three different sources answer questions about block markup, and they own
+disjoint slices. Going to the wrong one is how a pattern ends up wrong in a way
+no check reports.
 
-## Three ways a pattern is wrong
+| Question | Ask | In this document? |
+|---|---|---|
+| What markup does this block write? | Run `save()` — `createBlock`/`serialize`, or the validator | Fallback only |
+| What attributes exist? Types, enums, defaults, supports, context? | `list-block-types` | **No.** Ask the site |
+| What goes *inside* `layout`, `style`, `metadata`? What strings does `contentPosition` accept? | Nothing. Anywhere. | **Yes — this is the subject** |
 
-Tested directly against `@wordpress/blocks` with the core library registered —
-the same code the editor runs. `scripts/validate-pattern.mjs` reports all
-three, and only the first is the one people know about.
+The middle row is a call, not a memory:
 
-**INVALID** — no version of this block ever wrote markup like this. The editor
-says "unexpected or invalid content" the moment it opens the pattern.
+```bash
+curl -u "$WP_USER:$WP_APP_PASSWORD" -G \
+  --data-urlencode 'input[blocks][]=core/cover' \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/list-block-types/run"
+```
 
-- heading with `"level":2` but an `<h3>` tag
-- `group` missing `class="wp-block-group"`
-- `button` with no `<a>` inside
-- `column` missing `class="wp-block-column"`, or a width with no `flex-basis`
-- `"align":"full"` with no `alignfull`
-- a block comment never closed, or attribute JSON that does not parse
-- a block this site does not have (reported as `core/missing`)
+That returns the **post-registration** schema — every attribute including the
+ones block supports inject, with enums where they exist, plus `supports`,
+`usesContext` and whether the block is dynamic. It is current for the
+WordPress you are talking to and cannot go stale. Never take an attribute list
+from a document, this one included.
 
-**OLD FORM** — this matches a *deprecated* version of the block. Blocks carry
-their old `save()` implementations for backward compatibility (`core/paragraph`
-has six), and the parser tries every one. When an old version matches, the
-editor opens the pattern without a murmur and quietly migrates it — so it never
-looks broken *there*. But the front end renders the file, and the file is
-missing what the block writes today:
+## What the schema does not say
 
-- `"backgroundColor":"primary"` with no `has-primary-background-color`
-- `"textColor":"accent"` with no `has-accent-color has-text-color`
-- `"fontSize":"large"` with no `has-large-font-size`
-- `"align":"center"` with no `has-text-align-center`
-- `heading` with no `wp-block-heading`
-- `<li>` written directly instead of a `list-item` block
+Across 116 registered blocks, 1,190 attributes are fully described by their
+schema. The gap is small, it is on almost every block, and both known
+pattern-authoring disasters landed in it.
 
-Every one of those renders unstyled. It reads as a design mistake rather than a
-bug, which is why it survives review.
+### Opaque objects
 
-**DROPPED ATTRIBUTE** — the same migration, one step worse. `migrate()` treats
-the *markup* as authoritative, so it can throw away an attribute you wrote.
-A heading with `{"level":2,"fontSize":"xx-large"}` whose tag carries no
-`has-xx-large-font-size` comes back with no `fontSize` at all — the size is
-simply gone, the block is perfectly self-consistent afterwards, and nothing
-reports it. Custom values go the same way: `{"style":{"color":{"background":
-"#eeeeee"}}}` with no inline `style` attribute loses the whole `style` object.
+Four attribute names come back as `{"type":"object"}` with no interior:
+`lock` and `metadata` on all 116 blocks, `style` on 109, `layout` on 24.
 
-The common cause of all three is the same: **the attribute JSON and the HTML
-have to agree.** The table below is that correspondence.
+**`layout.type` is a closed set of four.** Nothing validates it — not
+`parse()`, not `validateBlock()`, not `createBlock()`, not the server:
 
-A running site refuses a narrower set on its own — attribute JSON that does
-not parse, a heading or list contradicting its attributes, an unregistered
-block, an unresolved reference, an unfillable slot — because PHP can see
-those. It cannot see any of the three above, which is why the validator is
-not optional.
-
-Two things the validator deliberately stays quiet about, because in both the
-markup is fine and only the check would be wrong:
-
-- **An attribute core relocated.** Block library 10.5 moved text alignment out
-  of a paragraph's `align` and a heading's `textAlign` and into a typography
-  support, migrating the value to `style.typography.textAlign`. The key is gone
-  and the setting is intact, so that is not a dropped attribute.
-- **A block with Pattern Overrides bindings.** A bound block takes its content
-  from the binding source at render rather than from the file, and core
-  reserves room in the saved markup for that value — so the file and a save
-  computed from the file's own attributes are not comparable. Slots are checked
-  by rendering them instead; see `design-content-split.md`.
-
-## What this document covers
-
-The contract below is for the blocks patterns are mostly built from — the ten
-families in "Structural requirements per block". It is deliberately not a
-catalogue of every core block: WordPress ships new ones every release, their
-saved markup is `save()`'s output rather than anything declared, and a list
-here would be wrong within two releases.
-
-**Outside those families, generate the markup instead of writing it** — the
-editor's own `createBlock`/`serialize`, as `SKILL.md` step 5 shows. That is
-right by construction and right for the version you are targeting. The
-attribute-to-class table below still applies to whatever comes out, because
-block supports are shared across every block that opts into them.
-
-## Attribute to class
-
-| Attribute | Class the markup must carry |
+| Want | Write |
 |---|---|
-| `"backgroundColor":"x"` | `has-x-background-color has-background` |
-| `"textColor":"x"` | `has-x-color has-text-color` |
-| `"gradient":"x"` | `has-x-gradient-background has-background` |
-| `"fontSize":"x"` | `has-x-font-size` |
-| `"fontFamily":"x"` | `has-x-font-family` |
-| `"style":{"typography":{"textAlign":"center"}}` on text blocks | `has-text-align-center` |
-| `"align":"wide"` on containers | `alignwide` |
-| `"align":"full"` on containers | `alignfull` |
-| `"style":{"color":{"background":"…"}}` | `has-background` + an inline `style` |
-| `"className":"is-style-x"` | `is-style-x` |
+| content width | `{"layout":{"type":"constrained"}}` |
+| plain vertical flow | `{"layout":{"type":"default"}}` |
+| a row | `{"layout":{"type":"flex"}}` |
+| a grid | `{"layout":{"type":"grid"}}` |
 
-Text alignment is the row that has already moved once, and the move is
-complete: on a current install `core/heading` has no `textAlign` attribute at
-all, and `{"align":"center"}` on a `core/paragraph` serializes with no
-`has-text-align-center` class. Both now carry it under
-`style.typography.textAlign`. The older spellings are what the "attribute core
-relocated" exemption below is about — the validator will not report them, so
-this table is the only thing that will.
+Those four names and no others. `flow`, `row`, `stack` and `columns` all
+*look* right — `flow` most of all, since it is Gutenberg's own filename for the
+default layout — and every one of them parses, serializes and validates clean,
+then **crashes the editor**: core resolves the name with a `.find()` over a
+private registry and calls a method on the `undefined` it gets back
+("Cannot read properties of undefined (reading `getAlignments`)"). The saved
+markup is byte-identical either way, which is why no save-side check can see
+it.
+
+The other `layout` properties, and the values each accepts:
+
+| Property | Layout types | Values |
+|---|---|---|
+| `contentSize`, `wideSize` | constrained | any CSS length |
+| `orientation` | flex | `horizontal` (default), `vertical` |
+| `justifyContent` | flex | `left`, `center`, `right`, `space-between` |
+| `flexWrap` | flex | `wrap` (default), `nowrap` |
+| `verticalAlignment` | flex | `top`, `center`, `bottom` |
+| `columnCount`, `minimumColumnWidth` | grid | a number; a CSS length |
+| `columnSpan`, `rowSpan` | grid (on a child) | a number |
+
+**`style`** is a theme.json-shaped subtree: `color.{background,text,gradient}`,
+`spacing.{padding,margin,blockGap}`, `typography.{fontSize,fontStyle,
+fontWeight,letterSpacing,lineHeight,textAlign,textDecoration,textTransform}`,
+`border.{color,radius,style,width}`, `dimensions.minHeight`,
+`elements.link.color.text`. Preset references inside it use the `var:preset|…`
+spelling — see "Two spellings" below.
+
+**`metadata`** carries `name` (the label a Pattern Overrides slot binds to),
+`bindings`, `categories` and `patternName`. `design-content-split.md` owns it.
+
+**`lock`** is `{"move":bool,"remove":bool}`.
+
+### Strings with an unstated vocabulary
+
+Declared `{"type":"string"}` with no enum, but only certain values do anything:
+
+| Attribute | On | Values |
+|---|---|---|
+| `contentPosition` | `core/cover` | nine pairs: `{top\|center\|bottom} {left\|center\|right}`, e.g. `"top left"`, `"center center"` |
+| `verticalAlignment` | `core/columns`, `core/column`, `core/media-text` | `top`, `center`, `bottom` — plus `stretch` on a column |
+| `mediaPosition` | `core/media-text` | `left` (default), `right` |
+
+A wrong value here does not crash and does not warn — the class core would
+have emitted simply never appears, and the block renders in its default
+position. That is the failure that reads as a design mistake.
+
+> Every value in the two sections above was extracted from the running
+> WordPress, not written from memory, and `test-abilities.php` re-checks them
+> against the install the test suite runs on. A vocabulary that drifts fails a
+> test rather than misleading a reader.
+
+## Two spellings of a preset
 
 Custom values go in an inline `style` attribute *as well as* the attribute
-JSON, and the two use different spellings of a preset:
+JSON, and the two spell a preset differently:
 
 ```html
 <!-- wp:group {"style":{"spacing":{"padding":{"top":"var:preset|spacing|50"}}},"layout":{"type":"constrained"}} -->
@@ -117,76 +110,102 @@ JSON, and the two use different spellings of a preset:
 
 `var:preset|spacing|50` in the JSON, `var(--wp--preset--spacing--50)` in the
 CSS. Both mistakes validate, and they fail differently. The JSON form inside
-the CSS (`padding-top:var:preset|spacing|50`) is not CSS, so the browser drops
-the declaration and the block renders with no padding at all. The CSS form
-inside the JSON renders — the saved `style` attribute is what the front end
-prints — but it is not the spelling the editor writes, so the spacing control
-no longer shows the preset as chosen and the value stops following the design
-system in the editor's eyes. Use each spelling in its own place.
+the CSS is not CSS, so the browser drops the declaration and the block renders
+with no padding at all. The CSS form inside the JSON renders — the saved
+`style` attribute is what the front end prints — but it is not the spelling the
+editor writes, so the control no longer shows the preset as chosen and the
+value stops following the design system in the editor's eyes.
 
-## Structural requirements per block
+## How the validator reports a mismatch
 
-These are the ones `save()` writes, so getting them wrong is a hard failure.
+`scripts/validate-pattern.mjs` runs the real `save()` and reports three things.
+Only the first is the one people expect.
 
-**heading** — the tag must match `level` (`{"level":3}` → `<h3>`). Include
-`class="wp-block-heading"`; it is not enforced but the editor writes it and
-themes style it.
+**INVALID** — no version of this block ever wrote markup like this. The editor
+says "unexpected or invalid content" the moment it opens the pattern. A heading
+whose tag contradicts its `level`; a group missing `wp-block-group`; a button
+with no `<a>`; `"align":"full"` with no `alignfull`; attribute JSON that does
+not parse; a block this site does not have (`core/missing`).
 
-**paragraph** — `<p>`, no required class.
+**OLD FORM** — this matches a *deprecated* save. Blocks keep their old
+implementations (`core/paragraph` has six) and the parser tries every one, so
+the editor opens the pattern without a murmur and migrates it. But the file on
+disk is missing what the block writes today — nearly always a supports class,
+so the styling silently does not apply on the front end.
 
-**group** — `class="wp-block-group"` required. The layout lives in attributes:
-`{"layout":{"type":"constrained"}}` for content-width, `"default"` for flow,
-`{"type":"flex"}` for a row.
+**DROPPED ATTRIBUTE** — the same migration, one step worse: it treats the
+*markup* as authoritative, so it throws away an attribute you wrote. A heading
+with `{"level":2,"fontSize":"xx-large"}` whose tag carries no
+`has-xx-large-font-size` comes back with no `fontSize` at all, perfectly
+self-consistent, with nothing reporting it.
 
-**columns / column** — `wp-block-columns` and `wp-block-column` both required.
-A column carrying an explicit width needs it in both places:
-`{"width":"33.33%"}` and `style="flex-basis:33.33%"`.
+Two things it stays deliberately quiet about, because the markup is fine and
+only the check would be wrong:
 
-**buttons / button** — `<div class="wp-block-buttons">` containing
-`<div class="wp-block-button">` containing
-`<a class="wp-block-button__link wp-element-button">`. The anchor is required.
-A style variation goes on the button:
-`{"className":"is-style-outline"}`.
+- **An attribute core relocated.** Block library 10.5 moved text alignment out
+  of a paragraph's `align` and a heading's `textAlign` into a typography
+  support, migrating the value to `style.typography.textAlign`. The key is gone
+  and the setting is intact.
+- **A block with Pattern Overrides bindings.** Its content comes from the
+  binding source at render, so the file and a save computed from the file's own
+  attributes are not comparable. Check slots by rendering
+  (`design-content-split.md`).
 
-**image** — `<figure class="wp-block-image">` around the `<img>`. A
-`sizeSlug` obliges a matching class on the figure —
-`{"sizeSlug":"large"}` with `<figure class="wp-block-image size-large">` —
-and without the class the migration drops the attribute outright, which the
-validator reports as DROPPED ATTRIBUTE. Never invent a `src`; find or add the
-file first (`assets.md`) and write the reference the site hands back.
+A running site refuses a narrower set on its own — unparseable attribute JSON,
+a heading contradicting its attributes, an unregistered block, an unresolved
+reference, an unfillable slot. It cannot see any of the three above.
 
-**list / list-item** — `core/list` wraps `<ul class="wp-block-list">`, and each
-item is its own `core/list-item` block. Writing bare `<li>` passes validation
-and then behaves oddly in the editor, because the list block expects inner
-blocks.
+## Fallback: the save() contract by hand
 
-**cover** — `wp-block-cover` on the figure/div, with the span for the overlay
-and `wp-block-cover__inner-container` around the content. Copy an existing
-cover rather than writing one from scratch; it has the most moving parts.
+**Generate the markup and none of this matters** — `createBlock`/`serialize`
+gets every class right by construction, for the version you are targeting.
+What follows is for reading markup you did not generate, for debugging a
+validator report, and for when you cannot run Node. It is *derivable*: anything
+here can be confirmed by serializing the block and looking.
 
-**media-text** — `wp-block-media-text` with `wp-block-media-text__media` and
-`wp-block-media-text__content` children, and the grid template in an inline
-style when `mediaWidth` is not 50.
+| Attribute | Class the markup must carry |
+|---|---|
+| `"backgroundColor":"x"` | `has-x-background-color has-background` |
+| `"textColor":"x"` | `has-x-color has-text-color` |
+| `"gradient":"x"` | `has-x-gradient-background has-background` |
+| `"fontSize":"x"` | `has-x-font-size` |
+| `"fontFamily":"x"` | `has-x-font-family` |
+| `"style":{"typography":{"textAlign":"center"}}` on text blocks | `has-text-align-center` |
+| `"align":"wide"` / `"align":"full"` on containers | `alignwide` / `alignfull` |
+| `"style":{"color":{"background":"…"}}` | `has-background` + an inline `style` |
+| `"className":"is-style-x"` | `is-style-x` |
 
-**spacer / separator** — nearly simple. A `spacer` needs its height in both
-the attribute and the inline style (`{"height":"2rem"}` with
-`style="height:2rem"`, plus `aria-hidden="true"`). A plain `separator` is
-`<hr class="wp-block-separator has-alpha-channel-opacity"/>` — the second
-class is what the current block writes by default, and a bare
-`wp-block-separator` is an old form.
+Structure, for the families patterns are mostly built from:
 
-## Self-closing blocks
+- **heading** — tag matches `level`; include `wp-block-heading`.
+- **group** — `wp-block-group` required.
+- **columns / column** — both classes required; an explicit width needs
+  `{"width":"33.33%"}` *and* `style="flex-basis:33.33%"`.
+- **buttons / button** — `wp-block-buttons` > `wp-block-button` >
+  `<a class="wp-block-button__link wp-element-button">`. The anchor is required.
+- **image** — `<figure class="wp-block-image">` around the `<img>`; a
+  `sizeSlug` obliges the matching `size-*` class or the migration drops it.
+  Never invent a `src` (`assets.md`).
+- **list / list-item** — each item is its own `core/list-item` block; bare
+  `<li>` passes validation and then behaves oddly in the editor.
+- **cover** — `wp-block-cover`, the overlay span, and
+  `wp-block-cover__inner-container` around the content. The most moving parts
+  of any of these; generate it.
+- **media-text** — `wp-block-media-text` with `__media` and `__content`
+  children, and the grid template inline when `mediaWidth` is not 50.
+- **spacer / separator** — a spacer needs its height in both the attribute and
+  the inline style, plus `aria-hidden="true"`. A plain separator is
+  `<hr class="wp-block-separator has-alpha-channel-opacity"/>`; a bare
+  `wp-block-separator` is an old form.
 
-A block with no inner HTML closes itself and must not have a closing comment:
+**Self-closing blocks.** A block with no saved inner HTML takes `/-->` and must
+have no closing comment — `core/pattern`, `core/post-content`,
+`core/site-title` and other dynamic blocks. `list-block-types` reports
+`dynamic` per block. Getting it wrong is a parse failure.
 
 ```html
 <!-- wp:pattern {"slug":"my-theme/header"} /-->
-<!-- wp:spacer {"height":"2rem"} -->…<!-- /wp:spacer -->
 ```
-
-`core/pattern`, `core/post-content`, `core/site-title` and other dynamic blocks
-with no saved markup take the `/-->` form. Adding a closing comment to one, or
-omitting `/` from one that needs it, produces a parse failure.
 
 ## A worked example
 
@@ -205,11 +224,10 @@ omitting `/` from one that needs it, produces a parse failure.
 ```
 
 Every attribute has its class; every preset appears in both spellings;
-`alignfull` accompanies `"align":"full"`; the alignment is spelled the way the
-current block writes it. And every slug is one `design-system.md` says is safe
-to assume — `base`, `contrast`, the numeric spacing scale, the font-size
-ladder — which is what lets this band land on another theme and take that
-theme's colours. That correspondence is the whole discipline.
+`alignfull` accompanies `"align":"full"`; `layout.type` is one of the four. And
+every slug is one `design-system.md` says is safe to assume — `base`,
+`contrast`, the numeric spacing scale, the font-size ladder — which is what
+lets this band land on another theme and take that theme's colours.
 
 The example is checked, not just written: `keeping-current.md` runs the
 validator over every example in these documents at each release.

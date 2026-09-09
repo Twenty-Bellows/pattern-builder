@@ -7,9 +7,18 @@ padding against `0.9rem/1.6rem`, a 24px block gap against 20px, and the layout
 widths. None of them look wrong on their own. All four are obvious the moment
 you compare numbers.
 
-What you can do depends on the source class from `SKILL.md` step 1.
+A fifth, from a later rebuild, is the reason the compare list below has a
+second row: a hero centred that the source left-aligned. It survived because
+the check compared type and colour, and every size, weight and colour in that
+band was right.
 
-## Readable source: diff, do not look
+**This document is for a readable source and a whole rebuild** — the one case
+where a real ground truth exists and the comparison is worth its time. Against
+an inferred source there is nothing to diff, and `SKILL.md` step 7 says what to
+do instead. For a single pattern, generation and the validator already give you
+what a browser would.
+
+## Diff, do not look
 
 ### First, the design systems
 
@@ -35,11 +44,19 @@ Load both at the same width and compare *computed* style per element, matched
 on the text, which is identical by construction when you are reproducing.
 Compare at least:
 
-`font-size` · `font-family` · `font-weight` · `line-height` ·
-`letter-spacing` · `text-transform` · `text-decoration` · `color` ·
-the nearest painted background
+*Type and colour* — `font-size` · `font-family` · `font-weight` ·
+`line-height` · `letter-spacing` · `text-transform` · `text-decoration` ·
+`color` · the nearest painted background
 
-Two details that decide whether the comparison is any good:
+*The box* — `text-align` · `flex-direction` · `justify-content` ·
+`align-items` · the element's content-box width · `margin-inline` · `padding`
+
+The second row is not optional and is the one most often left out, because a
+type-and-colour diff produces a clean report on a page whose every band is
+centred where the source was left-aligned. Nothing in the first row can see
+that: the sizes, the weights and the colours are all correct.
+
+Three details that decide whether the comparison is any good:
 
 - **Compare every occurrence of a string, not the first.** The same words
   appear on bands with different grounds; taking one hides the others. A link
@@ -47,6 +64,11 @@ Two details that decide whether the comparison is any good:
 - **Take the nearest *painted* ancestor for the background**, not the
   element's own, or everything reads `transparent` and the check means
   nothing.
+- **Compare band boxes as well as text elements.** Each band's painted
+  background against the viewport is where `alignfull` versus a constrained
+  group shows up, and a diff matched on text runs straight past it — the words
+  inside a full-width band and inside a constrained one can sit at identical
+  coordinates.
 
 Then look at where the two documents drift apart vertically. Report only where
 the running offset *changes* — that is where a band grew or shrank, rather
@@ -58,29 +80,14 @@ Page height within a percent or so, and no element differing on any compared
 property. State both. "617 strings, zero differences, heights within 0.5%" is
 a claim somebody can check; "it matches" is not.
 
-## Inferred source: you cannot diff, so declare
-
-There is no ground truth. The source is a picture; the rendered result is a
-picture; comparing them is the weak check this document exists to replace, and
-here it is the only one available. So the rigour moves from measuring to
-disclosing.
-
-1. **Compare at the viewport you measured at**, and say which that was. A
-   screenshot measured at 1400px says nothing about 900px.
-2. **List what you inferred and could not confirm** — the font, every
-   line-height, whether any size is fluid, every spacing step, anything behind
-   an interaction.
-3. **Do not call it a match.** The honest sentence is: *"Consistent with the
-   design at 1400px, with the font identified as X and these values inferred:
-   …"* Anything stronger is a claim the source cannot support.
-
-An inferred reproduction is finished when the person who has the original has
-looked at the list, not when it looks right to you.
-
-## Things worth checking whatever the source
+## Things worth checking
 
 - **Every band's width.** The most common single error, because the site's
   measure and a block's own override are two different numbers.
+- **Alignment, on the elements that are not the widest.** Check the short
+  paragraph and the button row against the headline, not the headline against
+  the margin — a near-full-width line looks the same centred or left-aligned,
+  so it is the only element in the band that cannot answer the question.
 - **Buttons.** Padding and line-height are set by an element style most
   designs override and most reproductions forget.
 - **Link decoration**, in both directions — an underline you added, and one
@@ -90,12 +97,3 @@ looked at the list, not when it looks right to you.
 - **The blocks that read this site's state.** `core/site-title`,
   `core/navigation` with no inner blocks, `core/query` — they render *your*
   site's content while looking like they work.
-
-## Do not create a page just to look at a pattern
-
-`pattern-builder/render-pattern` returns a `page` URL that renders the pattern
-inside the resolved page template, using a stand-in post primed into the
-object cache for one request and never written. That is the whole check with
-nothing to clean up afterwards.
-
-Create a real page when the page *is* the deliverable — and then it stays.

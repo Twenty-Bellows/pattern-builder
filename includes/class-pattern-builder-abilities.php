@@ -1191,7 +1191,7 @@ class Pattern_Builder_Abilities {
 	public function execute_validator() {
 		$files = array();
 
-		foreach ( array( 'validate-pattern.mjs', 'wp-core.mjs' ) as $name ) {
+		foreach ( array( 'validate-pattern.mjs', 'check-composition.mjs', 'wp-core.mjs' ) as $name ) {
 			$contents = $this->read_script( $name );
 			if ( null === $contents ) {
 				return new \WP_Error(
@@ -1224,9 +1224,15 @@ class Pattern_Builder_Abilities {
 					'  npm i --no-save jsdom',
 					"  curl -u USER:APP_PASSWORD 'SITE/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-editor-scripts/run' > scripts.json",
 					'  node validate-pattern.mjs --scripts scripts.json pattern.html',
+					'  node check-composition.mjs patterns/',
 					'',
 					"The first run downloads this site's block code (about 4MB) and caches it.",
 					'Exit status is non-zero when anything is invalid, in an old form, or has lost an attribute.',
+					'',
+					'validate-pattern answers a question about one block. check-composition is the',
+					'cross-block half: it resolves core/pattern references against the theme files and',
+					'reports a flex or grid container whose children cannot size, which renders as a',
+					'vertical stack. That failure is valid markup, so nothing else reports it.',
 				)
 			),
 		);

@@ -1,6 +1,6 @@
 {
-	"core": "WordPress/WordPress",
 	"port": 8498,
+	"testsEnvironment": true,
 	"testsPort": 8499,
 	"plugins": [ "." ],
 	"themes": [ "./dev-assets/themes/simple-theme" ],
