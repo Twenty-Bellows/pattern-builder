@@ -5,154 +5,99 @@ description: Write WordPress block patterns — hero sections, pricing tables, F
 
 # Authoring block patterns
 
-## The thing that makes this different from writing HTML
+## Why this is not writing HTML
 
-WordPress decides a block is valid by re-running the block's `save()` function
-against its stored attributes and diffing the result against the markup on
-disk. `save()` is JavaScript. That has one consequence that governs everything
-here:
+WordPress decides a block is valid by re-running its `save()` against the
+stored attributes and diffing the result against the markup on disk. `save()`
+is JavaScript. So **markup you write by hand can render perfectly and still be
+broken** — the front end prints what is stored, the editor re-derives it and
+offers to discard your markup. Nothing warns you first.
 
-**Markup you write by hand can render perfectly on the front end and still be
-broken.** The front end just prints what is stored. The editor re-derives it,
-finds a mismatch, and shows "This block contains unexpected or invalid
-content" — offering to discard the user's markup. Nothing warns you before
-that moment. Not the browser, not PHP, not a screenshot.
+Two consequences govern everything below:
 
-So the loop is always: **write → validate → fix → only then place it.**
-Skipping validation because the markup "looks fine" is how patterns ship
-broken. It will look fine. That is the problem.
+- **Generate the markup; don't type it.** The block library will serialize it
+  for you, correctly, for the version you are targeting (step 5). That is the
+  whole reason you can be confident in a pattern without opening a browser.
+- **Validate before placing it** (step 6). Not optional, and not doable by
+  reading the markup or looking at the front end.
 
-A second, quieter failure mode matters just as much. **WordPress reads
-malformed attribute JSON as *no* attributes**, and many blocks save markup
-that does not depend on their attributes — a paragraph, an `h2`, a plain
-group. For those, dropping the whole attribute object produces byte-identical
-output. So a lost brace leaves the block *valid*, rendering identically, and
-silently stripped of everything the attributes were doing. If those attributes
-were a Pattern Overrides slot, the slot is simply gone, and the page that
-fills it ships the design pattern's placeholder copy as though it were real
-copy.
+`references/block-markup.md` has the failure modes in detail, including the
+quiet one: WordPress reads malformed attribute JSON as *no* attributes, and for
+many blocks that produces byte-identical output — so a lost brace leaves a
+valid block silently stripped of everything its attributes were doing.
 
 ## Order of operations
 
-Each scale contains the ones before it — a site is pages, a page is patterns,
-a pattern is markup. Working out of order is recoverable but expensive: every
-step settles values the steps after it reference, so a late change to an early
-one re-opens everything downstream.
+Each scale contains the ones before it, and every step settles values the later
+ones reference.
 
-**One pattern:** orient → establish the vocabulary → decide the kind → factor →
-write → validate → place.
+- **One pattern:** orient → vocabulary → kind → factor → generate → validate → place.
+- **A page:** design system, then *elements*, then the *sections* referencing
+  them, then the *page* referencing those. Bottom-up, because a section cannot
+  be written until its elements exist by name.
+- **A site:** settle the design system as **layout → tokens → styles → block
+  style variations**, then the patterns bottom-up, then the pages.
 
-**A page:** the design system first, then *elements*, then the *sections* that
-reference them, then the *page* that references those. Build bottom-up, because
-a section cannot be written until the elements it references exist by name.
-
-**A whole site:** settle the design system in this order — **layout** (the
-widths every band measures against) → **tokens** (the presets markup
-references) → **styles** (what a block looks like before a pattern speaks) →
-**block style variations** (named looks applied with a class). Then the
-patterns, bottom-up as above, then the pages that place them.
-
-Layout comes first because it is the one thing every band's markup has to
-agree with: settle it late and every pattern written before it has the wrong
-measure baked in. Tokens come before styles because a style references a
-preset by slug and a slug that does not resolve renders as nothing.
+Layout first because every band's markup has to agree with it; tokens before
+styles because a style referencing an unresolvable slug renders as nothing.
 
 ## Workflow
 
-### 1. Orient before writing
+### 1. Orient
 
-Never invent colors, spacing, or font sizes. A pattern that hard-codes
-`#2c3e50` and `padding: 48px` looks right in one theme and wrong everywhere
-else, and it silently opts out of the site's dark mode, style variations, and
-future redesigns.
+Never invent colors, spacing, or font sizes — and never reference a preset the
+site lacks, which fails just as quietly (an unresolved slug renders as no
+styling at all).
 
-Referencing a preset the site does not define fails the same way and just as
-quietly — a slug that does not resolve renders as no styling at all.
-`references/design-system.md` covers all three layers a pattern leans on — the
-tokens it references, the styles it inherits and the block style variations it
-applies — and which names are actually safe, measured against core and the
-three most recent default themes: the short version is `base` and `contrast`
-for colour, the `small`…`xx-large` ladder for type, and the numeric spacing
-steps `40`–`60`. Everything else, check before you use it. It also says the
-thing hardest to see from the markup: what the site already styles is what the
-pattern inherits, so restating it is how a pattern stops adapting.
-
-Get the real values. In order of preference:
-
-**If the site is running and has Pattern Builder,** ask it — this resolves
-core, parent theme, child theme and the active style variation for you:
+On a running site, ask it. This resolves core, parent theme, child theme and
+the active style variation:
 
 ```bash
 curl -u "$WP_USER:$WP_APP_PASSWORD" \
   "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-design-system/run"
 ```
 
-Also worth asking before using a block that is not core, since markup for a
-block this site does not have parses to `core/missing`:
+Worth two more calls: `list-block-types` before using anything non-core (markup
+for a block the site lacks parses to `core/missing`), and
+`get-authoring-guide` for house rules a theme has added — which blocks this
+build has settled on, how its copy reads. Input goes under an `input` key:
+`input[key]=value` on a GET, `{"input":{…}}` in a POST body.
+`references/abilities.md` has the full set.
 
-```bash
-curl -u "$WP_USER:$WP_APP_PASSWORD" -G --data-urlencode 'input[namespace]=core' \
-  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/list-block-types/run"
-```
+Otherwise read `theme.json` (`settings.color.palette`,
+`settings.spacing.spacingSizes`, `settings.typography.fontSizes`,
+`settings.layout`), plus `styles/*.json` and the parent theme. Then read two or
+three existing patterns — they carry house style better than any description.
 
-Input goes under an `input` key — `input[key]=value` on a GET, `{"input":{…}}`
-in a POST body. See `references/abilities.md` for the full set.
+`references/design-system.md` covers the three layers a pattern leans on and
+which slugs are actually safe: the short version is `base` and `contrast` for
+colour, the `small`…`xx-large` ladder for type, and spacing steps `40`–`60`.
+Check anything else before using it. It also says the thing hardest to see from
+markup: what the site already styles is what the pattern inherits, so restating
+it is how a pattern stops adapting.
 
-A site can also carry authoring guides of its own — house rules a theme adds
-through the `pattern_builder_authoring_guides` filter, like which blocks this
-build has settled on or how its copy reads. Ask for the index when you have a
-site to ask; anything it returns beyond these documents is project policy, and
-this repository cannot know it:
+### 2. Establish the vocabulary
 
-```bash
-curl -u "$WP_USER:$WP_APP_PASSWORD" \
-  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-authoring-guide/run"
-```
+Ask where the pattern is going — and say which answer you assumed if nobody
+told you.
 
-**Otherwise, read the theme directly:** `theme.json` for `settings.color.palette`,
-`settings.spacing.spacingSizes`, `settings.typography.fontSizes`, and
-`settings.layout`. Check `styles/*.json` too, and the parent theme if this is a
-child. If the project has a design-system document, read that as well — it
-carries the intent that JSON cannot, like which variation to use when.
+- **Core blocks only** — anything that leaves this site: the pattern
+  directory, a shared cloud library, a theme others install. This is the
+  default when the destination is unclear.
+- **patternbuilderwp.com is narrower still** — no code, raw HTML, embeds or
+  non-image media.
+- **Core + the theme's own blocks and styles** — a pattern shipping inside that
+  theme; they travel together. A registered block style
+  (`{"className":"is-style-card"}`) usually beats a custom block anyway.
+- **Core + installed plugins** — only for patterns staying on this site.
 
-Then read two or three existing patterns in `patterns/`. They tell you more
-about house style than any description: how sections are spaced, whether
-groups are constrained or full, how headings step down.
-
-### 2. Establish which blocks you may use
-
-Ask where the pattern is going, because it decides the vocabulary — and say
-which answer you assumed if nobody told you.
-
-**Core blocks only** for anything that leaves this site: the WordPress.org
-pattern directory, a shared or public cloud library, a theme other people will
-install. Markup for a block the receiving site lacks parses to `core/missing`
-and renders as a grey "block cannot be displayed" box — it doesn't degrade, it
-breaks, and it breaks where you can't see it. This is the safe default when
-the destination is unclear.
-
-**patternbuilderwp.com is narrower still**: core membership is not its test,
-and it refuses code, raw HTML, embeds, non-image media and anything naming a
-row on the site that made it. It also records the WordPress version a pattern
-needs and refuses to install one on a site too old for it. See
-`references/block-vocabulary.md`.
-
-**Core plus the theme's own blocks and styles** for a pattern shipping inside
-that theme; they travel together. A registered block style
-(`{"className":"is-style-card"}`) is usually the better tool than a custom
-block anyway.
-
-**Core plus installed plugins** only for patterns staying on this site.
-
-`references/block-vocabulary.md` has the full rule, the current core
-vocabulary by purpose, and the composition guidance — which block is right for
-a job, and where hand-building something core already provides goes wrong.
+`references/block-vocabulary.md` has the rule in full, the current core
+vocabulary by purpose, and which block is right for which job.
 
 ### 3. Decide what the pattern is *for*
 
-"Pattern" covers six different jobs, and the job settles most of the
-mechanics — where it can be stored, which headers place it, whether it appears
-in the inserter. Pick the kind before writing markup:
+The job settles where it can be stored, which headers place it, and whether it
+appears in the inserter.
 
 | The user wants… | Kind | What it fixes |
 |---|---|---|
@@ -163,75 +108,48 @@ in the inserter. Pick the kind before writing markup:
 | a whole archive/404/home layout | **Template Pattern** | `Template Types`, `Inserter: no`, wide viewport |
 | a header or footer design | **Template Part Pattern** | `Block Types: core/template-part/header\|footer` |
 
-A kind is a starting point, not a stored property — nothing records it, and
-everything stays editable afterwards. `references/pattern-kinds.md` has each
-one in full.
+A kind is a starting point, not a stored property; everything stays editable
+afterwards. `references/pattern-kinds.md` has each in full.
 
-Two consequences that catch people out:
+**The four starter kinds are always theme patterns** — their placement lives in
+file headers and a `wp_block` has nowhere to put them. A request wanting a
+database pattern *and* wanting WordPress to offer it for new pages is asking
+for two incompatible things; say so rather than silently picking one.
 
-**The four starter kinds are always theme patterns.** Their placement lives in
-pattern-file headers, and a `wp_block` in the database has nowhere to put
-them. If a request wants a database pattern *and* wants WordPress to offer it
-for new pages, those conflict — say so rather than silently picking one.
-
-**Synced Design Pattern + Page Pattern is the design/content split.** Where a
-project uses that layering, those two kinds are its halves: the synced pattern
-owns the markup and carries placeholder copy, the page pattern owns the words
-and fills the slots. Read `references/design-content-split.md` before writing
-either; the failure modes there are silent.
-
-The split is the default wherever the runtime is present — and every site
-these abilities run on has Pattern Builder, so it is: `core/pattern`'s
-`content` attribute is declared by Pattern Builder and by Synced Patterns for
-Themes on the server and in the editor alike, and slot values persist through
-every save and render exactly as any attribute does. Match a project that
-already layers this way; where a project has no layering and the runtime is
-present, this is the one to introduce, and say so. The one case to weigh is a
-pattern destined for a site with neither plugin, where WordPress drops the
-attribute and every page renders placeholder copy — there, carry the copy
-inline and say why.
+**Synced Design Pattern + Page Pattern is the design/content split** — the
+synced pattern owns the markup and carries placeholder copy, the page pattern
+owns the words and fills the slots. It is the default wherever the runtime is
+present, and every site these abilities run on has Pattern Builder. Read
+`references/design-content-split.md` before writing either; those failure modes
+are silent.
 
 ### 4. Factor before you write
 
-This is the step whose absence produces the most wasted work, and skipping it
-does not look like a mistake — it looks like a finished page.
+Skipping this does not look like a mistake — it looks like a finished page. A
+pattern's value is exactly its reusability: markup spelling out one business's
+146 menu items is that business's *content* wearing a pattern's clothes.
 
-A pattern's value is exactly its reusability. Markup that spells out one
-business's 146 menu items is that business's *content* wearing a pattern's
-clothes: nobody else installs it, and changing the design of a menu item means
-146 edits. The fix is not "write less markup"; it is to find the parts that
-repeat and make each one a pattern the others reference.
-
-So before writing anything, produce an **inventory**. Not a mental note — a
-table, because a step with an artifact is a step you can see was skipped:
+Produce an **inventory**. Not a mental note — a table, because a step with an
+artifact is a step you can see was skipped:
 
 | shape | occurrences | leaves that differ | name | level |
 |---|---|---|---|---|
 | `group > columns > [image, group > [row > [p, p], p]]` | 146 | name, price, description, image | menu item | element |
 | `group > [rule, heading, p, group > columns…]` | 24 | heading, blurb | menu section | section |
 
-Three tests fill it in, and only the middle one needs judgement.
+Three tests fill it in; only the middle needs judgement.
 
-**1. What repeats?** Reduce the markup you are about to write to a *shape* —
-the tree of block names and attributes with all text, URLs and IDs stripped.
-Any shape occurring more than once is a candidate. This is mechanical: if you
-are about to write the same subtree twice, you have found one.
-
-Where the design comes from an existing page, the repetition is already in
-front of you. Be especially alert to the output of a loop — a menu, a product
-grid, a card deck. A page that renders the same subtree fifty times was built
-from a template, and a template is what you are supposed to be writing.
-
-**2. Does it have a name?** A candidate becomes a pattern when you can name it
-with a domain noun phrase — *menu item*, *dish card*, *testimonial*, *hours
-row*. If the only name available is structural — *the group wrapper*, *the
-two-column row* — it is markup, not a pattern. This is the test that stops the
-first one shattering a page into confetti.
-
-**3. What are the slots?** Given N occurrences of one shape, the slots are
-exactly the leaves whose content differs between them. Name differs → slot.
-Price differs → slot. The wrapper's padding is identical everywhere → not a
-slot. You compute this rather than decide it.
+1. **What repeats?** Reduce the markup to a *shape* — block names and
+   attributes, all text and URLs stripped. Any shape occurring twice is a
+   candidate. Mechanical: if you are about to write the same subtree twice, you
+   found one. Be especially alert to the output of a loop.
+2. **Does it have a name?** A candidate becomes a pattern when a domain noun
+   phrase fits — *menu item*, *dish card*, *hours row*. If only a structural
+   name fits — *the group wrapper* — it is markup, not a pattern. This is the
+   test that stops the first one shattering a page into confetti.
+3. **What are the slots?** Given N occurrences of a shape, the slots are
+   exactly the leaves whose content differs. You compute this rather than
+   decide it.
 
 Then place each row at its level:
 
@@ -241,30 +159,22 @@ Then place each row at its level:
 | **Section** | a full-width band | a heading and *references to elements* |
 | **Page** | the whole page | *references to sections* |
 
-**A pattern at any level may reference patterns below it, and the nesting is
-not limited to one hop.** A page references sections; a section references
-elements; a section may reference other sections. The failure to avoid is
-stopping after one level — bands as patterns, everything inside them written
-out longhand.
+**Nesting is not limited to one hop** — a section may reference other sections.
+The failure to avoid is stopping after one level: bands as patterns, everything
+inside written out longhand.
 
-Two things bound how far this goes:
+Two bounds: **Pattern Overrides binds `core/paragraph`, `core/heading`,
+`core/image` and `core/button`** — plus `core/list-item` from WordPress 6.9 —
+so a slot must land on one of those; you cannot slot "some blocks". And **don't
+factor what does not repeat**: a band appearing once is a section pattern
+because it is a named part of the page, not because it repeats.
 
-- **Pattern Overrides binds `core/paragraph`, `core/heading`, `core/image`
-  and `core/button`** — and, from WordPress 6.9, `core/list-item`, since the
-  list of overridable blocks is now the server's and includes it. A slot must
-  land on one of those, so boundaries fall where the varying content is text,
-  a heading, an image, a button or one item of a list. You cannot slot "some
-  blocks".
-- **Don't factor what does not repeat.** A band that appears once on one page
-  is a section pattern because it is a named part of the page, not because it
-  repeats. A wrapper that appears twice and has no name stays inline.
+`references/composition.md` has the worked example.
 
-`references/composition.md` has the worked example, the mechanics of
-references and slots together, and where this goes wrong.
+### 5. Generate the markup
 
-### 5. Write the markup
-
-Block markup is HTML comments wrapping HTML:
+Block markup is HTML comments wrapping HTML, and the attributes and the HTML
+have to agree exactly:
 
 ```html
 <!-- wp:heading {"level":2,"fontSize":"x-large"} -->
@@ -272,56 +182,11 @@ Block markup is HTML comments wrapping HTML:
 <!-- /wp:heading -->
 ```
 
-The attributes and the HTML have to agree, and they fail in **two different
-ways** that need different defences:
-
-**Structure the block's own `save()` writes** — a heading's tag matching its
-`level`, `wp-block-group` on a group, a button's anchor, a column's class. Get
-these wrong and the block is *invalid*: the editor offers to discard it. The
-validator catches all of these, which is why the validation step is not optional.
-
-**Classes contributed by block supports** — `"backgroundColor":"primary"`
-obliges `has-primary-background-color has-background`;
-`"style":{"typography":{"textAlign":"center"}}` obliges
-`has-text-align-center`; `"fontSize":"large"` obliges
-`has-large-font-size`. Get these wrong and the block stays *valid* — and the
-styling simply does not apply. No error anywhere; the pattern just renders
-wrong, usually in a way that looks like a design mistake rather than a bug.
-**The validator cannot catch these**, because the supports filters that add
-the classes only run inside a real editor. They are yours to get right by
-hand, and to confirm by looking at the rendered result.
-
-`references/block-markup.md` has the attribute-to-class table and a tested
-list of what the validator does and does not see.
-
-Reference presets by slug, never by value:
-
-- Color: `"backgroundColor":"base"` (slug), or `var(--wp--preset--color--base)` in a style
-- Spacing: `"var:preset|spacing|50"` in attributes, `var(--wp--preset--spacing--50)` in the inline style
-- Font size: `"fontSize":"large"`, or `var(--wp--preset--font-size--large)`
-
-Note the two spellings. Inside a block's attribute JSON, WordPress uses its
-own `var:preset|spacing|50` shorthand; in the actual CSS of the `style`
-attribute it must be the real custom property. The shorthand inside the CSS
-is not CSS and renders as no spacing at all; the custom property inside the
-JSON renders, but the editor no longer recognises it as the preset.
-
-Use slugs the destination is likely to have — `base` and `contrast`, the
-numeric spacing steps, the `small`…`xx-large` ladder. `references/design-system.md`
-says which names are safe and why; the short answer is that a slug shared
-with the destination adapts to it and a slug it lacks arrives carrying its
-own value.
-
-**For anything outside the common blocks, do not hand-write it — generate it.**
-`references/block-markup.md` carries the contract for the dozen or so blocks
-patterns are mostly made of. Outside that set, the shape is guesswork: the
-accordion family saves a `role="group"`, an `has-icon has-icon-right` pair, a
-`__toggle-title` span and an icon span, and nothing short of the block's own
-`save()` will tell you that. No documentation carries it — see
-`references/block-vocabulary.md` on what the handbook does and does not cover.
-
-The block library the validator already loads will write it for you, correctly
-and for the version you are targeting:
+**Let the block library write it.** It runs the real `save()` with the real
+supports filters, so the output is valid by construction *and* carries every
+support-contributed class correctly — which is the entire class of failure the
+validator cannot see, and the reason this is faster than drafting and
+iterating on errors:
 
 ```js
 import { loadWordPressBlocksFromUrls } from '<skill>/scripts/wp-core.mjs';
@@ -329,166 +194,113 @@ const core = await loadWordPressBlocksFromUrls( urls, { version } );
 const { createBlock, serialize } = core.window.wp.blocks;
 
 console.log( serialize( [
-        createBlock( 'core/accordion', {}, [
-                createBlock( 'core/accordion-item', {}, [
-                        createBlock( 'core/accordion-heading', { title: 'A question' } ),
-                        createBlock( 'core/accordion-panel', {}, [
-                                createBlock( 'core/paragraph', { content: 'An answer.' } ),
-                        ] ),
-                ] ),
+        createBlock( 'core/group', { align: 'full', backgroundColor: 'contrast' }, [
+                createBlock( 'core/heading', { level: 1, fontSize: 'xx-large' } ),
+                createBlock( 'core/paragraph', { content: 'A sentence that sets it up.' } ),
         ] ),
 ] ) );
 ```
 
-`urls` comes from `pattern-builder/get-editor-scripts` (or
-`loadWordPressBlocks( wpRoot )` against a local install). Markup produced this
-way is valid by construction — it is the editor's own output — so this is
-faster and more reliable than writing a draft and iterating on validator
-errors. Validate it anyway: the run is cached and it costs a second.
+`urls` comes from `pattern-builder/get-editor-scripts`, or
+`loadWordPressBlocks( wpRoot )` against a local install. Outside the dozen
+common blocks this is the *only* reliable route — the accordion family saves a
+`role="group"`, an `has-icon has-icon-right` pair, a `__toggle-title` span and
+an icon span, and nothing but the block's own `save()` will tell you that.
 
-Three things the serializer will do that you have to allow for:
+Three things the serializer does that you must allow for:
 
-- **It keeps `content` on `core/pattern` only because the loader declares
-  it.** The attribute is Pattern Builder's, not core's, and the block library
-  alone would drop it — from `parse()` and from `serialize()` both, silently.
-  `wp-core.mjs` registers it the way the plugin's runtime does before core's
-  blocks register, so a generated reference carries its slot values; a
-  scratch script using plain `@wordpress/blocks` does not, and a reference
-  serialized there comes out with the slots gone. Check the output.
+- **It keeps `content` on `core/pattern` only because the loader declares it.**
+  That attribute is Pattern Builder's, not core's; plain `@wordpress/blocks`
+  drops it from `parse()` and `serialize()` both, silently, and a generated
+  reference comes out with its slots gone.
+- **It escapes a PHP tag.** Serialize with a plain marker and substitute
+  afterwards: `serialize( … ).replace( /HERO_SRC/g, reference )`.
+- **It drops an attribute the block does not have**, silently — the same answer
+  the editor would give. `textAlign` on `core/heading` is the one to know: on
+  block library 10.5 it lives under `style.typography.textAlign`, and passed at
+  the top level it vanishes along with the class you expected.
 
-- **It escapes a PHP tag.** A theme asset's reference is
-  `<?php echo get_stylesheet_directory_uri() . '…'; ?>`, and passing that as an
-  attribute value serializes it as `&lt;?php …&gt;`, which lands in the file as
-  text and renders as a broken image. Serialize with a plain marker in its
-  place and substitute the PHP afterwards:
-  `serialize( … ).replace( /HERO_SRC/g, reference )`.
-- **It drops an attribute the block does not have**, silently, which is the
-  behaviour you want — it is the same answer the editor would give — but it
-  means a setting can vanish without a word. `textAlign` on `core/heading` is
-  the one to know: on block library 10.5 it belongs under
-  `style.typography.textAlign`, and passed at the top level it is simply gone,
-  along with the `has-text-align-center` class you were expecting.
+Reference presets by slug, never by value — and note the two spellings:
+`"var:preset|spacing|50"` inside attribute JSON,
+`var(--wp--preset--spacing--50)` in the `style` attribute's actual CSS. The
+shorthand inside CSS renders as no spacing at all.
 
-Write real placeholder copy, not lorem ipsum. Copy of a plausible length is
-what tells you the layout works, and in a design pattern the placeholder is
-what shows in the inserter preview.
+**If you cannot run Node**, hand-write it against the attribute-to-class table
+in `references/block-markup.md`. Every row there is a class the supports
+filters would have added for you, and getting one wrong leaves the block
+*valid* with the styling silently not applied.
+
+Write real placeholder copy, not lorem ipsum: copy of a plausible length is
+what tells you the layout works, and in a design pattern it is what shows in
+the inserter preview.
 
 ### 6. Validate — every time, before placing the file
-
-This is the step that makes the difference, and it cannot be done by reading
-the markup or by looking at the front end.
-
-Use the bundled script, which runs the editor's real parser with the core
-block library registered:
 
 ```bash
 node <skill>/scripts/validate-pattern.mjs path/to/pattern.php
 ```
 
-It reports three different things, and only the first is the one people expect:
+It reports three things, and only the first is the one people expect:
 
-- **INVALID** — no version of the block ever wrote markup like this. The editor
-  will say "unexpected or invalid content".
-- **OLD FORM** — the markup matches a *deprecated* version of the block. The
-  editor opens it happily and migrates it, so it never looks broken there, but
-  the file on disk is missing what the block writes today — nearly always a
-  block-supports class, which means the style silently does not apply on the
-  front end.
-- **DROPPED ATTRIBUTE** — the same migration threw away something you wrote.
-  A heading with `"fontSize":"xx-large"` and no `has-xx-large-font-size` class
-  comes back with no `fontSize` at all.
+- **INVALID** — no version of the block ever wrote this. The editor will say
+  "unexpected or invalid content".
+- **OLD FORM** — matches a *deprecated* version. The editor opens it happily
+  and migrates it, so it never looks broken there, but the file is missing what
+  the block writes today — nearly always a supports class, so the style
+  silently does not apply on the front end.
+- **DROPPED ATTRIBUTE** — that migration threw away something you wrote.
 
-The last two are the dangerous ones, because nothing else anywhere reports
-them: the pattern renders, the editor is quiet, and the design is just wrong.
+The last two are the dangerous ones: the pattern renders, the editor is quiet,
+and the design is just wrong. Fix and re-run; an empty report is the only
+acceptable result. A `core/missing` means the site lacks that block, or the
+markup has a typo.
 
-It handles a theme pattern's PHP header and inline `<?php echo esc_url( … ); ?>`
-expressions, and it takes `-` to read markup from stdin — useful for checking a
-draft before it is ever a file.
+It validates against a **WordPress install, not npm** — every install carries
+the editor's block code under `wp-includes/js/dist`, and it is the exact
+version the pattern is destined for. It finds the install itself when you are
+working inside one. Otherwise:
 
-**It validates against a WordPress install, not against npm.** Every install
-already carries the editor's block code — about 4MB under `wp-includes/js/dist`
-— so there is nothing to download, and more importantly it is the *exact*
-version the pattern is destined for. That is not a detail: block library 10.5
-moved text alignment into a typography support, so it disagrees with 9.22 about
-whether the same file is current. The first line of output says what was used:
+| Situation | How |
+|---|---|
+| WordPress elsewhere on disk | `--wp /path/to/wordpress`, or `WP_PATH=…` |
+| Only HTTP access to the site | `get-validator` for the script, `get-editor-scripts` > `scripts.json`, then `--scripts scripts.json` |
+| No WordPress anywhere | `--npm`, using `node_modules` |
 
-```
-Checked against WordPress 7.1 at /srv/www/example — 113 block types.
-```
+It needs a DOM either way: `npm i --no-save jsdom`. It handles a theme
+pattern's PHP header and inline `<?php echo esc_url( … ); ?>`, and takes `-` to
+read from stdin. If the project has its own validator, prefer it.
 
-It finds the install by itself when you are working anywhere inside one — a
-theme directory, a plugin directory — and the script ships inside the plugin,
-so it usually finds the install it lives in. Otherwise point it:
-
-```bash
-node <skill>/scripts/validate-pattern.mjs --wp /path/to/wordpress pattern.php
-WP_PATH=/path/to/wordpress node <skill>/scripts/validate-pattern.mjs pattern.php
-```
-
-The one thing WordPress cannot supply is a browser, and its editor code expects
-a document to exist as it loads: `npm i --no-save jsdom`. With no WordPress
-anywhere, `--npm` uses `@wordpress/blocks` and `@wordpress/block-library` from
-`node_modules` instead, which is the same check against whichever version npm
-resolved.
-
-**If you reached this site over HTTP and have no copy of any of it**, the site
-will hand you both halves. Two abilities, then the same command:
+**Then check that it lays out.** Validation answers a question about one
+block; a section is a relationship *between* blocks, and nothing above can see
+one:
 
 ```bash
-# The tool itself — write each file it returns into one directory.
-curl -u "$WP_USER:$WP_APP_PASSWORD" \
-  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-validator/run"
-
-# Where this site's own block code lives, in the order it loads.
-curl -u "$WP_USER:$WP_APP_PASSWORD" \
-  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-editor-scripts/run" \
-  > scripts.json
-
-npm i --no-save jsdom
-node validate-pattern.mjs --scripts scripts.json pattern.html
+node <skill>/scripts/check-composition.mjs patterns/
 ```
 
-The first run downloads that site's editor scripts (about 4MB) and caches
-them, so later runs are immediate. The URLs carry version strings, so an
-upgraded site fetches afresh rather than trusting a stale cache. You are
-checking against the WordPress the pattern is destined for, which is the
-whole point.
+It resolves `core/pattern` references against the theme's own files and reports
+any flex or grid container whose children cannot size — most often a card
+pattern written with `{"layout":{"type":"constrained"}}` at its root, which
+fills the whole track, so six references render as six full-width cards stacked
+vertically. That markup is entirely valid, every token resolves, and no other
+check in this workflow reports a thing. Static and immediate; it needs no
+browser and no rendering.
 
-If the project has its own validator (`npm run validate:blocks`), prefer it —
-it may carry project-specific lints as well.
-
-Fix what it reports and run it again; an empty report is the only acceptable
-result. A `core/missing` means the block is not registered on the target site,
-so either the markup has a typo or the site genuinely lacks that block.
-
-**If the pattern uses Pattern Overrides slots, render it.** Slot problems are
-invisible to block validation in both directions, and both ship the wrong
-words with no error anywhere. Against a site with the runtime:
+**If the pattern uses Pattern Overrides slots, render it too.** Slot problems
+are invisible to block validation in both directions, and both ship the wrong
+words with no error anywhere:
 
 ```bash
 wp eval-file <skill>/scripts/check-slots.php path/to/page-pattern.php
-wp eval-file <skill>/scripts/check-slots.php my-theme/faq '{"question":{"content":"…"}}'
 ```
 
-It renders the reference and reports which slots took their value and which
-still show the design pattern's placeholder. A misspelled slot name reports as
-`MISSED quesiton — no slot by that name in the design pattern (typo?)`; an
-unregistered slug reports that the reference renders as nothing at all.
-
-When it names a missing class, the attribute-to-class table in
-`references/block-markup.md` says what each attribute requires. Where a running
-site is available, `pattern-builder/render-pattern` is a useful second look —
-it shows the HTML that actually comes out, which is the thing your visitor
-gets.
-
-If the pattern uses Pattern Overrides slots, also check the split rules in
-`references/design-content-split.md` — block validation cannot see those
-mistakes at all, because malformed attributes leave a *valid* block behind.
+It reports which slots took their value and which still show placeholder copy.
+Also check the rules in `references/design-content-split.md` — malformed
+attributes there leave a *valid* block behind.
 
 ### 7. Place it
 
-A theme pattern is a PHP file in the theme's `patterns/` directory with a
-header comment:
+A theme pattern is a PHP file in `patterns/` with a header comment:
 
 ```php
 <?php
@@ -503,32 +315,20 @@ header comment:
 <!-- wp:group ... -->
 ```
 
-`Title` and `Slug` are required, and the slug must be namespaced with the
-theme slug. Which of the other headers you need follows from the kind —
-`references/pattern-kinds.md` lists them; `Keywords`, `Block Types`,
-`Post Types`, `Template Types`, `Viewport Width` and `Inserter` are the ones
-that appear.
+`Title` and `Slug` are required and the slug must be namespaced.
+`references/pattern-kinds.md` lists which other headers each kind needs.
+`Categories` names slugs the site has **registered** — core's own, or the
+theme's through `register_block_pattern_category()`; an unregistered slug files
+the pattern under Uncategorized, where nobody looks.
 
-`Categories` names slugs the site has *registered* — core's own (`banner`,
-`call-to-action`, `text`, `featured`, `header`, `footer` and the rest) or the
-theme's, through `register_block_pattern_category()`. A slug nothing
-registered files the pattern under Uncategorized, where nobody looks.
-`list-patterns` reports the categories a running site has; in a theme
-repository, `functions.php` does.
+Write the file directly when you have filesystem access. Against a running
+site, `pattern-builder/create-pattern` stores finished markup — it refuses what
+PHP can see (attribute JSON that does not parse, a heading contradicting its
+level, a missing block, a reference to nothing, a slot key naming no slot) and
+enforces the bottom-up order, but it cannot see block validity. Validate first
+either way.
 
-Write the file directly when you have filesystem access. When you're working
-against a running site instead, `pattern-builder/create-pattern` stores
-finished markup. It refuses what PHP can see — attribute JSON that does not
-parse, a heading contradicting its level, a block the site lacks, a reference
-to nothing, a slot key naming no slot — and it cannot see block validity, so
-validate first either way. It also enforces the bottom-up order: a pattern
-that references another cannot be stored until that other exists.
-
-### Placing a page pattern on an actual page
-
-A page pattern is not a page — it is what WordPress *offers* when somebody
-creates one. To make it a page yourself, create the page with a single
-reference as its content:
+A page pattern is not a page. To make one:
 
 ```bash
 curl -u "$WP_USER:$WP_APP_PASSWORD" -H 'Content-Type: application/json' \
@@ -537,128 +337,80 @@ curl -u "$WP_USER:$WP_APP_PASSWORD" -H 'Content-Type: application/json' \
   "$WP_URL/?rest_route=/wp/v2/pages"
 ```
 
-**To look at a pattern you do not need a page at all.**
-`pattern-builder/render-pattern` returns a `page` URL that renders it inside
-the resolved page template using a stand-in post primed into the object cache
-for one request and never written — which is also the only way to see whether
-an `alignfull` band escapes the content width. Create a real page only when
-the page is the deliverable, and if you do create anything to look at
-something, remove it again and say so if you could not.
+**To look at a pattern you need no page at all.**
+`pattern-builder/render-pattern` returns the HTML plus a `page` URL rendering
+it inside the resolved template, using a stand-in post primed into the object
+cache for one request and never written — the only way to see whether an
+`alignfull` band escapes the content width, and it reports any preset the
+markup references that the site does not define under `tokens.undefined`.
+Create a real page only when the page is the deliverable.
 
 ## Composing patterns from other patterns
-
-A pattern references another with `core/pattern`:
 
 ```html
 <!-- wp:pattern {"slug":"my-theme/section-intro"} /-->
 ```
 
-This is the normal way to build anything above the smallest scale, not an
-optimisation to apply afterwards. A page is references to its sections; a
-section is a heading and references to its elements. Step 4 is where you work
-out what those are.
+This is the normal way to build above the smallest scale, not an optimisation.
+Step 4 works out what the parts are. The cost of a reference is one hop of
+indirection; the cost of avoiding one is a copy, and every copy is a place the
+design must be changed again.
 
-The cost of a reference is one hop of indirection. The cost of *not* using one
-is a copy — and every copy is a place the design has to be changed again, a
-pattern nobody else can reuse, and markup an editor has to load. Where a part
-repeats and has a name, the reference is cheaper. Where it does neither, write
-it inline.
-
-Two mechanics to know. A referenced pattern must be registered on the site the
-pattern renders on, so a pattern that references others cannot travel alone —
-it needs its dependencies installed too, and **an unresolved reference renders
-as nothing at all**, with no error anywhere. And a `wp:pattern` block is
-self-closing (`/-->`), which is easy to get wrong.
-
-To fill a referenced pattern's slots, `core/pattern` takes a `content`
-attribute — that is the design/content split, and it needs Pattern Builder or
-Synced Patterns for Themes to resolve. `references/composition.md` covers the
-composition; `references/design-content-split.md` covers the slots.
+Two mechanics: the block is **self-closing** (`/-->`), and a referenced pattern
+must be registered on the site it renders on — **an unresolved reference
+renders as nothing at all**, with no error anywhere. To fill its slots,
+`core/pattern` takes a `content` attribute; see
+`references/design-content-split.md`.
 
 ## Turning a screenshot into a pattern
 
-Read the structure before the pixels: how many bands, how each is aligned,
-where the rhythm changes. Then map each band to a block — a full-width group,
-a `core/columns`, a `core/media-text`, a `core/cover`.
-
-For a whole page or a whole site rather than one section, load the
-`design-reproduction` skill — it covers reading the design system out of the
-source, what fidelity an image can honestly support, and how to check the
-result.
-
-Then factor it (step 4) before writing a line. A screenshot is the strongest
-invitation there is to transcribe rather than build, because everything in it
-is already spelled out — the six cards, the twelve rows, the forty menu items
-are all *there*, and copying them out feels like progress. Count the repeats
-first and name them; what you write afterwards is one card and a reference to
-it, not six cards.
-
-Match the screenshot to the theme's tokens rather than sampling its colors.
-The point is a pattern that belongs to *this* design system, so pick the
-nearest palette entry and the nearest spacing step. If nothing is close, say
-so rather than hard-coding a hex value — a missing token is a design-system
-decision for the user to make, not something to paper over.
-
-For images, never invent a URL — an `<img>` pointing at a plausible-looking
-path will 404 on a page the user thinks is finished, and a data-URI image
-bloats the markup past what an editor handles comfortably. Either put the
-file on the site or use a placeholder; `references/assets.md` covers both.
+Load the `design-reproduction` skill. It owns reading a design out of a
+source — including the structural measurements (alignment, band width, column
+ratios) that go straight into attributes with nothing downstream to catch them
+wrong — and what fidelity an image can honestly support.
 
 ## When a pattern needs an image or a typeface
 
-A pattern is markup plus the files it points at, and a reference that does not
-resolve fails quietly — a dead `src` shows a broken image, a `fontFamily`
-naming no preset renders in the default face with nothing to say why. So the
-files come first, and the reference you write is the one the site hands back.
-
-On a running site, `pattern-builder/find-media` lists what is already here —
-the media library *and* the theme's own `assets/images`, which no core route
-reports — and every result carries the exact `reference` to put in the markup.
-Use it verbatim: a theme pattern is a PHP file, so its own assets are composed
-at render, and a hard-coded URL breaks as soon as the theme moves.
-
-What to reach for depends on what you are holding:
+A reference that does not resolve fails quietly: a dead `src` shows a broken
+image, a `fontFamily` naming no preset renders in the default face. So the
+files come first, and you write the reference the site hands back —
+`pattern-builder/find-media` lists the media library *and* the theme's own
+`assets/images`, each with the exact `reference` to use verbatim.
 
 | You have | Use |
 | --- | --- |
-| A file (JPEG, PNG, WebP, AVIF) | `POST /pattern-builder/v1/assets` — the bytes are the request body. An ability cannot carry binary |
+| A file (JPEG, PNG, WebP, AVIF) | `POST /pattern-builder/v1/assets` — bytes as the request body. An ability cannot carry binary |
 | A URL the user pointed you at | `add-asset` with `url`; the site fetches it |
-| Something you can draw | `add-asset` with `svg`, or `add-placeholder-image` for a plain one |
-| Nothing yet | `add-placeholder-image`. Never a remote placeholder service — that makes every page view fetch from somebody else's server |
-| A typeface | `add-font`, which installs the files *and* registers the preset that makes them render |
+| Something you can draw | `add-asset` with `svg`, or `add-placeholder-image` |
+| Nothing yet | `add-placeholder-image`. Never a remote placeholder service |
+| A typeface | `add-font` — installs the files *and* the preset that makes them render |
 
-`references/assets.md` has the requests, the parameters, the 2400px resize on
-the way in, and why a font needs both halves.
+`references/assets.md` has the requests and the parameters.
 
-## When a pattern needs something the design system lacks
+## When the design system lacks something
 
-Propose it; don't quietly add it. Say which token is missing, what you'd call
-it, and what value you'd give it, then let the user decide. Silent additions
-are how a design system becomes forty near-identical greys.
+First check that is what is happening. **Picking the nearest existing token is
+not a gap** — it is the normal case, needs nobody's permission, and is what to
+do. Name the one you picked and what it stood in for.
 
-The exception is when the user has already said to extend the system. Then add
-the token and mention what you added — never inline the value in the markup,
-which opts the pattern out of the site's palette, its dark mode and every
-future restyle. On a running site that is `pattern-builder/add-design-tokens`
-(`references/abilities.md`); editing files directly, it is `theme.json`'s
-`settings.color.palette`, `settings.spacing.spacingSizes`,
-`settings.typography.fontSizes` or `settings.typography.fontFamilies`.
-
-Whichever route, add the token **before** the pattern that references it, and
-reference it by slug — `{"backgroundColor":"kiln-red"}` with the
-`has-kiln-red-background-color has-background` classes, or
-`var:preset|spacing|band` in a style attribute. A slug that does not resolve
-renders as no styling at all, silently.
+A real gap is when nothing is close. Then propose it — which token is missing,
+what you'd call it, what value — and **build with the nearest existing token
+meanwhile**, putting the proposal in the handoff. Stopping to ask hands back
+the work you were given, and the answer costs nothing after the fact. Never
+inline the value in the markup: that opts the pattern out of the site's
+palette, its dark mode and every future restyle. Where the user has already
+said to extend the system, add it with `pattern-builder/add-design-tokens`
+(or `theme.json` directly) **before** the pattern that references it.
 
 ## References
 
-- `references/pattern-kinds.md` — the six kinds, what each is for, and the headers each one writes
-- `references/block-vocabulary.md` — which blocks are allowed where (core-only vs theme vs plugin), the core vocabulary by purpose, and composition guidance
-- `references/design-system.md` — the three layers a pattern leans on: the tokens it references, the styles it inherits, the block style variations it applies, and which names travel
-- `references/block-markup.md` — the attribute-to-markup contract per block, and the mistakes that produce invalid markup
-- `references/composition.md` — factoring a design into elements, sections and pages, and how patterns reference patterns
-- The `design-reproduction` skill — rebuilding a design that already exists (a site, a Figma file, a screenshot): classifying how faithfully it can be read, extracting its design system, and verifying the result
-- `references/design-content-split.md` — Pattern Overrides slots, `core/pattern` `content`, synced patterns, and the silent failures
-- `references/assets.md` — images and fonts: finding what the site has, adding what it lacks, and the reference to write for each
-- `references/keeping-current.md` — how to bring these guides up to a new WordPress release, and what to re-check
-- `references/abilities.md` — asking a running site for its design system, block types and patterns, storing results, and the guides the site itself carries
+- `references/pattern-kinds.md` — the six kinds and the headers each writes
+- `references/block-vocabulary.md` — which blocks are allowed where, and the core vocabulary by purpose
+- `references/design-system.md` — tokens, inherited styles, block style variations, and which names travel
+- `references/block-markup.md` — the attribute-to-markup contract per block, for hand-writing and for debugging
+- `references/composition.md` — factoring into elements, sections and pages
+- `references/design-content-split.md` — Pattern Overrides slots and their silent failures
+- `references/assets.md` — images and fonts
+- `references/abilities.md` — asking a running site for what it has
+- `references/keeping-current.md` — bringing these guides to a new WordPress release
+- The `design-reproduction` skill — rebuilding a design that already exists

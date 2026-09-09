@@ -97,18 +97,35 @@ the site rather than at a page.
 
 ### Layout and structure
 
-| Need | Block |
-|---|---|
-| A band, a wrapper, anything with a background or shared padding | `core/group` |
-| Side-by-side content | `core/columns` + `core/column` |
-| A row of things that flow and wrap | `core/group` with `{"layout":{"type":"flex"}}` |
-| A grid | `core/group` with `{"layout":{"type":"grid"}}` |
-| Deliberate vertical gap | `core/spacer` — but prefer `blockGap` or padding |
-| A visible rule | `core/separator` |
+| Need | Block | What makes it actually work |
+|---|---|---|
+| A band, a wrapper, a background, shared padding | `core/group` with `{"layout":{"type":"constrained"}}` | **Bands only** — see below |
+| A fixed number of things across | `core/columns` + `core/column` | Each column carries its own `width` |
+| A wrapping grid of cards | `core/group` with `{"layout":{"type":"grid"}}` | `columnCount`, or `minimumColumnWidth` to wrap by size |
+| A few self-sizing things in a line — buttons, tags, an icon beside a label | `core/group` with `{"layout":{"type":"flex"}}` | Only for content that sizes itself |
+| Deliberate vertical gap | `core/spacer` — but prefer `blockGap` or padding | |
+| A visible rule | `core/separator` | |
 
-Reach for `core/group` first. Most "sections" are a full-width group with a
-constrained layout inside, and most spacing problems are solved by the
-group's `blockGap` rather than by spacers.
+Most spacing problems are solved by a group's `blockGap` rather than by
+spacers. Two rules about the first four rows matter more than the rows
+themselves, because getting either wrong produces a page that is entirely
+valid and has no layout.
+
+**A flex row will not make a grid of cards.** A flex child with no width sizes
+to its own content, and a `core/group` with `{"layout":{"type":"constrained"}}`
+takes the *whole* row. So six card references inside a flex group render as
+six full-width cards stacked vertically — valid markup, every token resolved,
+nothing to report, and no row. Use `core/columns` when the count is fixed and
+`{"type":"grid"}` when it should wrap. Keep `flex` for the handful of things
+that size themselves.
+
+**`constrained` is for bands, never for parts.** A pattern that will be placed
+*inside another pattern's layout* — a card, a tile, a testimonial, a menu item
+— must not carry `constrained` at its root, or it fills whatever track it
+lands in. Give it `{"type":"default"}` or no layout at all, and let the parent's
+columns or grid decide its width. This is the trap in the factor step: an
+element pattern reads like a small standalone thing, so it gets written like a
+band, and then it cannot be composed.
 
 ### Text
 

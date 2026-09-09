@@ -1163,6 +1163,139 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The evidence discipline used to cover only the values that become
+	 * presets — colour, type, spacing — which left alignment, band width,
+	 * column ratios and the rest going straight into block attributes as
+	 * unwritten guesses. That half has no safety net anywhere else: an
+	 * undefined preset slug is reported by render-pattern and a missing
+	 * supports class by the validator, but a wrong textAlign is a valid
+	 * block, a clean validation and the wrong design.
+	 *
+	 * So the structure table, the measurement that decides each fact, and the
+	 * box half of the verification are all load-bearing, and a guide that
+	 * quietly lost any of them would still read like complete advice.
+	 */
+	public function test_the_reproduction_guides_measure_structure_not_only_tokens() {
+		$reproduction = $this->abilities->execute_authoring_guide( array( 'guide' => 'reproduction' ) );
+
+		// The second table, keyed on the element and carrying its measurement.
+		foreach ( array( 'Measurement', 'text alignment', 'aspect ratio' ) as $expected ) {
+			$this->assertStringContainsString( $expected, $reproduction['content'], 'The reproduction guide no longer asks for ' . $expected . ' in writing.' );
+		}
+
+		$source = $this->abilities->execute_authoring_guide( array( 'guide' => 'reading-a-source' ) );
+
+		/*
+		 * The diagnostic itself. Writing a structural fact down is not enough
+		 * on its own: "the headline starts near the left margin" is
+		 * evidence-shaped and wrong, because the widest element in a band
+		 * looks identical centred or left-aligned. The rule that catches it is
+		 * to measure the elements that are not the widest.
+		 */
+		$this->assertStringContainsString( 'widest', $source['content'] );
+
+		foreach ( array( 'verticalAlignment', 'mediaPosition', 'textTransform' ) as $expected ) {
+			$this->assertStringContainsString( $expected, $source['content'], 'The source-reading guide gives no measurement for ' . $expected . '.' );
+		}
+
+		/*
+		 * And the verification has to be able to see it. A computed-style diff
+		 * over type and colour alone reports zero differences on a page whose
+		 * every band is centred where the source was left-aligned.
+		 */
+		$verifying = $this->abilities->execute_authoring_guide( array( 'guide' => 'verifying' ) );
+
+		foreach ( array( 'text-align', 'justify-content', 'flex-direction' ) as $expected ) {
+			$this->assertStringContainsString( $expected, $verifying['content'], 'The verification guide never compares ' . $expected . '.' );
+		}
+	}
+
+	/**
+	 * block-markup.md is the one guide that cannot defer to a machine. Every
+	 * other question about a block — which attributes exist, their types,
+	 * their enums, its supports and context — is answered authoritatively by
+	 * list-block-types, and the guide sends the reader there. What is left is
+	 * the gap the schema does not cover: the interiors of object-typed
+	 * attributes, and strings whose vocabulary is real but unstated.
+	 *
+	 * Both known pattern-authoring disasters landed in that gap — a
+	 * layout.type of "flow", which validates clean and crashes the editor,
+	 * and a contentPosition guessed rather than measured. So these
+	 * vocabularies are hand-written by necessity, and a hand-written
+	 * vocabulary rots silently. This checks them against the WordPress the
+	 * suite runs on.
+	 */
+	public function test_block_markup_vocabularies_still_match_wordpress() {
+		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'block-markup' ) );
+		$content = $guide['content'];
+
+		// It must send the reader to the site for anything the schema covers.
+		$this->assertStringContainsString( 'list-block-types', $content );
+
+		/*
+		 * The four layout types. Core has no accessor for these — the registry
+		 * is private to the editor bundle — but layout.php switches on the
+		 * same names server-side, so that file is the check.
+		 */
+		$layout_php = file_get_contents( ABSPATH . 'wp-includes/block-supports/layout.php' );
+		foreach ( array( 'default', 'constrained', 'flex', 'grid' ) as $type ) {
+			$this->assertStringContainsString(
+				'"' . $type . '"',
+				$content,
+				'block-markup.md no longer lists the layout type ' . $type . '.'
+			);
+			$this->assertStringContainsString(
+				"'" . $type . "'",
+				$layout_php,
+				'WordPress no longer knows the layout type ' . $type . ' — the guide is now wrong.'
+			);
+		}
+
+		// The spelling that caused the crash must never read as a recommendation.
+		$this->assertStringNotContainsString( '{"type":"flow"}', $content );
+		$this->assertStringContainsString( '`flow`', $content, 'The guide no longer warns about the flow trap.' );
+
+		/*
+		 * The unstated string vocabularies. Their *values* are not in the
+		 * schema — that is the whole point — but the attributes carrying them
+		 * are, so a rename or removal is catchable here.
+		 */
+		$registry = WP_Block_Type_Registry::get_instance();
+		$expected = array(
+			'core/cover'      => array( 'contentPosition' ),
+			'core/columns'    => array( 'verticalAlignment' ),
+			'core/column'     => array( 'verticalAlignment' ),
+			'core/media-text' => array( 'verticalAlignment', 'mediaPosition' ),
+		);
+		foreach ( $expected as $block => $attributes ) {
+			$type = $registry->get_registered( $block );
+			$this->assertNotNull( $type, $block . ' is no longer registered.' );
+			foreach ( $attributes as $attribute ) {
+				$this->assertArrayHasKey(
+					$attribute,
+					(array) $type->attributes,
+					$block . ' no longer has a ' . $attribute . ' attribute; block-markup.md documents its values.'
+				);
+				$this->assertStringContainsString( $attribute, $content );
+			}
+		}
+
+		/*
+		 * And the premise of the whole document: these are opaque. If core
+		 * ever gives layout or style an inner schema, the guide should stop
+		 * carrying it by hand and read it from the block type instead.
+		 */
+		$group = $registry->get_registered( 'core/group' );
+		foreach ( array( 'layout', 'style' ) as $attribute ) {
+			$this->assertArrayNotHasKey(
+				'properties',
+				(array) $group->attributes[ $attribute ],
+				$attribute . ' now declares an inner schema — block-markup.md can defer to it.'
+			);
+		}
+	}
+
+	/**
 	 * An agent that goes straight to create-pattern reads no guide at all, so
 	 * the one step it cannot afford to skip has to be on the index — and the
 	 * abilities it names have to be ones that exist, or it is worse than
