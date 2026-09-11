@@ -10,6 +10,7 @@
  */
 
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud;
+use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Abilities;
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Controller;
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Porter;
 use TwentyBellows\PatternBuilder\Pattern_File_Store;
@@ -587,6 +588,59 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 
 	}
 
+	public function test_installing_a_page_from_the_library_installs_its_sections_first() {
+		$this->mock_library();
+
+		// The collection as the Uploaded tab sends it, from the summary in hand.
+		$porter = new Pattern_Builder_Cloud_Porter();
+		$result = $porter->install_cloud_pattern(
+			102,
+			'theme',
+			false,
+			array(
+				'owner' => 7,
+				'slug'  => 'heroes',
+				'title' => 'Heroes',
+			),
+			'library'
+		);
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$this->assertSame( array( 'studio-a/heroes/hero' ), $result['dependencies'] );
+
+		// Both come from the account's own library: the page fetched first,
+		// the section written first.
+		$this->assertSame(
+			array( '/library/patterns/102/download', '/library/patterns/101/download' ),
+			$this->download_paths()
+		);
+
+		$this->assertFileExists( $this->theme_dir . '/patterns/studio-a/heroes/hero.php' );
+		$page = $this->theme_dir . '/patterns/studio-a/heroes/page-home.php';
+		$this->assertFileExists( $page );
+		$this->assertStringContainsString( 'studio-a/heroes/hero', file_get_contents( $page ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+	}
+
+	public function test_an_agent_installing_a_page_from_the_library_gets_its_sections_too() {
+		$this->mock_library();
+
+		$abilities = new Pattern_Builder_Cloud_Abilities();
+		remove_action( 'wp_abilities_api_init', array( $abilities, 'register_abilities' ) );
+
+		// An agent names the pattern and nothing about its collection.
+		$result = $abilities->execute_install_cloud_pattern(
+			array(
+				'id'     => 102,
+				'source' => 'library',
+			)
+		);
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$this->assertSame( 'user', $result['pattern']['type'] );
+		$this->assertSame( array( 'studio-a/heroes/hero' ), $result['pattern']['dependencies'] );
+		$this->assertFileExists( $this->theme_dir . '/patterns/studio-a/heroes/hero.php' );
+	}
+
 	/**
 	 * A downloadable package, as the service hands one over.
 	 *
@@ -607,5 +661,109 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 			'assets'    => array(),
 			'synced'    => false,
 		);
+	}
+
+	/**
+	 * Mock the connected account's library: Personal, and a Heroes
+	 * collection holding a page and the section it places. A route the mock
+	 * does not know is answered the way the service's REST server answers
+	 * one it does not have.
+	 */
+	private function mock_library() {
+		add_filter(
+			'pre_http_request',
+			function ( $pre, $args, $url ) {
+				$query = array();
+				parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
+				$path = str_replace( '/pbwp/v1', '', (string) ( $query['rest_route'] ?? '' ) );
+				$code = 200;
+
+				$this->seen[] = array(
+					'method' => $args['method'],
+					'path'   => $path,
+					'body'   => is_string( $args['body'] ) ? $args['body'] : '',
+				);
+
+				$heroes = array(
+					'id'        => 3,
+					'owner'     => 7,
+					'slug'      => 'heroes',
+					'title'     => 'Heroes',
+					'namespace' => 'studio-a/heroes',
+					'personal'  => false,
+				);
+
+				if ( '/library/collections' === $path ) {
+					$body = array(
+						array(
+							'id'        => 9,
+							'owner'     => 7,
+							'slug'      => 'personal',
+							'title'     => 'Personal',
+							'namespace' => 'studio-a/personal',
+							'personal'  => true,
+						),
+						$heroes,
+					);
+				} elseif ( '/library/collections/3' === $path ) {
+					$body = array_merge(
+						$heroes,
+						array(
+							'patterns' => array(
+								array(
+									'id'        => 101,
+									'namespace' => 'studio-a/heroes/hero',
+								),
+								array(
+									'id'        => 102,
+									'namespace' => 'studio-a/heroes/page-home',
+								),
+							),
+						)
+					);
+				} elseif ( '/library/patterns/101/download' === $path ) {
+					$body = $this->package( 'studio-a/heroes/hero', 'Hero', '<!-- wp:paragraph --><p>Hero</p><!-- /wp:paragraph -->' );
+				} elseif ( '/library/patterns/102/download' === $path ) {
+					$body = $this->package(
+						'studio-a/heroes/page-home',
+						'Home Page',
+						$this->reference( 'studio-a/heroes/hero' )
+					);
+				} else {
+					$code = 404;
+					$body = array(
+						'code'    => 'rest_no_route',
+						'message' => 'No route was found matching the URL and request method.',
+						'data'    => array( 'status' => 404 ),
+					);
+				}
+
+				return array(
+					'headers'  => array(),
+					'body'     => wp_json_encode( $body ),
+					'response' => array(
+						'code'    => $code,
+						'message' => 200 === $code ? 'OK' : 'Not Found',
+					),
+				);
+			},
+			10,
+			3
+		);
+	}
+
+	/**
+	 * The paths every package download the mock saw was sent to, in order.
+	 *
+	 * @return string[]
+	 */
+	private function download_paths() {
+		$paths = array();
+		foreach ( $this->seen as $request ) {
+			if ( '/download' === substr( $request['path'], -9 ) ) {
+				$paths[] = $request['path'];
+			}
+		}
+		return $paths;
 	}
 }

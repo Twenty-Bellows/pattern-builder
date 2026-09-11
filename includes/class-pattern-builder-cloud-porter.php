@@ -1362,15 +1362,7 @@ class Pattern_Builder_Cloud_Porter {
 			return array();
 		}
 
-		if ( empty( $collection['slug'] ) ) {
-			return new WP_Error(
-				'pb_cloud_dependencies_unknown',
-				__( 'This pattern uses other patterns, but the service did not say which collection they are in.', 'pattern-builder' ),
-				array( 'status' => 502 )
-			);
-		}
-
-		$members = $this->collection_members( $collection, $source );
+		$members = $this->collection_members( $pbp, $collection, $source );
 		if ( is_wp_error( $members ) ) {
 			return $members;
 		}
@@ -1414,29 +1406,47 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * A collection's patterns, as name => cloud id.
+	 * The patterns in the collection a package came from, as name => cloud id.
 	 *
-	 * One request per install, whatever the tree's shape: every dependency
-	 * is in the same collection, so one listing answers all of them.
+	 * One listing answers every reference a package makes, since they are
+	 * all in its collection (D38). The directory lists a collection by owner
+	 * and slug, which the caller has from the summary it installed from. The
+	 * library lists one by id, which nobody here has — but the package names
+	 * its collection and the account's collections say which id that is, so
+	 * a library install finds its tree whether or not the caller said where
+	 * the pattern came from, and an agent never does.
 	 *
-	 * @param array  $collection { owner, slug }.
+	 * @param array  $pbp        The package whose references these answer.
+	 * @param array  $collection { owner, slug } the pattern came from.
 	 * @param string $source     'directory' or 'library'.
 	 * @return array|WP_Error
 	 */
-	private function collection_members( $collection, $source ) {
-		$path = 'library' === $source
-			? sprintf( '/library/patterns?collection=%s', rawurlencode( (string) $collection['slug'] ) )
-			: sprintf( '/directory/collections/%d/%s', (int) $collection['owner'], rawurlencode( (string) $collection['slug'] ) );
+	private function collection_members( $pbp, $collection, $source ) {
+		if ( 'library' === $source ) {
+			$id = $this->library_collection_id( $pbp );
+			if ( is_wp_error( $id ) ) {
+				return $id;
+			}
+			$path = $id ? '/library/collections/' . $id : '';
+		} else {
+			$path = empty( $collection['slug'] ) ? '' : sprintf( '/directory/collections/%d/%s', (int) $collection['owner'], rawurlencode( (string) $collection['slug'] ) );
+		}
+
+		if ( '' === $path ) {
+			return new WP_Error(
+				'pb_cloud_dependencies_unknown',
+				__( 'This pattern uses other patterns, but the service did not say which collection they are in.', 'pattern-builder' ),
+				array( 'status' => 502 )
+			);
+		}
 
 		$answer = Pattern_Builder_Cloud::request( 'GET', $path );
 		if ( is_wp_error( $answer ) ) {
 			return $answer;
 		}
 
-		$patterns = isset( $answer['patterns'] ) ? $answer['patterns'] : ( isset( $answer['items'] ) ? $answer['items'] : array() );
-
 		$members = array();
-		foreach ( (array) $patterns as $pattern ) {
+		foreach ( (array) ( $answer['patterns'] ?? array() ) as $pattern ) {
 			if ( ! empty( $pattern['namespace'] ) && ! empty( $pattern['id'] ) ) {
 				$members[ (string) $pattern['namespace'] ] = (int) $pattern['id'];
 			}
@@ -1446,7 +1456,34 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * The name a downloaded pattern is installed under.    /**
+	 * Which of the connected account's collections a library package is in.
+	 *
+	 * @param array $pbp Package.
+	 * @return int|WP_Error The collection's id, or 0 when the package names
+	 *                      none of the account's collections.
+	 */
+	private function library_collection_id( $pbp ) {
+		$name = self::cloud_name_of_package( $pbp );
+		if ( '' === $name ) {
+			return 0;
+		}
+
+		$collections = Pattern_Builder_Cloud::request( 'GET', '/library/collections' );
+		if ( is_wp_error( $collections ) ) {
+			return $collections;
+		}
+
+		$namespace = substr( $name, 0, strrpos( $name, '/' ) );
+		foreach ( (array) $collections as $collection ) {
+			if ( isset( $collection['namespace'], $collection['id'] ) && $namespace === $collection['namespace'] ) {
+				return (int) $collection['id'];
+			}
+		}
+
+		return 0;
+	}
+
+	/**
 	 * The name a downloaded pattern is installed under.
 	 *
 	 * The package carries the name the pattern has on the service —
@@ -1522,7 +1559,6 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * Land a package as a theme pattern file.  /**
 	 * Land a package as a theme pattern file.
 	 *
 	 * @param array    $pbp         Package (for viewport/keywords extras).
