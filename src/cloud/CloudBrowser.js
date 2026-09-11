@@ -136,8 +136,9 @@ const PASSWORD_RULE = __(
  * @param {Object}   props             Component props.
  * @param {Function} props.onConnected Receives the fresh status payload.
  * @param {string}   props.intro       Why to connect, for this tab.
+ * @param {string}   props.title       The title for the panel.
  */
-function ConnectPanel( { onConnected, intro } ) {
+function ConnectPanel( { onConnected, intro, title } ) {
 	const [ mode, setMode ] = useState( 'login' );
 	const [ email, setEmail ] = useState( '' );
 	const [ password, setPassword ] = useState( '' );
@@ -240,9 +241,7 @@ function ConnectPanel( { onConnected, intro } ) {
 			} );
 	};
 
-	const title = isForgot
-		? __( 'Reset your password', 'pattern-builder' )
-		: __( 'Your patterns, on every site.', 'pattern-builder' );
+	title = isForgot ? __( 'Reset your password', 'pattern-builder' ) : title;
 
 	return (
 		<form className="pattern-builder-cloud__connect" onSubmit={ submit }>
@@ -257,14 +256,10 @@ function ConnectPanel( { onConnected, intro } ) {
 				<p className="pattern-builder-cloud__connect-intro">
 					{ isForgot
 						? __(
-								'Enter your account’s email and we’ll send a link to choose a new password. The link opens on patternbuilderwp.com.',
+								'Enter your account’s email and we’ll send a link to reset your password.',
 								'pattern-builder'
 						  )
-						: intro ||
-						  __(
-								'Keep a pattern library on patternbuilderwp.com: upload patterns from this site, download them anywhere, and share collections with the community.',
-								'pattern-builder'
-						  ) }
+						: intro }
 				</p>
 				{ isSignup && (
 					<TextControl
@@ -321,7 +316,7 @@ function ConnectPanel( { onConnected, intro } ) {
 						</legend>
 						<p className="pattern-builder-cloud__consent-hint">
 							{ __(
-								'Occasional notes about new patterns, features and Pro — no more than a couple a month. Change your mind any time from your account.',
+								'We send out occasional notes about new pattern collections and features. No more than a couple a month.',
 								'pattern-builder'
 							) }
 						</p>
@@ -419,6 +414,91 @@ function ConnectPanel( { onConnected, intro } ) {
 				) }
 			</VStack>
 		</form>
+	);
+}
+
+/**
+ * Disconnect, behind a prompt. Disconnecting forgets this WordPress user's
+ * token and nothing else — installed patterns and the cloud library are
+ * untouched — so the prompt says that. The prompt's state lives here rather
+ * than in CloudBrowser so it goes away with the account bar, whatever
+ * disconnected it, instead of reappearing after the next sign-in.
+ *
+ * @param {Object}   props                Component props.
+ * @param {Function} props.onDisconnected Called once the token is gone.
+ */
+function DisconnectButton( { onDisconnected } ) {
+	const [ isConfirming, setIsConfirming ] = useState( false );
+	const [ busy, setBusy ] = useState( false );
+	const [ error, setError ] = useState( '' );
+
+	const confirm = () => {
+		setError( '' );
+		setIsConfirming( true );
+	};
+
+	const disconnect = () => {
+		setBusy( true );
+		setError( '' );
+		apiFetch( { path: `${ BASE }/disconnect`, method: 'POST' } )
+			.then( () => onDisconnected() )
+			.catch( ( err ) => {
+				setBusy( false );
+				setError(
+					err.message ||
+						__( 'That did not work. Try again.', 'pattern-builder' )
+				);
+			} );
+	};
+
+	return (
+		<>
+			<Button variant="tertiary" icon={ closeSmall } onClick={ confirm }>
+				{ __( 'Disconnect', 'pattern-builder' ) }
+			</Button>
+			{ isConfirming && (
+				<Modal
+					title={ __(
+						'Disconnect from patternbuilderwp.com?',
+						'pattern-builder'
+					) }
+					onRequestClose={ () => setIsConfirming( false ) }
+					className="pattern-builder-cloud__destination-modal"
+				>
+					<VStack spacing={ 3 }>
+						<p className="pattern-builder-cloud__meta">
+							{ __(
+								'Patterns already on this site stay, and so does your cloud library. Sign in again any time to upload or install.',
+								'pattern-builder'
+							) }
+						</p>
+						{ error && (
+							<Notice status="error" isDismissible={ false }>
+								{ error }
+							</Notice>
+						) }
+						<HStack alignment="right" spacing={ 2 } wrap>
+							<Button
+								variant="tertiary"
+								onClick={ () => setIsConfirming( false ) }
+								disabled={ busy }
+							>
+								{ __( 'Cancel', 'pattern-builder' ) }
+							</Button>
+							<Button
+								variant="primary"
+								isDestructive
+								isBusy={ busy }
+								disabled={ busy }
+								onClick={ disconnect }
+							>
+								{ __( 'Disconnect', 'pattern-builder' ) }
+							</Button>
+						</HStack>
+					</VStack>
+				</Modal>
+			) }
+		</>
 	);
 }
 
@@ -1146,19 +1226,12 @@ export function CloudBrowser( {
 			);
 	};
 
-	const disconnect = () => {
-		apiFetch( { path: `${ BASE }/disconnect`, method: 'POST' } ).then(
-			() => {
-				setStatus( { connected: false } );
-				onCollections?.( [] );
-				createSuccessNotice(
-					__(
-						'Disconnected from patternbuilderwp.com.',
-						'pattern-builder'
-					),
-					{ type: 'snackbar' }
-				);
-			}
+	const disconnected = () => {
+		setStatus( { connected: false } );
+		onCollections?.( [] );
+		createSuccessNotice(
+			__( 'Disconnected from patternbuilderwp.com.', 'pattern-builder' ),
+			{ type: 'snackbar' }
 		);
 	};
 
@@ -1184,11 +1257,22 @@ export function CloudBrowser( {
 				<ConnectPanel
 					intro={
 						isLibrary
-							? undefined
-							: __(
-									'Sign in to browse community collections and add them to this site. A free account takes a minute, and keeps your own patterns in the cloud too.',
+							? __(
+									'Keep a pattern library on patternbuilderwp.com: upload patterns from this site, download them anywhere, and share collections with the community. Private by default, public if you want to share.',
 									'pattern-builder'
 							  )
+							: __(
+									'Sign in to browse community collections and add them to this site. A free account you can use to keep your own patterns in the cloud too.',
+									'pattern-builder'
+							  )
+					}
+					title={
+						isLibrary
+							? __(
+									'Take your patterns with you',
+									'pattern-builder'
+							  )
+							: __( 'Community Collections', 'pattern-builder' )
 					}
 					onConnected={ ( data ) => {
 						setStatus( data );
@@ -1204,8 +1288,6 @@ export function CloudBrowser( {
 			</main>
 		);
 	}
-
-	const personal = status.personal;
 
 	const accountBar = isLibrary && (
 		<HStack
@@ -1223,30 +1305,6 @@ export function CloudBrowser( {
 						: __( 'Free', 'pattern-builder' )
 				) }
 			</span>
-			{ personal && personal.cap > 0 && (
-				<span className="pattern-builder-cloud__meta">
-					{ sprintf(
-						/* translators: 1: patterns in Personal, 2: the cap. */
-						__( 'Personal: %1$d of %2$d', 'pattern-builder' ),
-						personal.count,
-						personal.cap
-					) }
-				</span>
-			) }
-			{ personal && personal.cap === -1 && (
-				<span className="pattern-builder-cloud__meta">
-					{ sprintf(
-						/* translators: %d: patterns in Personal. */
-						_n(
-							'Personal: %d pattern',
-							'Personal: %d patterns',
-							personal.count,
-							'pattern-builder'
-						),
-						personal.count
-					) }
-				</span>
-			) }
 
 			{ canGoPro && (
 				<Button
@@ -1283,13 +1341,18 @@ export function CloudBrowser( {
 				</span>
 			) }
 
-			<Button
-				variant="tertiary"
-				icon={ closeSmall }
-				onClick={ disconnect }
-			>
-				{ __( 'Disconnect', 'pattern-builder' ) }
-			</Button>
+			{ status.serviceUrl && (
+				<Button
+					variant="tertiary"
+					href={ `${ status.serviceUrl }/account/` }
+					target="_blank"
+					rel="noreferrer"
+				>
+					{ __( 'My Account', 'pattern-builder' ) }
+				</Button>
+			) }
+
+			<DisconnectButton onDisconnected={ disconnected } />
 		</HStack>
 	);
 

@@ -172,7 +172,7 @@ export const PATTERN_KINDS = [
 			'pattern-builder'
 		),
 		description: __(
-			'These patterns are offered to the user when a new page is created. They often have Design Patterns in them as starter content. They are stored in your theme, because the post types they are offered for are recorded in the pattern file.',
+			'These patterns are offered to the user when a new page is created. They often have Design Patterns in them as starter content. They must be stored in your theme.',
 			'pattern-builder'
 		),
 		// The contexts a starter pattern is offered in are pattern-file
@@ -193,7 +193,7 @@ export const PATTERN_KINDS = [
 		label: __( 'Block Starter Pattern', 'pattern-builder' ),
 		summary: __( 'Offered when a block is inserted.', 'pattern-builder' ),
 		description: __(
-			'These patterns belong to a block. WordPress offers them when that block is inserted and still empty, so an untouched Query Loop or Cover asks which one to start from. The block’s toolbar offers them too, to swap one design for another. They are stored in your theme, because the blocks they belong to are recorded in the pattern file.',
+			'These patterns belong to a block. WordPress offers them when that block is inserted and still empty, so an untouched Query Loop or Cover asks which one to start from. The block’s toolbar offers them too, to swap one design for another. They must be stored in your theme.',
 			'pattern-builder'
 		),
 		// Same story as a starter pattern: Block Types is a pattern-file
@@ -208,7 +208,7 @@ export const PATTERN_KINDS = [
 		label: __( 'Template Pattern', 'pattern-builder' ),
 		summary: __( 'Offered when a template is created.', 'pattern-builder' ),
 		description: __(
-			'These patterns are whole templates, like an archive or a 404, offered in the Site Editor when someone creates a template of that type, header and footer included. They are stored in your theme, because the template types they are offered for are recorded in the pattern file.',
+			'These patterns are whole templates, like an archive or a 404, offered in the Site Editor when someone creates a template of that type, header and footer included. They must be stored in your theme.',
 			'pattern-builder'
 		),
 		fields: [ TEMPLATE_TYPES_FIELD ],
@@ -229,7 +229,7 @@ export const PATTERN_KINDS = [
 		label: __( 'Template Part Pattern', 'pattern-builder' ),
 		summary: __( 'Offered for a header or a footer.', 'pattern-builder' ),
 		description: __(
-			'These patterns belong to a template part. The Site Editor offers them when a header or a footer is created, and from the part itself, to swap one design for another. WordPress supports those two areas only. They are stored in your theme, because the part they belong to is recorded in the pattern file.',
+			'These patterns belong to a template part. The Site Editor offers them when a header or a footer is created, and from the part itself, to swap one design for another. WordPress supports only the header and footer parts for now. They must be stored in your theme.',
 			'pattern-builder'
 		),
 		fields: [ TEMPLATE_PART_AREA_FIELD ],

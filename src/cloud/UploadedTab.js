@@ -656,6 +656,7 @@ export function UploadedTab( {
 	return (
 		<>
 			<main className="pattern-builder-browser__main pattern-builder-cloud">
+
 				{ chrome }
 
 				{ status?.overPolicy && (

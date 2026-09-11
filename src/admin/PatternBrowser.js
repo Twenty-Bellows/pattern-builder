@@ -33,14 +33,14 @@ const UNCATEGORIZED = 'uncategorized';
  * The four collections a pattern can come from. User and Theme are local;
  * Uploaded and Community are served by the cloud browser.
  */
-const USER = 'user';
 const THEME = 'theme';
+const USER = 'user';
 const UPLOADED = 'uploaded';
 const COMMUNITY = 'community';
 
 const COLLECTIONS = [
-	{ key: USER, label: __( 'User', 'pattern-builder' ) },
 	{ key: THEME, label: __( 'Theme', 'pattern-builder' ) },
+	{ key: USER, label: __( 'User', 'pattern-builder' ) },
 	{ key: UPLOADED, label: __( 'Uploaded', 'pattern-builder' ) },
 	{ key: COMMUNITY, label: __( 'Community', 'pattern-builder' ) },
 ];
@@ -130,7 +130,7 @@ function CategoryRail( { categories, active, onSelect } ) {
 export function PatternBrowser( { onEdit, editorSettings } ) {
 	const [ patterns, setPatterns ] = useState( null );
 	const [ search, setSearch ] = useState( '' );
-	const [ collection, setCollection ] = useState( USER );
+	const [ collection, setCollection ] = useState( THEME );
 	const [ category, setCategory ] = useState( ALL );
 	const [ cloudCollections, setCloudCollections ] = useState( [] );
 	const [ selectedId, setSelectedId ] = useState( null );

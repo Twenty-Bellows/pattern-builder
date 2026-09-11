@@ -114,25 +114,9 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 				<Heading level={ 2 } size={ 16 } truncate>
 					{ pattern.title }
 				</Heading>
-				<Text variant="muted" size="12px">
-					{ isThemePattern
-						? _x( 'Theme Pattern', 'UI String', 'pattern-builder' )
-						: _x( 'User Pattern', 'UI String', 'pattern-builder' ) }
-				</Text>
+				<Text>{ pattern.description }</Text>
 
 				<Flex className="pattern-builder-details__actions" gap={ 2 }>
-					<FlexItem isBlock>
-						<Button
-							__next40pxDefaultSize
-							variant="primary"
-							disabled={ ! hasEdits || isSaving }
-							isBusy={ isSaving }
-							onClick={ save }
-							className="pattern-builder-details__action-button"
-						>
-							{ __( 'Save', 'pattern-builder' ) }
-						</Button>
-					</FlexItem>
 					<FlexItem isBlock>
 						<Button
 							__next40pxDefaultSize
@@ -157,33 +141,6 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 					<>
 						<PanelBody
 							title={ _x(
-								'Pattern Metadata',
-								'UI String',
-								'pattern-builder'
-							) }
-							initialOpen
-						>
-							<PatternMetadataPanel
-								patternPost={ record }
-								postType={ postType }
-							/>
-						</PanelBody>
-
-						<PanelBody
-							title={ _x(
-								'Pattern Synced Status',
-								'UI String',
-								'pattern-builder'
-							) }
-						>
-							<PatternSyncedStatusPanel
-								patternPost={ record }
-								postType={ postType }
-							/>
-						</PanelBody>
-
-						<PanelBody
-							title={ _x(
 								'Pattern Source',
 								'UI String',
 								'pattern-builder'
@@ -195,21 +152,6 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 								postType={ postType }
 							/>
 						</PanelBody>
-
-						{ isThemePattern && (
-							<PanelBody
-								title={ _x(
-									'Pattern Associations',
-									'UI String',
-									'pattern-builder'
-								) }
-								initialOpen={ false }
-							>
-								<PatternAssociationsPanel
-									patternPost={ record }
-								/>
-							</PanelBody>
-						) }
 
 						<PanelBody
 							title={ _x(
