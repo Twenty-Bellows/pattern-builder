@@ -48,7 +48,7 @@ The panel shows the tree before the upload: *"Uploads 5 patterns: Home Page, plu
 
 Installing needs no rewriting at all. The reference in the markup is `studio-a/heroes/hero`, the file written is `patterns/studio-a/heroes/hero.php` with that exact `Slug:` header, and it resolves. This is namespacing paying for itself.
 
-- `install_cloud_pattern()` resolves the tree from the collection listing (every dependency is in the same collection, guaranteed by the service) and installs **leaves first**.
+- `install_cloud_pattern()` resolves the tree from the collection listing (every dependency is in the same collection, guaranteed by the service) and installs **leaves first**. The directory's listing is addressed by the owner and slug the install was handed. The account's own library addresses a collection by id, so its listing is `GET /library/collections/{id}`, with the id found by matching the package's own namespace in `GET /library/collections` — a library install gets its tree whether or not the caller named the collection, and an agent never does.
 - A member already installed under that name is skipped, so installing two page patterns that share a hero installs the hero once. Installs are idempotent by name.
 - **Dependencies always install as theme patterns**, even when the parent is going to a user pattern, because a `wp_block` can never be a `core/pattern` target. The destination step says so in a line rather than silently doing something surprising.
 - A failed dependency aborts the parent and names what failed; already-written members stay.
@@ -94,7 +94,7 @@ The Pattern Source panel — which both the browse sidebar and the editor render
 ## 9. Tests
 
 - **JS** (`tests/unit/pattern-tree.test.js`): references extracted from nested markup; the transitive walk in leaves-first order; a cycle detected and named; a missing name reported; references rewritten into a target namespace without touching anything else in the markup.
-- **PHP** (`tests/php/`, `pre_http_request` mocked as every cloud test does): `export_tree()` sends leaves first and rewrites references; a missing dependency refuses before any request is made; the install order; a second install of a shared dependency is skipped; the `Origin:` stamp in each of its three cases; the header round-trips through a file write and read.
+- **PHP** (`tests/php/`, `pre_http_request` mocked as every cloud test does): `export_tree()` sends leaves first and rewrites references; a missing dependency refuses before any request is made; the install order, from the directory and from the account's own library (with the collection named, and without it, as an agent asks); a second install of a shared dependency is skipped; the `Origin:` stamp in each of its three cases; the header round-trips through a file write and read.
 - **Manual**: `tests/e2e/cloud-roundtrip.php` extended to upload a page pattern with two sections and install it on a second site, checking the installed page renders its sections rather than placeholder copy.
 
 ## 10. Order of work (commits, stacked on the collections branch)
