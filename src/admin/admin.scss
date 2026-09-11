@@ -261,14 +261,8 @@ body.appearance_page_pattern-builder {
 	text-align: start;
 
 	&__preview {
-		// Grid, not flex: the preview mounts more than one element and flex
-		// would shrink them against each other. Short patterns sit in the
-		// middle of the tile; taller ones start at the top and lose their
-		// tail to the crop (`safe` is what keeps an overflowing pattern from
-		// being centred out through the top edge).
-		display: grid;
-		grid-template-columns: minmax(0, 1fr);
-		align-content: safe center;
+		// The square frame. The document inside centres a short pattern and
+		// starts a tall one at the top, so the frame only has to clip it.
 		position: relative;
 		width: 100%;
 		aspect-ratio: 1 / 1;
@@ -288,12 +282,11 @@ body.appearance_page_pattern-builder {
 
 	}
 
-	// A local preview scales itself to the tile width — BlockPreview's own
-	// iframe must be left alone — while a cloud preview renders the service's
-	// document at the design width and is scaled by the fixed ratio between
-	// the two. Same ratio either way, so a pattern is cropped at the same
+	// Every tile is a document — the site's own render of a local pattern, or
+	// the service's of a cloud one — framed at the design width and scaled by
+	// the fixed ratio between the two, so a pattern is cropped at the same
 	// point in both grids.
-	&--cloud &__preview iframe {
+	&__preview iframe {
 		position: absolute;
 		top: 0;
 		left: 0;
@@ -313,13 +306,6 @@ body.appearance_page_pattern-builder {
 		box-shadow:
 			inset 0 0 0 1px var(--wp-admin-theme-color, #3858e9),
 			inset 0 0 0 2px #fff;
-	}
-
-	&__placeholder {
-		display: block;
-		width: 100%;
-		height: 100%;
-		background: #f0f0f0;
 	}
 
 	&__title {

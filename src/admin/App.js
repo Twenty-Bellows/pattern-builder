@@ -22,6 +22,8 @@ export function PatternBuilderAdminApp( { settings } ) {
 		<PatternBrowser
 			onEdit={ openPattern }
 			editorSettings={ settings.editorSettings || {} }
+			tileBase={ settings.tileBase || '' }
+			designVersion={ settings.designVersion || '' }
 		/>
 	);
 }

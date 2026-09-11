@@ -11,7 +11,6 @@ import { registerCoreBlocks } from '@wordpress/block-library';
 
 import { PatternBuilderAdminApp } from './admin/App';
 import { bootPatternEditor } from './admin/editor-boot';
-import { registerPreviewBindings } from './admin/preview-bindings';
 import { setTelemetryState } from './utils/telemetry';
 import './admin/admin.scss';
 
@@ -59,12 +58,11 @@ if ( settings.pattern ) {
 
 		lockToViewportBottom( mountPoint );
 
-		// Core's editor screens do this during boot; the browse screen (which
-		// renders block previews) boots itself. The edit mode must NOT do
-		// this — initializeEditor registers core blocks and the binding
-		// sources on its own.
+		// Core's editor screens do this during boot; the browse screen boots
+		// itself, since its details panels parse and validate block markup
+		// (the tiles are drawn by the site, not here). The edit mode must NOT
+		// do this — initializeEditor registers core blocks on its own.
 		registerCoreBlocks();
-		registerPreviewBindings();
 
 		createRoot( mountPoint ).render(
 			<PatternBuilderAdminApp settings={ settings } />

@@ -220,6 +220,11 @@ class Pattern_Builder_Admin {
 						// before the download rather than after — the
 						// server refuses either way.
 						'wordPressVersion' => Pattern_Builder_Cloud_Porter::wordpress_version(),
+						// Where the grid's tiles are drawn — the site's own front
+						// end — and the part of each tile's cache key that is the
+						// same for every tile. Only the browse screen has tiles.
+						'tileBase'         => $pattern ? '' : Pattern_Builder_Preview::tile_base(),
+						'designVersion'    => $pattern ? '' : Pattern_Builder_Preview::design_version(),
 					)
 				)
 			),

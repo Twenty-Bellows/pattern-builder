@@ -18,6 +18,12 @@
  *               above it allows one to, and nothing in a pattern says whether
  *               it does.
  *
+ * The browse grid's tiles are the same standalone render, served from the
+ * front end rather than over REST (see serve_tile()): the site's own renderer
+ * draws every tile, so a tile shows what the site shows — block style
+ * variations, bindings and references included — with nothing re-created in
+ * the browser.
+ *
  * @package PatternBuilder
  */
 
@@ -43,6 +49,11 @@ class Pattern_Builder_Preview {
 	const STAND_IN_ID = 999000001;
 
 	/**
+	 * The query argument that asks the front end for a pattern's tile.
+	 */
+	const TILE_QUERY_VAR = 'pattern_builder_tile';
+
+	/**
 	 * The document to serve, held between the route callback and the filter
 	 * that writes it, because a REST response would otherwise be JSON.
 	 *
@@ -65,10 +76,12 @@ class Pattern_Builder_Preview {
 	private $carried = array();
 
 	/**
-	 * Hook the route.
+	 * Hook the route, and the tile ahead of the admin bar's own setup (which
+	 * runs at 0) so a tile is never drawn with one.
 	 */
 	public function __construct() {
 		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
+		add_action( 'template_redirect', array( $this, 'serve_tile' ), -1 );
 	}
 
 	/**
@@ -138,6 +151,170 @@ class Pattern_Builder_Preview {
 		}
 
 		return add_query_arg( $args, rest_url( self::REST_NAMESPACE . '/preview' ) );
+	}
+
+	/**
+	 * Where the browse grid asks for tiles: the front end, which the grid adds
+	 * the pattern and its cache key to.
+	 *
+	 * @return string
+	 */
+	public static function tile_base() {
+		return home_url( '/' );
+	}
+
+	/**
+	 * What every tile's render depends on besides the patterns in it: the
+	 * theme and its design system (theme.json, its style partials — block
+	 * style variations among them — its stylesheet and functions.php), the
+	 * site's Global Styles, and the software drawing it all. Part of each
+	 * tile's cache key, so a change to any of it redraws every tile.
+	 *
+	 * @return string
+	 */
+	public static function design_version() {
+		$parts = array(
+			get_bloginfo( 'version' ),
+			PATTERN_BUILDER_VERSION,
+			get_stylesheet(),
+			get_template(),
+			wp_json_encode( (array) get_option( 'active_plugins', array() ) ),
+			is_multisite() ? wp_json_encode( (array) get_site_option( 'active_sitewide_plugins', array() ) ) : '',
+		);
+
+		foreach ( array_unique( array( get_stylesheet_directory(), get_template_directory() ) ) as $directory ) {
+			$files = array_merge(
+				array( $directory . '/theme.json', $directory . '/style.css', $directory . '/functions.php' ),
+				(array) glob( $directory . '/styles/*.json' ),
+				(array) glob( $directory . '/styles/*/*.json' )
+			);
+			foreach ( $files as $file ) {
+				$parts[] = $file . '@' . ( is_file( $file ) ? filemtime( $file ) : 0 );
+			}
+		}
+
+		$global_styles = \WP_Theme_JSON_Resolver::get_user_data_from_wp_global_styles( wp_get_theme() );
+		$parts[]       = isset( $global_styles['post_modified_gmt'] ) ? $global_styles['post_modified_gmt'] : '';
+
+		return substr( md5( implode( '|', $parts ) ), 0, 12 );
+	}
+
+	/**
+	 * Serve a tile, when the front-end request asks for one.
+	 *
+	 * A front-end request rather than a REST one, because an iframe can send
+	 * the login cookie but not the REST nonce, and a nonce in the URL would
+	 * change every twelve hours and take the browser's cache with it. Leaving
+	 * the nonce out is safe here for three reasons: the tile changes nothing,
+	 * so there is no request for another site to forge; it answers only a user
+	 * who may edit posts; and only this site may frame it.
+	 */
+	public function serve_tile() {
+		if ( ! isset( $_GET[ self::TILE_QUERY_VAR ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only; see above.
+			return;
+		}
+
+		// Private to whoever asked, so no page cache may keep it.
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true );
+		}
+
+		$tile = $this->tile(
+			sanitize_text_field( wp_unslash( $_GET[ self::TILE_QUERY_VAR ] ) ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			! empty( $_GET['v'] ) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		);
+
+		if ( ! headers_sent() ) {
+			// WordPress sends no-cache headers to anyone logged in; a versioned
+			// tile replaces them with its own.
+			header_remove( 'Expires' );
+			header_remove( 'Pragma' );
+			status_header( $tile['status'] );
+			foreach ( $tile['headers'] as $name => $value ) {
+				header( $name . ': ' . $value );
+			}
+		}
+
+		echo $tile['body']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered blocks, escaped by the blocks that produced them.
+		exit;
+	}
+
+	/**
+	 * A pattern's tile: the response serve_tile() sends, built without
+	 * sending it.
+	 *
+	 * With a cache key (`v`), the URL changes whenever anything the tile
+	 * depends on does, so the browser may keep it for as long as it likes.
+	 *
+	 * @param string $id        Pattern id.
+	 * @param bool   $versioned Whether the request carries a cache key.
+	 * @return array { status: int, headers: array, body: string }
+	 */
+	public function tile( $id, $versioned ) {
+		$headers = array(
+			'Content-Type'            => 'text/html; charset=' . get_option( 'blog_charset' ),
+			'X-Robots-Tag'            => 'noindex',
+			'Content-Security-Policy' => 'frame-ancestors ' . self::frame_ancestors(),
+			'Cache-Control'           => 'no-store',
+		);
+
+		if ( ! $this->can_preview() ) {
+			return array(
+				'status'  => is_user_logged_in() ? 403 : 401,
+				'headers' => $headers,
+				'body'    => '',
+			);
+		}
+
+		$pattern = $this->find( $id );
+		if ( is_wp_error( $pattern ) ) {
+			return array(
+				'status'  => 404,
+				'headers' => $headers,
+				'body'    => '',
+			);
+		}
+
+		show_admin_bar( false );
+
+		if ( $versioned ) {
+			$headers['Cache-Control'] = 'private, max-age=31536000, immutable';
+		}
+
+		return array(
+			'status'  => 200,
+			'headers' => $headers,
+			'body'    => self::without_scripts( $this->document_around( do_blocks( $pattern->content ), $pattern, true ) ),
+		);
+	}
+
+	/**
+	 * Who may frame a tile: this site, and the admin when it lives elsewhere.
+	 *
+	 * @return string
+	 */
+	private static function frame_ancestors() {
+		$sources = array( "'self'" );
+		$admin   = wp_parse_url( admin_url() );
+
+		if ( ! empty( $admin['scheme'] ) && ! empty( $admin['host'] ) ) {
+			$sources[] = $admin['scheme'] . '://' . $admin['host'] . ( isset( $admin['port'] ) ? ':' . $admin['port'] : '' );
+		}
+
+		return implode( ' ', $sources );
+	}
+
+	/**
+	 * A tile is a picture of a pattern: the site's front-end scripts would run
+	 * once per tile and do nothing a picture needs, so they are left out.
+	 *
+	 * @param string $html The document.
+	 * @return string
+	 */
+	private static function without_scripts( $html ) {
+		$html = preg_replace( '#<script\b[^>]*>.*?</script>\s*#is', '', $html );
+
+		return (string) preg_replace( '#<link\b[^>]*\brel=(["\'])modulepreload\1[^>]*>\s*#i', '', (string) $html );
 	}
 
 	/**
@@ -591,7 +768,7 @@ class Pattern_Builder_Preview {
 	 * @param Abstract_Pattern $pattern The pattern.
 	 * @return string
 	 */
-	private function document_around( $html, $pattern ) {
+	private function document_around( $html, $pattern, $tile = false ) {
 		ob_start();
 
 		?>
@@ -602,11 +779,35 @@ class Pattern_Builder_Preview {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title><?php echo esc_html( $pattern->title ); ?></title>
 		<?php wp_head(); ?>
+		<?php if ( $tile ) : ?>
+<style id="pattern-builder-tile">
+	/*
+	 * The grid frames this document at a fixed size and scales it into its
+	 * tile, exactly as it does the cloud's preview documents, so it centres
+	 * its own content the way those do: a pattern shorter than the frame sits
+	 * in the middle, a taller one starts at the top and runs off the bottom,
+	 * where the tile crops it (`safe` keeps it from being centred out through
+	 * the top edge). Whatever the footer prints lands below the frame.
+	 */
+	html, body { margin: 0; padding: 0; background: #fff; }
+	body { pointer-events: none; }
+	.pattern-builder-tile { min-height: 100vh; display: grid; align-content: safe center; }
+	/* flow-root so the pattern's own margins stay inside the centring. */
+	.pattern-builder-tile__content { display: flow-root; }
+	.pattern-builder-tile__content > * { margin-top: 0 !important; }
+</style>
+		<?php endif; ?>
 </head>
 <body class="pattern-builder-preview wp-embed-responsive">
 		<?php
+		if ( $tile ) {
+			echo '<div class="pattern-builder-tile"><div class="pattern-builder-tile__content">';
+		}
 		// Rendered block output, escaped by the blocks that produced it.
 		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		if ( $tile ) {
+			echo '</div></div>';
+		}
 		wp_footer();
 		?>
 </body>

@@ -14,6 +14,7 @@ import { store as coreStore } from '@wordpress/core-data';
 import { store as noticesStore } from '@wordpress/notices';
 
 import { fetchAllPatterns } from '../utils/resolvers';
+import { tileUrls } from '../utils/tileKey';
 import { PatternCard } from '../components/PatternCard';
 import { PatternDetailsPanel } from '../components/PatternDetailsPanel';
 import { PatternCreatePanel } from '../components/PatternCreatePanel';
@@ -125,9 +126,16 @@ function CategoryRail( { categories, active, onSelect } ) {
  *
  * @param {Object}   props                Component props.
  * @param {Function} props.onEdit         Called with the pattern to open its editor.
- * @param {Object}   props.editorSettings Block editor settings for previews.
+ * @param {Object}   props.editorSettings Block editor settings, for the details panels.
+ * @param {string}   props.tileBase       Where the site draws the grid's tiles.
+ * @param {string}   props.designVersion  What every tile's render depends on.
  */
-export function PatternBrowser( { onEdit, editorSettings } ) {
+export function PatternBrowser( {
+	onEdit,
+	editorSettings,
+	tileBase,
+	designVersion,
+} ) {
 	const [ patterns, setPatterns ] = useState( null );
 	const [ search, setSearch ] = useState( '' );
 	const [ collection, setCollection ] = useState( THEME );
@@ -162,33 +170,15 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 	);
 
 	/*
-	 * A preview resolves a `wp:pattern` reference against the block editor's
-	 * own pattern list, which reaches it through the settings. The settings
-	 * this page prints carry none — core stopped putting patterns in editor
-	 * settings, and every editor fetches them itself — so a pattern that
-	 * references another rendered "not available" in its tile while opening
-	 * perfectly in the editor next door.
-	 *
-	 * The screen waits for the fetch rather than rendering a grid of
-	 * warnings and correcting it a moment later; it waits on the resolution
-	 * finishing, not on the value, so a request that fails still lets the
-	 * browser through.
+	 * Every tile is the site's own render of its pattern, so nothing here
+	 * re-creates what the editor provides for rendering — styles, block style
+	 * variations, bindings, the patterns a reference resolves to. The key in
+	 * each URL follows the pattern and everything it places, so an edit, a
+	 * section's edit or a design change is a new URL and the rest stay cached.
 	 */
-	const { blockPatterns, hasBlockPatterns } = useSelect( ( select ) => {
-		const { getBlockPatterns, hasFinishedResolution } = select( coreStore );
-
-		return {
-			blockPatterns: getBlockPatterns(),
-			hasBlockPatterns: hasFinishedResolution( 'getBlockPatterns' ),
-		};
-	}, [] );
-
-	const previewSettings = useMemo(
-		() => ( {
-			...editorSettings,
-			__experimentalBlockPatterns: blockPatterns || [],
-		} ),
-		[ editorSettings, blockPatterns ]
+	const tiles = useMemo(
+		() => tileUrls( patterns, tileBase, designVersion ),
+		[ patterns, tileBase, designVersion ]
 	);
 
 	const snackbarNotices = useSelect(
@@ -326,7 +316,7 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 		[ patterns, selectedId ]
 	);
 
-	if ( null === patterns || ! hasBlockPatterns ) {
+	if ( null === patterns ) {
 		return (
 			<div className="pattern-builder-browser__loading">
 				<Spinner />
@@ -335,10 +325,9 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 	}
 
 	return (
-		// Real editor settings: previews need theme styles, the
-		// block-bindings map to render `__default` bindings, and the
-		// registered patterns to resolve a reference to another pattern.
-		<BlockEditorProvider settings={ previewSettings }>
+		// The details sidebar's panels are the editor's own, and read the
+		// block editor's settings as they do there.
+		<BlockEditorProvider settings={ editorSettings }>
 			<div className="pattern-builder-browser">
 				<header className="pattern-builder-browser__header">
 					<div className="pattern-builder-browser__brand">
@@ -422,6 +411,7 @@ export function PatternBrowser( { onEdit, editorSettings } ) {
 										<PatternCard
 											key={ pattern.id || pattern.name }
 											pattern={ pattern }
+											tileUrl={ tiles.get( pattern.id ) }
 											isSelected={
 												pattern.id === selectedId
 											}

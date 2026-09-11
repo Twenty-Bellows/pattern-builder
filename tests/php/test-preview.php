@@ -326,4 +326,115 @@ class Test_Preview extends WP_UnitTestCase {
 
 		$this->assertArrayHasKey( '/pattern-builder/v1/preview', $routes );
 	}
+
+	/**
+	 * A user pattern to draw a tile of.
+	 *
+	 * @param string $content Its markup.
+	 * @return int Post ID.
+	 */
+	private function a_user_pattern( $content = '<!-- wp:paragraph --><p>Tile copy.</p><!-- /wp:paragraph -->' ) {
+		return self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_block',
+				'post_status'  => 'publish',
+				'post_title'   => 'Tile Probe',
+				'post_content' => $content,
+			)
+		);
+	}
+
+	/**
+	 * What the tiles exist for: a block style variation is styled in its
+	 * tile, because the site's own renderer drew it. The editor's in-browser
+	 * preview could not apply one outside an editor boot.
+	 */
+	public function test_a_tile_styles_the_block_style_variation_it_applies() {
+		register_block_style(
+			'core/group',
+			array(
+				'name'       => 'tile-probe',
+				'label'      => 'Tile probe',
+				'style_data' => array( 'color' => array( 'background' => '#123456' ) ),
+			)
+		);
+		WP_Theme_JSON_Resolver::clean_cached_data();
+
+		$post_id = $this->a_user_pattern( '<!-- wp:group {"className":"is-style-tile-probe"} --><div class="wp-block-group is-style-tile-probe"><!-- wp:paragraph --><p>Inside the band.</p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
+		$tile    = $this->preview->tile( (string) $post_id, true );
+
+		unregister_block_style( 'core/group', 'tile-probe' );
+		WP_Theme_JSON_Resolver::clean_cached_data();
+
+		$this->assertSame( 200, $tile['status'] );
+		$this->assertStringContainsString( 'Inside the band.', $tile['body'] );
+		$this->assertStringContainsString( 'is-style-tile-probe--', $tile['body'] );
+		$this->assertStringContainsString( '#123456', $tile['body'] );
+	}
+
+	/**
+	 * A tile is a picture: no scripts, framed only here, centred by its own
+	 * document, and kept by the browser for as long as its key holds.
+	 */
+	public function test_a_tile_is_a_cacheable_picture_only_this_site_frames() {
+		add_action(
+			'wp_enqueue_scripts',
+			static function () {
+				wp_enqueue_script( 'tile-probe', 'https://example.test/probe.js', array(), '1', true );
+			}
+		);
+
+		$tile = $this->preview->tile( (string) $this->a_user_pattern(), true );
+
+		$this->assertSame( 200, $tile['status'] );
+		$this->assertStringContainsString( 'Tile copy.', $tile['body'] );
+		$this->assertStringNotContainsString( '<script', $tile['body'] );
+		$this->assertStringContainsString( 'pattern-builder-tile__content', $tile['body'] );
+		$this->assertStringContainsString( "frame-ancestors 'self'", $tile['headers']['Content-Security-Policy'] );
+		$this->assertSame( 'private, max-age=31536000, immutable', $tile['headers']['Cache-Control'] );
+	}
+
+	/**
+	 * Without a key there is nothing to tell a stale tile from a fresh one.
+	 */
+	public function test_a_tile_without_a_key_is_not_kept() {
+		$tile = $this->preview->tile( (string) $this->a_user_pattern(), false );
+
+		$this->assertSame( 200, $tile['status'] );
+		$this->assertSame( 'no-store', $tile['headers']['Cache-Control'] );
+	}
+
+	/**
+	 * With no nonce, the capability is the whole door.
+	 */
+	public function test_a_tile_answers_only_someone_who_may_edit() {
+		$post_id = $this->a_user_pattern();
+
+		wp_set_current_user( 0 );
+		$refused = $this->preview->tile( (string) $post_id, true );
+		$this->assertSame( 401, $refused['status'] );
+		$this->assertSame( '', $refused['body'] );
+		$this->assertSame( 'no-store', $refused['headers']['Cache-Control'] );
+
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'subscriber' ) ) );
+		$this->assertSame( 403, $this->preview->tile( (string) $post_id, true )['status'] );
+	}
+
+	public function test_an_unknown_tile_is_a_404() {
+		$this->assertSame( 404, $this->preview->tile( 'nobody/nothing', true )['status'] );
+	}
+
+	/**
+	 * The part of every tile's key that is not the pattern: it holds still,
+	 * and moves when something every tile depends on does.
+	 */
+	public function test_the_design_version_follows_what_every_tile_depends_on() {
+		$before = Pattern_Builder_Preview::design_version();
+
+		$this->assertSame( $before, Pattern_Builder_Preview::design_version() );
+
+		update_option( 'active_plugins', array( 'tile-probe/tile-probe.php' ) );
+
+		$this->assertNotSame( $before, Pattern_Builder_Preview::design_version() );
+	}
 }
