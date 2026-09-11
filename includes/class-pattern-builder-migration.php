@@ -60,6 +60,12 @@ class Pattern_Builder_Migration {
 		$stored = get_option( self::VERSION_OPTION, '0' );
 
 		if ( version_compare( $stored, '2.0.0', '>=' ) ) {
+			if ( version_compare( $stored, PATTERN_BUILDER_VERSION, '<' ) ) {
+				// 2.1 builds from before each pattern carried its own `Cloud:`
+				// reference kept a site-wide map of them; nothing reads it now.
+				delete_option( 'pattern_builder_cloud_links' );
+				update_option( self::VERSION_OPTION, PATTERN_BUILDER_VERSION );
+			}
 			return;
 		}
 

@@ -44,7 +44,7 @@ class Pattern_Builder_Cloud_Porter {
 	 * @param string|int $id   Theme pattern name or wp_block post ID.
 	 * @param string     $target_namespace  Target `{handle}/{collection}` to point this
 	 *                               pattern's references at, or '' to leave them.
-	 * @return array|WP_Error { pbp: array, files: array (key => path), localKey: string, contentHash: string }
+	 * @return array|WP_Error { pbp: array, files: array (key => path) }
 	 */
 	public function export_local( $type, $id, $target_namespace = '' ) {
 		$pattern = $this->load_local( $type, $id );
@@ -53,7 +53,6 @@ class Pattern_Builder_Cloud_Porter {
 		}
 
 		$content = (string) $pattern->content;
-		$raw_md5 = md5( $content );
 		$files   = array();
 		$assets  = array();
 
@@ -89,8 +88,7 @@ class Pattern_Builder_Cloud_Porter {
 		/*
 		 * The pattern's references have to name the collection it is going
 		 * into, because that is where its dependencies are being uploaded
-		 * to. The hash above is of the local content, so "changed since
-		 * upload?" still compares like with like.
+		 * to.
 		 */
 		if ( '' !== $target_namespace ) {
 			$content = self::rewrite_references( $content, $target_namespace );
@@ -138,10 +136,8 @@ class Pattern_Builder_Cloud_Porter {
 		);
 
 		return array(
-			'pbp'         => $pbp,
-			'files'       => $files,
-			'localKey'    => self::local_key( $type, $id ),
-			'contentHash' => $raw_md5,
+			'pbp'   => $pbp,
+			'files' => $files,
 		);
 	}
 
@@ -380,40 +376,20 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * Hash of a local pattern's raw content — the "has it changed since
-	 * upload?" fingerprint stored in the cloud-link map.
+	 * Record on a local pattern which cloud pattern is its copy, or forget
+	 * it — the `Cloud:` header or its post meta.
 	 *
 	 * @param string     $type 'theme' or 'user'.
 	 * @param string|int $id   Local identifier.
-	 * @return string|WP_Error
+	 * @param string     $name `{handle}/{collection}/{slug}`, or '' to forget.
+	 * @return true|WP_Error
 	 */
-	public function content_hash( $type, $id ) {
+	public function remember_cloud_copy( $type, $id, $name ) {
 		$pattern = $this->load_local( $type, $id );
 		if ( is_wp_error( $pattern ) ) {
 			return $pattern;
 		}
-		return md5( (string) $pattern->content );
-	}
-
-	/**
-	 * A local pattern's identity, or null when it no longer exists — the
-	 * liveness check behind "installed on this site".
-	 *
-	 * @param string     $type 'theme' or 'user'.
-	 * @param string|int $id   Local identifier.
-	 * @return array|null { type: string, id: string|int, title: string }
-	 */
-	public function describe_local( $type, $id ) {
-		$pattern = $this->load_local( $type, $id );
-		if ( is_wp_error( $pattern ) ) {
-			return null;
-		}
-
-		return array(
-			'type'  => $type,
-			'id'    => $id,
-			'title' => (string) $pattern->title,
-		);
+		return $this->store->set_cloud_reference( $pattern, $name );
 	}
 
 	/**
@@ -485,6 +461,11 @@ class Pattern_Builder_Cloud_Porter {
 
 		$origin = $this->origin_for( $pbp );
 
+		// The cloud pattern this is a copy of, kept on the pattern: what
+		// answers "is this installed here?" and, for the account's own
+		// patterns, what lets an edit here go back up as an update.
+		$cloud = self::cloud_name_of_package( $pbp );
+
 		if ( 'theme' === $destination ) {
 			/*
 			 * No attachments to name: a theme pattern's images are moved into
@@ -492,25 +473,31 @@ class Pattern_Builder_Cloud_Porter {
 			 * (Pattern_File_Store::update_theme_pattern), so the package's
 			 * blocks stay as they arrived — an id would name nothing.
 			 */
-			return $this->import_as_theme_pattern( $pbp, $title, $this->install_name( $pbp, $slug ), $description, $categories, $synced, $content, $origin );
+			return $this->import_as_theme_pattern( $pbp, $title, $this->install_name( $pbp, $slug ), $description, $categories, $synced, $content, $origin, $cloud );
 		}
 
 		// A user pattern's images did land in the media library, so its blocks
 		// can name them — the identity the export dropped, in local terms.
 		$content = $this->attach_media_library_ids( $content, $attachments );
 
-		return $this->import_as_user_pattern( $title, $slug, $description, $categories, $synced, $content, $origin );
+		return $this->import_as_user_pattern( $title, $slug, $description, $categories, $synced, $content, $origin, $cloud );
 	}
 
 	/**
-	 * Build the link-map key for a local pattern.
+	 * A package's cloud name, when it carries a whole one.
 	 *
-	 * @param string     $type 'theme' or 'user'.
-	 * @param string|int $id   Local identifier.
-	 * @return string
+	 * @param array $pbp Package.
+	 * @return string `{handle}/{collection}/{slug}`, or ''.
 	 */
-	public static function local_key( $type, $id ) {
-		return $type . ':' . $id;
+	private static function cloud_name_of_package( $pbp ) {
+		$segments = array_map(
+			static function ( $segment ) {
+				return preg_replace( '/[^a-z0-9_-]/', '', strtolower( $segment ) );
+			},
+			explode( '/', isset( $pbp['namespace'] ) ? (string) $pbp['namespace'] : '' )
+		);
+
+		return 3 === count( $segments ) && 3 === count( array_filter( $segments, 'strlen' ) ) ? implode( '/', $segments ) : '';
 	}
 
 	/**
@@ -1009,9 +996,10 @@ class Pattern_Builder_Cloud_Porter {
 	 * @param bool     $synced      Synced flag.
 	 * @param string   $content     Sanitized markup with local URLs.
 	 * @param string   $origin      Attribution to record, or ''.
+	 * @param string   $cloud       The cloud pattern this is a copy of, or ''.
 	 * @return array|WP_Error
 	 */
-	private function import_as_user_pattern( $title, $slug, $description, $categories, $synced, $content, $origin = '' ) {
+	private function import_as_user_pattern( $title, $slug, $description, $categories, $synced, $content, $origin = '', $cloud = '' ) {
 		$post_id = wp_insert_post(
 			array(
 				'post_title'   => $title,
@@ -1036,6 +1024,10 @@ class Pattern_Builder_Cloud_Porter {
 
 		if ( '' !== $origin ) {
 			update_post_meta( $post_id, Pattern_File_Store::META_ORIGIN, $origin );
+		}
+
+		if ( '' !== $cloud ) {
+			update_post_meta( $post_id, Pattern_File_Store::META_CLOUD, $cloud );
 		}
 
 		if ( ! empty( $categories ) ) {
@@ -1079,42 +1071,12 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * Which local pattern (if any) a cloud pattern is installed as; a
-	 * deleted local copy reads as not installed.
-	 *
-	 * @param int $cloud_id Cloud pattern ID.
-	 * @return array|null { type, id, title, collection: array }
-	 */
-	public function find_installed( $cloud_id ) {
-		foreach ( Pattern_Builder_Cloud::links() as $key => $link ) {
-			if ( (int) $link['cloudId'] !== (int) $cloud_id ) {
-				continue;
-			}
-
-			$parts = explode( ':', (string) $key, 2 );
-			if ( 2 !== count( $parts ) ) {
-				continue;
-			}
-
-			$type  = 'user' === $parts[0] ? 'user' : 'theme';
-			$id    = 'user' === $type ? (int) $parts[1] : $parts[1];
-			$local = $this->describe_local( $type, $id );
-			if ( $local ) {
-				$local['collection'] = isset( $link['collection'] ) && is_array( $link['collection'] ) ? $link['collection'] : array();
-				return $local;
-			}
-		}
-
-		return null;
-	}
-
-	/**
 	 * Install a whole cloud collection onto this site.
 	 *
 	 * Fetches the collection, then imports each pattern in turn through the
-	 * single-pattern path: one the link map says is already installed from
-	 * this collection is skipped, a failure is recorded and the rest carry
-	 * on, and every pattern lands under the collection's local category.
+	 * single-pattern path: one already here under its cloud name is skipped,
+	 * a failure is recorded and the rest carry on, and every pattern lands
+	 * under the collection's local category.
 	 * The browser drives the same steps itself through /cloud/download so it
 	 * can show progress; the agent ability calls this.
 	 *
@@ -1140,6 +1102,7 @@ class Pattern_Builder_Cloud_Porter {
 		}
 
 		$described = Pattern_Builder_Cloud::describe_collection( $collection );
+		$installed = $this->store->cloud_names();
 		$results   = array();
 		$counts    = array(
 			'installed' => 0,
@@ -1149,25 +1112,23 @@ class Pattern_Builder_Cloud_Porter {
 
 		foreach ( $collection['patterns'] as $summary ) {
 			$cloud_id = isset( $summary['id'] ) ? (int) $summary['id'] : 0;
+			$name     = Pattern_Builder_Cloud::name_of( $summary );
 			$title    = isset( $summary['title'] ) ? (string) $summary['title'] : '';
 			$result   = array(
 				'cloudId' => $cloud_id,
 				'title'   => $title,
 			);
 
-			$installed = $cloud_id ? $this->find_installed( $cloud_id ) : null;
-			if ( $installed && ! empty( $installed['collection']['slug'] )
-				&& $installed['collection']['slug'] === $described['slug']
-				&& (int) $installed['collection']['owner'] === $described['owner'] ) {
+			if ( '' !== $name && isset( $installed[ $name ] ) ) {
 				$result['status'] = 'skipped';
-				$result['type']   = $installed['type'];
-				$result['id']     = $installed['id'];
+				$result['type']   = $installed[ $name ]['type'];
+				$result['id']     = $installed[ $name ]['id'];
 				++$counts['skipped'];
 				$results[] = $result;
 				continue;
 			}
 
-			$outcome = $this->install_cloud_pattern( $cloud_id, $destination, 'add' === $tokens, $described, ! empty( $summary['mine'] ) );
+			$outcome = $this->install_cloud_pattern( $cloud_id, $destination, 'add' === $tokens, $described );
 			if ( is_wp_error( $outcome ) ) {
 				$result['status']  = 'failed';
 				$result['message'] = $outcome->get_error_message();
@@ -1177,6 +1138,26 @@ class Pattern_Builder_Cloud_Porter {
 				$result['type']   = $outcome['type'];
 				$result['id']     = $outcome['id'];
 				++$counts['installed'];
+
+				// It is here now, and so are the sections it brought — always
+				// theme patterns, under their own names — so a later pattern
+				// in the list that is one of them is skipped.
+				if ( '' !== $name ) {
+					$installed[ $name ] = array(
+						'type'  => $outcome['type'],
+						'id'    => $outcome['id'],
+						'title' => $title,
+					);
+				}
+				foreach ( (array) $outcome['dependencies'] as $dependency ) {
+					if ( ! isset( $installed[ $dependency ] ) ) {
+						$installed[ $dependency ] = array(
+							'type'  => 'theme',
+							'id'    => $dependency,
+							'title' => $dependency,
+						);
+					}
+				}
 			}
 			$results[] = $result;
 		}
@@ -1247,19 +1228,18 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * Download one directory pattern and land it here: the single-pattern
 	 * path the REST route and install_collection() share. Missing design
-	 * tokens go to the same destination as the pattern, and the link map
-	 * records the cloud copy and its collection.
+	 * tokens go to the same destination as the pattern, and the pattern
+	 * keeps the name of the cloud pattern it is a copy of.
 	 *
 	 * @param int    $cloud_id   Cloud pattern ID.
 	 * @param string $destination 'user' or 'theme'.
 	 * @param bool   $add_tokens Whether to write the design tokens this site lacks.
 	 * @param array  $collection { owner, slug, title } or empty.
-	 * @param bool   $mine       Whether the cloud copy is this account's, as the service said.
 	 * @param string $source     'directory' or 'library'.
 	 * @param array  $seen       Cloud ids already being installed, for the recursion.
 	 * @return array|WP_Error { type, id, title, tokensWritten, dependencies }
 	 */
-	public function install_cloud_pattern( $cloud_id, $destination, $add_tokens, $collection = array(), $mine = false, $source = 'directory', $seen = array() ) {
+	public function install_cloud_pattern( $cloud_id, $destination, $add_tokens, $collection = array(), $source = 'directory', $seen = array() ) {
 		$cloud_id    = (int) $cloud_id;
 		$destination = 'theme' === $destination ? 'theme' : 'user';
 		$source      = 'library' === $source ? 'library' : 'directory';
@@ -1350,23 +1330,7 @@ class Pattern_Builder_Cloud_Porter {
 			return $result;
 		}
 
-		$result['dependencies'] = $dependencies;
-
-		$hash = $this->content_hash( $result['type'], $result['id'] );
-
-		/*
-		 * Whether the cloud copy is this account's to update later. One from
-		 * the account's own library always is; one from the directory only if
-		 * the service said so when it listed it.
-		 */
-		Pattern_Builder_Cloud::set_link(
-			self::local_key( $result['type'], $result['id'] ),
-			$cloud_id,
-			is_wp_error( $hash ) ? '' : $hash,
-			'library' === $source || $mine,
-			$collection
-		);
-
+		$result['dependencies']      = $dependencies;
 		$result['tokensWritten']     = $tokens_written;
 		$result['variationsWritten'] = $variations_written;
 		return $result;
@@ -1437,7 +1401,7 @@ class Pattern_Builder_Cloud_Porter {
 			}
 			$seen[ $dependency_id ] = true;
 
-			$outcome = $this->install_cloud_pattern( $dependency_id, 'theme', $add_tokens, $collection, false, $source, $seen );
+			$outcome = $this->install_cloud_pattern( $dependency_id, 'theme', $add_tokens, $collection, $source, $seen );
 			if ( is_wp_error( $outcome ) ) {
 				return $outcome;
 			}
@@ -1569,9 +1533,10 @@ class Pattern_Builder_Cloud_Porter {
 	 * @param bool     $synced      Synced flag.
 	 * @param string   $content     Sanitized markup with local URLs.
 	 * @param string   $origin      Attribution to record, or ''.
+	 * @param string   $cloud       The cloud pattern this is a copy of, or ''.
 	 * @return array|WP_Error
 	 */
-	private function import_as_theme_pattern( $pbp, $title, $name, $description, $categories, $synced, $content, $origin = '' ) {
+	private function import_as_theme_pattern( $pbp, $title, $name, $description, $categories, $synced, $content, $origin = '', $cloud = '' ) {
 		$pattern = new Abstract_Pattern(
 			array(
 				'id'            => $name,
@@ -1586,6 +1551,7 @@ class Pattern_Builder_Cloud_Porter {
 				'inserter'      => true,
 				'source'        => 'theme',
 				'origin'        => $origin,
+				'cloud'         => $cloud,
 			)
 		);
 

@@ -17,8 +17,18 @@ import {
 	needsNewerWordPress,
 } from '../../src/cloud/collections';
 
-const starter = { owner: 2, slug: 'starter-sections', title: 'Starter' };
-const other = { owner: 2, slug: 'other', title: 'Other' };
+const starter = {
+	owner: 2,
+	slug: 'starter-sections',
+	namespace: 'studio/starter-sections',
+	title: 'Starter',
+};
+const other = {
+	owner: 2,
+	slug: 'other',
+	namespace: 'studio/other',
+	title: 'Other',
+};
 
 describe( 'unionTokens', () => {
 	it( 'keeps one of each token across the patterns, first value winning', () => {
@@ -43,19 +53,16 @@ describe( 'unionTokens', () => {
 } );
 
 describe( 'planInstall', () => {
-	it( 'skips only what is already installed from this collection', () => {
-		const plan = planInstall(
-			[
-				{ id: 1, installed: null },
-				{ id: 2, installed: { type: 'user', collection: starter } },
-				{ id: 3, installed: { type: 'user', collection: other } },
-				{ id: 4, installed: { type: 'user', collection: {} } },
-			],
-			starter
-		);
+	it( 'skips what is already here under its cloud name', () => {
+		const plan = planInstall( [
+			{ id: 1, installed: null },
+			{ id: 2, installed: { type: 'user', id: 7 } },
+			{ id: 3 },
+			{ id: 4, installed: { type: 'theme', id: 'studio/other/hero' } },
+		] );
 
-		expect( plan.toInstall.map( ( p ) => p.id ) ).toEqual( [ 1, 3, 4 ] );
-		expect( plan.skipped.map( ( p ) => p.id ) ).toEqual( [ 2 ] );
+		expect( plan.toInstall.map( ( p ) => p.id ) ).toEqual( [ 1, 3 ] );
+		expect( plan.skipped.map( ( p ) => p.id ) ).toEqual( [ 2, 4 ] );
 	} );
 } );
 
@@ -77,17 +84,19 @@ describe( 'summarizeInstall', () => {
 } );
 
 describe( 'installedFromCollection', () => {
-	it( 'counts the link-map entries that name the collection', () => {
-		const links = {
-			'user:1': { cloudId: 10, collection: starter },
-			'user:2': { cloudId: 11, collection: other },
-			'theme:x': { cloudId: 12, collection: { ...starter } },
-			'user:3': { cloudId: 13 },
-		};
+	it( 'counts the local cloud names under the collection’s namespace', () => {
+		const names = [
+			'studio/starter-sections/hero',
+			'studio/other/hero',
+			'studio/starter-sections/footer',
+			// A different collection whose slug merely starts the same way.
+			'studio/starter-sections-two/hero',
+		];
 
-		expect( installedFromCollection( links, starter ) ).toBe( 2 );
-		expect( installedFromCollection( links, other ) ).toBe( 1 );
-		expect( installedFromCollection( {}, starter ) ).toBe( 0 );
+		expect( installedFromCollection( names, starter ) ).toBe( 2 );
+		expect( installedFromCollection( names, other ) ).toBe( 1 );
+		expect( installedFromCollection( [], starter ) ).toBe( 0 );
+		expect( installedFromCollection( names, { slug: 'x' } ) ).toBe( 0 );
 	} );
 } );
 

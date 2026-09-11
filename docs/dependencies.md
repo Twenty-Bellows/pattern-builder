@@ -33,11 +33,12 @@ The existing block-validity gate (`src/utils/blockValidity.js`) runs over **ever
 The upload runs server-side, in the proxy, so the authoritative walk is `Pattern_Builder_Cloud_Porter::local_tree()` rather than the JavaScript one — and `/cloud/pattern-tree` serves the panel from that same code, so there is one answer rather than two.
 
 1. **Walk** the tree locally, leaves first, over the theme's own pattern files.
-2. **Resolve the target.** `GET /library/collections` gives the collection's `namespace` and its count — only the service knows the account's handle and the collection's slug. A pattern that references nothing skips this entirely: there is nothing to rewrite, so an ordinary upload costs exactly what it always did.
-3. **Pre-flight the cap.** Count the members not already linked and check them against the Personal cap **before uploading anything**, so a tree that will not fit is refused whole rather than half way. The service refuses one pattern at a time, which for a tree means stopping in the middle.
-4. **Rewrite** each member's references onto the target namespace, on the exported copy; the local file is untouched, and the content hash is still of the local content so "changed since upload?" compares like with like.
-5. **Upload** leaves first. Each request is validated by the service against what is already in the collection, so ordering is the whole of the transaction: no batching, no rollback.
-6. **Link** every member in the link map, as a single upload does today.
+2. **Resolve the target.** The root's `Cloud:` reference, when the connected account's library still has it, makes this an update in that pattern's collection; otherwise it goes into the collection asked for. `GET /library/collections` gives the collection's `namespace` and its count — only the service knows the account's handle and the collection's slug. A pattern that references nothing skips this entirely: there is nothing to rewrite, so an ordinary upload costs exactly what it always did.
+3. **Address each member by name** in that collection (`GET /library/patterns/by-name/{collection}/{slug}`): one that is there is updated, one that is not is created. A name that is already the cloud copy of a *different* pattern on this site refuses the whole upload (`pb_cloud_name_taken`) rather than overwrite it.
+4. **Pre-flight the cap.** Count the members that will be created and check them against the Personal cap **before uploading anything**, so a tree that will not fit is refused whole rather than half way. The service refuses one pattern at a time, which for a tree means stopping in the middle.
+5. **Rewrite** each member's references onto the target namespace, on the exported copy; the local file's content is untouched.
+6. **Upload** leaves first. Each request is validated by the service against what is already in the collection, so ordering is the whole of the transaction: no batching, no rollback.
+7. **Remember** each copy on the pattern: the root takes its copy's name as its `Cloud:` reference, and every other member does too unless it already carries a copy of the account's own elsewhere — a section shared by pages in two collections has a copy in each, and its reference names the first.
 
 A failure part-way leaves the successfully uploaded members in place — they are valid patterns on their own — and reports which member failed and why. The parent is not uploaded.
 
@@ -64,7 +65,7 @@ The `Origin:` file header, and `pattern_builder_origin` post meta for user patte
 | Install, no `origin`, and it is the account's own pattern | Write nothing. |
 | Upload | Send the header if there is one. |
 
-Core parses a fixed list of pattern-file headers and ignores the rest, so `Origin:` is inert to WordPress and travels with the theme — which is the point, since a link map does not. It is the one piece of service metadata that belongs in a distributed theme file: a **link** is this site's relationship to a cloud copy and stays in the option map, an **origin** is part of the pattern's identity.
+Core parses a fixed list of pattern-file headers and ignores the rest, so `Origin:` is inert to WordPress and travels with the theme — which is the point. It sits beside the `Cloud:` header and is not the same thing: `Cloud:` names this pattern's own copy on the cloud and changes whenever the pattern goes up somewhere new, while an **origin** names whose work it started as and is never rewritten. A pattern installed from somebody else's collection and then shared again from yours carries both.
 
 The Pattern Source panel — which both the browse sidebar and the editor render — shows one line: *"Originally from studio-a/heroes/hero"*. By construction an origin never names your own account, so there is no display-time check and a pattern you authored shows nothing.
 

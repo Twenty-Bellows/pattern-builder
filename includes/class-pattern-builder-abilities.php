@@ -2844,6 +2844,11 @@ class Pattern_Builder_Abilities {
 			$args['viewportWidth'] = $fallback( 'viewportWidth', null );
 		}
 
+		// Installs and uploads write these, never an edit, so an update
+		// carries them over rather than dropping them.
+		$args['origin'] = (string) $fallback( 'origin', '' );
+		$args['cloud']  = (string) $fallback( 'cloud', '' );
+
 		return $args;
 	}
 
@@ -2922,6 +2927,11 @@ class Pattern_Builder_Abilities {
 		if ( ! empty( $pattern->origin ) ) {
 			// Attribution: the cloud pattern this one was first copied from.
 			$summary['origin'] = (string) $pattern->origin;
+		}
+
+		if ( ! empty( $pattern->cloud ) ) {
+			// Where this pattern's own copy lives on the cloud.
+			$summary['cloud'] = (string) $pattern->cloud;
 		}
 
 		return $summary;

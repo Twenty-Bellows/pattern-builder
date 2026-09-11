@@ -12,6 +12,7 @@
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud;
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Controller;
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Porter;
+use TwentyBellows\PatternBuilder\Pattern_File_Store;
 
 class Test_Cloud_Tree extends WP_UnitTestCase {
 
@@ -21,6 +22,13 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 	 * @var array
 	 */
 	private $seen = array();
+
+	/**
+	 * What the mocked account's library holds: cloud name => id.
+	 *
+	 * @var array
+	 */
+	private $library = array();
 
 	/**
 	 * The writable theme directory these tests write pattern files into.
@@ -49,7 +57,8 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 		add_filter( 'stylesheet_directory', array( $this, 'theme_dir' ) );
 		add_filter( 'stylesheet', array( $this, 'theme_slug' ) );
 
-		$this->seen = array();
+		$this->seen    = array();
+		$this->library = array();
 	}
 
 	public function tear_down() {
@@ -67,7 +76,6 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 
 		delete_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_TOKEN );
 		delete_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_ACCOUNT );
-		delete_option( Pattern_Builder_Cloud::OPTION_LINKS );
 		parent::tear_down();
 	}
 
@@ -96,9 +104,20 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 	 * @param string $title   Pattern title.
 	 * @param string $content Block markup.
 	 */
-	private function make_theme_pattern( $slug, $title, $content ) {
-		$header = "<?php\n/**\n * Title: {$title}\n * Slug: simple-theme/{$slug}\n * Description: A test pattern.\n */\n?>\n";
+	private function make_theme_pattern( $slug, $title, $content, $cloud = '' ) {
+		$cloud  = $cloud ? "\n * Cloud: {$cloud}" : '';
+		$header = "<?php\n/**\n * Title: {$title}\n * Slug: simple-theme/{$slug}\n * Description: A test pattern.{$cloud}\n */\n?>\n";
 		file_put_contents( $this->theme_dir . '/patterns/' . $slug . '.php', $header . $content ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+	}
+
+	/**
+	 * The `Cloud:` reference a theme pattern carries now.
+	 *
+	 * @param string $name Local pattern name.
+	 * @return string
+	 */
+	private function cloud_of( $name ) {
+		return ( new Pattern_File_Store() )->find_theme_pattern( $name )->cloud;
 	}
 
 	/**
@@ -112,32 +131,22 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Mock the service. Every create answers with an incrementing id.
+	 * Mock the service: Personal, and a library that answers a lookup by name
+	 * with 404 until something is uploaded under it.
 	 *
-	 * @param array $collections What GET /library/collections answers.
+	 * @param int $personal_count How many patterns Personal holds already.
+	 * @param int $personal_cap   Its cap, or -1 for none.
 	 */
-	private function mock_service( $collections = null ) {
-		if ( null === $collections ) {
-			$collections = array(
-				array(
-					'id'        => 9,
-					'title'     => 'Personal',
-					'slug'      => 'personal',
-					'namespace' => 'studio-a/personal',
-					'personal'  => true,
-					'count'     => 0,
-				),
-			);
-		}
-
+	private function mock_service( $personal_count = 0, $personal_cap = -1 ) {
 		$next = 100;
 
 		add_filter(
 			'pre_http_request',
-			function ( $pre, $args, $url ) use ( $collections, &$next ) {
+			function ( $pre, $args, $url ) use ( $personal_count, $personal_cap, &$next ) {
 				$query = array();
 				parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
 				$path = str_replace( '/pbwp/v1', '', (string) ( $query['rest_route'] ?? '' ) );
+				$code = 200;
 
 				$this->seen[] = array(
 					'method' => $args['method'],
@@ -146,34 +155,69 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 				);
 
 				if ( '/library/collections' === $path ) {
-					$body = $collections;
-				} elseif ( '/me' === $path ) {
-					$body = array( 'entitlements' => array( 'personal_cap' => -1 ) );
-				} else {
 					$body = array(
-						'id'         => $next++,
-						'title'      => 'Uploaded',
-						'collection' => array(
-							'id'       => 9,
-							'owner'    => 7,
-							'slug'     => 'personal',
-							'title'    => 'Personal',
-							'personal' => true,
+						array(
+							'id'        => 9,
+							'title'     => 'Personal',
+							'slug'      => 'personal',
+							'namespace' => 'studio-a/personal',
+							'personal'  => true,
+							'count'     => $personal_count,
 						),
 					);
+				} elseif ( '/me' === $path ) {
+					$body = array( 'entitlements' => array( 'personal_cap' => $personal_cap ) );
+				} elseif ( 0 === strpos( $path, '/library/patterns/by-name/' ) ) {
+					$name = 'studio-a/' . substr( $path, strlen( '/library/patterns/by-name/' ) );
+					if ( isset( $this->library[ $name ] ) ) {
+						$body = $this->summary( $name );
+					} else {
+						$code = 404;
+						$body = array( 'code' => 'pbwp_not_found' );
+					}
+				} else {
+					preg_match( '/"slug":"([^"]+)"/', (string) $args['body'], $slug );
+					$name = 'studio-a/personal/' . $slug[1];
+					if ( ! isset( $this->library[ $name ] ) ) {
+						$this->library[ $name ] = $next++;
+					}
+					$body = $this->summary( $name );
 				}
 
 				return array(
 					'headers'  => array(),
 					'body'     => wp_json_encode( $body ),
 					'response' => array(
-						'code'    => 200,
+						'code'    => $code,
 						'message' => 'OK',
 					),
 				);
 			},
 			10,
 			3
+		);
+	}
+
+	/**
+	 * A library pattern as the mocked service summarizes it.
+	 *
+	 * @param string $name Its cloud name.
+	 * @return array
+	 */
+	private function summary( $name ) {
+		return array(
+			'id'         => $this->library[ $name ],
+			'title'      => 'Uploaded',
+			'slug'       => substr( $name, strrpos( $name, '/' ) + 1 ),
+			'namespace'  => $name,
+			'collection' => array(
+				'id'        => 9,
+				'owner'     => 7,
+				'slug'      => 'personal',
+				'title'     => 'Personal',
+				'namespace' => 'studio-a/personal',
+				'personal'  => true,
+			),
 		);
 	}
 
@@ -185,11 +229,26 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 	private function uploads() {
 		$bodies = array();
 		foreach ( $this->seen as $request ) {
-			if ( 0 === strpos( $request['path'], '/library/patterns' ) ) {
+			if ( 'POST' === $request['method'] && 0 === strpos( $request['path'], '/library/patterns' ) ) {
 				$bodies[] = $request['body'];
 			}
 		}
 		return $bodies;
+	}
+
+	/**
+	 * The paths every pattern create or update was sent to, in order.
+	 *
+	 * @return string[]
+	 */
+	private function upload_paths() {
+		$paths = array();
+		foreach ( $this->seen as $request ) {
+			if ( 'POST' === $request['method'] && 0 === strpos( $request['path'], '/library/patterns' ) ) {
+				$paths[] = $request['path'];
+			}
+		}
+		return $paths;
 	}
 
 	public function test_a_page_pattern_uploads_its_sections_first() {
@@ -223,10 +282,62 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'studio-a\/personal\/cta', $uploads[2] );
 		$this->assertStringNotContainsString( 'simple-theme\/hero', $uploads[2] );
 
-		// Every member is linked, so a second upload updates rather than duplicates.
-		$links = Pattern_Builder_Cloud::links();
-		$this->assertArrayHasKey( Pattern_Builder_Cloud_Porter::local_key( 'theme', 'simple-theme/hero' ), $links );
-		$this->assertArrayHasKey( Pattern_Builder_Cloud_Porter::local_key( 'theme', 'simple-theme/page-home' ), $links );
+		// Every member now carries the name of its copy…
+		$this->assertSame( 'studio-a/personal/hero', $this->cloud_of( 'simple-theme/hero' ) );
+		$this->assertSame( 'studio-a/personal/cta', $this->cloud_of( 'simple-theme/cta' ) );
+		$this->assertSame( 'studio-a/personal/page-home', $this->cloud_of( 'simple-theme/page-home' ) );
+		$this->assertSame( 'studio-a/personal/page-home', $result['cloud'] );
+
+		// …so a second upload updates all three rather than duplicating any.
+		$this->seen = array();
+		$again      = Pattern_Builder_Cloud_Controller::upload_pattern( 'theme', 'simple-theme/page-home' );
+
+		$this->assertIsArray( $again, is_wp_error( $again ) ? $again->get_error_message() : '' );
+		$this->assertTrue( $again['updated'] );
+		$this->assertSame(
+			array(
+				'/library/patterns/' . $this->library['studio-a/personal/hero'],
+				'/library/patterns/' . $this->library['studio-a/personal/cta'],
+				'/library/patterns/' . $this->library['studio-a/personal/page-home'],
+			),
+			$this->upload_paths()
+		);
+		$this->assertCount( 3, $this->library );
+	}
+
+	public function test_a_section_whose_name_is_another_patterns_copy_is_refused() {
+		// Another pattern here was uploaded as studio-a/personal/hero…
+		$this->make_theme_pattern( 'hero-copy', 'Older Hero', '<!-- wp:paragraph --><p>Older</p><!-- /wp:paragraph -->', 'studio-a/personal/hero' );
+		// …and this page's hero would go up under that same name.
+		$this->make_theme_pattern( 'hero', 'Hero', '<!-- wp:paragraph --><p>Hero</p><!-- /wp:paragraph -->' );
+		$this->make_theme_pattern( 'page-home', 'Home Page', $this->reference( 'simple-theme/hero' ) );
+
+		$this->mock_service();
+		$this->library['studio-a/personal/hero'] = 50;
+
+		$result = Pattern_Builder_Cloud_Controller::upload_pattern( 'theme', 'simple-theme/page-home' );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_cloud_name_taken', $result->get_error_code() );
+		$this->assertStringContainsString( 'Older Hero', $result->get_error_message() );
+		$this->assertSame( array(), $this->uploads() );
+	}
+
+	public function test_a_section_keeps_the_copy_it_already_has() {
+		// The hero went up on its own, into another collection, first.
+		$this->make_theme_pattern( 'hero', 'Hero', '<!-- wp:paragraph --><p>Hero</p><!-- /wp:paragraph -->', 'studio-a/elsewhere/hero' );
+		$this->make_theme_pattern( 'page-home', 'Home Page', $this->reference( 'simple-theme/hero' ) );
+
+		$this->mock_service();
+
+		$result = Pattern_Builder_Cloud_Controller::upload_pattern( 'theme', 'simple-theme/page-home' );
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		// The page's collection gets a copy of it, since a collection is a
+		// closed world; the hero's own reference is left where it was.
+		$this->assertArrayHasKey( 'studio-a/personal/hero', $this->library );
+		$this->assertSame( 'studio-a/elsewhere/hero', $this->cloud_of( 'simple-theme/hero' ) );
+		$this->assertSame( 'studio-a/personal/page-home', $this->cloud_of( 'simple-theme/page-home' ) );
 	}
 
 	public function test_a_missing_dependency_refuses_before_anything_is_sent() {
@@ -301,46 +412,7 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 			$this->reference( 'simple-theme/hero' ) . "\n" . $this->reference( 'simple-theme/cta' )
 		);
 
-		add_filter(
-			'pre_http_request',
-			function ( $pre, $args, $url ) {
-				$query = array();
-				parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
-				$path = str_replace( '/pbwp/v1', '', (string) ( $query['rest_route'] ?? '' ) );
-
-				$this->seen[] = array(
-					'method' => $args['method'],
-					'path'   => $path,
-					'body'   => is_string( $args['body'] ) ? $args['body'] : '',
-				);
-
-				if ( '/library/collections' === $path ) {
-					$body = array(
-						array(
-							'id'        => 9,
-							'title'     => 'Personal',
-							'slug'      => 'personal',
-							'namespace' => 'studio-a/personal',
-							'personal'  => true,
-							'count'     => 24,
-						),
-					);
-				} else {
-					$body = array( 'entitlements' => array( 'personal_cap' => 25 ) );
-				}
-
-				return array(
-					'headers'  => array(),
-					'body'     => wp_json_encode( $body ),
-					'response' => array(
-						'code'    => 200,
-						'message' => 'OK',
-					),
-				);
-			},
-			10,
-			3
-		);
+		$this->mock_service( 24, 25 );
 
 		$result = Pattern_Builder_Cloud_Controller::upload_pattern( 'theme', 'simple-theme/page-home' );
 
@@ -439,6 +511,8 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 		$this->assertFileExists( $page );
 		$this->assertStringContainsString( 'studio-b/heroes/hero', file_get_contents( $page ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
 
+		// Each keeps the name of the cloud pattern it is a copy of.
+		$this->assertStringContainsString( 'Cloud: studio-b/heroes/page-home', file_get_contents( $page ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
 	}
 
 	public function test_a_section_already_here_is_not_installed_again() {

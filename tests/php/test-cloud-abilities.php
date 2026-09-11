@@ -11,6 +11,7 @@
 
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud;
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Abilities;
+use TwentyBellows\PatternBuilder\Pattern_File_Store;
 
 class Test_Cloud_Abilities extends WP_UnitTestCase {
 
@@ -38,14 +39,21 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 		remove_all_filters( 'pre_http_request' );
 		delete_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_TOKEN );
 		delete_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_ACCOUNT );
-		delete_option( Pattern_Builder_Cloud::OPTION_LINKS );
 		delete_option( Pattern_Builder_Cloud::OPTION_COLLECTION_CATEGORIES );
 		parent::tear_down();
 	}
 
 	private function connect() {
 		update_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_TOKEN, 'pbwp_test-token' );
-		update_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_ACCOUNT, array( 'id' => 7, 'name' => 'Tester' ) );
+		update_user_meta(
+			get_current_user_id(),
+			Pattern_Builder_Cloud::META_ACCOUNT,
+			array(
+				'id'     => 7,
+				'name'   => 'Tester',
+				'handle' => 'studio',
+			)
+		);
 	}
 
 	private function mock_service( $callback ) {
@@ -93,12 +101,24 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 
 	private function package( $id, $title ) {
 		return array(
-			'format'  => 'pbp/1',
-			'title'   => $title,
-			'slug'    => sanitize_title( $title ),
-			'content' => '<!-- wp:paragraph --><p>' . esc_html( $title ) . '</p><!-- /wp:paragraph -->',
-			'assets'  => array(),
-			'tokens'  => array(),
+			'format'    => 'pbp/1',
+			'title'     => $title,
+			'slug'      => sanitize_title( $title ),
+			'namespace' => 'studio-b/starter-sections/' . sanitize_title( $title ),
+			'content'   => '<!-- wp:paragraph --><p>' . esc_html( $title ) . '</p><!-- /wp:paragraph -->',
+			'assets'    => array(),
+			'tokens'    => array(),
+		);
+	}
+
+	/**
+	 * A pattern summary in the collection, as the directory lists it.
+	 */
+	private function pattern( $id, $title ) {
+		return array(
+			'id'        => $id,
+			'title'     => $title,
+			'namespace' => 'studio-b/starter-sections/' . sanitize_title( $title ),
 		);
 	}
 
@@ -198,8 +218,8 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 						$this->collection(),
 						array(
 							'patterns' => array(
-								array( 'id' => 101, 'title' => 'Bold Hero' ),
-								array( 'id' => 102, 'title' => 'Locked One' ),
+								$this->pattern( 101, 'Bold Hero' ),
+								$this->pattern( 102, 'Locked One' ),
 							),
 						)
 					);
@@ -250,15 +270,29 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 
 		$this->assertSame( 'user', $result['pattern']['type'] );
 		$this->assertSame( 'Bold Hero', get_post( $result['pattern']['id'] )->post_title );
-		$this->assertSame( 101, Pattern_Builder_Cloud::links()[ 'user:' . $result['pattern']['id'] ]['cloudId'] );
+		$this->assertSame( 'studio-b/starter-sections/bold-hero', get_post_meta( $result['pattern']['id'], Pattern_File_Store::META_CLOUD, true ) );
 	}
 
 	public function test_upload_pattern_takes_markup_and_defaults_to_personal() {
 		$this->connect();
 		$this->mock_service(
 			function ( $path ) {
-				if ( '/library/patterns' === $path ) {
-					return array( 'id' => 42, 'title' => 'Fresh', 'collection' => array( 'id' => 9, 'owner' => 7, 'slug' => 'personal', 'title' => 'Personal', 'personal' => true ) );
+				$answers = array( '/library/patterns', '/library/patterns/42', '/library/patterns/by-name/personal/fresh' );
+				if ( in_array( $path, $answers, true ) ) {
+					return array(
+						'id'         => 42,
+						'title'      => 'Fresh',
+						'slug'       => 'fresh',
+						'namespace'  => 'studio/personal/fresh',
+						'collection' => array(
+							'id'        => 9,
+							'owner'     => 7,
+							'slug'      => 'personal',
+							'title'     => 'Personal',
+							'namespace' => 'studio/personal',
+							'personal'  => true,
+						),
+					);
 				}
 				return array();
 			}
@@ -282,6 +316,7 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 		// permanent name, decided when it was first uploaded (D38).
 		$again = $this->abilities->execute_upload_pattern( array( 'id' => (string) $result['local']['id'], 'collection' => '31' ) );
 		$this->assertTrue( $again['updated'] );
+		$this->assertSame( '/library/patterns/42', end( $this->seen )['path'] );
 		$this->assertStringNotContainsString( 'name="collection"', end( $this->seen )['body'] );
 	}
 

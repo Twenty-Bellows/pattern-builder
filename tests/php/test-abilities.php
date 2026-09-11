@@ -862,6 +862,39 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Attribution and the cloud reference are written by installs and
+	 * uploads, never by an edit, so an agent's update must not be what drops
+	 * them.
+	 */
+	public function test_update_keeps_the_origin_and_the_cloud_reference() {
+		$this->use_a_writable_theme();
+
+		$this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Agent Kept Cloud',
+				'name'    => 'agent-kept-cloud',
+				'content' => '<!-- wp:paragraph --><p>First.</p><!-- /wp:paragraph -->',
+				'source'  => 'theme',
+			)
+		);
+
+		$file = get_stylesheet_directory() . '/patterns/agent-kept-cloud.php';
+		file_put_contents( $file, preg_replace( '/\n \*\//', "\n * Origin: studio-b/heroes/hero\n * Cloud: studio-a/personal/agent-kept-cloud\n */", file_get_contents( $file ), 1 ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+
+		$this->abilities->execute_update_pattern(
+			array(
+				'id'      => 'agent-kept-cloud',
+				'content' => '<!-- wp:paragraph --><p>Second.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$header = file_get_contents( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		$this->assertStringContainsString( 'Second.', $header );
+		$this->assertStringContainsString( 'Origin: studio-b/heroes/hero', $header );
+		$this->assertStringContainsString( 'Cloud: studio-a/personal/agent-kept-cloud', $header );
+	}
+
+	/**
 	 * A listing is a catalogue, not a payload: an agent choosing between
 	 * patterns should not have to receive every one's markup to do it.
 	 */

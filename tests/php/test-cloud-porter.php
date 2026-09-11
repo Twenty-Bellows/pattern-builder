@@ -64,7 +64,6 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		$this->assertArrayHasKey( $key, $exported['files'] );
 		$this->assertFileExists( $exported['files'][ $key ] );
 		$this->assertSame( 'image/jpeg', $pbp['assets'][0]['mime'] );
-		$this->assertSame( 'user:' . $fixture['post_id'], $exported['localKey'] );
 	}
 
 	/**

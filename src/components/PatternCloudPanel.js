@@ -14,7 +14,6 @@ import { cloudUpload } from '@wordpress/icons';
 import { useDispatch } from '@wordpress/data';
 import { store as noticesStore } from '@wordpress/notices';
 import { addQueryArgs } from '@wordpress/url';
-import { humanTimeDiff } from '@wordpress/date';
 
 import {
 	findInvalidBlocks,
@@ -65,7 +64,9 @@ export function useCloudCollections( connected ) {
 
 /**
  * One pattern's cloud standing: null while loading, then the
- * /cloud/pattern-state payload.
+ * /cloud/pattern-state payload — `linked` when the pattern's `Cloud:`
+ * reference names one of the connected account's patterns that still
+ * exists, with its `cloudId` and `collection`.
  *
  * @param {string}        patternType 'theme' or 'user'.
  * @param {string|number} patternId   Local pattern identifier.
@@ -98,7 +99,10 @@ export function usePatternCloudState( patternType, patternId, refreshKey ) {
 }
 
 /**
- * The Cloud panel's controls: upload, update, or an up-to-date line.
+ * The Cloud panel's controls. A pattern whose copy is in the connected
+ * account's library can push an update to it or delete it; any other —
+ * never uploaded, somebody else's, or a copy since deleted — can be
+ * uploaded into a collection.
  *
  * Uploading is gated on the editor's own block validation. Markup a block
  * type would not have written itself renders correctly here — it is only
@@ -121,7 +125,7 @@ export function PatternCloudControls( {
 	patternId,
 	content,
 } ) {
-	const [ busy, setBusy ] = useState( false );
+	const [ busy, setBusy ] = useState( '' ); // '', 'upload' or 'delete'.
 	const [ error, setError ] = useState( '' );
 	const [ collectionId, setCollectionId ] = useState( 0 );
 	const { createSuccessNotice } = useDispatch( noticesStore );
@@ -204,15 +208,11 @@ export function PatternCloudControls( {
 
 	const isUpdate = state.linked;
 
-	// Downloaded from somebody else's cloud pattern: only its owner can
-	// update it, so there is nothing here to offer.
-	const isTheirs = state.linked && ! state.owned;
-
 	const upload = () => {
 		if ( busy || invalid.length ) {
 			return;
 		}
-		setBusy( true );
+		setBusy( 'upload' );
 		setError( '' );
 		const data = { patternType, patternId };
 		// An update keeps its collection; a first upload names one.
@@ -225,7 +225,7 @@ export function PatternCloudControls( {
 			data,
 		} )
 			.then( () => {
-				setBusy( false );
+				setBusy( '' );
 				if ( ! isUpdate && collectionId ) {
 					setLocalStorageValue( LAST_COLLECTION_KEY, collectionId );
 				}
@@ -241,7 +241,7 @@ export function PatternCloudControls( {
 				onRefresh();
 			} )
 			.catch( ( err ) => {
-				setBusy( false );
+				setBusy( '' );
 				// The service names what it objected to (an image it can't
 				// reach, say); say it too, or the message can't be acted on.
 				const details = err.data?.violations?.length
@@ -257,28 +257,56 @@ export function PatternCloudControls( {
 			} );
 	};
 
-	const uploadedAgo =
-		state.uploadedAt > 0
-			? sprintf(
-					/* translators: %s: relative time, e.g. "2 hours ago". */
-					__( 'Uploaded %s.', 'pattern-builder' ),
-					humanTimeDiff( state.uploadedAt * 1000, Date.now() )
-			  )
-			: '';
+	// The pattern stays here; only its copy goes, and the pattern stops
+	// carrying its name.
+	const deleteFromCloud = () => {
+		if ( busy ) {
+			return;
+		}
+		const confirmed =
+			// eslint-disable-next-line no-alert
+			window.confirm(
+				__(
+					'Delete this pattern from your cloud library? It stays on this site, and sites that downloaded it keep their copies.',
+					'pattern-builder'
+				)
+			);
+		if ( ! confirmed ) {
+			return;
+		}
+		setBusy( 'delete' );
+		setError( '' );
+		apiFetch( {
+			path: addQueryArgs( `${ BASE }/library/${ state.cloudId }`, {
+				patternType,
+				patternId,
+			} ),
+			method: 'DELETE',
+		} )
+			.then( () => {
+				setBusy( '' );
+				createSuccessNotice(
+					__(
+						'Pattern deleted from your cloud library.',
+						'pattern-builder'
+					),
+					{ type: 'snackbar' }
+				);
+				onRefresh();
+			} )
+			.catch( ( err ) => {
+				setBusy( '' );
+				setError(
+					err.message ||
+						__( 'Could not delete the pattern.', 'pattern-builder' )
+				);
+			} );
+	};
 
 	const blockedByInvalidBlocks = invalid.length > 0;
 
 	return (
 		<VStack spacing={ 3 }>
-			{ isTheirs && (
-				<Text variant="muted">
-					{ __(
-						'Downloaded from another account’s pattern. Changes stay on this site — the cloud copy is not yours to update.',
-						'pattern-builder'
-					) }
-				</Text>
-			) }
-
 			{ ! state.linked && (
 				<>
 					<Text variant="muted">
@@ -293,14 +321,14 @@ export function PatternCloudControls( {
 							value={ collectionId }
 							onChange={ setCollectionId }
 							onCreated={ reloadCollections }
-							disabled={ busy }
+							disabled={ !! busy }
 						/>
 					) }
 					<Button
 						variant="primary"
 						icon={ cloudUpload }
-						isBusy={ busy }
-						disabled={ busy || blockedByInvalidBlocks }
+						isBusy={ busy === 'upload' }
+						disabled={ !! busy || blockedByInvalidBlocks }
 						onClick={ upload }
 					>
 						{ __( 'Upload to the cloud', 'pattern-builder' ) }
@@ -308,19 +336,25 @@ export function PatternCloudControls( {
 				</>
 			) }
 
-			{ state.linked && state.owned && state.changed && (
+			{ state.linked && (
 				<>
-					<Text variant="muted">
-						{ __(
-							'This pattern has changed since it was uploaded.',
-							'pattern-builder'
-						) }
-					</Text>
+					{ state.collection?.title && (
+						<Text variant="muted">
+							{ sprintf(
+								/* translators: %s: collection title. */
+								__(
+									'In your cloud library, in %s.',
+									'pattern-builder'
+								),
+								state.collection.title
+							) }
+						</Text>
+					) }
 					<Button
 						variant="primary"
 						icon={ cloudUpload }
-						isBusy={ busy }
-						disabled={ busy || blockedByInvalidBlocks }
+						isBusy={ busy === 'upload' }
+						disabled={ !! busy || blockedByInvalidBlocks }
 						onClick={ upload }
 					>
 						{ __(
@@ -328,27 +362,16 @@ export function PatternCloudControls( {
 							'pattern-builder'
 						) }
 					</Button>
+					<Button
+						variant="tertiary"
+						isDestructive
+						isBusy={ busy === 'delete' }
+						disabled={ !! busy }
+						onClick={ deleteFromCloud }
+					>
+						{ __( 'Delete from cloud', 'pattern-builder' ) }
+					</Button>
 				</>
-			) }
-
-			{ state.linked && state.owned && ! state.changed && (
-				<Text variant="muted">
-					{ __(
-						'Up to date in your cloud library.',
-						'pattern-builder'
-					) }
-					{ uploadedAgo ? ` ${ uploadedAgo }` : '' }
-				</Text>
-			) }
-
-			{ state.linked && state.owned && state.collection?.title && (
-				<Text variant="muted" size="12px">
-					{ sprintf(
-						/* translators: %s: collection title. */
-						__( 'In %s.', 'pattern-builder' ),
-						state.collection.title
-					) }
-				</Text>
 			) }
 
 			{ tree?.problem && (

@@ -11,6 +11,7 @@
 
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud;
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Porter;
+use TwentyBellows\PatternBuilder\Pattern_File_Store;
 
 class Test_Cloud_Collections extends WP_UnitTestCase {
 
@@ -33,7 +34,6 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		remove_all_filters( 'pre_http_request' );
 		delete_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_TOKEN );
 		delete_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_ACCOUNT );
-		delete_option( Pattern_Builder_Cloud::OPTION_LINKS );
 		delete_option( Pattern_Builder_Cloud::OPTION_COLLECTION_CATEGORIES );
 		parent::tear_down();
 	}
@@ -95,6 +95,7 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 				'id'         => 31,
 				'owner'      => 2,
 				'slug'       => 'starter-sections',
+				'namespace'  => 'studio/starter-sections',
 				'title'      => 'Starter Sections',
 				'visibility' => 'public',
 				'personal'   => false,
@@ -112,9 +113,10 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		return array(
 			'id'         => $id,
 			'title'      => $title,
+			'slug'       => sanitize_title( $title ),
+			'namespace'  => 'studio/starter-sections/' . sanitize_title( $title ),
 			'collection' => $this->collection_summary(),
 			'tokens'     => array(),
-			'mine'       => false,
 		);
 	}
 
@@ -126,6 +128,7 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 			'format'             => 'pbp/1',
 			'title'              => $title,
 			'slug'               => sanitize_title( $title ),
+			'namespace'          => 'studio/starter-sections/' . sanitize_title( $title ),
 			'description'        => '',
 			'collection'         => 'starter-sections',
 			'inserterCategories' => array( 'banner' ),
@@ -238,7 +241,16 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		$this->assertSame( '9', end( $this->seen )['query']['collection'] );
 	}
 
-	public function test_upload_names_its_collection_and_the_link_map_records_it() {
+	public function test_upload_names_its_collection_and_the_pattern_keeps_its_cloud_name() {
+		update_user_meta(
+			get_current_user_id(),
+			Pattern_Builder_Cloud::META_ACCOUNT,
+			array(
+				'id'     => 7,
+				'name'   => 'Tester',
+				'handle' => 'studio',
+			)
+		);
 		$post_id = wp_insert_post(
 			array(
 				'post_title'   => 'Local One',
@@ -248,10 +260,18 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 			)
 		);
 
+		$summary = array(
+			'id'         => 42,
+			'title'      => 'Local One',
+			'slug'       => 'local-one',
+			'namespace'  => 'studio/starter-sections/local-one',
+			'collection' => $this->collection_summary(),
+		);
+
 		$this->mock_service(
-			function ( $path, $method ) {
-				if ( '/library/patterns' === $path ) {
-					return array( 'id' => 42, 'title' => 'Local One', 'collection' => $this->collection_summary( array( 'id' => 31 ) ) );
+			function ( $path, $method ) use ( $summary ) {
+				if ( '/library/patterns' === $path || '/library/patterns/by-name/starter-sections/local-one' === $path ) {
+					return $summary;
 				}
 				return array();
 			}
@@ -266,12 +286,13 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		$this->assertStringContainsString( '"inserterCategories"', $sent['body'] );
 		$this->assertStringNotContainsString( '"categories"', $sent['body'] );
 
-		$links = Pattern_Builder_Cloud::links();
-		$this->assertSame( 'starter-sections', $links[ 'user:' . $post_id ]['collection']['slug'] );
-		$this->assertSame( 'Starter Sections', $links[ 'user:' . $post_id ]['collection']['title'] );
+		$this->assertSame( 'studio/starter-sections/local-one', get_post_meta( $post_id, Pattern_File_Store::META_CLOUD, true ) );
 
+		// The panel's collection line comes from the service, asked by name.
 		$state = $this->request( 'GET', '/pattern-builder/v1/cloud/pattern-state', array( 'patternType' => 'user', 'patternId' => $post_id ) )->get_data();
+		$this->assertTrue( $state['linked'] );
 		$this->assertSame( 'starter-sections', $state['collection']['slug'] );
+		$this->assertSame( '/library/patterns/by-name/starter-sections/local-one', end( $this->seen )['path'] );
 	}
 
 	public function test_upload_defaults_to_personal_when_nothing_is_asked() {
@@ -342,8 +363,8 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		$term = get_term_by( 'slug', 'pbwp-2-starter-sections', 'wp_pattern_category' );
 		$this->assertSame( 'Starter Sections', $term->name );
 
-		$links = Pattern_Builder_Cloud::links();
-		$this->assertSame( 'starter-sections', $links[ 'user:' . $result['id'] ]['collection']['slug'] );
+		// And it keeps the name of the cloud pattern it is a copy of.
+		$this->assertSame( 'studio/starter-sections/bold-hero', get_post_meta( $result['id'], Pattern_File_Store::META_CLOUD, true ) );
 	}
 
 	public function test_download_asks_the_directory_which_collection_when_not_told() {
@@ -376,7 +397,7 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 				'post_status'  => 'publish',
 			)
 		);
-		Pattern_Builder_Cloud::set_link( 'user:' . $already, 100, '', false, $this->collection_summary() );
+		update_post_meta( $already, Pattern_File_Store::META_CLOUD, 'studio/starter-sections/already-here' );
 
 		$this->mock_service(
 			function ( $path ) {
@@ -425,7 +446,12 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		$installed = $result['results'][1];
 		$terms     = wp_get_object_terms( $installed['id'], 'wp_pattern_category', array( 'fields' => 'slugs' ) );
 		$this->assertContains( 'pbwp-2-starter-sections', $terms );
-		$this->assertSame( 'starter-sections', Pattern_Builder_Cloud::links()[ 'user:' . $installed['id'] ]['collection']['slug'] );
+		$this->assertSame( 'studio/starter-sections/bold-hero', get_post_meta( $installed['id'], Pattern_File_Store::META_CLOUD, true ) );
+
+		// Installing it again skips what the first run put here.
+		$again = $porter->install_collection( 2, 'starter-sections', 'user', 'skip' );
+		$this->assertSame( 0, $again['installed'] );
+		$this->assertSame( 2, $again['skipped'] );
 	}
 
 	public function test_collection_view_marks_installed_patterns() {
@@ -437,7 +463,7 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 				'post_status'  => 'publish',
 			)
 		);
-		Pattern_Builder_Cloud::set_link( 'user:' . $already, 100, '', false, $this->collection_summary() );
+		update_post_meta( $already, Pattern_File_Store::META_CLOUD, 'studio/starter-sections/already-here' );
 
 		$this->mock_service(
 			function ( $path ) {
@@ -450,7 +476,12 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 
 		$one = $this->request( 'GET', '/pattern-builder/v1/cloud/collections/2/starter-sections' )->get_data();
 		$this->assertSame( 'user', $one['patterns'][0]['installed']['type'] );
-		$this->assertSame( 'starter-sections', $one['patterns'][0]['installed']['collection']['slug'] );
+		$this->assertSame( $already, $one['patterns'][0]['installed']['id'] );
 		$this->assertNull( $one['patterns'][1]['installed'] );
+
+		// The tiles count the same names.
+		$names = $this->request( 'GET', '/pattern-builder/v1/cloud/installed' )->get_data();
+		$this->assertContains( 'studio/starter-sections/already-here', $names );
+		$this->assertNotContains( 'studio/starter-sections/bold-hero', $names );
 	}
 }

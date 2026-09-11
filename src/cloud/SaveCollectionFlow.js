@@ -51,7 +51,7 @@ export function SaveCollectionFlow( {
 	const [ current, setCurrent ] = useState( 0 );
 	const cancelled = useRef( false );
 
-	const plan = planInstall( patterns, collection );
+	const plan = planInstall( patterns );
 
 	useEffect( () => {
 		return () => {
@@ -117,7 +117,6 @@ export function SaveCollectionFlow( {
 					cloudId: pattern.id,
 					destination,
 					addTokens,
-					mine: !! pattern.mine,
 					collection: {
 						owner: collection.owner,
 						slug: collection.slug,

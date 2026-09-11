@@ -124,14 +124,26 @@ class Abstract_Pattern {
 	 * original work here.
 	 *
 	 * Attribution, not linkage (D38): it travels with the pattern, in the
-	 * file header and through every upload and download, while the cloud
-	 * link — which cloud copy this site's pattern corresponds to — stays in
-	 * the site option map, because that is about this site rather than
-	 * about the pattern.
+	 * file header and through every upload and download. Which cloud copy
+	 * this pattern corresponds to is `cloud`, a separate field, because a
+	 * pattern can be somebody else's work and have a copy of its own.
 	 *
 	 * @var string
 	 */
 	public $origin;
+
+	/**
+	 * The name of this pattern's copy on the cloud —
+	 * `{handle}/{collection}/{slug}` — or '' when it has none.
+	 *
+	 * Written by an upload and by an install, and kept on the pattern (the
+	 * `Cloud:` header, or post meta) so it goes wherever the pattern goes.
+	 * Whether that copy still exists, and whether it is the connected
+	 * account's, is asked of the service each time rather than remembered.
+	 *
+	 * @var string
+	 */
+	public $cloud;
 
 	/**
 	 * Constructor.
@@ -161,6 +173,7 @@ class Abstract_Pattern {
 
 		$this->filePath = $args['filePath'] ?? null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 		$this->origin   = $args['origin'] ?? '';
+		$this->cloud    = $args['cloud'] ?? '';
 
 		$this->id = $args['id'] ?? ( 'theme' === $this->source ? $this->name : null );
 	}
@@ -213,6 +226,7 @@ class Abstract_Pattern {
 				'templateTypes' => 'Template Types',
 				'synced'        => 'Synced',
 				'origin'        => 'Origin',
+				'cloud'         => 'Cloud',
 			)
 		);
 
@@ -233,6 +247,7 @@ class Abstract_Pattern {
 				'synced'        => in_array( strtolower( trim( $pattern_data['synced'] ) ), array( 'yes', 'true', '1', 'on' ), true ),
 				'inserter'      => 'no' !== strtolower( trim( $pattern_data['inserter'] ) ),
 				'origin'        => trim( $pattern_data['origin'] ),
+				'cloud'         => trim( $pattern_data['cloud'] ),
 			)
 		);
 	}
@@ -266,6 +281,7 @@ class Abstract_Pattern {
 				'categories'  => $categories,
 				'inserter'    => true,
 				'origin'      => (string) ( $metadata[ Pattern_File_Store::META_ORIGIN ][0] ?? '' ),
+				'cloud'       => (string) ( $metadata[ Pattern_File_Store::META_CLOUD ][0] ?? '' ),
 			)
 		);
 	}

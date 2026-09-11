@@ -97,7 +97,7 @@ export function CommunityTab( {
 	const [ open, setOpen ] = useState( null ); // { owner, slug } of the opened collection.
 	const [ opened, setOpened ] = useState( null ); // Its payload, with patterns.
 	const [ selected, setSelected ] = useState( null );
-	const [ links, setLinks ] = useState( {} );
+	const [ installedNames, setInstalledNames ] = useState( [] );
 	const [ saving, setSaving ] = useState( false );
 	const [ reloadKey, setReloadKey ] = useState( 0 );
 
@@ -115,11 +115,14 @@ export function CommunityTab( {
 
 	const isSearching = search.trim() !== '';
 
-	// The link map, for "installed n of m" on the tiles.
+	// The cloud names this site's patterns answer to, for "installed n of m"
+	// on the tiles.
 	useEffect( () => {
-		apiFetch( { path: `${ BASE }/links` } )
-			.then( ( data ) => setLinks( data || {} ) )
-			.catch( () => setLinks( {} ) );
+		apiFetch( { path: `${ BASE }/installed` } )
+			.then( ( data ) =>
+				setInstalledNames( Array.isArray( data ) ? data : [] )
+			)
+			.catch( () => setInstalledNames( [] ) );
 	}, [ reloadKey ] );
 
 	// A new search restarts paging and closes whatever was open.
@@ -239,7 +242,10 @@ export function CommunityTab( {
 				<CollectionTile
 					key={ collectionKey( collection ) }
 					collection={ collection }
-					installed={ installedFromCollection( links, collection ) }
+					installed={ installedFromCollection(
+						installedNames,
+						collection
+					) }
 					onOpen={ openCollection }
 				/>
 			) ) }

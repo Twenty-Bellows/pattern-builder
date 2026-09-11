@@ -462,6 +462,9 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 			// else's work; empty when it originated here (D38). Read-only:
 			// it is written on install and carried, never edited.
 			'origin'        => (string) $pattern->origin,
+			// The name of this pattern's own copy on the cloud, or empty.
+			// Read-only too: uploads and installs write it.
+			'cloud'         => (string) $pattern->cloud,
 		);
 
 		if ( $is_theme && current_user_can( 'edit_theme_options' ) ) {
@@ -639,6 +642,11 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 				),
 				'origin'        => array(
 					'description' => __( 'The cloud pattern this one was first copied from, or empty when it is original work here.', 'pattern-builder' ),
+					'type'        => 'string',
+					'readonly'    => true,
+				),
+				'cloud'         => array(
+					'description' => __( 'The name of this pattern’s copy on the cloud, or empty when it has none.', 'pattern-builder' ),
 					'type'        => 'string',
 					'readonly'    => true,
 				),

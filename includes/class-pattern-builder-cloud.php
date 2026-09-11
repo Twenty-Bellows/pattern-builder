@@ -11,8 +11,7 @@ use WP_Error;
  */
 class Pattern_Builder_Cloud {
 
-	const OPTION_URL   = 'pattern_builder_cloud_url';
-	const OPTION_LINKS = 'pattern_builder_cloud_links';
+	const OPTION_URL = 'pattern_builder_cloud_url';
 
 	/**
 	 * The local pattern categories that stand for cloud collections:
@@ -212,13 +211,69 @@ class Pattern_Builder_Cloud {
 	 * name it publishes (D37).
 	 *
 	 * What an installed pattern is checked against before it is given an
-	 * attribution: a pattern from your own account gets none.
+	 * attribution — a pattern from your own account gets none — and what
+	 * decides whether a pattern's `Cloud:` reference is yours to update.
 	 *
 	 * @return string Empty when disconnected, or on a service too old to say.
 	 */
 	public static function account_handle() {
 		$account = self::account();
 		return isset( $account['handle'] ) ? trim( (string) $account['handle'] ) : '';
+	}
+
+	/**
+	 * Whether a cloud name — `{handle}/{collection}/{slug}` — is the connected
+	 * account's.
+	 *
+	 * @param string $name Cloud pattern name.
+	 * @return bool
+	 */
+	public static function is_own_name( $name ) {
+		$name   = (string) $name;
+		$handle = self::account_handle();
+
+		return '' !== $handle && 2 === substr_count( $name, '/' ) && 0 === strpos( $name, $handle . '/' );
+	}
+
+	/**
+	 * The connected account's pattern with this name, as the service
+	 * summarizes it — asked each time, never remembered, so an account
+	 * switch or a pattern deleted on the cloud needs no bookkeeping here.
+	 *
+	 * @param string $name Cloud pattern name.
+	 * @return array|null|WP_Error The summary; null when the name is not this
+	 *                             account's or the service has no such
+	 *                             pattern; an error when it could not answer.
+	 */
+	public static function own_pattern( $name ) {
+		if ( ! self::is_own_name( $name ) ) {
+			return null;
+		}
+
+		list( , $collection, $slug ) = explode( '/', (string) $name );
+
+		$found = self::request( 'GET', '/library/patterns/by-name/' . rawurlencode( $collection ) . '/' . rawurlencode( $slug ) );
+		if ( is_wp_error( $found ) ) {
+			return 404 === (int) ( $found->get_error_data()['status'] ?? 0 ) ? null : $found;
+		}
+
+		return $found;
+	}
+
+	/**
+	 * The full name of a cloud pattern as the service summarized it.
+	 *
+	 * @param array $summary A pattern summary from the service.
+	 * @return string `{handle}/{collection}/{slug}`, or '' when it cannot say.
+	 */
+	public static function name_of( $summary ) {
+		if ( ! empty( $summary['namespace'] ) && 2 === substr_count( (string) $summary['namespace'], '/' ) ) {
+			return (string) $summary['namespace'];
+		}
+		if ( ! empty( $summary['collection']['namespace'] ) && ! empty( $summary['slug'] ) ) {
+			return $summary['collection']['namespace'] . '/' . $summary['slug'];
+		}
+		return '';
 	}
 
 	/**
@@ -493,49 +548,8 @@ class Pattern_Builder_Cloud {
 	}
 
 	/**
-	 * The cloud-link map: which local patterns are linked to cloud copies.
-	 *
-	 * @return array localKey => { cloudId: int, account: int, hash: string, uploadedAt: int }
-	 */
-	public static function links() {
-		$links = get_option( self::OPTION_LINKS );
-		return is_array( $links ) ? $links : array();
-	}
-
-	/**
-	 * Remember (or forget) a local pattern's cloud copy.
-	 *
-	 * @param string   $local_key    "theme:{name}" or "user:{postId}".
-	 * @param int|null $cloud_id     Cloud pattern ID, or null to forget.
-	 * @param string   $content_hash md5 of the raw content at upload time;
-	 *                               empty reads as changed.
-	 * @param bool     $owned        Whether the cloud copy is this account's
-	 *                               to update. False for a pattern downloaded
-	 *                               from somebody else's.
-	 * @param array    $collection   The cloud collection the pattern is in,
-	 *                               as { owner, slug, title } — what
-	 *                               "already installed from this collection"
-	 *                               reads. Empty when unknown.
-	 */
-	public static function set_link( $local_key, $cloud_id, $content_hash = '', $owned = true, $collection = array() ) {
-		$links = self::links();
-		if ( null === $cloud_id ) {
-			unset( $links[ $local_key ] );
-		} else {
-			$links[ $local_key ] = array(
-				'cloudId'    => (int) $cloud_id,
-				'account'    => (int) ( self::account()['id'] ?? 0 ),
-				'hash'       => (string) $content_hash,
-				'uploadedAt' => time(),
-				'owned'      => (bool) $owned,
-				'collection' => self::describe_collection( $collection ),
-			);
-		}
-		update_option( self::OPTION_LINKS, $links, false );
-	}
-
-	/**
-	 * The three things the link map keeps about a collection.
+	 * The three things an install keeps about a collection: enough to file
+	 * the pattern under the collection's local category.
 	 *
 	 * @param mixed $collection A collection summary from the service, or a
 	 *                          request's { owner, slug, title }.
@@ -550,25 +564,6 @@ class Pattern_Builder_Cloud {
 			'slug'  => sanitize_title( (string) $collection['slug'] ),
 			'title' => sanitize_text_field( (string) ( $collection['title'] ?? $collection['slug'] ) ),
 		);
-	}
-
-	/**
-	 * Record that a linked cloud pattern is not this account's to update.
-	 *
-	 * The link itself stays: it is what recognizes the pattern as already
-	 * installed. Only the offer to update it goes away.
-	 *
-	 * @param string $local_key "theme:{name}" or "user:{postId}".
-	 */
-	public static function disown_link( $local_key ) {
-		$links = self::links();
-
-		if ( ! isset( $links[ $local_key ] ) ) {
-			return;
-		}
-
-		$links[ $local_key ]['owned'] = false;
-		update_option( self::OPTION_LINKS, $links, false );
 	}
 
 	/**

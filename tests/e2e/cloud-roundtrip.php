@@ -221,8 +221,9 @@ $out['upload'] = $attempt(
 );
 $cloud_id = $out['upload']['pattern']['id'];
 
-// 2. Upload again. The link map should send this down the update path
-// rather than creating a second cloud copy.
+// 2. Upload again. The pattern's `Cloud:` reference, found on the service by
+// name, should send this down the update path rather than creating a second
+// cloud copy.
 $reupload        = $attempt(
 	'Re-upload',
 	$controller->upload(
@@ -266,6 +267,7 @@ $image_path = str_replace( $uploads['baseurl'], $uploads['basedir'], strtok( $im
 $checks = array(
 	'landed as a user pattern'      => 'wp_block' === $post->post_type,
 	'took the update path'          => ! empty( $out['reupload']['updated'] ) && $out['reupload']['sameId'],
+	'carries its cloud name'        => ( new \TwentyBellows\PatternBuilder\Pattern_File_Store() )->find_theme_pattern( $pattern_id )->cloud === $out['upload']['cloud'],
 	'no placeholders left behind'   => false === strpos( $post->post_content, 'pbp-asset:' ),
 	'image points at this site'     => $image_url && 0 === strpos( $image_url, $uploads['baseurl'] ),
 	'image file was fetched'        => $image_path && file_exists( $image_path ),

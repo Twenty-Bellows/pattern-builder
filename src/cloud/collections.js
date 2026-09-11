@@ -21,18 +21,6 @@ export function collectionKey( collection ) {
 }
 
 /**
- * Whether two collection references name the same collection.
- *
- * @param {Object} a A collection summary or link-map entry.
- * @param {Object} b Another.
- * @return {boolean} Whether they match.
- */
-export function sameCollection( a, b ) {
-	const ka = collectionKey( a );
-	return ka !== '' && ka === collectionKey( b );
-}
-
-/**
  * The union of the design tokens a set of patterns references — what a
  * whole-collection install has to check once rather than once per pattern.
  * A token is identified by its type and slug; the first value seen wins,
@@ -55,27 +43,18 @@ export function unionTokens( patterns ) {
 }
 
 /**
- * Which of a collection's patterns to install and which to skip: one the
- * link map says is already installed from this collection is skipped.
+ * Which of a collection's patterns to install and which to skip: one
+ * already here under its cloud name is skipped. The name carries the
+ * collection, so "installed" already means "installed from this one".
  *
- * @param {Array}  patterns   Pattern summaries with an `installed` field.
- * @param {Object} collection The collection they belong to.
+ * @param {Array} patterns Pattern summaries with an `installed` field.
  * @return {{toInstall: Array, skipped: Array}} The plan.
  */
-export function planInstall( patterns, collection ) {
+export function planInstall( patterns ) {
 	const toInstall = [];
 	const skipped = [];
 	( patterns || [] ).forEach( ( pattern ) => {
-		const installed = pattern.installed;
-		if (
-			installed &&
-			installed.collection &&
-			sameCollection( installed.collection, collection )
-		) {
-			skipped.push( pattern );
-		} else {
-			toInstall.push( pattern );
-		}
+		( pattern.installed ? skipped : toInstall ).push( pattern );
 	} );
 	return { toInstall, skipped };
 }
@@ -105,16 +84,20 @@ export function summarizeInstall( results ) {
 }
 
 /**
- * How many of a collection's patterns the link map says are installed here.
+ * How many of a collection's patterns are installed here: the cloud names
+ * this site's patterns answer to that sit under the collection's namespace.
  *
- * @param {Object} links      The link map, localKey => entry.
- * @param {Object} collection The collection.
+ * @param {Array}  names      Cloud names, as /cloud/installed lists them.
+ * @param {Object} collection The collection, with its `{handle}/{slug}` namespace.
  * @return {number} The count.
  */
-export function installedFromCollection( links, collection ) {
-	return Object.values( links || {} ).filter( ( link ) =>
-		sameCollection( link.collection, collection )
-	).length;
+export function installedFromCollection( names, collection ) {
+	if ( ! collection?.namespace ) {
+		return 0;
+	}
+	const prefix = `${ collection.namespace }/`;
+	return ( names || [] ).filter( ( name ) => name.startsWith( prefix ) )
+		.length;
 }
 
 /**

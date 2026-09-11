@@ -63,7 +63,6 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 		remove_filter( 'stylesheet_directory', array( $this, 'theme_dir' ) );
 		remove_filter( 'stylesheet', array( $this, 'theme_slug' ) );
 		delete_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_TOKEN );
-		delete_option( Pattern_Builder_Cloud::OPTION_LINKS );
 		wp_clean_theme_json_cache();
 		parent::tear_down();
 	}

@@ -28,6 +28,12 @@ class Pattern_File_Store {
 	const META_ORIGIN = 'pattern_builder_origin';
 
 	/**
+	 * Post meta holding the name of a user pattern's copy on the cloud — the
+	 * same thing the `Cloud:` header holds for a theme pattern.
+	 */
+	const META_CLOUD = 'pattern_builder_cloud';
+
+	/**
 	 * Returns all patterns found as PHP files in the active theme's and the
 	 * parent theme's `patterns/` directories.
 	 *
@@ -124,6 +130,73 @@ class Pattern_File_Store {
 	}
 
 	/**
+	 * Every cloud name a local pattern answers to, with the pattern it names.
+	 *
+	 * A pattern answers to one in two ways: a theme pattern installed from
+	 * the cloud keeps its cloud name as its own, and any pattern with a copy
+	 * on the cloud carries that copy's name as its `Cloud:` reference. Read
+	 * from the files' headers and one meta query, rendering nothing, so a
+	 * whole collection's worth of "is this installed here?" costs one pass.
+	 *
+	 * @return array name => { type: string, id: string|int, title: string }
+	 */
+	public function cloud_names() {
+		$names = array();
+
+		foreach ( $this->get_pattern_directories() as $directory ) {
+			foreach ( $this->pattern_files_in( $directory ) as $pattern_file ) {
+				$headers = get_file_data(
+					$pattern_file,
+					array(
+						'title' => 'Title',
+						'slug'  => 'Slug',
+						'cloud' => 'Cloud',
+					)
+				);
+
+				$slug = trim( $headers['slug'] );
+				if ( '' === $slug ) {
+					continue;
+				}
+
+				foreach ( array( $slug, trim( $headers['cloud'] ) ) as $name ) {
+					// A child theme's pattern wins over its parent's, as it does
+					// everywhere else.
+					if ( 2 === substr_count( $name, '/' ) && ! isset( $names[ $name ] ) ) {
+						$names[ $name ] = array(
+							'type'  => 'theme',
+							'id'    => $slug,
+							'title' => trim( $headers['title'] ),
+						);
+					}
+				}
+			}
+		}
+
+		$posts = get_posts(
+			array(
+				'post_type'      => 'wp_block',
+				'post_status'    => 'publish',
+				'posts_per_page' => -1,
+				'no_found_rows'  => true,
+				'meta_key'       => self::META_CLOUD, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+			)
+		);
+		foreach ( $posts as $post ) {
+			$name = (string) get_post_meta( $post->ID, self::META_CLOUD, true );
+			if ( '' !== $name && ! isset( $names[ $name ] ) ) {
+				$names[ $name ] = array(
+					'type'  => 'user',
+					'id'    => (int) $post->ID,
+					'title' => $post->post_title,
+				);
+			}
+		}
+
+		return $names;
+	}
+
+	/**
 	 * Updates a theme pattern by writing its PHP file.
 	 *
 	 * @param Abstract_Pattern $pattern The pattern to update.
@@ -178,6 +251,38 @@ class Pattern_File_Store {
 		}
 
 		return $pattern;
+	}
+
+	/**
+	 * Record which cloud pattern a local pattern is a copy of, or forget it.
+	 *
+	 * A theme pattern's reference is a header, so setting one rewrites the
+	 * file through the same door an editor save does; nothing is written
+	 * when the reference is already the one asked for.
+	 *
+	 * @param Abstract_Pattern $pattern The local pattern.
+	 * @param string           $name    `{handle}/{collection}/{slug}`, or '' to clear it.
+	 * @return true|WP_Error
+	 */
+	public function set_cloud_reference( Abstract_Pattern $pattern, $name ) {
+		$name = (string) $name;
+		if ( (string) $pattern->cloud === $name ) {
+			return true;
+		}
+
+		if ( 'user' === $pattern->source ) {
+			if ( '' === $name ) {
+				delete_post_meta( (int) $pattern->id, self::META_CLOUD );
+			} else {
+				update_post_meta( (int) $pattern->id, self::META_CLOUD, $name );
+			}
+			return true;
+		}
+
+		$pattern->cloud = $name;
+		$saved          = $this->update_theme_pattern( $pattern );
+
+		return is_wp_error( $saved ) ? $saved : true;
 	}
 
 	/**
@@ -256,6 +361,14 @@ class Pattern_File_Store {
 		}
 
 		wp_set_object_terms( $post_id, $pattern->categories, 'wp_pattern_category', false );
+
+		// Still the same pattern: its attribution and its cloud copy come along.
+		if ( $pattern->origin ) {
+			update_post_meta( $post_id, self::META_ORIGIN, $pattern->origin );
+		}
+		if ( $pattern->cloud ) {
+			update_post_meta( $post_id, self::META_CLOUD, $pattern->cloud );
+		}
 
 		// Delete the theme pattern file.
 		if ( ! is_wp_error( $filepath ) && $filepath ) {
@@ -484,12 +597,13 @@ class Pattern_File_Store {
 		// Core reads a fixed list of headers and ignores the rest, so this is
 		// inert to WordPress and legible to anyone who opens the file.
 		$origin = $pattern->origin ? "\n * Origin: " . $pattern->origin : '';
+		$cloud  = $pattern->cloud ? "\n * Cloud: " . $pattern->cloud : '';
 
 		$metadata  = "<?php\n";
 		$metadata .= "/**\n";
 		$metadata .= " * Title: $pattern->title\n";
 		$metadata .= " * Slug: $pattern->name\n";
-		$metadata .= " * Description: $pattern->description$categories$keywords$blockTypes$postTypes$templateTypes$viewportWidth$inserter$synced$origin\n";
+		$metadata .= " * Description: $pattern->description$categories$keywords$blockTypes$postTypes$templateTypes$viewportWidth$inserter$synced$origin$cloud\n";
 		$metadata .= " */\n";
 		$metadata .= "?>\n";
 		return $metadata;

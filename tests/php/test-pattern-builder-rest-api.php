@@ -403,6 +403,24 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		$this->assertFileDoesNotExist( $this->test_dir . '/patterns/theme_synced_pattern.php' );
 	}
 
+	/**
+	 * Converting is still the same pattern: its attribution and the name of
+	 * its copy on the cloud go with it, from header to post meta.
+	 */
+	public function test_converting_to_a_user_pattern_keeps_its_origin_and_cloud_reference() {
+		$this->copy_test_pattern( 'theme_synced_pattern.php' );
+		$file = $this->test_dir . '/patterns/theme_synced_pattern.php';
+		file_put_contents( $file, preg_replace( '/\n \*\//', "\n * Origin: studio-b/heroes/hero\n * Cloud: studio-a/personal/theme-synced-pattern\n */", file_get_contents( $file ), 1 ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+
+		$request = $this->create_rest_request( 'PUT', '/pattern-builder/v1/patterns/simple-theme/theme-synced-pattern' );
+		$request->set_body_params( array( 'source' => 'user' ) );
+		$data = rest_get_server()->dispatch( $request )->get_data();
+
+		$this->assertSame( 'studio-b/heroes/hero', get_post_meta( $data['id'], \TwentyBellows\PatternBuilder\Pattern_File_Store::META_ORIGIN, true ) );
+		$this->assertSame( 'studio-a/personal/theme-synced-pattern', get_post_meta( $data['id'], \TwentyBellows\PatternBuilder\Pattern_File_Store::META_CLOUD, true ) );
+		$this->assertSame( 'studio-a/personal/theme-synced-pattern', $data['cloud'] );
+	}
+
 	public function test_convert_user_pattern_to_theme_pattern() {
 		$post_id = wp_insert_post(
 			array(

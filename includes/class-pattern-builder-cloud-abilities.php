@@ -328,10 +328,11 @@ class Pattern_Builder_Cloud_Abilities {
 			return $collection;
 		}
 
-		$porter   = new Pattern_Builder_Cloud_Porter();
-		$patterns = isset( $collection['patterns'] ) && is_array( $collection['patterns'] ) ? $collection['patterns'] : array();
+		$installed = ( new Pattern_File_Store() )->cloud_names();
+		$patterns  = isset( $collection['patterns'] ) && is_array( $collection['patterns'] ) ? $collection['patterns'] : array();
 		foreach ( $patterns as &$pattern ) {
-			$pattern['installed'] = isset( $pattern['id'] ) ? $porter->find_installed( (int) $pattern['id'] ) : null;
+			$name                 = Pattern_Builder_Cloud::name_of( $pattern );
+			$pattern['installed'] = '' !== $name && isset( $installed[ $name ] ) ? $installed[ $name ] : null;
 		}
 		unset( $pattern, $collection['patterns'] );
 
@@ -540,7 +541,6 @@ class Pattern_Builder_Cloud_Abilities {
 			isset( $input['destination'] ) ? (string) $input['destination'] : 'user',
 			! ( isset( $input['tokens'] ) && 'skip' === $input['tokens'] ),
 			array(),
-			false,
 			isset( $input['source'] ) && 'library' === $input['source'] ? 'library' : 'directory'
 		);
 		if ( is_wp_error( $result ) ) {

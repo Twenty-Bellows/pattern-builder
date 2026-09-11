@@ -579,15 +579,20 @@ export function CloudDetails( {
 		if ( busy ) {
 			return; // Re-check once the in-flight action (e.g. a download) lands.
 		}
+		// Installed here means a local pattern answers to its cloud name.
+		if ( ! pattern.namespace ) {
+			setInstalled( null );
+			return;
+		}
 		setInstalled( undefined );
 		apiFetch( {
 			path: addQueryArgs( `${ BASE }/pattern-state`, {
-				cloudId: pattern.id,
+				name: pattern.namespace,
 			} ),
 		} )
 			.then( ( data ) => setInstalled( data.installed || null ) )
 			.catch( () => setInstalled( null ) );
-	}, [ pattern.id, busy ] );
+	}, [ pattern.namespace, busy ] );
 
 	return (
 		<div className="pattern-builder-details">
@@ -927,10 +932,6 @@ export function useDownloadFlow( { source, onDownloaded } ) {
 				cloudId: pattern.id,
 				destination,
 				addTokens,
-				// Whose the cloud copy is, as the service reported it: what
-				// decides whether this site is later offered an update for
-				// it. The service checks again when one is attempted.
-				mine: !! pattern.mine,
 				// Which collection it came from, so it lands under that
 				// collection's local category.
 				collection: pattern.collection

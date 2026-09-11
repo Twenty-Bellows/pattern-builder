@@ -34,11 +34,12 @@ Every route stays nonce- and capability-gated and answers 401 disconnected, as t
 | `GET /cloud/library` | Unchanged; gains `collection` filter. |
 | `POST /cloud/upload` | Gains `collection` (required; `personal` accepted). |
 | `GET /cloud/status` | `/me` relayed; now carries `entitlements` (personal cap, can_create_private, fair use), `personal { count, cap }` and `over_policy`. |
-| `GET /cloud/pattern-state` | Unchanged; the link map gains the collection. |
+| `GET /cloud/pattern-state` | Whether the pattern's `Cloud:` reference is in the connected account's library, asked of the service by name; the answer names the collection. With `name`, which local pattern answers to that cloud name. |
+| `GET /cloud/installed` | Every cloud name a pattern on this site answers to — what a collection tile counts. |
 
 `/cloud/categories` goes away.
 
-**Installing a collection** is one PHP method used by the REST route and by the ability alike: `Pattern_Builder_Cloud_Porter::install_collection( $owner, $slug, $destination, $tokens )` fetches the collection, then imports each pattern in turn through the existing single-pattern path, skipping ones the link map says are already installed from this collection, collecting per-pattern results, and never stopping on one failure. The browser calls `POST /cloud/download` per pattern itself so it can show progress; the ability calls the method.
+**Installing a collection** is one PHP method used by the REST route and by the ability alike: `Pattern_Builder_Cloud_Porter::install_collection( $owner, $slug, $destination, $tokens )` fetches the collection, then imports each pattern in turn through the existing single-pattern path, skipping ones already here under their cloud name, collecting per-pattern results, and never stopping on one failure. The browser calls `POST /cloud/download` per pattern itself so it can show progress; the ability calls the method.
 
 ## 3. Community tab (`src/cloud/`)
 
@@ -47,7 +48,7 @@ Every route stays nonce- and capability-gated and answers 401 disconnected, as t
 - **Collection view**: a header with title, owner, description, count, and **Save collection to this site**; then the pattern grid with the details sidebar exactly as today (single-pattern save, already-installed → Edit).
 - **Save collection**: one destination choice (Theme or User); one design-tokens step that computes the union of missing tokens across every pattern and offers **Add tokens & save**; then sequential downloads with "3 of 12" progress, already-installed patterns skipped, failures listed at the end with the rest installed. Premium collections show the Pro prompt before any of it when the account is free.
 - **Landing footprint**: every pattern installed from a collection carries a local pattern category whose slug is `pbwp-{owner}-{slug}` and whose label is the collection's title. Theme patterns get it in `Categories:`; user patterns get the `wp_pattern_category` term. The plugin registers the category label on `init` from a site option (`pattern_builder_collection_categories`) so the inserter shows the title rather than the slug.
-- **Link map** (`pattern_builder_cloud_links`): each entry gains `collection: { owner, slug, title }`, which is what "already installed" and "installed n of m" on a collection tile read.
+- **Cloud names**: an installed pattern keeps the name of the cloud pattern it is a copy of (a theme install's own name, and the `Cloud:` header or `pattern_builder_cloud` meta on either kind), and a cloud name carries its collection — so "already installed" is a lookup by name and "installed n of m" on a tile counts the local names under the collection's namespace. Nothing is recorded about the relationship.
 
 ## 4. Uploaded tab
 
@@ -60,6 +61,7 @@ Every route stays nonce- and capability-gated and answers 401 disconnected, as t
 
 - With only Personal, nothing is asked. With more, a **collection picker** defaulting to the last one used, with **New collection…** inline.
 - When the target is public: "This collection is public. The pattern will be listed once it passes the checks."
+- A pattern whose `Cloud:` reference the connected account's library still has offers **Update pattern on the cloud** and **Delete from cloud**; any other — never uploaded, somebody else's, or a copy since deleted — offers the upload.
 - Update keeps the pattern's collection, which is the only thing it can do: a pattern stays in the collection it was uploaded into (D38).
 - The block-validity gate is unchanged.
 
@@ -83,20 +85,20 @@ No ability changes visibility or deletes a collection. The authoring guide's `ab
 
 - `includes/class-pattern-builder-cloud-controller.php`: the routes in §2.
 - `includes/class-pattern-builder-cloud-porter.php`: `install_collection()`, the collection parameter on import, the category footprint.
-- `includes/class-pattern-builder-cloud.php`: link-map collection, the collection-categories option and its `init` registration.
+- `includes/class-pattern-builder-cloud.php`: `own_pattern()` (a `Cloud:` reference, looked up by name as the connected account), the collection-categories option and its `init` registration.
 - `includes/class-pattern-builder-abilities.php`: §6.
 - `src/cloud/`: `CloudBrowser.js` splits into `CommunityTab`, `UploadedTab`, `CollectionTile`, `CollectionView`, `CollectionPicker`, `SaveCollectionFlow`, with `cloud.scss` for the tiles; `src/components/PatternCloudPanel.js` gains the picker.
 - `guides/pattern-author/references/abilities.md`, `readme.txt`, `CLAUDE.md`: the documentation.
 
 ## 8. Tests
 
-- **PHP** (`tests/php/`, `pre_http_request` mocked as the cloud tests do today): every new proxy route relays the service's refusals verbatim; `install_collection()` skips installed patterns, continues past a failure and files the category; the link map carries the collection; each ability is registered, refuses disconnected, and `install-collection` produces per-pattern results.
+- **PHP** (`tests/php/`, `pre_http_request` mocked as the cloud tests do today): every new proxy route relays the service's refusals verbatim; `install_collection()` skips installed patterns, continues past a failure and files the category; an installed pattern carries its cloud name; each ability is registered, refuses disconnected, and `install-collection` produces per-pattern results.
 - **JS** (`tests/unit/`): the collection picker's default and inline create; the save-collection flow's progress and failure list; the token-union computation.
 - **Manual**: `tests/e2e/cloud-roundtrip.php` extended to upload into a collection and install that collection on a second site.
 
 ## 9. Order of work (one pull request, commits in this order)
 
-1. Proxy routes, `/cloud/status` shape, link map, the categories option.
+1. Proxy routes, `/cloud/status` shape, the categories option.
 2. Community tab: tiles, collection view, search groups.
 3. Save collection: porter method, the flow, the footprint.
 4. Uploaded tab: rail, create, header actions, meter, over-policy banner.
