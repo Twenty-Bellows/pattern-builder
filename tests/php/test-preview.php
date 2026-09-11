@@ -373,6 +373,64 @@ class Test_Preview extends WP_UnitTestCase {
 	}
 
 	/**
+	 * And the half of a variation the style properties cannot express. A
+	 * variation's `css` is emitted by the same render path, so a tile shows a
+	 * pseudo-element or a hover rule with no further work here — which is what
+	 * the tiles were introduced for. Registered from `style_data` rather than
+	 * from a partial only because this test has no theme directory to write
+	 * one into; both land at `styles.blocks.{block}.variations.{slug}`.
+	 */
+	public function test_a_tile_styles_a_variation_that_carries_css() {
+		/*
+		 * Core hangs the generated variation rules off a handle that depends
+		 * on `global-styles`, which only a block theme registers — and a block
+		 * theme is the only kind that has a `styles/` directory to define a
+		 * variation in, so this is the situation rather than a contrivance.
+		 */
+		$was = get_stylesheet();
+		register_theme_directory( dirname( __DIR__, 2 ) . '/themes' );
+		delete_site_transient( 'theme_roots' );
+		if ( ! wp_get_theme( 'opinionated-theme' )->exists() ) {
+			$this->markTestSkipped( 'The bundled themes directory is not registered in this environment.' );
+		}
+		switch_theme( 'opinionated-theme' );
+		wp_clean_theme_json_cache();
+
+		/*
+		 * `WP_Styles` is one object for the whole process and a handle it has
+		 * already printed is never printed again, so a tile drawn after
+		 * another test rendered a variation would find this one's rules
+		 * already "done". A real tile is its own request; this is how to say
+		 * so here.
+		 */
+		$GLOBALS['wp_styles'] = null;
+
+		register_block_style(
+			'core/group',
+			array(
+				'name'       => 'tile-css-probe',
+				'label'      => 'Tile CSS probe',
+				'style_data' => array( 'css' => 'position: relative; &::before { content: ""; outline: 2px solid #abcdef; }' ),
+			)
+		);
+		WP_Theme_JSON_Resolver::clean_cached_data();
+
+		$post_id = $this->a_user_pattern( '<!-- wp:group {"className":"is-style-tile-css-probe"} --><div class="wp-block-group is-style-tile-css-probe"><!-- wp:paragraph --><p>Inside the band.</p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
+		$tile    = $this->preview->tile( (string) $post_id, true );
+
+		unregister_block_style( 'core/group', 'tile-css-probe' );
+		switch_theme( $was );
+		$GLOBALS['wp_styles'] = null;
+		WP_Theme_JSON_Resolver::clean_cached_data();
+		wp_clean_theme_json_cache();
+
+		$this->assertSame( 200, $tile['status'] );
+		$this->assertStringContainsString( 'Inside the band.', $tile['body'] );
+		$this->assertStringContainsString( '::before', $tile['body'] );
+		$this->assertStringContainsString( '#abcdef', $tile['body'] );
+	}
+
+	/**
 	 * A tile is a picture: no scripts, framed only here, centred by its own
 	 * document, and kept by the browser for as long as its key holds.
 	 */

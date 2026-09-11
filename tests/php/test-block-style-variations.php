@@ -269,13 +269,124 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 		$this->assertSame( 'pb_variation_unknown_block', $result->get_error_code() );
 	}
 
-	public function test_raw_css_is_refused() {
+	/**
+	 * CSS that fits the subset is written into the partial as it was given,
+	 * because a variation without one cannot express a pseudo-element, a
+	 * descendant rule or a hover state — most of what a variation is for.
+	 */
+	public function test_css_in_the_safe_subset_is_written_into_the_partial() {
+		$css = 'position: relative; & > * { z-index: 1; } &::before { content: ""; inset: 0; }';
+
+		$result = Pattern_Builder_Block_Style_Variations::add(
+			$this->args( array( 'styles' => array( 'css' => $css, 'border' => array( 'radius' => '999px' ) ) ) )
+		);
+
+		$this->assertNotWPError( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$this->assertSame( array(), $result['skipped'] );
+
+		$partial = json_decode(
+			(string) file_get_contents( Pattern_Builder_Block_Style_Variations::directory() . '/button-secondary.json' ), // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test assertion.
+			true
+		);
+
+		$this->assertSame( $css, $partial['styles']['css'], 'The CSS is written through unchanged — nothing strips or repairs it.' );
+	}
+
+	/**
+	 * And CSS outside it is refused with the rule it broke, rather than
+	 * written and left for a browser to interpret.
+	 */
+	public function test_css_outside_the_safe_subset_is_refused() {
 		$result = Pattern_Builder_Block_Style_Variations::add(
 			$this->args( array( 'styles' => array( 'css' => '} body { display: none } .x {' ) ) )
 		);
 
 		$this->assertWPError( $result );
+		$this->assertSame( 'pb_variation_css_refused', $result->get_error_code() );
+	}
+
+	/**
+	 * One `css`, at the top of the variation's own styles tree. A `css` on an
+	 * element or an inner block is refused rather than checked, so what has to
+	 * be audited is one string per variation.
+	 */
+	public function test_css_deeper_in_the_tree_is_refused() {
+		$result = Pattern_Builder_Block_Style_Variations::add(
+			$this->args(
+				array(
+					'styles' => array(
+						'elements' => array( 'link' => array( 'css' => 'color: red;' ) ),
+					),
+				)
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_variation_nested_css', $result->get_error_code() );
+		$this->assertStringContainsString( 'elements.link.css', $result->get_error_message() );
+	}
+
+	/**
+	 * Global styles are a different question and the answer there has not
+	 * changed: a `css` at the root or on an element is scoped to nothing a
+	 * pattern brought with it, so `set-global-styles` still refuses one.
+	 */
+	public function test_global_styles_still_refuse_raw_css_altogether() {
+		$result = Pattern_Builder_Theme_Styles::apply(
+			array( 'css' => 'position: relative;' ),
+			'theme'
+		);
+
+		$this->assertWPError( $result );
 		$this->assertSame( 'pb_styles_css_refused', $result->get_error_code() );
+	}
+
+	/**
+	 * The rules a variation's CSS describes have to reach the front end, or
+	 * the feature does nothing. Everything else only proves the checker agrees
+	 * with itself; this proves core emits what was written.
+	 */
+	public function test_a_variation_carrying_css_renders_its_rules_on_the_front_end() {
+		$written = Pattern_Builder_Block_Style_Variations::add(
+			$this->args(
+				array(
+					'slug'       => 'group-hover',
+					'blockTypes' => array( 'core/group' ),
+					'styles'     => array( 'css' => 'position: relative; &:hover { outline: 3px solid #123456; }' ),
+				)
+			)
+		);
+		$this->assertNotWPError( $written, is_wp_error( $written ) ? $written->get_error_message() : '' );
+
+		wp_clean_theme_json_cache();
+		\WP_Theme_JSON_Resolver::get_theme_data();
+		wp_register_block_style_variations_from_theme_json_partials(
+			\WP_Theme_JSON_Resolver::get_style_variations( 'block' )
+		);
+		wp_clean_theme_json_cache();
+
+		do_blocks(
+			'<!-- wp:group {"className":"is-style-group-hover"} -->'
+				. '<div class="wp-block-group is-style-group-hover"></div>'
+				. '<!-- /wp:group -->'
+		);
+
+		$after = wp_styles()->get_data( 'block-style-variation-styles', 'after' );
+		$css   = is_array( $after ) ? implode( "\n", $after ) : (string) $after;
+
+		/*
+		 * `WP_Styles` is one object for the whole process, and the handle core
+		 * just registered names `global-styles` as a dependency — which only a
+		 * block theme registers. Left behind, it would follow the suite into
+		 * tests that print a head under a classic theme. A real render is its
+		 * own request; this says so.
+		 */
+		$GLOBALS['wp_styles'] = null;
+
+		$this->assertStringContainsString( 'position: relative', $css );
+		$this->assertStringContainsString( ':hover', $css );
+		$this->assertStringContainsString( '#123456', $css );
+		$this->assertStringContainsString( ':root :where(', $css, 'Core scopes the rules to the variation rather than emitting them bare.' );
 	}
 
 	public function test_a_variation_needs_a_block_type() {

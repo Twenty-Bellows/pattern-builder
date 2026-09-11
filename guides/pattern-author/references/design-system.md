@@ -268,12 +268,16 @@ say so. `add-` only ever adds, and a name already taken is skipped. `set-`
 at once, including pages you have not seen. Properties it does not name are
 left alone, so you can set one thing without restating the rest.
 
-Two things it will not do. **Raw CSS is refused** — WordPress does not sanitize
-a theme.json `css` property, it gates it on the `edit_css` capability instead,
-and a string that closes its own selector writes rules for the whole document.
-And what core's schema does not recognise comes back under `skipped` rather
-than vanishing, because an agent that believes it set a property will build the
-rest of the design on top of one that is not there.
+Two things it will not do. **Raw CSS is refused here** — WordPress does not
+sanitize a theme.json `css` property, it gates it on the `edit_css` capability
+instead, and a string that closes its own selector writes rules for the whole
+document. A `css` at the root or on an element is scoped to nothing a pattern
+brought with it, so it stays refused even though a *block style variation* may
+carry one (below): there the selector is a class the pattern's own markup
+carries, and here it is the whole page. And what core's schema does not
+recognise comes back under `skipped` rather than vanishing, because an agent
+that believes it set a property will build the rest of the design on top of one
+that is not there.
 
 A theme that sets no root font size is worth watching for. A pattern that names
 no size then inherits the browser's, not the site's, and the copy comes out two
@@ -327,7 +331,49 @@ the site you author on**, and a name the destination already holds wins.
 
 A variation's own styles may reference presets, and those are collected too —
 the markup carries the class and no colour at all, so a token named only inside
-a variation still ships.
+a variation still ships. So does its `css`, below.
+
+## CSS, in a variation and nowhere else
+
+The style properties cannot express a pseudo-element, a descendant rule or a
+hover state, and those are most of what a variation is for. So a variation —
+alone among the things these abilities write — may carry a `css` string, at the
+top of its `styles` and nowhere deeper:
+
+```json
+{
+  "slug": "band-dark",
+  "blockTypes": ["core/group"],
+  "styles": {
+    "css": "position: relative; overflow: hidden; & > * { position: relative; z-index: 1; } &::before { content: \"\"; position: absolute; inset: 0; background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px); background-size: 22px 22px; }"
+  }
+}
+```
+
+The shape is **declarations first, then nested rules anchored on `&`** — and
+the order matters: WordPress folds a declaration written after a rule into that
+rule, so one written there is refused rather than silently moved.
+
+It travels with the pattern like the rest of the definition, and it is checked
+three times on the way: where you write it, on the service, and on the site
+that installs it. What the check refuses, and why:
+
+| Refused | Because |
+|---|---|
+| `url()`, `image-set()`, `attr()`, `expression()` — any function not on a fixed allow list | a stored pattern fetches nothing, and an unknown name is refused rather than ignored |
+| `@media` and every other at-rule | core's parser cannot place one here at all, so a media query in variation CSS does not work today |
+| comments (`/* … */`) | stripping them correctly means stripping them exactly as a browser does |
+| `<`, anywhere, quoted strings included | `</style` ends the style element whatever CSS thinks a string is |
+| `,`, `+` and `~` in a selector | a comma escapes the variation's scope and lands `body` at the top level; a sibling combinator reaches outside the block the pattern carries |
+| a backslash outside a quoted string | an escape can spell `u\72l(` past a name check. Inside a string it is fine and necessary — `content: "\2713"` is how an icon glyph is written |
+| a rule nested inside a rule | WordPress reads one level and drops the rest |
+
+Caps: 2000 characters, 20 nested rules, 40 declarations each. `!important` is
+allowed; `:not()`, `:is()`, `:where()`, `:has()` and the `nth-` family are
+allowed but single-argument only, since the comma is out.
+
+Nothing is stripped or repaired — a refusal names the rule you broke and the
+fragment that broke it, so the fix is usually one edit away.
 
 ## Names collide, so an upload namespaces them
 
@@ -338,7 +384,9 @@ block entirely.
 
 An upload therefore stamps the collection onto the name:
 `is-style-button-secondary` becomes `is-style-studio-a-heroes-button-secondary`
-in the markup, and the definition's slug moves with it. **You do not do this
+in the markup, and the definition's slug moves with it — as does any
+`is-style-` its own `css` names, so a variation that reaches for a sibling by
+class keeps reaching for it. **You do not do this
 yourself.** Author under the readable local name; the namespace is applied on
 the way up, once, and never rewritten afterwards — a re-upload that renamed it
 would install a second identical variation beside the first.

@@ -92,12 +92,18 @@ class Pattern_Builder_Theme_Styles {
 	/**
 	 * Refuse a styles tree carrying raw CSS.
 	 *
-	 * Shared with the block style variation writer, which has the same
-	 * problem for the same reason: WordPress does not sanitize a theme.json
-	 * `css` property — it gates it on `edit_css` instead, and says so in a
-	 * comment — so a string that closes its own selector writes rules for the
-	 * whole document. Everything written through these abilities is meant to
-	 * be able to travel, and unsanitisable CSS cannot.
+	 * This is the *global styles* rule, and it stays absolute. WordPress does
+	 * not sanitize a theme.json `css` property — it gates it on `edit_css`
+	 * instead, and says so in a comment — so a string that closes its own
+	 * selector writes rules for the whole document. A `css` at `styles.css`
+	 * or on an element node is scoped to nothing a pattern brought with it:
+	 * core emits it against the document, and a pattern that arrived from
+	 * somewhere else must not repaint the site it arrived at.
+	 *
+	 * A block style variation is the one place that opens up, because there
+	 * the selector is a class the pattern's own markup carries.
+	 * `Pattern_Builder_Block_Style_Variations` holds that rule, and what it
+	 * accepts it puts through `Safe_Css` first.
 	 *
 	 * @param array $styles A theme.json `styles` subtree.
 	 * @return true|WP_Error
@@ -182,11 +188,14 @@ class Pattern_Builder_Theme_Styles {
 	/**
 	 * Every place a `css` property appears, as dotted paths.
 	 *
+	 * Public because the block style variation writer allows one of them —
+	 * the variation's own `styles.css` — and has to find the rest.
+	 *
 	 * @param array  $node   Styles subtree.
 	 * @param string $prefix Path so far.
 	 * @return string[]
 	 */
-	private static function find_css( $node, $prefix = '' ) {
+	public static function find_css( $node, $prefix = '' ) {
 		$found = array();
 
 		foreach ( $node as $key => $value ) {

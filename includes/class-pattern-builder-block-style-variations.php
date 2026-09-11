@@ -29,7 +29,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * That scoping is also what makes it the only styling a pattern can honestly
  * bring with it — the selector needs a class the pattern's own markup carries,
- * so installing one changes nothing the pattern did not put there.
+ * so installing one changes nothing the pattern did not put there. It is also
+ * why this is the one writer that accepts a `css` property: a variation
+ * without one cannot express a pseudo-element, a descendant rule or a hover
+ * state, which is most of what a variation is for, and the class the rules
+ * hang off is one the pattern brought. What may be in that string is
+ * `Safe_Css`'s business, and only at the partial's top-level `styles.css` —
+ * a `css` deeper in the tree is refused, so the audit surface stays one
+ * string per variation.
  *
  * Registration is a **file**, not a theme.json key. `styles.blocks.variations`
  * in theme.json only *styles* a variation something else registered — core
@@ -52,8 +59,9 @@ class Pattern_Builder_Block_Style_Variations {
 	 *
 	 * Required: `slug` (the name the is-style- class is built from),
 	 * `blockTypes` (the blocks it applies to) and `styles` (a theme.json
-	 * `styles` subtree). Optional: `title`, the label shown in the editor, and
-	 * `description`.
+	 * `styles` subtree, which may carry a top-level `css` string in the subset
+	 * `Safe_Css` accepts). Optional: `title`, the label shown in the editor,
+	 * and `description`.
 	 *
 	 * @param array $args The variation to write.
 	 * @return array|WP_Error slug, title, class, blockTypes, path, written and skipped.
@@ -80,7 +88,7 @@ class Pattern_Builder_Block_Style_Variations {
 			return new WP_Error( 'pb_variation_no_styles', __( 'A block style variation needs styles — WordPress skips a partial that carries none.', 'pattern-builder' ), array( 'status' => 400 ) );
 		}
 
-		$css = Pattern_Builder_Theme_Styles::check_css( $styles );
+		$css = self::check_css( $styles );
 		if ( is_wp_error( $css ) ) {
 			return $css;
 		}
@@ -241,13 +249,26 @@ class Pattern_Builder_Block_Style_Variations {
 	 * here. A name that is taken is left alone and reported, so installing the
 	 * same collection twice is idempotent.
 	 *
+	 * This is also where the CSS check matters most. It ran on the authoring
+	 * site when the string was written and again on the service when the
+	 * package arrived, and neither of those is this machine — the one about to
+	 * write rules a browser will execute. So it runs a third time here, and a
+	 * string that fails takes its own variation out of the install rather than
+	 * the whole download: the pattern is still worth having with one look
+	 * missing, and the caller is told which and why.
+	 *
 	 * @param array $variation A variation from a package.
-	 * @return string|WP_Error 'written' or 'skipped'.
+	 * @return string|WP_Error 'written', 'skipped', or `pb_variation_css_refused` for a variation to leave out.
 	 */
 	public static function install( $variation ) {
 		$slug = isset( $variation['slug'] ) ? sanitize_title( (string) $variation['slug'] ) : '';
 		if ( '' === $slug ) {
 			return new WP_Error( 'pb_variation_no_slug', __( 'A block style variation arrived without a slug.', 'pattern-builder' ), array( 'status' => 400 ) );
+		}
+
+		$css = self::check_css( isset( $variation['styles'] ) && is_array( $variation['styles'] ) ? $variation['styles'] : array() );
+		if ( is_wp_error( $css ) ) {
+			return $css;
 		}
 
 		if ( file_exists( self::path_for( $slug ) ) || null !== self::definition( $slug ) ) {
@@ -306,14 +327,22 @@ class Pattern_Builder_Block_Style_Variations {
 				continue;
 			}
 
-			$css = Pattern_Builder_Theme_Styles::check_css( $definition['styles'] );
+			/*
+			 * The `css` travels inside `styles`, where core reads it and where
+			 * the service validates it — but a partial written by hand is not
+			 * held to anything, so it is checked again on the way out. Better
+			 * to name the variation here than to have the upload refused at
+			 * the far end with nothing local to point at.
+			 */
+			$css = self::check_css( $definition['styles'] );
 			if ( is_wp_error( $css ) ) {
 				return new WP_Error(
 					'pb_variation_css_cannot_travel',
 					sprintf(
-						/* translators: %s: variation slug. */
-						__( 'The block style variation "%s" carries raw CSS, which cannot travel with a pattern — the service will not store unsanitised CSS. Express it with the styles properties instead.', 'pattern-builder' ),
-						$slug
+						/* translators: 1: variation slug, 2: what is wrong with the CSS. */
+						__( 'The block style variation "%1$s" carries CSS a pattern cannot take with it: %2$s', 'pattern-builder' ),
+						$slug,
+						$css->get_error_message()
 					),
 					array( 'status' => 400 )
 				);
@@ -328,6 +357,68 @@ class Pattern_Builder_Block_Style_Variations {
 		}
 
 		return $carried;
+	}
+
+	/**
+	 * Whether a variation's styles carry CSS this site will write.
+	 *
+	 * The one `css` a variation may hold sits at the top of its own styles
+	 * tree, which is where core looks for it and where every partial in this
+	 * design system puts it. One deeper — on an element, on an inner block —
+	 * is refused rather than checked, so what has to be audited is one string
+	 * per variation rather than a tree of them, and so that a reader of a
+	 * partial can see the whole of what it will emit in one place.
+	 *
+	 * There is deliberately **no `edit_css` capability check** here, which is
+	 * how core gates the same property. Two reasons. A gate would say that
+	 * unvalidated CSS is acceptable from a privileged caller, and it is not —
+	 * most of this string's journey is over the wire, and the destination
+	 * site's installer runs as whoever pressed the button. And `edit_css` is
+	 * a super-admin-only capability on multisite, so gating on it would stop
+	 * an ordinary network site's administrator writing a variation they can
+	 * already write by editing the file. The grammar is the boundary.
+	 *
+	 * @param array $styles A variation's `styles` subtree.
+	 * @return true|WP_Error
+	 */
+	private static function check_css( $styles ) {
+		$deeper = array();
+		foreach ( Pattern_Builder_Theme_Styles::find_css( $styles ) as $path ) {
+			if ( 'css' !== $path ) {
+				$deeper[] = $path;
+			}
+		}
+
+		if ( $deeper ) {
+			return new WP_Error(
+				'pb_variation_nested_css',
+				sprintf(
+					/* translators: %s: dotted paths within the styles tree, comma separated. */
+					__( 'A block style variation may carry CSS only at the top of its styles tree, and this one carries it at %s. Move the rules into the one "css" string, where a nested selector can say the same thing.', 'pattern-builder' ),
+					implode( ', ', $deeper )
+				),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( ! isset( $styles['css'] ) ) {
+			return true;
+		}
+
+		$safe = Safe_Css::check( $styles['css'] );
+		if ( is_wp_error( $safe ) ) {
+			return new WP_Error(
+				'pb_variation_css_refused',
+				sprintf(
+					/* translators: %s: the rule that was broken and the CSS that broke it. */
+					__( 'This CSS is outside the subset a block style variation may carry — %s', 'pattern-builder' ),
+					$safe->get_error_message()
+				),
+				array( 'status' => 400 )
+			);
+		}
+
+		return true;
 	}
 
 	/**

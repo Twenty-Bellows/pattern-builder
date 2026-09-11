@@ -317,11 +317,16 @@ if ( $store->find_theme_pattern( $tree_pattern ) ) {
 }
 
 /*
- * 6. A block style variation (D43). The markup carries `is-style-{slug}` and
- * the definition lives in the theme, so a pattern that travels without it
+ * 6. A block style variation (D43, D44). The markup carries `is-style-{slug}`
+ * and the definition lives in the theme, so a pattern that travels without it
  * arrives with the class intact and nothing styling it. The name is stamped
  * with the collection on the way up, in the markup and in the definition
- * together. Skipped rather than failed where the theme is not writable.
+ * together — and inside the definition's own `css`, where a variation reaches
+ * for another by class. The `css` itself has to survive the service's copy of
+ * `Safe_Css`, which is the half no mocked test can prove: every automated
+ * test here runs the plugin's copy of that checker, and a disagreement
+ * between the two copies shows up only over the wire. Skipped rather than
+ * failed where the theme is not writable.
  */
 $variations = \TwentyBellows\PatternBuilder\Pattern_Builder_Block_Style_Variations::class;
 $made       = $variations::add(
@@ -329,11 +334,26 @@ $made       = $variations::add(
 		'slug'       => 'e2e-inset',
 		'title'      => 'E2E Inset',
 		'blockTypes' => array( 'core/group' ),
+		'styles'     => array(
+			'border' => array( 'radius' => '999px' ),
+			// Everything the subset is for in one string: a declaration, a
+			// child-combinator rule, a pseudo-element, an allowed function,
+			// and a reference by class to the sibling variation below.
+			'css'    => 'position: relative; & > * { z-index: 1; } &::before { content: ""; inset: 0; background: rgba(0, 0, 0, 0.04); } & .is-style-e2e-pill { color: inherit; }',
+		),
+	)
+);
+
+$made_inner = $variations::add(
+	array(
+		'slug'       => 'e2e-pill',
+		'title'      => 'E2E Pill',
+		'blockTypes' => array( 'core/group' ),
 		'styles'     => array( 'border' => array( 'radius' => '999px' ) ),
 	)
 );
 
-if ( ! is_wp_error( $made ) ) {
+if ( ! is_wp_error( $made ) && ! is_wp_error( $made_inner ) ) {
 	$styled = $store->update_theme_pattern(
 		new \TwentyBellows\PatternBuilder\Abstract_Pattern(
 			array(
@@ -342,7 +362,10 @@ if ( ! is_wp_error( $made ) ) {
 				'title'   => 'E2E Styled',
 				'source'  => 'theme',
 				'content' => '<!-- wp:group {"className":"is-style-e2e-inset"} -->' . "\n"
-					. '<div class="wp-block-group is-style-e2e-inset"></div>' . "\n" . '<!-- /wp:group -->',
+					. '<div class="wp-block-group is-style-e2e-inset">' . "\n"
+					. '<!-- wp:group {"className":"is-style-e2e-pill"} -->' . "\n"
+					. '<div class="wp-block-group is-style-e2e-pill"></div>' . "\n" . '<!-- /wp:group -->' . "\n"
+					. '</div>' . "\n" . '<!-- /wp:group -->',
 			)
 		)
 	);
@@ -371,9 +394,21 @@ if ( ! is_wp_error( $made ) ) {
 		$own      = is_wp_error( $stored_styled ) ? '' : (string) ( $stored_styled['namespace'] ?? '' );
 		$expected = implode( '-', array_slice( explode( '/', $own ), 0, 2 ) ) . '-e2e-inset';
 
-		$checks['variation travelled']    = 1 === count( $carried ) && ( $carried[0]['slug'] ?? '' ) === $expected;
+		$slugs       = wp_list_pluck( $carried, 'slug' );
+		$at          = array_search( $expected, $slugs, true );
+		$carried_css = false === $at ? '' : (string) ( $carried[ $at ]['styles']['css'] ?? '' );
+		$pill        = str_replace( '-e2e-inset', '-e2e-pill', $expected );
+
+		$checks['variation travelled']     = 2 === count( $carried ) && in_array( $expected, $slugs, true ) && in_array( $pill, $slugs, true );
 		$checks['its class was rewritten'] = false !== strpos( $markup, 'is-style-' . $expected )
 			&& false === strpos( $markup, '"is-style-e2e-inset"' );
+
+		// The service stored the CSS rather than stripping or refusing it,
+		// and the namespace stamp reached the class named inside it.
+		$checks['its css travelled']        = false !== strpos( $carried_css, '&::before' )
+			&& false !== strpos( $carried_css, 'rgba(0, 0, 0, 0.04)' );
+		$checks['its css was renamespaced'] = false !== strpos( $carried_css, 'is-style-' . $pill )
+			&& false === strpos( $carried_css, ' .is-style-e2e-pill ' );
 	}
 }
 

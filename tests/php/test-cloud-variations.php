@@ -54,7 +54,7 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 		 * rest of the process — hence a distinct slug per test rather than
 		 * `card` throughout.
 		 */
-		foreach ( array( 'card', 'card-wide', 'card-ns', 'card-token', 'card-css', 'card-install', 'studio-a-heroes-card', 'studio-a-heroes-card-ns' ) as $slug ) {
+		foreach ( array( 'card', 'card-wide', 'card-ns', 'card-token', 'card-css', 'card-bad-css', 'card-css-ns', 'card-ns-inner', 'card-css-install', 'card-css-refused', 'card-install', 'studio-a-heroes-card', 'studio-a-heroes-card-ns', 'studio-a-heroes-card-css-ns', 'studio-a-heroes-card-ns-inner' ) as $slug ) {
 			if ( WP_Block_Styles_Registry::get_instance()->is_registered( 'core/group', $slug ) ) {
 				unregister_block_style( 'core/group', $slug );
 			}
@@ -256,30 +256,180 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A partial written by hand can carry raw CSS even though the ability
-	 * refuses it, and the service will not store it — so the export says so
-	 * rather than letting the upload fail at the far end.
+	 * Write a partial by hand, which is how a variation gets CSS the ability
+	 * would have refused — and how one gets CSS at all in a theme nobody
+	 * built with these abilities.
+	 *
+	 * @param string $slug Variation slug.
+	 * @param string $css  Its `css` string.
 	 */
-	public function test_a_variation_carrying_raw_css_refuses_the_export() {
+	private function make_partial_with_css( $slug, $css ) {
 		file_put_contents( // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-			$this->theme_dir . '/styles/card-css.json',
+			$this->theme_dir . '/styles/' . $slug . '.json',
 			wp_json_encode(
 				array(
 					'version'    => 3,
-					'title'      => 'Card',
-					'slug'       => 'card-css',
+					'title'      => ucfirst( $slug ),
+					'slug'       => $slug,
 					'blockTypes' => array( 'core/group' ),
-					'styles'     => array( 'css' => '&:hover { opacity: 0 }' ),
+					'styles'     => array( 'css' => $css ),
 				)
 			)
 		);
 		wp_clean_theme_json_cache();
+	}
+
+	/**
+	 * The CSS is most of what a variation does — a pseudo-element, a
+	 * descendant rule, a hover state — so a package that left it behind would
+	 * carry a look that does almost nothing at the far end.
+	 */
+	public function test_a_package_carries_the_css_its_variation_defines() {
+		$css = 'position: relative; &::before { content: ""; inset: 0; }';
+		$this->make_partial_with_css( 'card-css', $css );
 		$this->make_theme_pattern( 'banner-css', $this->group_with( 'card-css' ) );
 
 		$porter   = new Pattern_Builder_Cloud_Porter();
 		$exported = $porter->export_local( 'theme', 'simple-theme/banner-css' );
 
+		$this->assertNotWPError( $exported, is_wp_error( $exported ) ? $exported->get_error_message() : '' );
+		$this->assertSame( $css, $exported['pbp']['variations'][0]['styles']['css'] );
+	}
+
+	/**
+	 * CSS outside the subset still refuses the export, and says which
+	 * variation and which rule — better than letting the upload fail at the
+	 * far end with nothing local to point at.
+	 */
+	public function test_a_variation_carrying_unsafe_css_refuses_the_export() {
+		$this->make_partial_with_css( 'card-bad-css', 'background: url(https://evil.test/x.png);' );
+		$this->make_theme_pattern( 'banner-bad-css', $this->group_with( 'card-bad-css' ) );
+
+		$porter   = new Pattern_Builder_Cloud_Porter();
+		$exported = $porter->export_local( 'theme', 'simple-theme/banner-bad-css' );
+
 		$this->assertWPError( $exported );
 		$this->assertSame( 'pb_variation_css_cannot_travel', $exported->get_error_code() );
+		$this->assertStringContainsString( 'card-bad-css', $exported->get_error_message() );
+		$this->assertStringContainsString( 'url(', $exported->get_error_message() );
+	}
+
+	/**
+	 * A variation's own CSS can name a variation by class — `& .is-style-x` —
+	 * so the namespace stamp has to reach inside the string too, or the two
+	 * halves of a rename drift apart and the rule styles a class that is no
+	 * longer there.
+	 */
+	public function test_the_namespace_rewrite_reaches_inside_the_css() {
+		// The outer band, whose CSS reaches for the inner piece by class, and
+		// the inner piece itself — both applied by the markup, so both travel.
+		$this->make_partial_with_css(
+			'card-css-ns',
+			'& .is-style-card-ns-inner { color: red; } & .wp-block-button.is-style-outline .wp-block-button__link { color: blue; }'
+		);
+		$this->make_variation( 'card-ns-inner' );
+		$this->make_theme_pattern(
+			'banner-css-ns',
+			$this->group_with( 'card-css-ns' ) . "\n" . $this->group_with( 'card-ns-inner' )
+		);
+
+		$porter   = new Pattern_Builder_Cloud_Porter();
+		$exported = $porter->export_local( 'theme', 'simple-theme/banner-css-ns', 'studio-a/heroes' );
+
+		$this->assertNotWPError( $exported, is_wp_error( $exported ) ? $exported->get_error_message() : '' );
+
+		$slugs = wp_list_pluck( $exported['pbp']['variations'], 'slug' );
+		$this->assertContains( 'studio-a-heroes-card-css-ns', $slugs );
+		$this->assertContains( 'studio-a-heroes-card-ns-inner', $slugs );
+
+		$carried = $exported['pbp']['variations'][ array_search( 'studio-a-heroes-card-css-ns', $slugs, true ) ];
+		$this->assertStringContainsString( 'is-style-studio-a-heroes-card-ns-inner', $carried['styles']['css'] );
+
+		// A variation WordPress itself ships is not travelling, so its class
+		// is left exactly as it was.
+		$this->assertStringContainsString( 'is-style-outline', $carried['styles']['css'] );
+		$this->assertStringNotContainsString( 'is-style-studio-a-heroes-outline', $carried['styles']['css'] );
+	}
+
+	/**
+	 * And the install writes it, so the look arrives whole.
+	 */
+	public function test_installing_writes_the_css_into_the_partial() {
+		$css = 'position: relative; &:hover { outline: 2px solid #abcdef; }';
+
+		$written = Pattern_Builder_Block_Style_Variations::install(
+			array(
+				'slug'       => 'card-css-install',
+				'title'      => 'Card',
+				'blockTypes' => array( 'core/group' ),
+				'styles'     => array( 'css' => $css ),
+			)
+		);
+
+		$this->assertSame( 'written', $written );
+
+		$partial = json_decode( (string) file_get_contents( $this->theme_dir . '/styles/card-css-install.json' ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test assertion.
+		$this->assertSame( $css, $partial['styles']['css'] );
+	}
+
+	/**
+	 * The check that matters most, because this is the machine that will run
+	 * the CSS. A package can say anything; the destination decides. What it
+	 * refuses costs that one look rather than the pattern — the markup still
+	 * installs, and the refusal is reported with its reason.
+	 */
+	public function test_an_install_skips_a_variation_whose_css_this_site_will_not_write() {
+		$refused = Pattern_Builder_Block_Style_Variations::install(
+			array(
+				'slug'       => 'card-css-refused',
+				'title'      => 'Card',
+				'blockTypes' => array( 'core/group' ),
+				'styles'     => array( 'css' => 'content: "</style><script>alert(1)</script>";' ),
+			)
+		);
+
+		$this->assertWPError( $refused );
+		$this->assertSame( 'pb_variation_css_refused', $refused->get_error_code() );
+		$this->assertFalse( file_exists( $this->theme_dir . '/styles/card-css-refused.json' ) );
+
+		$pbp = array(
+			'format'     => 'pbp/1',
+			'title'      => 'Downloaded Band',
+			'slug'       => 'downloaded-band',
+			'content'    => $this->group_with( 'card-css-refused' ),
+			'variations' => array(
+				array(
+					'slug'       => 'card-css-refused',
+					'title'      => 'Card',
+					'blockTypes' => array( 'core/group' ),
+					'styles'     => array( 'css' => 'content: "</style><script>alert(1)</script>";' ),
+				),
+			),
+		);
+
+		add_filter(
+			'pre_http_request',
+			static function () use ( $pbp ) {
+				return array(
+					'headers'  => array(),
+					'response' => array(
+						'code'    => 200,
+						'message' => 'OK',
+					),
+					'body'     => wp_json_encode( $pbp ),
+				);
+			}
+		);
+
+		$porter = new Pattern_Builder_Cloud_Porter();
+		$result = $porter->install_cloud_pattern( 77, 'user', false );
+		remove_all_filters( 'pre_http_request' );
+
+		$this->assertNotWPError( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$this->assertSame( array(), $result['variationsWritten'] );
+		$this->assertCount( 1, $result['variationsRefused'] );
+		$this->assertSame( 'card-css-refused', $result['variationsRefused'][0]['slug'] );
+		$this->assertStringContainsString( '<', $result['variationsRefused'][0]['reason'] );
+		$this->assertFalse( file_exists( $this->theme_dir . '/styles/card-css-refused.json' ) );
 	}
 }
