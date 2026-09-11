@@ -274,8 +274,8 @@ function DeleteCollectionModal( { collection, onDeleted, onClose, onGoPro } ) {
 					{ sprintf(
 						/* translators: %d: pattern count. */
 						_n(
-							'It holds %d pattern, which is deleted with it. A pattern cannot move between collections — its collection is part of its permanent name — so download anything worth keeping first.',
-							'It holds %d patterns, which are deleted with it. A pattern cannot move between collections — its collection is part of its permanent name — so download anything worth keeping first.',
+							'It holds %d pattern, which will be deleted too. Download anything worth keeping first.',
+							'It holds %d patterns, which will be deleted too. Download anything worth keeping first.',
 							collection.count || 0,
 							'pattern-builder'
 						),

@@ -103,10 +103,7 @@ export function CollectionView( {
 						disabled={ busy || ! patterns.length }
 						onClick={ onSaveCollection }
 					>
-						{ __(
-							'Save collection to this site',
-							'pattern-builder'
-						) }
+						{ __( 'Install Collection', 'pattern-builder' ) }
 					</Button>
 				</HStack>
 			</div>

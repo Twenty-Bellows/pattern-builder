@@ -611,7 +611,7 @@ export function CloudDetails( {
 							onClick={ () => onDownload( pattern ) }
 							className="pattern-builder-details__action-button"
 						>
-							{ __( 'Save', 'pattern-builder' ) }
+							{ __( 'Install Pattern', 'pattern-builder' ) }
 						</Button>
 					</FlexItem>
 					{ !! installed && (
