@@ -11,7 +11,15 @@ const versionParts = currentVersion.split( '.' );
 const major = parseInt( versionParts[ 0 ] );
 const minor = parseInt( versionParts[ 1 ] );
 const patch = parseInt( versionParts[ 2 ] );
-const newVersion = `${ major }.${ minor }.${ patch + 1 }`;
+
+// `npm run version-bump` bumps the patch number; `npm run version-bump -- 2.2.0`
+// sets the version outright, for a minor or major release.
+const requested = process.argv[ 2 ];
+if ( requested !== undefined && ! /^\d+\.\d+\.\d+$/.test( requested ) ) {
+	console.error( `Not a version: ${ requested } (expected major.minor.patch)` );
+	process.exit( 1 );
+}
+const newVersion = requested || `${ major }.${ minor }.${ patch + 1 }`;
 
 console.log( `Bumping version from ${ currentVersion } to ${ newVersion }` );
 packageJson.version = newVersion;
