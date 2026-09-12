@@ -1,11 +1,6 @@
 <?php
 /**
- * settings.layout: the one part of a design system that is neither a preset
- * nor a style.
- *
- * Every constrained band measures against these widths, so a site whose layout
- * an agent cannot set is one where every pattern has to restate the measure on
- * every band — which is exactly what a design system exists to stop.
+ * settings.layout: the one part of a design system that is neither a preset nor a style.
  *
  * @package PatternBuilder
  */
@@ -13,7 +8,6 @@
 use TwentyBellows\PatternBuilder\Pattern_Builder_Abilities;
 
 class Test_Set_Layout extends WP_UnitTestCase {
-
 	/**
 	 * @var Pattern_Builder_Abilities
 	 */
@@ -22,9 +16,6 @@ class Test_Set_Layout extends WP_UnitTestCase {
 	public function set_up() {
 		parent::set_up();
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
-
-		// Registered already during bootstrap; this instance is only here to
-		// call the execute_* methods directly.
 		$this->abilities = new Pattern_Builder_Abilities();
 		remove_action( 'wp_abilities_api_categories_init', array( $this->abilities, 'register_category' ) );
 		remove_action( 'wp_abilities_api_init', array( $this->abilities, 'register_abilities' ) );
@@ -53,12 +44,6 @@ class Test_Set_Layout extends WP_UnitTestCase {
 
 	/**
 	 * Make a rewritten theme.json visible to core's resolver.
-	 *
-	 * `WP_Theme_JSON_Resolver` keys parsed theme.json files by path and
-	 * `clean_cached_data()` deliberately leaves that cache alone, so within one
-	 * PHP process the first read of a path is the only read. A live site gets a
-	 * fresh process per request and never notices; a test that writes and then
-	 * asks core what it now thinks has to clear it by hand.
 	 */
 	private function refresh_theme_json() {
 		wp_clean_theme_json_cache();
@@ -95,8 +80,8 @@ class Test_Set_Layout extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A constrained block reads this at render, so what core now generates is
-	 * the only proof that the write took.
+	 * A constrained block reads this at render, so what core now generates is the only
+	 * proof that the write took.
 	 */
 	public function test_the_generated_custom_property_follows() {
 		$this->abilities->execute_set_layout( array( 'contentSize' => '37rem' ) );
@@ -106,8 +91,8 @@ class Test_Set_Layout extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Naming one width leaves the other alone: an agent correcting the measure
-	 * should not have to restate a wide size it never asked about.
+	 * Naming one width leaves the other alone: an agent correcting the measure should not
+	 * have to restate a wide size it never asked about.
 	 */
 	public function test_one_width_does_not_clear_the_other() {
 		$this->abilities->execute_set_layout( array( 'contentSize' => '46rem', 'wideSize' => '80rem' ) );
@@ -119,8 +104,8 @@ class Test_Set_Layout extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Root padding without this flag insets every full-width band, so the two
-	 * belong to the same decision and the same ability.
+	 * Root padding without this flag insets every full-width band, so the two belong to the
+	 * same decision and the same ability.
 	 */
 	public function test_the_root_padding_flag_is_settable() {
 		$result = $this->abilities->execute_set_layout( array( 'useRootPaddingAwareAlignments' => true ) );
@@ -132,8 +117,8 @@ class Test_Set_Layout extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A clamp() is the shape a fluid measure takes, so the grammar has to
-	 * accept one rather than only a bare length.
+	 * A clamp() is the shape a fluid measure takes, so the grammar has to accept one rather
+	 * than only a bare length.
 	 */
 	public function test_a_fluid_width_is_accepted() {
 		$result = $this->abilities->execute_set_layout(
@@ -145,9 +130,8 @@ class Test_Set_Layout extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Core substitutes `initial` for a value it judges unsafe, which renders as
-	 * a layout that silently did not take. Refusing here is what turns that
-	 * into something the caller can read.
+	 * Core substitutes `initial` for a value it judges unsafe, which renders as a layout
+	 * that silently did not take.
 	 */
 	public function test_a_value_that_is_not_a_length_is_refused() {
 		foreach ( array( '46rem; position:fixed', 'url(https://example.com/x)', '46rem } body {', 'auto !important' ) as $bad ) {
@@ -168,8 +152,8 @@ class Test_Set_Layout extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The read half: an agent is told to call get-design-system first, so the
-	 * widths it would be changing have to be in that answer.
+	 * The read half: an agent is told to call get-design-system first, so the widths it
+	 * would be changing have to be in that answer.
 	 */
 	public function test_the_design_system_reports_the_layout() {
 		$this->abilities->execute_set_layout(

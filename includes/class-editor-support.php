@@ -14,19 +14,8 @@ use WP_REST_Response;
 
 /**
  * Runs `Pattern_Resolver` over the markup the block editor loads.
- *
- * Since WordPress 6.6 core flattens `core/pattern` blocks server side so the
- * editor doesn't have to (`resolve_pattern_blocks()`), and flattening throws
- * away everything but the pattern's slug — the content, and whether the
- * reference was to a synced pattern at all. The pattern list is recomposed
- * from the registry after core has flattened it; templates are composed
- * before the editor sees them, with anything plain left for the editor.
- *
- * Both are cheap on sites that don't use the feature: the markup is only parsed
- * when a substring check says it might be worth it.
  */
 class Editor_Support {
-
 	/**
 	 * REST route the block editor loads patterns from.
 	 */
@@ -64,24 +53,9 @@ class Editor_Support {
 	/**
 	 * Composes the patterns the editor lists, previews and inserts.
 	 *
-	 * Core has already flattened the response by the time this runs, so the
-	 * content is recomposed from the pattern registry rather than patched:
-	 * content written in, plain references inlined as core inlines them, and
-	 * references to synced patterns kept as written — with their content —
-	 * for the editor to render as instances. Core's own resolver is never
-	 * run over the result, since it would flatten those too.
-	 *
-	 * A synced pattern also gains a companion entry here. The inserter hands
-	 * over a pattern's blocks, so a pattern cannot offer a reference to itself;
-	 * the companion carries the same title and categories with a single
-	 * reference block as its content, and the pattern itself steps out of the
-	 * inserter in its place. The companion exists only in this response — it is
-	 * never registered, because nothing but the inserter ever asks for it, and
-	 * the block it inserts names the real pattern.
-	 *
 	 * @param WP_REST_Response|mixed $response Result to send to the client.
-	 * @param array|mixed            $handler  Route handler used for the request.
-	 * @param WP_REST_Request|mixed  $request  Request used to generate the response.
+	 * @param array|mixed            $handler Route handler used for the request.
+	 * @param WP_REST_Request|mixed  $request Request used to generate the response.
 	 * @return WP_REST_Response|mixed The response.
 	 */
 	public function resolve_patterns_response( $response, $handler, $request ) {
@@ -142,8 +116,6 @@ class Editor_Support {
 		if ( ! Synced_Patterns::is_synced( $pattern['name'] ) ) {
 			return null;
 		}
-
-		// A pattern already kept out of the inserter is only used from markup.
 		if ( isset( $pattern['inserter'] ) && ! $pattern['inserter'] ) {
 			return null;
 		}
@@ -177,9 +149,6 @@ class Editor_Support {
 	/**
 	 * Composes the patterns used by a single template or template part.
 	 *
-	 * Only for the editor: on the front end `Pattern_Block` renders the
-	 * template's pattern blocks with their content already in context.
-	 *
 	 * @param WP_Block_Template|mixed $template Template being returned.
 	 * @return WP_Block_Template|mixed The template.
 	 */
@@ -202,12 +171,7 @@ class Editor_Support {
 		/**
 		 * Filters whether template content is composed for the current request.
 		 *
-		 * Templates only need composing for the block editor, which loads them
-		 * over the REST API. The front end renders their pattern blocks
-		 * directly, with the content already in block context.
-		 *
 		 * @since 2.0.0
-		 *
 		 * @param bool $is_editor_request Whether this request loads content for the editor.
 		 */
 		return (bool) apply_filters(
@@ -237,11 +201,6 @@ class Editor_Support {
 			$asset['version'],
 			array( 'in_footer' => true )
 		);
-
-		/*
-		 * The editor script has translatable strings of its own, and without
-		 * this WordPress never hands it the translations it downloads.
-		 */
 		wp_set_script_translations(
 			'pattern-builder-runtime',
 			'pattern-builder'

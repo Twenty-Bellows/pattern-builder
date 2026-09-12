@@ -15,7 +15,6 @@ use TwentyBellows\PatternBuilder\Pattern_Resolver;
  * @covers \TwentyBellows\PatternBuilder\Inner_HTML_Processor
  */
 class Test_Pattern_Resolver extends Pattern_Test_Case {
-
 	/**
 	 * Content is written into the pattern's markup.
 	 */
@@ -46,9 +45,6 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 
 	/**
 	 * A slot nothing was supplied for keeps its default and loses its binding.
-	 *
-	 * Left in place the binding would resolve to nothing outside a pattern, and
-	 * would make the block read-only in the editor.
 	 */
 	public function test_unfilled_slot_keeps_its_default_without_its_binding() {
 		$slug = $this->register_pattern( 'test/hero', $this->bound_heading() );
@@ -134,8 +130,6 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 		$this->assertStringContainsString( 'New label', $resolved );
 		$this->assertStringContainsString( 'https://example.org/new', $resolved );
 		$this->assertStringNotContainsString( 'Old label', $resolved );
-
-		// The wrapper block survived the rewrite.
 		$this->assertStringContainsString( '<div class="wp-block-buttons">', $resolved );
 		$this->assertStringContainsString( '<!-- /wp:buttons -->', $resolved );
 	}
@@ -179,8 +173,6 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 		$this->assertStringContainsString( '<p>One</p>', $resolved );
 		$this->assertStringContainsString( '<p>Two</p>', $resolved );
 		$this->assertStringContainsString( 'Three', $resolved );
-
-		// All three blocks landed inside the group, and it still closes.
 		$group = substr(
 			$resolved,
 			strpos( $resolved, '<div class="wp-block-group">' ),
@@ -189,9 +181,6 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 		$this->assertStringContainsString( '<p>One</p>', $group );
 		$this->assertStringContainsString( 'Three', $group );
 		$this->assertStringContainsString( '<!-- /wp:group -->', $resolved );
-
-		// The parse survives a round trip, which it would not if the inner
-		// content markers had fallen out of step with the inner blocks.
 		$blocks = parse_blocks( $resolved );
 		$this->assertCount( 1, array_filter( $blocks, static fn( $block ) => 'core/group' === $block['blockName'] ) );
 		$this->assertCount( 3, $blocks[0]['innerBlocks'] );
@@ -228,8 +217,8 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 	}
 
 	/**
-	 * A synced reference reached through an unsynced pattern is kept too,
-	 * while the pattern around it is composed.
+	 * A synced reference reached through an unsynced pattern is kept too, while the pattern
+	 * around it is composed.
 	 */
 	public function test_synced_reference_inside_a_composed_pattern_is_kept() {
 		$hero = $this->register_pattern( 'test/hero', $this->bound_heading() );
@@ -279,8 +268,8 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 	}
 
 	/**
-	 * `compose()` does not change what `resolve()` does afterwards: a plain
-	 * reference is still left for core there.
+	 * `compose()` does not change what `resolve()` does afterwards: a plain reference is
+	 * still left for core there.
 	 */
 	public function test_resolve_still_leaves_plain_references_after_compose() {
 		$plain = $this->register_pattern( 'test/plain', '<!-- wp:paragraph --><p>Plain</p><!-- /wp:paragraph -->' );
@@ -382,11 +371,6 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 
 	/**
 	 * Emptying a caption takes the `figcaption` with it.
-	 *
-	 * `core/image` only writes the element when there is something to put in
-	 * it, so an empty one left behind is markup no version of the block would
-	 * save. Resolving strips the bindings that would have excused it, and the
-	 * editor then reports the block as invalid.
 	 */
 	public function test_empty_caption_removes_the_figcaption() {
 		$slug = $this->register_pattern(
@@ -466,11 +450,6 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 
 	/**
 	 * An element the block would have saved empty is emptied, not removed.
-	 *
-	 * `core/button` writes its `a` whether or not there is a label in it, so
-	 * the rule that removes an empty caption must not reach this far. Losing
-	 * the anchor would take the block's link, its classes and its styling with
-	 * it.
 	 */
 	public function test_empty_button_text_keeps_the_anchor() {
 		$slug = $this->register_pattern(

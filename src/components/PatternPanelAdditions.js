@@ -9,8 +9,8 @@ import { PatternMetadataPanel } from './PatternMetadataPanel';
 import { BlockBindingsPanel } from './BlockBindingsPanel';
 import { PatternActionsPanel } from './PatternActionsPanel';
 /**
- * The post types whose editor gets the pattern panels: user patterns
- * (wp_block) and Pattern Builder's file-backed theme patterns (pb_pattern).
+ * The post types whose editor gets the pattern panels: user patterns (wp_block) and Pattern
+ * Builder's file-backed theme patterns (pb_pattern).
  */
 const PATTERN_POST_TYPES = [ 'wp_block', 'pb_pattern' ];
 

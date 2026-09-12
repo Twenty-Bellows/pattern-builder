@@ -14,12 +14,13 @@ import { arrowLeft } from '@wordpress/icons';
 import { CloudCard } from './CloudBrowser';
 
 /**
- * One community collection opened: a header with its title, owner,
- * description and count, "Save collection to this site", and then its
- * patterns as the grid the rest of the browser uses.
+ * One community collection opened: a header with its title, owner, description and count,
+ * "Save collection to this site", and then its patterns as the grid the rest of the browser
+ * uses.
  *
  * @param {Object}   props                  Component props.
- * @param {Object}   props.collection       The collection with its patterns, or null while loading.
+ * @param {Object}   props.collection       The collection with its patterns, or null while
+ *                                          loading.
  * @param {Function} props.onBack           Returns to the landing.
  * @param {Function} props.onSaveCollection Starts the whole-collection save.
  * @param {Object}   props.selected         The selected pattern.

@@ -13,29 +13,23 @@ require_once ABSPATH . 'wp-admin/includes/file.php';
 
 /**
  * Reads and writes block patterns.
- *
- * Theme patterns live in PHP files in the theme's (and parent theme's)
- * `patterns/` directory — the files are the only source of truth, nothing is
- * mirrored into the database. User patterns are core `wp_block` posts and are
- * only touched here for listing and conversion.
  */
 class Pattern_File_Store {
-
 	/**
-	 * Post meta holding a user pattern's attribution — the same thing the
-	 * `Origin:` header holds for a theme pattern (D38).
+	 * Post meta holding a user pattern's attribution — the same thing the `Origin:` header
+	 * holds for a theme pattern (D38).
 	 */
 	const META_ORIGIN = 'pattern_builder_origin';
 
 	/**
-	 * Post meta holding the name of a user pattern's copy on the cloud — the
-	 * same thing the `Cloud:` header holds for a theme pattern.
+	 * Post meta holding the name of a user pattern's copy on the cloud — the same thing the
+	 * `Cloud:` header holds for a theme pattern.
 	 */
 	const META_CLOUD = 'pattern_builder_cloud';
 
 	/**
-	 * Returns all patterns found as PHP files in the active theme's and the
-	 * parent theme's `patterns/` directories.
+	 * Returns all patterns found as PHP files in the active theme's and the parent theme's
+	 * `patterns/` directories.
 	 *
 	 * @return Abstract_Pattern[]
 	 */
@@ -48,7 +42,6 @@ class Pattern_File_Store {
 				$pattern = Abstract_Pattern::from_file( $pattern_file );
 
 				if ( '' === $pattern->name || isset( $seen[ $pattern->name ] ) ) {
-					// A child theme pattern overrides a parent pattern with the same slug.
 					continue;
 				}
 
@@ -62,13 +55,6 @@ class Pattern_File_Store {
 
 	/**
 	 * Every pattern file under a directory, however deep.
-	 *
-	 * Core scans `patterns/` to unlimited depth (`WP_Theme::scandir()` with
-	 * a depth of -1), so a pattern in a subdirectory is a pattern
-	 * WordPress already registers. This plugin files installed patterns
-	 * that way — `patterns/{handle}/{collection}/{slug}.php` — so that two
-	 * accounts' patterns of the same name can both live here, and so a
-	 * pattern's namespace is legible from the theme's file tree.
 	 *
 	 * @param string $directory Directory to scan.
 	 * @return string[] Absolute file paths.
@@ -132,12 +118,6 @@ class Pattern_File_Store {
 	/**
 	 * Every cloud name a local pattern answers to, with the pattern it names.
 	 *
-	 * A pattern answers to one in two ways: a theme pattern installed from
-	 * the cloud keeps its cloud name as its own, and any pattern with a copy
-	 * on the cloud carries that copy's name as its `Cloud:` reference. Read
-	 * from the files' headers and one meta query, rendering nothing, so a
-	 * whole collection's worth of "is this installed here?" costs one pass.
-	 *
 	 * @return array name => { type: string, id: string|int, title: string }
 	 */
 	public function cloud_names() {
@@ -160,8 +140,6 @@ class Pattern_File_Store {
 				}
 
 				foreach ( array( $slug, trim( $headers['cloud'] ) ) as $name ) {
-					// A child theme's pattern wins over its parent's, as it does
-					// everywhere else.
 					if ( 2 === substr_count( $name, '/' ) && ! isset( $names[ $name ] ) ) {
 						$names[ $name ] = array(
 							'type'  => 'theme',
@@ -200,7 +178,8 @@ class Pattern_File_Store {
 	 * Updates a theme pattern by writing its PHP file.
 	 *
 	 * @param Abstract_Pattern $pattern The pattern to update.
-	 * @param array            $options Optional settings: 'localize' (bool), 'import_images' (bool).
+	 * @param array            $options Optional settings: 'localize' (bool),
+	 * 'import_images' (bool).
 	 * @return Abstract_Pattern|WP_Error The pattern as re-read from disk, or an error.
 	 */
 	public function update_theme_pattern( Abstract_Pattern $pattern, $options = array() ) {
@@ -211,27 +190,13 @@ class Pattern_File_Store {
 				array( 'status' => 403 )
 			);
 		}
-
-		/*
-		 * A theme pattern's name is what everything else refers to it by, and
-		 * WordPress reads it from the file's `Slug:` header, so a bare name
-		 * registers as `hero` while every `core/pattern` reference written
-		 * against the documented `{theme}/hero` resolves to nothing — silently,
-		 * because an unresolved reference renders as nothing rather than as an
-		 * error. Namespacing here rather than at each caller is what keeps the
-		 * name a caller passes and the name WordPress registers the same.
-		 */
 		$pattern->name = self::namespaced_name( $pattern->name );
 		if ( 'theme' === $pattern->source ) {
 			$pattern->id = $pattern->name;
 		}
-
-		// Import images unless explicitly disabled.
 		if ( ! isset( $options['import_images'] ) || true === $options['import_images'] ) {
 			$pattern = $this->import_pattern_image_assets( $pattern );
 		}
-
-		// Localize if enabled.
 		if ( isset( $options['localize'] ) && true === $options['localize'] ) {
 			$pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 		}
@@ -243,8 +208,6 @@ class Pattern_File_Store {
 		}
 
 		$this->flush_pattern_caches();
-
-		// Rebuild the pattern from the file (so that content has no PHP tags).
 		$filepath = $this->get_pattern_filepath( $pattern );
 		if ( ! is_wp_error( $filepath ) && $filepath ) {
 			$pattern = Abstract_Pattern::from_file( $filepath );
@@ -256,12 +219,8 @@ class Pattern_File_Store {
 	/**
 	 * Record which cloud pattern a local pattern is a copy of, or forget it.
 	 *
-	 * A theme pattern's reference is a header, so setting one rewrites the
-	 * file through the same door an editor save does; nothing is written
-	 * when the reference is already the one asked for.
-	 *
 	 * @param Abstract_Pattern $pattern The local pattern.
-	 * @param string           $name    `{handle}/{collection}/{slug}`, or '' to clear it.
+	 * @param string           $name `{handle}/{collection}/{slug}`, or '' to clear it.
 	 * @return true|WP_Error
 	 */
 	public function set_cloud_reference( Abstract_Pattern $pattern, $name ) {
@@ -288,8 +247,9 @@ class Pattern_File_Store {
 	/**
 	 * Creates a theme pattern from a user pattern (wp_block), deleting the post.
 	 *
-	 * @param \WP_Post         $post    The wp_block post to convert.
-	 * @param Abstract_Pattern $pattern The pattern data to write (already carrying any edits).
+	 * @param \WP_Post         $post The wp_block post to convert.
+	 * @param Abstract_Pattern $pattern The pattern data to write (already carrying any
+	 * edits).
 	 * @param array            $options Optional settings passed to update_theme_pattern().
 	 * @return Abstract_Pattern|WP_Error The new theme pattern, or an error.
 	 */
@@ -322,7 +282,8 @@ class Pattern_File_Store {
 	 * Converts a theme pattern into a user pattern (wp_block), deleting the file.
 	 *
 	 * @param Abstract_Pattern $pattern The theme pattern to convert.
-	 * @return Abstract_Pattern|WP_Error The new user pattern (with its post ID), or an error.
+	 * @return Abstract_Pattern|WP_Error The new user pattern (with its post ID), or an
+	 * error.
 	 */
 	public function convert_theme_pattern_to_user( Abstract_Pattern $pattern ) {
 		if ( ! current_user_can( 'edit_theme_options' ) ) {
@@ -334,9 +295,7 @@ class Pattern_File_Store {
 		}
 
 		$filepath = $this->get_pattern_filepath( $pattern );
-
-		// Export any theme assets to the media library.
-		$pattern = $this->export_pattern_image_assets( $pattern );
+		$pattern  = $this->export_pattern_image_assets( $pattern );
 
 		$post_id = wp_insert_post(
 			array(
@@ -361,16 +320,12 @@ class Pattern_File_Store {
 		}
 
 		wp_set_object_terms( $post_id, $pattern->categories, 'wp_pattern_category', false );
-
-		// Still the same pattern: its attribution and its cloud copy come along.
 		if ( $pattern->origin ) {
 			update_post_meta( $post_id, self::META_ORIGIN, $pattern->origin );
 		}
 		if ( $pattern->cloud ) {
 			update_post_meta( $post_id, self::META_CLOUD, $pattern->cloud );
 		}
-
-		// Delete the theme pattern file.
 		if ( ! is_wp_error( $filepath ) && $filepath ) {
 			$deleted = Pattern_Builder_Security::safe_file_delete(
 				$filepath,
@@ -455,10 +410,6 @@ class Pattern_File_Store {
 	/**
 	 * A theme pattern's fully namespaced name.
 	 *
-	 * A name that already carries a namespace is left alone — that covers the
-	 * theme's own `{theme}/hero` and a cloud pattern's permanent
-	 * `{handle}/{collection}/{slug}`, neither of which may be rewritten.
-	 *
 	 * @param string $name Pattern name, namespaced or bare.
 	 * @return string
 	 */
@@ -475,25 +426,12 @@ class Pattern_File_Store {
 	/**
 	 * The file a pattern's name implies, under the active theme.
 	 *
-	 * A pattern's name is its namespace, and the namespace is the path.
-	 * The theme's own patterns keep the flat layout every theme uses —
-	 * `mytheme/hero` is `patterns/hero.php` — because the theme slug is
-	 * the theme's whole namespace and a directory named after the theme
-	 * inside the theme says nothing. Everything else keeps its namespace
-	 * as directories: a pattern installed from the cloud is
-	 * `{handle}/{collection}/{slug}`, so it lands in
-	 * `patterns/{handle}/{collection}/{slug}.php` and cannot collide with
-	 * another account's pattern of the same name.
-	 *
 	 * @param string $name Namespaced pattern name.
 	 * @return string Absolute path.
 	 */
 	private function path_for_name( $name ) {
 		$segments = array_values( array_filter( explode( '/', (string) $name ), 'strlen' ) );
 		$slug     = array_pop( $segments );
-
-		// A single leading segment naming this theme is the theme's own
-		// namespace, and is not a directory.
 		if ( 1 === count( $segments ) && in_array( $segments[0], array( get_stylesheet(), get_template() ), true ) ) {
 			$segments = array();
 		}
@@ -506,15 +444,11 @@ class Pattern_File_Store {
 	/**
 	 * Writes a theme pattern's PHP file to disk.
 	 *
-	 * Creates the file if it doesn't exist. Content is formatted before writing.
-	 *
 	 * @param Abstract_Pattern $pattern The pattern to write.
 	 * @return Abstract_Pattern|WP_Error
 	 */
 	public function update_theme_pattern_file( Abstract_Pattern $pattern ) {
 		$path = $this->get_pattern_filepath( $pattern );
-
-		// If get_pattern_filepath returns an error, construct a new path.
 		if ( is_wp_error( $path ) ) {
 			$path = $this->path_for_name( $pattern->name );
 		}
@@ -537,12 +471,6 @@ class Pattern_File_Store {
 
 	/**
 	 * Forgets every cache derived from the theme's pattern files.
-	 *
-	 * Covers core's per-theme pattern header cache, this plugin's synced-slug
-	 * lookup, and the Synced Patterns for Themes transient. The companion
-	 * stays unloaded while this plugin is active, but its week-long cache may
-	 * survive from before — clearing it here keeps the companion current if
-	 * this plugin is ever deactivated.
 	 *
 	 * @return void
 	 */
@@ -584,7 +512,6 @@ class Pattern_File_Store {
 	 * @return string PHP header comment string.
 	 */
 	private function build_pattern_file_metadata( Abstract_Pattern $pattern ): string {
-
 		$categories    = $pattern->categories ? "\n * Categories: " . implode( ', ', $pattern->categories ) : '';
 		$keywords      = $pattern->keywords ? "\n * Keywords: " . implode( ', ', $pattern->keywords ) : '';
 		$blockTypes    = $pattern->blockTypes ? "\n * Block Types: " . implode( ', ', $pattern->blockTypes ) : '';
@@ -593,11 +520,8 @@ class Pattern_File_Store {
 		$viewportWidth = $pattern->viewportWidth ? "\n * Viewport Width: " . (int) $pattern->viewportWidth : '';
 		$inserter      = $pattern->inserter ? '' : "\n * Inserter: no";
 		$synced        = $pattern->synced ? "\n * Synced: yes" : '';
-		// Attribution travels with the pattern, so it goes in the file (D38).
-		// Core reads a fixed list of headers and ignores the rest, so this is
-		// inert to WordPress and legible to anyone who opens the file.
-		$origin = $pattern->origin ? "\n * Origin: " . $pattern->origin : '';
-		$cloud  = $pattern->cloud ? "\n * Cloud: " . $pattern->cloud : '';
+		$origin        = $pattern->origin ? "\n * Origin: " . $pattern->origin : '';
+		$cloud         = $pattern->cloud ? "\n * Cloud: " . $pattern->cloud : '';
 
 		$metadata  = "<?php\n";
 		$metadata .= "/**\n";
@@ -612,13 +536,10 @@ class Pattern_File_Store {
 	/**
 	 * Exports pattern image assets from the theme directory to the WordPress media library.
 	 *
-	 * Used when converting a theme pattern to a user pattern.
-	 *
 	 * @param Abstract_Pattern $pattern The pattern whose images should be exported.
 	 * @return Abstract_Pattern Updated pattern with media library URLs.
 	 */
 	public function export_pattern_image_assets( $pattern ) {
-
 		$home_url = home_url();
 
 		/**
@@ -627,9 +548,7 @@ class Pattern_File_Store {
 		 * @param string $url Source URL.
 		 * @return string|WP_Error New media library URL, or WP_Error on failure.
 		 */
-		$upload_image = function ( $url ) use ( $home_url ) {
-
-			// Skip if the asset isn't an image.
+		$upload_image     = function ( $url ) use ( $home_url ) {
 			if ( ! preg_match( '/\.(jpg|jpeg|png|gif|webp|svg)$/i', $url ) ) {
 				return new WP_Error(
 					'invalid_image_type',
@@ -639,9 +558,7 @@ class Pattern_File_Store {
 			}
 
 			$download_file = false;
-
-			// Convert the URL to a local file path.
-			$file_path = str_replace( $home_url, ABSPATH, $url );
+			$file_path     = str_replace( $home_url, ABSPATH, $url );
 			if ( file_exists( $file_path ) ) {
 				$temp_file = wp_tempnam( basename( $file_path ) );
 				if ( copy( $file_path, $temp_file ) ) {
@@ -654,7 +571,6 @@ class Pattern_File_Store {
 			}
 
 			if ( is_wp_error( $download_file ) ) {
-				// Try again with port 80 if we're inside a Docker container on localhost.
 				$parsed_url = wp_parse_url( $url );
 				if ( 'localhost' === $parsed_url['host'] && '80' !== ( $parsed_url['port'] ?? null ) ) {
 					$download_file = download_url( str_replace( 'localhost:' . $parsed_url['port'], 'localhost:80', $url ) );
@@ -678,13 +594,9 @@ class Pattern_File_Store {
 			}
 
 			$upload_file = $upload_dir['path'] . '/' . basename( $url );
-
-			// Return existing URL if the file is already in uploads.
 			if ( file_exists( $upload_file ) ) {
 				return $upload_dir['url'] . '/' . basename( $upload_file );
 			}
-
-			// Move the downloaded file to the uploads directory.
 			global $wp_filesystem;
 			if ( ! $wp_filesystem ) {
 				WP_Filesystem();
@@ -727,8 +639,6 @@ class Pattern_File_Store {
 
 			return wp_get_attachment_url( $attachment_id );
 		};
-
-		// Handle HTML attributes (src and href).
 		$pattern->content = preg_replace_callback(
 			'/(src|href)="(' . preg_quote( $home_url, '/' ) . '[^"]+)"/',
 			function ( $matches ) use ( $upload_image ) {
@@ -740,8 +650,6 @@ class Pattern_File_Store {
 			},
 			$pattern->content
 		);
-
-		// Handle JSON-encoded URLs.
 		$pattern->content = preg_replace_callback(
 			'/"url"\s*:\s*"(' . preg_quote( $home_url, '/' ) . '[^"]+)"/',
 			function ( $matches ) use ( $upload_image ) {
@@ -759,16 +667,13 @@ class Pattern_File_Store {
 	}
 
 	/**
-	 * Imports pattern image assets from the media library into the theme's assets directory.
-	 *
-	 * Used when saving a theme pattern — downloads URLs pointing to home_url and
-	 * stores them as static theme assets, replacing the URLs with PHP template tags.
+	 * Imports pattern image assets from the media library into the theme's assets
+	 * directory.
 	 *
 	 * @param Abstract_Pattern $pattern The pattern whose images should be imported.
 	 * @return Abstract_Pattern Updated pattern with theme-relative asset paths.
 	 */
 	private function import_pattern_image_assets( $pattern ) {
-
 		$home_url = home_url();
 
 		/**
@@ -778,7 +683,6 @@ class Pattern_File_Store {
 		 * @return string|false Theme-relative path on success, false on failure.
 		 */
 		$download_and_save_image = function ( $url ) {
-			// Skip if the asset isn't an image.
 			if ( ! preg_match( '/\.(jpg|jpeg|png|gif|webp|svg)$/i', $url ) ) {
 				return false;
 			}
@@ -786,7 +690,6 @@ class Pattern_File_Store {
 			$download_file = download_url( $url );
 
 			if ( is_wp_error( $download_file ) ) {
-				// Try again with port 80 if we're inside a Docker container on localhost.
 				$parsed_url = wp_parse_url( $url );
 				if ( 'localhost' === $parsed_url['host'] && '80' !== ( $parsed_url['port'] ?? null ) ) {
 					$download_file = download_url( str_replace( 'localhost:' . $parsed_url['port'], 'localhost:80', $url ) );
@@ -821,9 +724,7 @@ class Pattern_File_Store {
 
 			return '/assets/images/' . $filename;
 		};
-
-		// Handle HTML attributes (src and href).
-		$pattern->content = preg_replace_callback(
+		$pattern->content        = preg_replace_callback(
 			'/(src|href)="(' . preg_quote( $home_url, '/' ) . '[^"]+)"/',
 			function ( $matches ) use ( $download_and_save_image ) {
 				$new_url = $download_and_save_image( $matches[2] );
@@ -834,9 +735,7 @@ class Pattern_File_Store {
 			},
 			$pattern->content
 		);
-
-		// Handle JSON-encoded URLs.
-		$pattern->content = preg_replace_callback(
+		$pattern->content        = preg_replace_callback(
 			'/"url"\s*:\s*"(' . preg_quote( $home_url, '/' ) . '[^"]+)"/',
 			function ( $matches ) use ( $download_and_save_image ) {
 				$new_url = $download_and_save_image( $matches[1] );
@@ -854,8 +753,6 @@ class Pattern_File_Store {
 	/**
 	 * Formats block markup for readability.
 	 *
-	 * This is a PHP port of the JavaScript formatBlockMarkup() function.
-	 *
 	 * @param string $block_markup The block markup to format.
 	 * @return string Formatted block markup.
 	 */
@@ -872,7 +769,6 @@ class Pattern_File_Store {
 	 * @return string Block markup with newlines added.
 	 */
 	private function add_new_lines_to_block_markup( $block_markup ) {
-		// Add newlines before and after each comment.
 		$block_markup = preg_replace_callback(
 			'/<!--(.*?)-->/s',
 			function ( $matches ) {
@@ -881,14 +777,8 @@ class Pattern_File_Store {
 			},
 			$block_markup
 		);
-
-		// Fix spacing for self-closing blocks.
 		$block_markup = str_replace( '/ -->', '/-->', $block_markup );
-
-		// Normalize multiple newlines into a single one.
 		$block_markup = preg_replace( '/\n{2,}/', "\n", $block_markup );
-
-		// Eliminate blank lines.
 		$block_markup = preg_replace( '/^\s*[\r\n]/m', '', $block_markup );
 
 		return $block_markup;
@@ -908,7 +798,6 @@ class Pattern_File_Store {
 		$output       = array();
 
 		foreach ( $lines as $line ) {
-			// Detect closing tags/comments — reduce indent before rendering.
 			$is_closing_comment = preg_match( '/^<!--\s*\/[\w:-]+\s*-->$/', $line );
 			$is_closing_tag     = preg_match( '/^<\/[\w:-]+>$/', $line );
 
@@ -916,19 +805,11 @@ class Pattern_File_Store {
 				$indent_level = max( $indent_level - 1, 0 );
 			}
 
-			$output[] = str_repeat( $indent_str, $indent_level ) . $line;
-
-			// Detect opening comment (not self-closing).
-			$is_opening_comment = preg_match( '/^<!--\s*[\w:-]+\b.*-->$/', $line ) &&
+			$output[]                = str_repeat( $indent_str, $indent_level ) . $line;
+			$is_opening_comment      = preg_match( '/^<!--\s*[\w:-]+\b.*-->$/', $line ) &&
 				! preg_match( '/\/\s*-->$/', $line );
-
-			// Detect opening tag (not self-closing).
-			$is_opening_tag = preg_match( '/^<([\w:-]+)(\s[^>]*)?>$/', $line );
-
-			// Self-closing HTML tag.
-			$is_self_closing_tag = preg_match( '/^<[^>]+\/>$/', $line );
-
-			// Self-closing block markup.
+			$is_opening_tag          = preg_match( '/^<([\w:-]+)(\s[^>]*)?>$/', $line );
+			$is_self_closing_tag     = preg_match( '/^<[^>]+\/>$/', $line );
 			$is_self_closing_comment = preg_match( '/^<!--.*\/\s*-->$/', $line );
 
 			if ( ( $is_opening_comment || $is_opening_tag ) && ! $is_self_closing_tag && ! $is_self_closing_comment ) {

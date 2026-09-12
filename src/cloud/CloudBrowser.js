@@ -38,15 +38,11 @@ import { UploadedTab } from './UploadedTab';
 import './cloud.scss';
 
 /**
- * What this site's WordPress can render. A cloud pattern names the version
- * it needs; the server refuses one this site is too old for, and this is
- * what lets the browser say so before the round trip.
+ * What this site's WordPress can render.
  */
 const SITE_WORDPRESS = window.patternBuilderAdmin?.wordPressVersion || '';
 
 const BASE = '/pattern-builder/v1/cloud';
-
-// How long to keep asking whether a purchase has landed, and how often.
 const UPGRADE_POLL_INTERVAL = 5000;
 const UPGRADE_POLL_TIMEOUT = 3 * 60 * 1000;
 
@@ -54,10 +50,8 @@ export const CLOUD_LIBRARY = 'cloud-library';
 export const CLOUD_DIRECTORY = 'cloud-directory';
 
 /**
- * The password rule, as the service enforces it: eight characters with an
- * upper-case letter, a digit and a symbol. Checked here first so the form
- * can say what is missing before a round trip, and again on the service,
- * whose answer is the one that counts.
+ * The password rule, as the service enforces it: eight characters with an upper-case
+ * letter, a digit and a symbol.
  *
  * @param {string} password Candidate password.
  * @return {string} What is missing, or '' when it passes.
@@ -86,10 +80,8 @@ export function passwordProblem( password ) {
 }
 
 /**
- * The handle rule, as the service enforces it: three to thirty-two
- * characters of lower-case letters, numbers and single hyphens, starting
- * with a letter. Checked here first for the same reason the password is,
- * and again on the service, whose answer is the one that counts.
+ * The handle rule, as the service enforces it: three to thirty-two characters of lower-case
+ * letters, numbers and single hyphens, starting with a letter.
  *
  * @param {string} handle Candidate handle.
  * @return {string} What is wrong, or '' when it passes.
@@ -124,14 +116,8 @@ const PASSWORD_RULE = __(
 );
 
 /**
- * Sign in / create an account / start a password reset without leaving
- * wp-admin; credentials relay through this site's proxy, which stores only
- * the returned token. A reset finishes on patternbuilderwp.com, from the
- * emailed link — the plugin only starts it.
- *
- * Creating an account asks one more question, in two buttons with neither
- * preselected: may we email you news and offers? No answer is no, and the
- * service records the answer with when and where it was given.
+ * Sign in / create an account / start a password reset without leaving wp-admin;
+ * credentials relay through this site's proxy, which stores only the returned token.
  *
  * @param {Object}   props             Component props.
  * @param {Function} props.onConnected Receives the fresh status payload.
@@ -144,7 +130,7 @@ function ConnectPanel( { onConnected, intro, title } ) {
 	const [ password, setPassword ] = useState( '' );
 	const [ name, setName ] = useState( '' );
 	const [ handle, setHandle ] = useState( '' );
-	const [ marketing, setMarketing ] = useState( null ); // null = unanswered.
+	const [ marketing, setMarketing ] = useState( null );
 	const [ busy, setBusy ] = useState( false );
 	const [ error, setError ] = useState( '' );
 	const [ notice, setNotice ] = useState( '' );
@@ -418,11 +404,7 @@ function ConnectPanel( { onConnected, intro, title } ) {
 }
 
 /**
- * Disconnect, behind a prompt. Disconnecting forgets this WordPress user's
- * token and nothing else — installed patterns and the cloud library are
- * untouched — so the prompt says that. The prompt's state lives here rather
- * than in CloudBrowser so it goes away with the account bar, whatever
- * disconnected it, instead of reappearing after the next sign-in.
+ * Disconnect, behind a prompt.
  *
  * @param {Object}   props                Component props.
  * @param {Function} props.onDisconnected Called once the token is gone.
@@ -503,11 +485,8 @@ function DisconnectButton( { onDisconnected } ) {
 }
 
 /**
- * A cloud pattern card: the service's preview document rendered at the
- * grid's design width and scaled into the same fixed square tile the local
- * cards use. The tile and the scale are fixed in CSS, and the preview
- * document centers its own content — nothing measures anything, so the two
- * grids cannot drift apart.
+ * A cloud pattern card: the service's preview document rendered at the grid's design width
+ * and scaled into the same fixed square tile the local cards use.
  *
  * @param {Object}   props            Component props.
  * @param {Object}   props.pattern    Cloud pattern summary.
@@ -547,9 +526,8 @@ export function CloudCard( { pattern, isSelected, onSelect } ) {
 }
 
 /**
- * The details sidebar for a selected cloud pattern — the same shell the
- * local sidebar uses: title, kind, and the actions on top. Save picks a
- * destination; Edit appears once the pattern is installed here.
+ * The details sidebar for a selected cloud pattern, the same shell the local sidebar uses.
+ * title, kind, and the actions on top.
  *
  * @param {Object}   props             Component props.
  * @param {Object}   props.pattern     Cloud pattern summary.
@@ -569,17 +547,13 @@ export function CloudDetails( {
 	busy,
 	children,
 } ) {
-	// undefined = looking it up, null = not installed, else { type, id, title }.
 	const [ installed, setInstalled ] = useState( undefined );
-
-	// The version this pattern needs, when this site does not have it.
 	const needsWordPress = needsNewerWordPress( pattern, SITE_WORDPRESS );
 
 	useEffect( () => {
 		if ( busy ) {
-			return; // Re-check once the in-flight action (e.g. a download) lands.
+			return;
 		}
-		// Installed here means a local pattern answers to its cloud name.
 		if ( ! pattern.namespace ) {
 			setInstalled( null );
 			return;
@@ -768,10 +742,8 @@ export function DestinationModal( { pattern, busy, onConfirm, onClose } ) {
 }
 
 /**
- * The missing-tokens step of a download: the pattern references design
- * tokens this site doesn't define. Where they go isn't a question — they
- * follow the pattern to the destination already chosen — so this lists what
- * will be added and says where.
+ * The missing-tokens step of a download: the pattern references design tokens this site
+ * doesn't define.
  *
  * @param {Object}   props             Component props.
  * @param {Array}    props.missing     Tokens the site lacks.
@@ -875,9 +847,9 @@ export function TokensList( { missing } ) {
 }
 
 /**
- * The single-pattern save: a destination, then the tokens the site lacks,
- * then the download — as a hook, so the Community and Uploaded tabs share
- * one flow and render its two modals where they like.
+ * The single-pattern save: a destination, then the tokens the site lacks, then the download
+ * — as a hook, so the Community and Uploaded tabs share one flow and render its two modals
+ * where they like.
  *
  * @param {Object}   options              Hook options.
  * @param {string}   options.source       'library' or 'directory'.
@@ -890,15 +862,7 @@ export function useDownloadFlow( { source, onDownloaded } ) {
 	const [ pendingDestination, setPendingDestination ] = useState( null );
 	const { createSuccessNotice, createErrorNotice } =
 		useDispatch( noticesStore );
-
-	// Save asks for a destination first; the rest of the flow is unchanged.
 	const requestDownload = ( pattern ) => {
-		/*
-		 * Except when this site is too old for it. The server refuses these
-		 * anyway — the import would re-sanitize against this site's KSES
-		 * and quietly strip markup it does not know — so asking where to
-		 * put it first would only be a longer way round to the same no.
-		 */
 		const needs = needsNewerWordPress( pattern, SITE_WORDPRESS );
 		if ( needs ) {
 			createErrorNotice(
@@ -919,9 +883,6 @@ export function useDownloadFlow( { source, onDownloaded } ) {
 
 		setPendingDestination( pattern );
 	};
-
-	// `addTokens` carries the answer to the tokens modal; the tokens follow
-	// the pattern to `destination`, which the server decides for itself.
 	const performDownload = ( pattern, destination, addTokens = false ) => {
 		setBusy( true );
 		apiFetch( {
@@ -932,8 +893,6 @@ export function useDownloadFlow( { source, onDownloaded } ) {
 				cloudId: pattern.id,
 				destination,
 				addTokens,
-				// Which collection it came from, so it lands under that
-				// collection's local category.
 				collection: pattern.collection
 					? {
 							owner: pattern.collection.owner,
@@ -999,8 +958,6 @@ export function useDownloadFlow( { source, onDownloaded } ) {
 			} )
 			.finally( () => setBusy( false ) );
 	};
-
-	// Tokens this site lacks need a destination before the download (§4a).
 	const download = ( pattern, destination ) => {
 		if ( ! pattern.tokens?.length ) {
 			performDownload( pattern, destination );
@@ -1063,18 +1020,19 @@ export function useDownloadFlow( { source, onDownloaded } ) {
 }
 
 /**
- * The cloud browsing surface: connect state and the account bar, then the
- * Uploaded tab (the account's collections and patterns) or the Community
- * tab (public collections first, then patterns) — rendered in place of the
- * local grid when a cloud tab is active.
+ * The cloud browsing surface: connect state and the account bar, then the Uploaded tab (the
+ * account's collections and patterns) or the Community tab (public collections first, then
+ * patterns) — rendered in place of the local grid when a cloud tab is active.
  *
  * @param {Object}   props               Component props.
  * @param {string}   props.view          CLOUD_LIBRARY or CLOUD_DIRECTORY.
  * @param {Function} props.onDownloaded  Called after a pattern lands locally.
  * @param {Function} props.onEditLocal   Opens an installed local copy's editor.
  * @param {string}   props.search        Search term, owned by the browser chrome.
- * @param {string}   props.collection    The Uploaded tab's rail selection: a collection id, or '' for all.
- * @param {Function} props.onCollections Reports the Uploaded tab's collections for the rail.
+ * @param {string}   props.collection    The Uploaded tab's rail selection: a collection id,
+ *                                       or '' for all.
+ * @param {Function} props.onCollections Reports the Uploaded tab's collections for the
+ *                                       rail.
  */
 export function CloudBrowser( {
 	view,
@@ -1107,23 +1065,9 @@ export function CloudBrowser( {
 	useEffect( () => {
 		refreshStatus();
 	}, [ refreshStatus ] );
-
-	// Which cloud tab was opened — one event per visit, not per page.
 	useEffect( () => {
 		track( isLibrary ? 'cloud_browsed' : 'community_browsed' );
 	}, [ isLibrary ] );
-
-	/*
-	 * Checkout happens on Freemius, in another tab, and the licence reaches
-	 * this account by a webhook to the service — so nothing about paying
-	 * passes through this screen, and without watching for it the panel
-	 * still says "Free" until the page is reloaded.
-	 *
-	 * Two watchers, because the timing is not ours: a bounded poll after the
-	 * upgrade link is opened (the webhook lands a moment after the payment,
-	 * not with it), and a re-check whenever this tab is looked at again,
-	 * which is what catches somebody who took their time.
-	 */
 	useEffect( () => {
 		if ( ! awaitingUpgrade ) {
 			return undefined;
@@ -1143,8 +1087,6 @@ export function CloudBrowser( {
 					{ type: 'snackbar' }
 				);
 			} else if ( elapsed >= UPGRADE_POLL_TIMEOUT ) {
-				// Stop guessing. The tab-focus check below still catches it,
-				// and so does the next visit.
 				setAwaitingUpgrade( false );
 			}
 		}, UPGRADE_POLL_INTERVAL );
@@ -1165,13 +1107,6 @@ export function CloudBrowser( {
 	}, [ refreshStatus ] );
 
 	const awaitUpgrade = useCallback( () => setAwaitingUpgrade( true ), [] );
-
-	/*
-	 * Go Pro opens Freemius's overlay right here when the service handed
-	 * over a checkout configuration; the hosted-page link is the fallback
-	 * for a service that has not, or a script that would not load. Either
-	 * way the poll above watches for the licence to land.
-	 */
 	const goPro = () => {
 		track( 'upgrade_opened' );
 		if ( ! status?.checkout ) {
@@ -1245,13 +1180,6 @@ export function CloudBrowser( {
 			</main>
 		);
 	}
-
-	/*
-	 * Both cloud tabs are browsed as an account. The service would list its
-	 * directory to anyone; here the community is behind a sign-in so what a
-	 * site downloads is downloaded by somebody, and the proxy enforces the
-	 * same rule. The intro says why for the tab that was opened.
-	 */
 	if ( ! status.connected ) {
 		return (
 			<main className="pattern-builder-browser__main">

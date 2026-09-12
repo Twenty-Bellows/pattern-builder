@@ -1,34 +1,7 @@
 <?php
 /**
- * The cloud round trip, over the wire: upload a theme pattern with an image,
- * re-upload it to take the update path, download it back as a user pattern,
- * and check what landed.
- *
- * This is a manual utility, not part of the PHPUnit suite, because it needs
- * something PHPUnit cannot provide: a second WordPress. Every automated test
- * of this path mocks `pre_http_request`, so nothing else exercises the real
- * multipart upload, the service's own sanitization and asset rehosting, or
- * the download that fetches those assets back. Run it after touching the
- * porter, the cloud controller, or anything in the service's store.
- *
- * Run it on the CLIENT site, with a token from the service:
- *
- *   wp eval-file tests/e2e/cloud-roundtrip.php <token> [pattern-id]
- *
- * `pattern-id` is a theme pattern's namespaced name and defaults to one with
- * a local image, which is the case worth checking. The site must already
- * point at the service (`PATTERN_BUILDER_CLOUD_URL`, or the option). The
- * upload goes into a collection made for the run ("E2E Roundtrip", public
- * on a free account), and the output names it as `{owner}/{slug}`.
- *
- * Then, on a SECOND site connected to any account, install that collection:
- *
- *   wp eval-file tests/e2e/cloud-roundtrip.php <token> install <owner>/<slug>
- *
- * which is the whole-collection path — the fetch, each download, the local
- * category footprint — against the real service.
- *
- * Exits non-zero on the first thing that does not hold.
+ * The cloud round trip, over the wire: upload a theme pattern with an image, re-upload it
+ * to take the update path, download it back as a user pattern, and check what landed.
  *
  * @package PatternBuilder
  */
@@ -49,13 +22,6 @@ if ( ! $token ) {
 
 wp_set_current_user( 1 );
 update_user_meta( 1, Pattern_Builder_Cloud::META_TOKEN, $token );
-
-/*
- * The account as the service describes it, handle included. Attribution
- * compares the connected handle against a package's namespace (D38), so a
- * stubbed account would have this site stamping its own patterns as
- * somebody else's work.
- */
 $me = Pattern_Builder_Cloud::request( 'GET', '/me' );
 if ( is_wp_error( $me ) ) {
 	WP_CLI::error( 'Could not read the account: ' . $me->get_error_message() );
@@ -68,7 +34,7 @@ $out        = array();
 /**
  * Runs a cloud endpoint, stopping the script on a WP_Error.
  *
- * @param string $step   What is being attempted, for the failure message.
+ * @param string $step What is being attempted, for the failure message.
  * @param mixed  $result Response or WP_Error.
  * @return array The response data.
  */
@@ -82,7 +48,7 @@ $attempt = function ( $step, $result ) {
 /**
  * Builds a cloud request.
  *
- * @param string $route  Route under /pattern-builder/v1/cloud.
+ * @param string $route Route under /pattern-builder/v1/cloud.
  * @param array  $params Request parameters.
  * @return WP_REST_Request
  */
@@ -93,14 +59,10 @@ $request = function ( $route, $params ) {
 	}
 	return $req;
 };
-
-// 0. The connection itself — a live /me round trip.
 $out['status'] = $controller->status()->get_data();
 if ( empty( $out['status']['connected'] ) ) {
 	WP_CLI::error( 'Not connected: ' . wp_json_encode( $out['status'] ) );
 }
-
-// The second site's half: install a collection the first run made.
 if ( 'install' === $pattern_id ) {
 	$target = isset( $args[2] ) ? explode( '/', $args[2], 2 ) : array();
 	if ( 2 !== count( $target ) ) {
@@ -124,12 +86,6 @@ if ( 'install' === $pattern_id ) {
 	if ( $install['failed'] || ! $filed ) {
 		WP_CLI::error( sprintf( 'Collection install broke: %d failed, filed under %s: %s', $install['failed'], $category, $filed ? 'yes' : 'no' ) );
 	}
-	/*
-	 * A page pattern's sections have to be here, under the names its
-	 * markup uses, or it renders their placeholder copy (D38). Installing
-	 * as `user` still lands dependencies as theme patterns, because a
-	 * `wp_block` can never be a `core/pattern` target.
-	 */
 	$store    = new \TwentyBellows\PatternBuilder\Pattern_File_Store();
 	$dangling = array();
 	foreach ( $landed as $r ) {
@@ -147,11 +103,6 @@ if ( 'install' === $pattern_id ) {
 	if ( $dangling ) {
 		WP_CLI::error( 'Installed patterns reference patterns that are not here: ' . implode( ', ', array_unique( $dangling ) ) );
 	}
-
-	/*
-	 * And the looks they apply, for the same reason: `is-style-{slug}` in the
-	 * markup with no partial defining it renders as nothing at all (D43).
-	 */
 	$variations = \TwentyBellows\PatternBuilder\Pattern_Builder_Block_Style_Variations::class;
 	$unstyled   = array();
 	foreach ( $landed as $r ) {
@@ -160,7 +111,6 @@ if ( 'install' === $pattern_id ) {
 			: (string) ( $store->find_theme_pattern( $r['id'] )->content ?? '' );
 
 		foreach ( $variations::used_in( $content ) as $slug ) {
-			// Core's own ship with WordPress and need no partial here.
 			if ( \WP_Block_Styles_Registry::get_instance()->is_registered( 'core/button', $slug ) ) {
 				continue;
 			}
@@ -177,9 +127,6 @@ if ( 'install' === $pattern_id ) {
 	WP_CLI::success( sprintf( 'Collection installed: %d landed, %d already here, all under %s, every reference resolves.', $install['installed'], $install['skipped'], $category ) );
 	return;
 }
-
-// 1. A collection for the run, then the upload into it. The pattern's
-// images travel with it as package assets.
 $collections   = $attempt( 'List collections', $controller->library_collections() );
 $e2e           = null;
 foreach ( $collections as $candidate ) {
@@ -195,8 +142,6 @@ if ( ! $e2e ) {
 				'library/collections',
 				array(
 					'name'        => 'E2E Roundtrip',
-					// Permanent, and the middle segment of every pattern
-					// name in it (D37), so it is given rather than derived.
 					'slug'        => 'e2e-roundtrip',
 					'description' => 'Made by tests/e2e/cloud-roundtrip.php.',
 				)
@@ -220,10 +165,6 @@ $out['upload'] = $attempt(
 	)
 );
 $cloud_id = $out['upload']['pattern']['id'];
-
-// 2. Upload again. The pattern's `Cloud:` reference, found on the service by
-// name, should send this down the update path rather than creating a second
-// cloud copy.
 $reupload        = $attempt(
 	'Re-upload',
 	$controller->upload(
@@ -240,8 +181,6 @@ $out['reupload'] = array(
 	'updated' => $reupload['updated'],
 	'sameId'  => $reupload['pattern']['id'] === $cloud_id,
 );
-
-// 3. Download it back, this time as a user pattern.
 $out['download'] = $attempt(
 	'Download',
 	$controller->download(
@@ -255,8 +194,6 @@ $out['download'] = $attempt(
 		)
 	)
 );
-
-// 4. What actually landed.
 $post    = get_post( $out['download']['id'] );
 $uploads = wp_get_upload_dir();
 
@@ -274,13 +211,6 @@ $checks = array(
 	'image names its attachment'    => (bool) preg_match( '/wp-image-\d+/', $post->post_content ),
 	'filed in the collection'       => isset( $out['upload']['pattern']['collection']['slug'] ) && $out['upload']['pattern']['collection']['slug'] === $e2e['slug'],
 );
-
-/*
- * 5. The dependency tree (D38), when the site has one to send: a pattern
- * that references others goes up with them, leaves first, its references
- * rewritten onto the collection's namespace. Skipped rather than failed
- * where the theme has no page pattern, so the script still runs anywhere.
- */
 $tree_pattern = isset( $args[2] ) ? $args[2] : 'simple-theme/e2e-page-home';
 $store        = new \TwentyBellows\PatternBuilder\Pattern_File_Store();
 
@@ -300,8 +230,6 @@ if ( $store->find_theme_pattern( $tree_pattern ) ) {
 	);
 
 	$members = isset( $out['tree']['members'] ) ? $out['tree']['members'] : array();
-
-	// Read the stored page back and look at what its references say now.
 	$root      = Pattern_Builder_Cloud::request( 'GET', '/library/patterns/' . (int) ( $out['tree']['pattern']['id'] ?? 0 ) );
 	$namespace = is_wp_error( $root ) ? '' : (string) ( $root['namespace'] ?? '' );
 	$stored    = is_wp_error( $root ) ? '' : (string) ( $root['content'] ?? '' );
@@ -315,19 +243,6 @@ if ( $store->find_theme_pattern( $tree_pattern ) ) {
 		'namespace' => $namespace,
 	);
 }
-
-/*
- * 6. A block style variation (D43, D44). The markup carries `is-style-{slug}`
- * and the definition lives in the theme, so a pattern that travels without it
- * arrives with the class intact and nothing styling it. The name is stamped
- * with the collection on the way up, in the markup and in the definition
- * together — and inside the definition's own `css`, where a variation reaches
- * for another by class. The `css` itself has to survive the service's copy of
- * `Safe_Css`, which is the half no mocked test can prove: every automated
- * test here runs the plugin's copy of that checker, and a disagreement
- * between the two copies shows up only over the wire. Skipped rather than
- * failed where the theme is not writable.
- */
 $variations = \TwentyBellows\PatternBuilder\Pattern_Builder_Block_Style_Variations::class;
 $made       = $variations::add(
 	array(
@@ -336,9 +251,6 @@ $made       = $variations::add(
 		'blockTypes' => array( 'core/group' ),
 		'styles'     => array(
 			'border' => array( 'radius' => '999px' ),
-			// Everything the subset is for in one string: a declaration, a
-			// child-combinator rule, a pseudo-element, an allowed function,
-			// and a reference by class to the sibling variation below.
 			'css'    => 'position: relative; & > * { z-index: 1; } &::before { content: ""; inset: 0; background: rgba(0, 0, 0, 0.04); } & .is-style-e2e-pill { color: inherit; }',
 		),
 	)
@@ -388,9 +300,6 @@ if ( ! is_wp_error( $made ) && ! is_wp_error( $made_inner ) ) {
 		$stored_styled = Pattern_Builder_Cloud::request( 'GET', '/library/patterns/' . (int) ( $out['variation']['pattern']['id'] ?? 0 ) );
 		$carried       = is_wp_error( $stored_styled ) ? array() : (array) ( $stored_styled['variations'] ?? array() );
 		$markup        = is_wp_error( $stored_styled ) ? '' : (string) ( $stored_styled['content'] ?? '' );
-
-		// `{handle}/{collection}` off the pattern's own name, flattened —
-		// the tree step above may not have run, so nothing is borrowed from it.
 		$own      = is_wp_error( $stored_styled ) ? '' : (string) ( $stored_styled['namespace'] ?? '' );
 		$expected = implode( '-', array_slice( explode( '/', $own ), 0, 2 ) ) . '-e2e-inset';
 
@@ -402,9 +311,6 @@ if ( ! is_wp_error( $made ) && ! is_wp_error( $made_inner ) ) {
 		$checks['variation travelled']     = 2 === count( $carried ) && in_array( $expected, $slugs, true ) && in_array( $pill, $slugs, true );
 		$checks['its class was rewritten'] = false !== strpos( $markup, 'is-style-' . $expected )
 			&& false === strpos( $markup, '"is-style-e2e-inset"' );
-
-		// The service stored the CSS rather than stripping or refusing it,
-		// and the namespace stamp reached the class named inside it.
 		$checks['its css travelled']        = false !== strpos( $carried_css, '&::before' )
 			&& false !== strpos( $carried_css, 'rgba(0, 0, 0, 0.04)' );
 		$checks['its css was renamespaced'] = false !== strpos( $carried_css, 'is-style-' . $pill )

@@ -219,14 +219,11 @@ function TemplatePartAreaField( { value, onChange } ) {
 /**
  * The kinds, grouped, as a list to pick from.
  *
- * In the modal the pick swaps the pane beside it, so the chosen kind stays
- * marked; in the editor sidebar the pick is a navigation to the kind's own
- * screen, which is why the rows carry a chevron there and nothing is marked.
- *
  * @param {Object}   props              Component props.
  * @param {string}   props.selectedKind The chosen kind's key, where one stays chosen.
  * @param {Function} props.onSelect     Called with a kind key.
- * @param {string}   props.layout       'columns' (the modal) or 'stacked' (the editor sidebar).
+ * @param {string}   props.layout       'columns' (the modal) or 'stacked' (the editor
+ *                                      sidebar).
  */
 export function PatternKindList( {
 	selectedKind,
@@ -297,8 +294,7 @@ export function PatternKindList( {
 }
 
 /**
- * One kind of pattern: what it is for, what it still needs, and the button
- * that creates it.
+ * One kind of pattern: what it is for, what it still needs, and the button that creates it.
  *
  * @param {Object}   props           Component props.
  * @param {Object}   props.kind      The chosen kind.
@@ -316,9 +312,6 @@ export function PatternCreateForm( { kind, onCreated, layout = 'columns' } ) {
 	const [ values, setValues ] = useState( () => getInitialValues( kind ) );
 	const [ error, setError ] = useState( '' );
 	const [ isCreating, setIsCreating ] = useState( false );
-
-	// Where the kind can be swapped without leaving the form, its own fields
-	// start again; what the user has typed is theirs and stays.
 	useEffect( () => {
 		setValues( ( current ) => ( {
 			...getInitialValues( kind ),
@@ -373,8 +366,7 @@ export function PatternCreateForm( { kind, onCreated, layout = 'columns' } ) {
 		>
 			<div className="pattern-builder-create__body">
 				<div className="pattern-builder-create__intro">
-					{ /* Stacked, the screen this form is on is already named
-					     after the kind. */ }
+					{  }
 					{ ! isStacked && (
 						<h3 className="pattern-builder-create__title">
 							{ kind.label }
@@ -476,10 +468,6 @@ export function PatternCreateForm( { kind, onCreated, layout = 'columns' } ) {
 
 /**
  * Creates a pattern from one of a few kinds, both panes at once.
- *
- * The kinds sit on the left; picking one describes what that kind of pattern
- * is for and asks only for what it leaves open. The editor sidebar has no
- * room for two panes, so it puts these same two pieces on two screens.
  *
  * @param {Object}   props           Component props.
  * @param {Function} props.onCreated Called with the created pattern.

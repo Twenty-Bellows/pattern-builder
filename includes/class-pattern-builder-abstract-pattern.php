@@ -5,17 +5,10 @@ namespace TwentyBellows\PatternBuilder;
 
 /**
  * Value object representing a single block pattern.
- *
- * Property names intentionally use camelCase to mirror the JavaScript AbstractPattern class,
- * keeping PHP and JS representations symmetrical and reducing mapping friction.
  */
 class Abstract_Pattern {
-
 	/**
 	 * Pattern identity.
-	 *
-	 * Theme patterns are identified by their namespaced name (e.g.
-	 * "theme-slug/pattern-name"); user patterns by their wp_block post ID.
 	 *
 	 * @var string|int|null
 	 */
@@ -120,26 +113,16 @@ class Abstract_Pattern {
 	public $filePath; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.PropertyNotSnakeCase
 
 	/**
-	 * The cloud pattern this one was first copied from, or '' when it is
-	 * original work here.
-	 *
-	 * Attribution, not linkage (D38): it travels with the pattern, in the
-	 * file header and through every upload and download. Which cloud copy
-	 * this pattern corresponds to is `cloud`, a separate field, because a
-	 * pattern can be somebody else's work and have a copy of its own.
+	 * The cloud pattern this one was first copied from, or '' when it is original work
+	 * here.
 	 *
 	 * @var string
 	 */
 	public $origin;
 
 	/**
-	 * The name of this pattern's copy on the cloud —
-	 * `{handle}/{collection}/{slug}` — or '' when it has none.
-	 *
-	 * Written by an upload and by an install, and kept on the pattern (the
-	 * `Cloud:` header, or post meta) so it goes wherever the pattern goes.
-	 * Whether that copy still exists, and whether it is the connected
-	 * account's, is asked of the service each time rather than remembered.
+	 * The name of this pattern's copy on the cloud — `{handle}/{collection}/{slug}` — or ''
+	 * when it has none.
 	 *
 	 * @var string
 	 */

@@ -10,8 +10,6 @@ import {
 	__experimentalText as Text,
 } from '@wordpress/components';
 import { useState } from '@wordpress/element';
-
-// NOTE: this was retrieved from the packages/patterns/src/constants.js file in Gutenberg.
 export const PARTIAL_SYNCING_SUPPORTED_BLOCKS = {
 	'core/paragraph': [ 'content' ],
 	'core/heading': [ 'content' ],
@@ -113,12 +111,9 @@ const BindableBlockControls = ( { block } ) => {
 export const BlockBindingsPanel = () => {
 	function getBindableBlocks( blocks ) {
 		return blocks.reduce( ( acc, block ) => {
-			// Check if the block is bindable
 			if ( PARTIAL_SYNCING_SUPPORTED_BLOCKS[ block.name ] ) {
 				acc.push( block );
 			}
-
-			// Recursively check inner blocks
 			if ( block.innerBlocks && block.innerBlocks.length > 0 ) {
 				acc.push( ...getBindableBlocks( block.innerBlocks ) );
 			}
@@ -129,8 +124,6 @@ export const BlockBindingsPanel = () => {
 
 	const bindableBlocks = useSelect( ( select ) => {
 		const rootBlocks = select( blockEditorStore ).getBlocks();
-
-		// Dig through the blocks to find anything in the tree that is bindable.
 		return getBindableBlocks( rootBlocks );
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [] );

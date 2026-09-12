@@ -3,23 +3,8 @@ namespace TwentyBellows\PatternBuilder;
 
 /**
  * Registers the rowless `pb_pattern` post type.
- *
- * This registration creates no database rows and no admin UI — it exists for
- * two things, the same way core's `wp_template` registration does:
- *
- * 1. It hangs `Pattern_Builder_REST_Patterns_Controller` (string IDs, backed
- *    by theme pattern files) off core's REST routing.
- * 2. Because the type is `show_in_rest`, the block editor auto-creates a
- *    matching client-side entity from `/wp/v2/types`, which gives theme
- *    patterns entity-powered editing — undo, dirty tracking, save flow — with
- *    no mirror posts and no REST interception.
- *
- * It also gives core's `wp_block` records the two fields a theme pattern's
- * record carries beyond core's own, so the panels read one shape whichever
- * kind of pattern they are showing.
  */
 class Pattern_Builder_Entity {
-
 	/**
 	 * The post type name.
 	 */
@@ -34,9 +19,8 @@ class Pattern_Builder_Entity {
 	}
 
 	/**
-	 * A user pattern's `origin` and `cloud` on its wp_block record, under the
-	 * names a theme pattern's record uses. Read-only: both are written by
-	 * installs and uploads, never by an edit.
+	 * A user pattern's `origin` and `cloud` on its wp_block record, under the names a theme
+	 * pattern's record uses.
 	 *
 	 * @return void
 	 */
@@ -86,7 +70,6 @@ class Pattern_Builder_Entity {
 				'rest_namespace'          => 'pattern-builder/v1',
 				'rest_base'               => 'patterns',
 				'rest_controller_class'   => Pattern_Builder_REST_Patterns_Controller::class,
-				// Registers the REST routes after the built-in post type routes, like wp_template.
 				'late_route_registration' => true,
 				'capability_type'         => array( 'pb_pattern', 'pb_patterns' ),
 				'capabilities'            => array(

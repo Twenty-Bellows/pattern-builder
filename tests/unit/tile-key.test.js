@@ -1,7 +1,7 @@
 /**
- * A tile's cache key has to change exactly when the site's render of the
- * tile could: the pattern's markup, the markup of what it places, or the
- * design system — and nothing else, or the grid redraws for no reason.
+ * A tile's cache key has to change exactly when the site's render of the tile could: the
+ * pattern's markup, the markup of what it places, or the design system — and nothing else,
+ * or the grid redraws for no reason.
  */
 
 import { tileKey, tileUrls } from '../../src/utils/tileKey';

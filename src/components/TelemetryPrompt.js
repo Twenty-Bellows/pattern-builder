@@ -1,10 +1,5 @@
 /**
  * The one-time question: may Pattern Builder report anonymous usage?
- *
- * Shown the first time anyone opens the pattern browser on a site, and
- * never again once answered either way (a site that declined is offered
- * it once more, on the connect panel, as a one-line Allow). Two buttons,
- * neither preselected — the answer is an answer, not a default.
  */
 
 import { __ } from '@wordpress/i18n';
@@ -40,7 +35,8 @@ export function telemetryFacts() {
  *
  * @param {Object}   props           Component props.
  * @param {Function} props.onAnswer  Called with the new state after either button.
- * @param {Function} props.onDismiss Called when closed without answering (asked again next time).
+ * @param {Function} props.onDismiss Called when closed without answering (asked again next
+ *                                   time).
  */
 export function TelemetryPrompt( { onAnswer, onDismiss } ) {
 	const [ busy, setBusy ] = useState( false );

@@ -1,12 +1,8 @@
 <?php
 /**
- * The sidebar Cloud panel's state endpoint and the `Cloud:` reference it
- * reads: a pattern carries the name of its copy on the cloud, and whether
- * that copy exists — and is the connected account's — is asked of the
- * service each time.
- *
- * The service is a small fake here: an in-memory library keyed by cloud
- * name, answering the routes the plugin calls.
+ * The sidebar Cloud panel's state endpoint and the `Cloud:` reference it reads: a pattern
+ * carries the name of its copy on the cloud, and whether that copy exists — and is the
+ * connected account's — is asked of the service each time.
  *
  * @package PatternBuilder
  */
@@ -15,7 +11,6 @@ use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud;
 use TwentyBellows\PatternBuilder\Pattern_File_Store;
 
 class Test_Cloud_Pattern_State extends WP_UnitTestCase {
-
 	private $post_id;
 
 	/**
@@ -74,9 +69,9 @@ class Test_Cloud_Pattern_State extends WP_UnitTestCase {
 	/**
 	 * The fake service.
 	 *
-	 * @param mixed  $pre  Short-circuit value.
+	 * @param mixed  $pre Short-circuit value.
 	 * @param array  $args Request args.
-	 * @param string $url  Request URL.
+	 * @param string $url Request URL.
 	 * @return mixed
 	 */
 	public function answer( $pre, $args, $url ) {
@@ -192,7 +187,6 @@ class Test_Cloud_Pattern_State extends WP_UnitTestCase {
 
 		$this->assertTrue( $data['connected'] );
 		$this->assertFalse( $data['linked'] );
-		// Nothing to look up: a pattern with no reference asks the service nothing.
 		$this->assertSame( array(), $this->asked );
 	}
 
@@ -208,8 +202,6 @@ class Test_Cloud_Pattern_State extends WP_UnitTestCase {
 		$this->assertTrue( $data['linked'] );
 		$this->assertSame( $this->library['me/personal/sidebar-pattern'], $data['cloudId'] );
 		$this->assertSame( 'Personal', $data['collection']['title'] );
-
-		// A user pattern's record carries it, as a theme pattern's does.
 		$record = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/blocks/' . $this->post_id ) )->get_data();
 		$this->assertSame( 'me/personal/sidebar-pattern', $record['cloud'] );
 	}
@@ -227,19 +219,17 @@ class Test_Cloud_Pattern_State extends WP_UnitTestCase {
 
 	public function test_a_copy_deleted_on_the_cloud_reads_as_not_on_the_cloud() {
 		$this->upload();
-		$this->library = array(); // Deleted on the website, say.
+		$this->library = array();
 
 		$this->assertFalse( $this->state()->get_data()['linked'] );
-
-		// And uploading it again makes a new copy rather than failing an update.
 		$response = $this->upload();
 		$this->assertFalse( $response->get_data()['updated'] );
 		$this->assertArrayHasKey( 'me/personal/sidebar-pattern', $this->library );
 	}
 
 	/**
-	 * The case that retired the site-wide link map: an upload made by one
-	 * account read as "in your cloud library" to whoever connected next.
+	 * The case that retired the site-wide link map: an upload made by one account read as
+	 * "in your cloud library" to whoever connected next.
 	 */
 	public function test_another_account_connected_here_sees_no_copy() {
 		$this->upload();
@@ -255,8 +245,6 @@ class Test_Cloud_Pattern_State extends WP_UnitTestCase {
 		$this->assertFalse( $this->state()->get_data()['linked'] );
 
 		$response = $this->upload();
-
-		// A copy of its own, in this account's library; theirs is never touched.
 		$this->assertFalse( $response->get_data()['updated'] );
 		$this->assertSame( 'me/personal/sidebar-pattern', $this->reference() );
 		foreach ( $this->asked as $asked ) {
@@ -280,8 +268,6 @@ class Test_Cloud_Pattern_State extends WP_UnitTestCase {
 
 	public function test_name_lookup_reports_the_local_copy() {
 		$this->upload();
-
-		// Answered from this site's patterns — it works disconnected.
 		delete_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_TOKEN );
 
 		$request = new WP_REST_Request( 'GET', '/pattern-builder/v1/cloud/pattern-state' );
@@ -295,8 +281,6 @@ class Test_Cloud_Pattern_State extends WP_UnitTestCase {
 		$request = new WP_REST_Request( 'GET', '/pattern-builder/v1/cloud/pattern-state' );
 		$request->set_param( 'name', 'me/personal/nothing-here' );
 		$this->assertNull( rest_do_request( $request )->get_data()['installed'] );
-
-		// A deleted local copy answers to nothing.
 		wp_delete_post( $this->post_id, true );
 		$request = new WP_REST_Request( 'GET', '/pattern-builder/v1/cloud/pattern-state' );
 		$request->set_param( 'name', 'me/personal/sidebar-pattern' );

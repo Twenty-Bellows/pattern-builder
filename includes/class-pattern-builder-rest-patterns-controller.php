@@ -11,23 +11,8 @@ use WP_REST_Server;
 
 /**
  * REST controller for block patterns.
- *
- * Follows the model of core's `WP_REST_Templates_Controller`: theme patterns
- * are file-backed entities addressed by string IDs (their namespaced pattern
- * name, e.g. `theme-slug/pattern-name`) with no database row behind them.
- * Reads come from the pattern files; writes go back to the pattern files.
- *
- * The collection also lists user patterns (`wp_block` posts, numeric IDs) so
- * one request paints the whole pattern library, but single-item routes address
- * theme patterns only — user patterns remain managed by core's own
- * `/wp/v2/blocks` endpoints.
- *
- * Registered as the REST controller of the rowless `pb_pattern` post type, so
- * the block editor auto-registers a matching client-side entity from
- * `/wp/v2/types`.
  */
 class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
-
 	/**
 	 * Post type.
 	 *
@@ -187,10 +172,6 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 	/**
 	 * Creates a theme pattern.
 	 *
-	 * When `fromWpBlock` carries a wp_block post ID, that user pattern is
-	 * converted: its content (with theme edits from the request applied) is
-	 * written to a pattern file and the post is deleted.
-	 *
 	 * @param WP_REST_Request $request The request.
 	 * @return WP_REST_Response|WP_Error
 	 */
@@ -258,10 +239,6 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 	/**
 	 * Updates a theme pattern, writing its file.
 	 *
-	 * A request whose `source` is `user` converts the theme pattern into a
-	 * user pattern instead: the file is deleted and a wp_block post created.
-	 * The response then describes the new user pattern (numeric `id`).
-	 *
 	 * @param WP_REST_Request $request The request.
 	 * @return WP_REST_Response|WP_Error
 	 */
@@ -274,12 +251,7 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 
 		$original = clone $pattern;
 		$pattern  = $this->apply_request_to_pattern( $pattern, $request );
-
-		/*
-		 * A renamed pattern belongs in a file named after its new slug, so
-		 * write a fresh file and drop the old one once that succeeds.
-		 */
-		$renamed = $pattern->name !== $original->name;
+		$renamed  = $pattern->name !== $original->name;
 		if ( $renamed ) {
 			$pattern->filePath = null;
 			$pattern->id       = $pattern->name;
@@ -458,12 +430,7 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 			'synced'        => (bool) $pattern->synced,
 			'viewportWidth' => $pattern->viewportWidth,
 			'source'        => $pattern->source,
-			// Where the pattern was first copied from, when it is somebody
-			// else's work; empty when it originated here (D38). Read-only:
-			// it is written on install and carried, never edited.
 			'origin'        => (string) $pattern->origin,
-			// The name of this pattern's own copy on the cloud, or empty.
-			// Read-only too: uploads and installs write it.
 			'cloud'         => (string) $pattern->cloud,
 		);
 
@@ -482,12 +449,6 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 					array( 'href' => rest_url( $this->namespace . '/' . $this->rest_base ) ),
 				),
 			);
-
-			/*
-			 * Action links, as core's posts controller advertises them. The
-			 * editor's save button reads `wp:action-publish` off the record;
-			 * without it, it assumes the user can only "Submit for Review".
-			 */
 			if ( current_user_can( 'edit_theme_options' ) ) {
 				$data['_links']['wp:action-publish'] = array(
 					array( 'href' => $self ),

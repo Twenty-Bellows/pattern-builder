@@ -36,8 +36,7 @@ import { PatternBuilderConfiguration } from './PatternBuilderConfiguration';
 import { patternBuilderAppIcon } from '../assets/icons';
 
 /**
- * The kinds, as the first of the two screens creating a pattern takes in
- * the sidebar. Picking one goes to that kind's own screen.
+ * The kinds, as the first of the two screens creating a pattern takes in the sidebar.
  */
 function CreateKindsScreen() {
 	const navigator = useNavigator();

@@ -6,10 +6,6 @@ import { getAdminEditorUrl } from '../utils/patternNavigation';
 /**
  * The Pattern Builder admin app: the pattern browser.
  *
- * Editing always happens in this page's edit mode (`&pattern={id}`), which
- * hosts core's edit-post editor bound to the pattern's entity — the same
- * editor for theme and user patterns alike.
- *
  * @param {Object} props          Component props.
  * @param {Object} props.settings The settings the PHP side printed.
  */

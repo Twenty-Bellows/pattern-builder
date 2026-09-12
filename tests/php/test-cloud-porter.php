@@ -6,7 +6,6 @@ use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Porter;
  * The cloud porter: local pattern ↔ Portable Pattern Package conversion.
  */
 class Test_Cloud_Porter extends WP_UnitTestCase {
-
 	public function set_up() {
 		parent::set_up();
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
@@ -54,8 +53,6 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		$this->assertSame( 'Cloud Export Test', $pbp['title'] );
 		$this->assertSame( 'A pattern that travels.', $pbp['description'] );
 		$this->assertSame( 'user', $pbp['origin']['kind'] );
-
-		// The local URL became a placeholder and its file travels along.
 		$this->assertStringNotContainsString( $fixture['attachment_url'], $pbp['content'] );
 		$this->assertStringContainsString( 'pbp-asset://', $pbp['content'] );
 		$this->assertCount( 1, $pbp['assets'] );
@@ -87,10 +84,9 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Anything the package leaves pointing at a URL is refused by the
-	 * service ("Patterns may only reference images uploaded with them"), so
-	 * every reference it checks — src, a block attribute's url, CSS url() —
-	 * has to be bundled, however the URL is written.
+	 * Anything the package leaves pointing at a URL is refused by the service ("Patterns
+	 * may only reference images uploaded with them"), so every reference it checks — src, a
+	 * block attribute's url, CSS url() — has to be bundled, however the URL is written.
 	 */
 	public function test_export_bundles_every_reference_the_service_checks() {
 		$attachment_id = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
@@ -118,14 +114,13 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A link is not an image, wherever the pattern keeps it: an anchor's
-	 * href, or a social link's `url` attribute. Neither is the exporter's
-	 * business, and neither may block an upload.
+	 * A link is not an image, wherever the pattern keeps it: an anchor's href, or a social
+	 * link's `url` attribute.
 	 */
 	/**
-	 * An attachment id means nothing on another site, so the ids and the
-	 * `wp-image-N` classes naming them are dropped on the way out; the image
-	 * itself travels in the package.
+	 * An attachment id means nothing on another site, so the ids and the `wp-image-N`
+	 * classes naming them are dropped on the way out; the image itself travels in the
+	 * package.
 	 */
 	public function test_export_forgets_which_attachment_an_image_was() {
 		$attachment_id = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
@@ -146,8 +141,6 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( '"mediaId":' . $attachment_id, $package );
 		$this->assertStringNotContainsString( 'wp-image-' . $attachment_id, $package );
 		$this->assertStringNotContainsString( 'class=""', $package );
-
-		// Everything else about the blocks survives.
 		$this->assertStringContainsString( '"sizeSlug":"full"', $package );
 		$this->assertStringContainsString( '"dimRatio":50', $package );
 		$this->assertStringContainsString( '"mediaType":"image"', $package );
@@ -170,8 +163,6 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		$this->assertStringContainsString( '<!-- wp:image -->', $package );
 		$this->assertStringContainsString( '<!-- wp:gallery -->', $package );
 		$this->assertSame( 2, substr_count( $package, '<!-- /wp:' ) );
-
-		// It still parses back to the same blocks.
 		$blocks = array_values(
 			array_filter(
 				parse_blocks( $package ),
@@ -239,8 +230,8 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A downloadable PBP whose asset resolves to a local test image (the
-	 * pre-fetch filter stands in for the service download).
+	 * A downloadable PBP whose asset resolves to a local test image (the pre-fetch filter
+	 * stands in for the service download).
 	 *
 	 * @return array
 	 */
@@ -282,21 +273,17 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		$this->assertSame( 'wp_block', $post->post_type );
 		$this->assertSame( 'Downloaded Hero', $post->post_title );
 		$this->assertSame( 'unsynced', get_post_meta( $post->ID, 'wp_pattern_sync_status', true ) );
-
-		// The placeholder became a local media-library URL.
 		$this->assertStringNotContainsString( 'pbp-asset:', $post->post_content );
 		$uploads = wp_get_upload_dir();
 		$this->assertStringContainsString( $uploads['baseurl'], $post->post_content );
-
-		// Categories landed as wp_pattern_category terms.
 		$terms = wp_get_object_terms( $post->ID, 'wp_pattern_category', array( 'fields' => 'names' ) );
 		$this->assertEqualSets( array( 'Heroes', 'Featured' ), $terms );
 	}
 
 	/**
-	 * The export drops attachment ids because they mean nothing elsewhere;
-	 * a user pattern's images do land in this site's media library, so the
-	 * blocks are pointed back at them in local terms.
+	 * The export drops attachment ids because they mean nothing elsewhere; a user pattern's
+	 * images do land in this site's media library, so the blocks are pointed back at them
+	 * in local terms.
 	 */
 	public function test_import_names_the_attachments_it_created_for_a_user_pattern() {
 		$porter = new Pattern_Builder_Cloud_Porter();
@@ -310,18 +297,14 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		preg_match( '/"id":(\d+)/', $content, $id );
 		$this->assertSame( 'attachment', get_post_type( (int) $id[1] ) );
 		$this->assertStringContainsString( 'wp-image-' . $id[1], $content );
-
-		// And it names the attachment the image actually shows.
 		$this->assertStringContainsString( wp_get_attachment_url( (int) $id[1] ), $content );
 	}
 
 	/**
-	 * A theme pattern's images are moved into the theme's own assets
-	 * directory and referenced from there, so there is no attachment for a
-	 * block to name.
+	 * A theme pattern's images are moved into the theme's own assets directory and
+	 * referenced from there, so there is no attachment for a block to name.
 	 */
 	public function test_import_leaves_a_theme_pattern_without_attachment_ids() {
-		// A writable theme directory, as test_import_as_theme_pattern_writes_file does.
 		$test_dir = sys_get_temp_dir() . '/pattern-builder-cloud-test';
 		if ( ! is_dir( $test_dir . '/patterns' ) ) {
 			mkdir( $test_dir, 0777, true );
@@ -350,7 +333,6 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 	}
 
 	public function test_import_as_theme_pattern_writes_file() {
-		// Stand in a writable theme directory, the way the REST API tests do.
 		$test_dir = sys_get_temp_dir() . '/pattern-builder-cloud-test';
 		if ( ! is_dir( $test_dir . '/patterns' ) ) {
 			mkdir( $test_dir, 0777, true );
@@ -399,9 +381,6 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		add_filter( 'stylesheet', $slug_filter );
 
 		$porter = new Pattern_Builder_Cloud_Porter();
-
-		// Two accounts, each with a pattern of the same name. Before
-		// namespacing the second overwrote the first.
 		$first          = $this->make_downloaded_pbp();
 		$first['slug']  = 'hero';
 		$first['title'] = 'Studio A Hero';
@@ -426,9 +405,6 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		$this->assertFileExists( $file_b );
 		$this->assertStringContainsString( 'Title: Studio A Hero', file_get_contents( $file_a ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
 		$this->assertStringContainsString( 'Title: Studio B Hero', file_get_contents( $file_b ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
-
-		// And both are found by a scan of the theme, which core reads to
-		// the same depth.
 		$store = new \TwentyBellows\PatternBuilder\Pattern_File_Store();
 		$names = wp_list_pluck( $store->get_theme_patterns(), 'name' );
 		$this->assertContains( 'studio-a/heroes/hero', $names );
@@ -508,8 +484,6 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 
 		$pbp = $this->make_downloaded_pbp();
 		remove_all_filters( 'pattern_builder_cloud_pre_fetch_asset' );
-		// The package names a foreign host; the path must be re-rooted onto
-		// the configured service origin, never fetched where it points.
 		$pbp['assets'][0]['url'] = 'https://evil.example/steal.jpg?sig=abc';
 
 		$fetched = array();
@@ -533,13 +507,8 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		$porter = new Pattern_Builder_Cloud_Porter();
 		$result = $porter->import_pbp( $pbp, 'user' );
 		remove_all_filters( 'pre_http_request' );
-
-		// The 404 on the service surfaces as a failed asset download…
 		$this->assertWPError( $result );
 		$this->assertSame( 'pb_cloud_asset_failed', $result->get_error_code() );
-
-		// …and the one request went to the service origin with the
-		// package's path, not to the foreign host.
 		$this->assertCount( 1, $fetched );
 		$service_host = wp_parse_url( \TwentyBellows\PatternBuilder\Pattern_Builder_Cloud::service_url(), PHP_URL_HOST );
 		$this->assertSame( $service_host, wp_parse_url( $fetched[0], PHP_URL_HOST ) );
@@ -616,8 +585,6 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		$file = $theme['dir'] . '/patterns/studio-a/heroes/downloaded-hero.php';
 		$this->assertFileExists( $file );
 		$this->assertStringContainsString( 'Origin: studio-a/heroes/downloaded-hero', file_get_contents( $file ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
-
-		// And it reads back off the file, so it survives the round trip.
 		$pattern = \TwentyBellows\PatternBuilder\Abstract_Pattern::from_file( $file );
 		$this->assertSame( 'studio-a/heroes/downloaded-hero', $pattern->origin );
 
@@ -627,8 +594,6 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 	public function test_an_origin_already_on_the_package_is_carried_unchanged() {
 		$theme  = $this->in_a_theme( 'studio-c' );
 		$porter = new Pattern_Builder_Cloud_Porter();
-
-		// Three accounts deep: the credit still names the first.
 		$pbp              = $this->make_downloaded_pbp();
 		$pbp['namespace'] = 'studio-b/mine/downloaded-hero';
 		$pbp['origin']    = array( 'pattern' => 'studio-a/heroes/downloaded-hero' );
@@ -686,42 +651,29 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A package says which WordPress it needs. Installing one this site is
-	 * too old for is not merely disappointing: the import re-sanitizes with
-	 * `wp_kses_post()` against this site's KSES, which on an older release
-	 * does not know some of the markup and removes it — MathML being the
-	 * case that costs content rather than appearance.
+	 * A package says which WordPress it needs.
 	 */
 	public function test_version_problem_compares_against_this_site() {
 		$here = Pattern_Builder_Cloud_Porter::wordpress_version();
-
-		// Nothing claimed, nothing to check: the common case.
 		$this->assertNull( Pattern_Builder_Cloud_Porter::version_problem( array() ) );
 		$this->assertNull( Pattern_Builder_Cloud_Porter::version_problem( array( 'minWordPress' => '' ) ) );
-
-		// What this site already runs, and anything older, is fine.
 		$this->assertNull( Pattern_Builder_Cloud_Porter::version_problem( array( 'minWordPress' => $here ) ) );
 		$this->assertNull( Pattern_Builder_Cloud_Porter::version_problem( array( 'minWordPress' => '5.0' ) ) );
 
 		$problem = Pattern_Builder_Cloud_Porter::version_problem( array( 'minWordPress' => '99.0' ) );
 		$this->assertWPError( $problem );
 		$this->assertSame( 'pb_cloud_needs_newer_wordpress', $problem->get_error_code() );
-
-		// Both versions are named, so a client can say what to do about it.
 		$data = $problem->get_error_data();
 		$this->assertSame( '99.0', $data['minWordPress'] );
 		$this->assertSame( $here, $data['wordPress'] );
 	}
 
 	/**
-	 * A release candidate sorts *below* the release it leads to, so a site
-	 * on 7.2-RC1 must not be told it is too old for a 7.2 pattern.
+	 * A release candidate sorts *below* the release it leads to, so a site on 7.2-RC1 must
+	 * not be told it is too old for a 7.2 pattern.
 	 */
 	public function test_a_release_suffix_does_not_count_as_older() {
 		$version = Pattern_Builder_Cloud_Porter::wordpress_version();
-
-		// Whatever this site reports — 7.2, 7.2-RC1, 7.2-alpha-12345 — what
-		// gets compared is the release number alone.
 		$this->assertMatchesRegularExpression( '/^\d+(\.\d+)*$/', $version );
 		$this->assertStringStartsWith( $version, (string) get_bloginfo( 'version' ) );
 
@@ -731,8 +683,8 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 	}
 
 	/**
-	 * And the gate runs before anything is written, so a refusal leaves
-	 * nothing half-applied.
+	 * And the gate runs before anything is written, so a refusal leaves nothing half-
+	 * applied.
 	 */
 	public function test_installing_a_pattern_this_site_is_too_old_for_is_refused() {
 		$pbp                 = $this->make_downloaded_pbp();

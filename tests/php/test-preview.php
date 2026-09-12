@@ -12,7 +12,6 @@ use TwentyBellows\PatternBuilder\Pattern_Builder_Preview;
  * Rendering a pattern as something a browser can open.
  */
 class Test_Preview extends WP_UnitTestCase {
-
 	/**
 	 * @var Pattern_Builder_Preview
 	 */
@@ -28,7 +27,7 @@ class Test_Preview extends WP_UnitTestCase {
 	 * Reach a private builder, since the route wiring is core's business.
 	 *
 	 * @param string $method Method name.
-	 * @param array  $args   Arguments.
+	 * @param array  $args Arguments.
 	 * @return mixed
 	 */
 	private function call( $method, $args = array() ) {
@@ -49,10 +48,6 @@ class Test_Preview extends WP_UnitTestCase {
 
 	/**
 	 * The whole reason this exists: the document carries the site's stylesheets.
-	 *
-	 * `render-pattern` answers with markup, which cannot show that a band is
-	 * rendering at the wrong width. Without wp_head() this route would be the
-	 * same answer in a bigger envelope.
 	 */
 	public function test_the_document_carries_the_sites_styles() {
 		$html = $this->call( 'standalone_document', array( $this->a_pattern() ) );
@@ -75,11 +70,6 @@ class Test_Preview extends WP_UnitTestCase {
 
 	/**
 	 * The stand-in is what makes the page context possible.
-	 *
-	 * `core/post-content` renders nothing without a post, and the point of that
-	 * context is the wrappers it puts around the pattern — so the pattern goes
-	 * in as a page's content and a stand-in post carries it, primed into the
-	 * object cache for one request rather than written anywhere.
 	 */
 	public function test_the_stand_in_lets_post_content_render_the_pattern() {
 		$this->call( 'pose_as_a_page', array( '<!-- wp:paragraph --><p>Inside the template.</p><!-- /wp:paragraph -->' ) );
@@ -143,13 +133,6 @@ class Test_Preview extends WP_UnitTestCase {
 
 	/**
 	 * Rendering against another theme, without changing the site.
-	 *
-	 * The whole point of carrying blank-theme is being able to look at a pattern
-	 * with no design system under it. Doing that by switching the site's theme
-	 * would change what every visitor sees, so the swap lasts one request: the
-	 * four values deciding which theme WordPress reads are filtered, the
-	 * theme.json caches cleared either side, and the active theme is never
-	 * touched.
 	 */
 	public function test_wearing_blank_theme_leaves_the_site_alone() {
 		$before = get_stylesheet();
@@ -166,10 +149,6 @@ class Test_Preview extends WP_UnitTestCase {
 
 	/**
 	 * And what it renders really has none of core's presets in it.
-	 *
-	 * This is the assertion that says the swap reached theme.json rather than
-	 * merely renaming the theme: blank-theme's functions.php is what empties
-	 * core's palette, and it only runs if the preview loaded it.
 	 */
 	public function test_a_blank_preview_carries_no_core_presets() {
 		$this->call( 'wear_theme', array( 'blank-theme' ) );
@@ -195,10 +174,6 @@ class Test_Preview extends WP_UnitTestCase {
 	 */
 	public function test_an_opinionated_preview_carries_that_themes_presets() {
 		$this->call( 'wear_theme', array( 'opinionated-theme' ) );
-
-		// The stylesheet rather than the document: wp_head() fires its enqueue
-		// actions once per process, so a second document in the same run has an
-		// empty head and would pass this by saying nothing at all.
 		$css = wp_get_global_stylesheet( array( 'variables' ) );
 
 		$this->call( 'take_theme_off' );
@@ -210,19 +185,11 @@ class Test_Preview extends WP_UnitTestCase {
 
 	/**
 	 * A pattern carries its own presets into a theme that has none.
-	 *
-	 * This is what makes the blank render mean anything. Without it, previewing
-	 * against a theme with no design system shows every reference resolving to
-	 * nothing — which is not the pattern's intent, it is the pattern stripped.
-	 * With it, the render is the pattern's own values with nothing on top: what
-	 * an upload ships, and what a download would install at the far end.
 	 */
 	public function test_a_pattern_carries_its_presets_into_a_blank_render() {
 		$pattern = $this->a_pattern(
 			'<!-- wp:paragraph {"backgroundColor":"carried-probe"} --><p class="has-carried-probe-background-color has-background">Body copy.</p><!-- /wp:paragraph -->'
 		);
-
-		// A preset this site defines and blank-theme does not.
 		$carried = array(
 			array(
 				'type'  => 'color',
@@ -345,9 +312,8 @@ class Test_Preview extends WP_UnitTestCase {
 	}
 
 	/**
-	 * What the tiles exist for: a block style variation is styled in its
-	 * tile, because the site's own renderer drew it. The editor's in-browser
-	 * preview could not apply one outside an editor boot.
+	 * What the tiles exist for: a block style variation is styled in its tile, because the
+	 * site's own renderer drew it.
 	 */
 	public function test_a_tile_styles_the_block_style_variation_it_applies() {
 		register_block_style(
@@ -373,20 +339,9 @@ class Test_Preview extends WP_UnitTestCase {
 	}
 
 	/**
-	 * And the half of a variation the style properties cannot express. A
-	 * variation's `css` is emitted by the same render path, so a tile shows a
-	 * pseudo-element or a hover rule with no further work here — which is what
-	 * the tiles were introduced for. Registered from `style_data` rather than
-	 * from a partial only because this test has no theme directory to write
-	 * one into; both land at `styles.blocks.{block}.variations.{slug}`.
+	 * And the half of a variation the style properties cannot express.
 	 */
 	public function test_a_tile_styles_a_variation_that_carries_css() {
-		/*
-		 * Core hangs the generated variation rules off a handle that depends
-		 * on `global-styles`, which only a block theme registers — and a block
-		 * theme is the only kind that has a `styles/` directory to define a
-		 * variation in, so this is the situation rather than a contrivance.
-		 */
 		$was = get_stylesheet();
 		register_theme_directory( dirname( __DIR__, 2 ) . '/themes' );
 		delete_site_transient( 'theme_roots' );
@@ -395,14 +350,6 @@ class Test_Preview extends WP_UnitTestCase {
 		}
 		switch_theme( 'opinionated-theme' );
 		wp_clean_theme_json_cache();
-
-		/*
-		 * `WP_Styles` is one object for the whole process and a handle it has
-		 * already printed is never printed again, so a tile drawn after
-		 * another test rendered a variation would find this one's rules
-		 * already "done". A real tile is its own request; this is how to say
-		 * so here.
-		 */
 		$GLOBALS['wp_styles'] = null;
 
 		register_block_style(
@@ -431,8 +378,8 @@ class Test_Preview extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A tile is a picture: no scripts, framed only here, centred by its own
-	 * document, and kept by the browser for as long as its key holds.
+	 * A tile is a picture: no scripts, framed only here, centred by its own document, and
+	 * kept by the browser for as long as its key holds.
 	 */
 	public function test_a_tile_is_a_cacheable_picture_only_this_site_frames() {
 		add_action(
@@ -483,8 +430,8 @@ class Test_Preview extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The part of every tile's key that is not the pattern: it holds still,
-	 * and moves when something every tile depends on does.
+	 * The part of every tile's key that is not the pattern: it holds still, and moves when
+	 * something every tile depends on does.
 	 */
 	public function test_the_design_version_follows_what_every_tile_depends_on() {
 		$before = Pattern_Builder_Preview::design_version();

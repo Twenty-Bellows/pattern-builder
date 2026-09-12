@@ -1,22 +1,6 @@
 <?php
 /**
  * Check that a page pattern's slot values actually reach the design pattern.
- *
- * Run with WP-CLI against a site that has the pattern runtime (Pattern Builder
- * or Synced Patterns for Themes) and the design pattern registered:
- *
- *   wp eval-file check-slots.php <path/to/page-pattern.php>
- *   wp eval-file check-slots.php my-theme/faq '{"question":{"content":"…"}}'
- *
- * Why this exists. A Pattern Overrides slot fails silently in both
- * directions: misspell a key in the page pattern's `content` and the design
- * pattern's placeholder ships as though it were the client's words; lose a
- * brace in the design pattern's `metadata` and the block stays *valid* while
- * quietly ceasing to be a slot. Block validation sees neither, because in both
- * cases the markup is exactly what `save()` would write. The only way to know
- * is to render the reference and look at what came out.
- *
- * Exit status is non-zero when any slot still shows its placeholder.
  */
 
 if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
@@ -36,8 +20,6 @@ function pb_slot_refs( $markup ) {
 		foreach ( $matches[1] as $raw ) {
 			$attrs = json_decode( $raw, true );
 			if ( ! is_array( $attrs ) || empty( $attrs['slug'] ) ) {
-				// A reference whose attributes do not parse loses its slug with
-				// them, and the whole section renders as nothing at all.
 				$refs[] = array( null, null, $raw );
 				continue;
 			}
@@ -74,8 +56,6 @@ function pb_expected( $content ) {
 	}
 	return $out;
 }
-
-// WP-CLI's eval-file passes positional arguments only, in $args.
 $args   = $args ?? array();
 $checks = array();
 
@@ -113,7 +93,6 @@ foreach ( $checks as list( $slug, $content, $raw ) ) {
 	WP_CLI::log( "\n" . $slug );
 
 	if ( ! $registry->is_registered( $slug ) ) {
-		// Worth saying plainly: this renders as empty output, not an error.
 		WP_CLI::log( '  NOT REGISTERED on this site — the reference renders as nothing at all.' );
 		++$problems;
 		continue;
@@ -155,14 +134,11 @@ foreach ( $checks as list( $slug, $content, $raw ) ) {
 
 		++$problems;
 		$hint = '';
-		// The usual cause is a name that does not exist in the design pattern.
 		if ( $placeholder && false === strpos( $placeholder, '"' . $slot . '"' ) ) {
 			$hint = ' — no slot by that name in the design pattern (typo?)';
 		}
 		WP_CLI::log( "  MISSED  {$slot}{$hint}" );
 	}
-
-	// A placeholder still on screen after filling means some slot did not take.
 	if ( $placeholder ) {
 		preg_match_all( '/>([^<>]{12,})</', $placeholder, $phrases );
 		foreach ( array_slice( array_unique( $phrases[1] ), 0, 12 ) as $phrase ) {

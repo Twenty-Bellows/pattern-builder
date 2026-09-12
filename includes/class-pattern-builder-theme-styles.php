@@ -16,26 +16,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Writing `styles` into theme.json or Global Styles.
- *
- * A preset is a value a pattern *references*; a style is one it *inherits*,
- * and the difference decides everything about how this class behaves next to
- * `Pattern_Builder_Cloud_Tokens`.
- *
- * A preset is additive and inert — adding one changes nothing on the site
- * until some block names it — so tokens are never overwritten and a collision
- * is reported as skipped. A style is neither: there is one
- * `styles.elements.link.color.text`, setting it replaces whatever was there,
- * and it repaints every link on every page the moment it lands. So this
- * replaces where the tokens never do, and it is deliberately not reachable
- * from the cloud download path — a pattern that arrived from somewhere else
- * must not repaint the site it arrived at.
  */
 class Pattern_Builder_Theme_Styles {
-
 	/**
 	 * Merge styles into a destination.
 	 *
-	 * @param array  $styles      A theme.json `styles` subtree.
+	 * @param array  $styles A theme.json `styles` subtree.
 	 * @param string $destination "theme" or "user".
 	 * @return array|WP_Error { destination, written, skipped }
 	 */
@@ -92,19 +78,6 @@ class Pattern_Builder_Theme_Styles {
 	/**
 	 * Refuse a styles tree carrying raw CSS.
 	 *
-	 * This is the *global styles* rule, and it stays absolute. WordPress does
-	 * not sanitize a theme.json `css` property — it gates it on `edit_css`
-	 * instead, and says so in a comment — so a string that closes its own
-	 * selector writes rules for the whole document. A `css` at `styles.css`
-	 * or on an element node is scoped to nothing a pattern brought with it:
-	 * core emits it against the document, and a pattern that arrived from
-	 * somewhere else must not repaint the site it arrived at.
-	 *
-	 * A block style variation is the one place that opens up, because there
-	 * the selector is a class the pattern's own markup carries.
-	 * `Pattern_Builder_Block_Style_Variations` holds that rule, and what it
-	 * accepts it puts through `Safe_Css` first.
-	 *
 	 * @param array $styles A theme.json `styles` subtree.
 	 * @return true|WP_Error
 	 */
@@ -128,28 +101,10 @@ class Pattern_Builder_Theme_Styles {
 	/**
 	 * Drop anything WordPress would not accept as a style.
 	 *
-	 * Core's own schema does this — the same pass a theme.json gets when
-	 * WordPress reads it, so it stays right across releases in a way a
-	 * hand-written property list would not. What it drops is reported rather
-	 * than silently lost, since an agent that believes it set a property and
-	 * did not will go on to build against a design that isn't there.
-	 *
 	 * @param array $styles A theme.json `styles` subtree.
 	 * @return array|WP_Error
 	 */
 	public static function sanitize( $styles ) {
-		/*
-		 * A `styles.blocks.{block}.variations.{slug}` node is kept only while
-		 * `{slug}` is in the block style registry, and a variation this theme
-		 * defines as a `styles/*.json` partial is registered lazily — by
-		 * `WP_Theme_JSON_Resolver::get_theme_data()`, the first time something
-		 * asks for the theme's data. Nothing may have asked yet in this
-		 * request, in which case the node would be dropped and reported as
-		 * unrecognised for a variation that plainly exists. This is also the
-		 * one way to give a variation a block *state*: a partial is read as a
-		 * whole-theme styles tree, which has no `:hover`, so a button
-		 * variation's hover colour lives here and nowhere else.
-		 */
 		if ( self::names_a_variation( $styles ) && class_exists( '\WP_Theme_JSON_Resolver' ) ) {
 			\WP_Theme_JSON_Resolver::get_theme_data();
 		}
@@ -188,10 +143,7 @@ class Pattern_Builder_Theme_Styles {
 	/**
 	 * Every place a `css` property appears, as dotted paths.
 	 *
-	 * Public because the block style variation writer allows one of them —
-	 * the variation's own `styles.css` — and has to find the rest.
-	 *
-	 * @param array  $node   Styles subtree.
+	 * @param array  $node Styles subtree.
 	 * @param string $prefix Path so far.
 	 * @return string[]
 	 */
@@ -215,11 +167,8 @@ class Pattern_Builder_Theme_Styles {
 	/**
 	 * Leaf paths present in the first tree and not the second.
 	 *
-	 * Public because the block style variation writer sanitizes the same way
-	 * and owes an agent the same account of what was dropped.
-	 *
-	 * @param array  $given  What was asked for.
-	 * @param array  $kept   What survived sanitization.
+	 * @param array  $given What was asked for.
+	 * @param array  $kept What survived sanitization.
 	 * @param string $prefix Path so far.
 	 * @return string[]
 	 */
@@ -244,7 +193,7 @@ class Pattern_Builder_Theme_Styles {
 	/**
 	 * The leaf paths a styles tree sets.
 	 *
-	 * @param array  $node   Styles subtree.
+	 * @param array  $node Styles subtree.
 	 * @param string $prefix Path so far.
 	 * @return string[]
 	 */
@@ -265,10 +214,6 @@ class Pattern_Builder_Theme_Styles {
 
 	/**
 	 * Merge incoming styles over existing ones, leaf by leaf.
-	 *
-	 * Deep rather than wholesale: setting `elements.link.color.text` should
-	 * not take `elements.button` with it, since an agent sets the one thing
-	 * it means to change and has no reason to restate the rest.
 	 *
 	 * @param array $existing Styles already in the config.
 	 * @param array $incoming Styles to write.

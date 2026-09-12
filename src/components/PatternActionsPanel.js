@@ -46,9 +46,6 @@ export const PatternActionsPanel = ( { patternPost, postType, onChanged } ) => {
 	const { createSuccessNotice, createErrorNotice } =
 		useDispatch( noticesStore );
 	const { deleteEntityRecord } = useDispatch( coreStore );
-
-	// Whether an editor on this screen is showing the pattern itself, in
-	// which case deleting it leaves nothing here to edit.
 	const isEditingThisPattern = useSelect(
 		( select ) =>
 			select( editorStore )?.getCurrentPostId() === patternPost.id,
@@ -153,14 +150,6 @@ export const PatternActionsPanel = ( { patternPost, postType, onChanged } ) => {
 		}
 
 		setBusy( 'delete' );
-
-		/*
-		 * Through the entity layer, not a hand-built path: it addresses the
-		 * record the way core's own save does — a theme pattern's id carries
-		 * a slash, and encoding that slash gets the request rejected before
-		 * it reaches WordPress on the servers that refuse encoded slashes —
-		 * and it drops the deleted record, and its edits, from the store.
-		 */
 		deleteEntityRecord(
 			'postType',
 			postType,

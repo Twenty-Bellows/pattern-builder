@@ -9,7 +9,6 @@
  * Registers patterns for a test and cleans them up afterwards.
  */
 abstract class Pattern_Test_Case extends WP_UnitTestCase {
-
 	/**
 	 * Slugs of the patterns registered by the running test.
 	 *
@@ -48,8 +47,8 @@ abstract class Pattern_Test_Case extends WP_UnitTestCase {
 	/**
 	 * Registers a pattern for the duration of the test.
 	 *
-	 * @param string $slug       Pattern slug, including namespace.
-	 * @param string $content    Pattern content.
+	 * @param string $slug Pattern slug, including namespace.
+	 * @param string $content Pattern content.
 	 * @param array  $properties Additional pattern properties.
 	 * @return string The slug.
 	 */
@@ -83,8 +82,8 @@ abstract class Pattern_Test_Case extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Marks a pattern as synced for the duration of a test, through the
-	 * filter, as a plugin would.
+	 * Marks a pattern as synced for the duration of a test, through the filter, as a plugin
+	 * would.
 	 *
 	 * @param string $slug Pattern slug.
 	 * @return void
@@ -105,7 +104,7 @@ abstract class Pattern_Test_Case extends WP_UnitTestCase {
 	/**
 	 * Serializes a `core/pattern` block that carries content.
 	 *
-	 * @param string $slug    Pattern slug.
+	 * @param string $slug Pattern slug.
 	 * @param array  $content Content, keyed by slot name and then attribute name.
 	 * @return string Block markup.
 	 */

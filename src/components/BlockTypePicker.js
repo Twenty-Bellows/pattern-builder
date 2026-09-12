@@ -15,10 +15,6 @@ const BLOCK_NAME = /^[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/;
 /**
  * The blocks worth offering a pattern for.
  *
- * Blocks that only exist inside another block (a column, a list item) and
- * blocks the inserter itself hides are left out: a pattern is offered where
- * a block is inserted, which those blocks never are on their own.
- *
  * @param {Object[]} blockTypes Registered block types.
  * @return {Object[]} The block types a pattern can sensibly belong to.
  */
@@ -33,10 +29,6 @@ export function getOfferableBlockTypes( blockTypes ) {
 
 /**
  * Labels for the block types, unique enough to be tokens.
- *
- * The field talks in block titles because that is what the block is called
- * everywhere else; the pattern file records `core/cover`. Two blocks are
- * allowed to share a title, so a shared one carries its name as well.
  *
  * @param {Object[]} blockTypes Block types to label.
  * @return {Object[]} `{ name, label }`, sorted by label.
@@ -62,11 +54,6 @@ export function getBlockChoices( blockTypes ) {
 /**
  * The block name a token stands for.
  *
- * A token is usually a label the field suggested. Typing a block name
- * straight in is allowed too — a pattern may name a block that belongs to a
- * plugin this site does not have — but anything else is not a block and is
- * dropped rather than written into the pattern file.
- *
  * @param {string}   token   What the user entered or picked.
  * @param {Object[]} choices The labelled block types.
  * @return {string|null} A block name, or null when the token is neither.
@@ -87,10 +74,6 @@ export function tokenToBlockName( token, choices ) {
 /**
  * Picks block types from everything registered on this site.
  *
- * There are far too many blocks for a list of checkboxes, so this is core's
- * token field: type to narrow the list, click the field to browse all of
- * them, and each pick becomes a token.
- *
  * @param {Object}   props          Component props.
  * @param {string}   props.label    The field's label.
  * @param {string[]} props.value    The chosen block names.
@@ -108,20 +91,10 @@ export function BlockTypePicker( { label, value, onChange } ) {
 		() => getBlockChoices( blockTypes ),
 		[ blockTypes ]
 	);
-
-	// Tokens read as block titles; a block this site does not have keeps its
-	// name, which is all there is to show.
 	const tokens = value.map(
 		( name ) =>
 			choices.find( ( choice ) => choice.name === name )?.label || name
 	);
-
-	/*
-	 * The suggestions open below the field rather than over the top of it,
-	 * and the pane they open in scrolls — so a field sitting near the bottom
-	 * would drop its list out of sight. Wait for the list to render, then
-	 * bring the whole field into view.
-	 */
 	const revealSuggestions = () => {
 		window.requestAnimationFrame( () =>
 			window.requestAnimationFrame( () =>

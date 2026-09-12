@@ -9,7 +9,6 @@ use TwentyBellows\PatternBuilder\Pattern_Builder_Block_Style_Variations;
 use TwentyBellows\PatternBuilder\Pattern_Builder_Theme_Styles;
 
 class Test_Block_Style_Variations extends WP_UnitTestCase {
-
 	public function set_up() {
 		parent::set_up();
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
@@ -17,12 +16,6 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 	}
 
 	public function tear_down() {
-		/*
-		 * `WP_Block_Styles_Registry` is a process-wide singleton and the test
-		 * case does not reset it, so a variation registered by one test is
-		 * still registered for the next — where it reads as somebody else's
-		 * name and gets refused.
-		 */
 		foreach ( array( 'core/button' => array( 'button-secondary', 'button-hover', 'button-hover-css' ), 'core/group' => array( 'group-hover' ) ) as $block => $slugs ) {
 			foreach ( $slugs as $slug ) {
 				if ( WP_Block_Styles_Registry::get_instance()->is_registered( $block, $slug ) ) {
@@ -78,10 +71,7 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The partial is only worth writing if WordPress registers it. Core reads
-	 * the theme's `styles/` directory, keeps the files carrying a
-	 * `blockTypes` key, and registers each as a block style — so the proof is
-	 * the registry, not the file.
+	 * The partial is only worth writing if WordPress registers it.
 	 */
 	public function test_wordpress_registers_the_variation_it_finds() {
 		Pattern_Builder_Block_Style_Variations::add( $this->args() );
@@ -106,8 +96,8 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Revising a design means rewriting the variation, and this theme's own
-	 * partial is the file this ability wrote.
+	 * Revising a design means rewriting the variation, and this theme's own partial is the
+	 * file this ability wrote.
 	 */
 	public function test_our_own_partial_is_rewritten_rather_than_refused() {
 		Pattern_Builder_Block_Style_Variations::add( $this->args() );
@@ -122,10 +112,9 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * `wp_register_block_style_variations_from_theme_json_partials()` checks
-	 * the registry and skips a name that is already there, so a partial
-	 * written over somebody else's registration is inert. Reporting that is
-	 * the difference between a refusal and a silent no-op.
+	 * `wp_register_block_style_variations_from_theme_json_partials()` checks the registry
+	 * and skips a name that is already there, so a partial written over somebody else's
+	 * registration is inert.
 	 */
 	public function test_a_name_another_registration_holds_is_refused() {
 		register_block_style( 'core/button', array( 'name' => 'button-secondary', 'label' => 'Someone else\'s' ) );
@@ -142,12 +131,9 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Core reads a partial through the whole-theme schema before it puts the
-	 * styles under the variation's node (`get_style_variations()`), so what a
-	 * partial can carry is what a root `styles` tree can: properties,
-	 * `elements`, inner `blocks`. A block state such as `:hover` is dropped on
-	 * read, silently. The ability checks the file exactly as core will read
-	 * it, keeps what survives, and says where the state goes instead.
+	 * Core reads a partial through the whole-theme schema before it puts the styles under
+	 * the variation's node (`get_style_variations()`), so what a partial can carry is what
+	 * a root `styles` tree can: properties, `elements`, inner `blocks`.
 	 */
 	public function test_a_block_state_is_reported_with_where_it_goes_and_elements_survive() {
 		$result = Pattern_Builder_Block_Style_Variations::add(
@@ -172,22 +158,14 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 
 		$partial = json_decode( (string) file_get_contents( Pattern_Builder_Block_Style_Variations::directory() . '/button-hover.json' ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test assertion.
 		$this->assertArrayNotHasKey( ':hover', $partial['styles'] );
-		// Core spells a preset reference out as the custom property on the
-		// way through its schema, which is the form the partial is stored in.
 		$this->assertSame( 'var(--wp--preset--color--base)', $partial['styles']['elements']['link']['color']['text'] );
 	}
 
 	/**
-	 * The state does have a home: theme.json's block-level node for the
-	 * variation, which core merges over the partial. That node is kept only
-	 * while the variation is registered, and a partial registers lazily — so
-	 * the styles writer has to ask for the theme's data first, or a state set
-	 * for a variation that plainly exists would come back as unrecognised.
-	 * The proof is the CSS core generates for the button.
+	 * The state does have a home: theme.json's block-level node for the variation, which
+	 * core merges over the partial.
 	 */
 	public function test_a_state_set_through_global_styles_reaches_the_rendered_css() {
-		// A slug no other test writes: the resolver caches a partial by path
-		// for the whole process, so a path reused across tests reads stale.
 		$added = Pattern_Builder_Block_Style_Variations::add(
 			$this->args(
 				array(
@@ -224,14 +202,6 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 			$this->assertNotWPError( $set );
 			$this->assertSame( array(), $set['skipped'] );
 			$this->assertContains( 'blocks.core/button.variations.button-hover-css.:hover.color.background', $set['written'] );
-
-			/*
-			 * The resolver also caches the *file* by path for the whole process,
-			 * and `wp_clean_theme_json_cache()` leaves that cache alone — so
-			 * within one process the theme.json it already read is the one it
-			 * keeps. A real request never sees this; a test that writes and then
-			 * renders in one process has to reach in.
-			 */
 			$file_cache = new ReflectionProperty( WP_Theme_JSON_Resolver::class, 'theme_json_file_cache' );
 			$file_cache->setAccessible( true );
 			$file_cache->setValue( null, array() );
@@ -250,17 +220,13 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 			if ( ! $had_file ) {
 				unlink( $theme_json ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 			}
-			// Core registered this handle on the process-wide `wp_styles()`
-			// with `global-styles` as a dependency; a later test that prints
-			// a head would trip a notice over it, so take it away again.
 			wp_styles()->remove( 'block-style-variation-styles' );
 		}
 	}
 
 	/**
-	 * A block this site has not registered cannot be checked against
-	 * anything, and a partial naming one would register a look for a block
-	 * that parses to core/missing.
+	 * A block this site has not registered cannot be checked against anything, and a
+	 * partial naming one would register a look for a block that parses to core/missing.
 	 */
 	public function test_a_variation_for_a_block_this_site_lacks_is_refused() {
 		$result = Pattern_Builder_Block_Style_Variations::add( $this->args( array( 'blockTypes' => array( 'acme/nothing' ) ) ) );
@@ -270,9 +236,9 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * CSS that fits the subset is written into the partial as it was given,
-	 * because a variation without one cannot express a pseudo-element, a
-	 * descendant rule or a hover state — most of what a variation is for.
+	 * CSS that fits the subset is written into the partial as it was given, because a
+	 * variation without one cannot express a pseudo-element, a descendant rule or a hover
+	 * state — most of what a variation is for.
 	 */
 	public function test_css_in_the_safe_subset_is_written_into_the_partial() {
 		$css = 'position: relative; & > * { z-index: 1; } &::before { content: ""; inset: 0; }';
@@ -293,8 +259,8 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * And CSS outside it is refused with the rule it broke, rather than
-	 * written and left for a browser to interpret.
+	 * And CSS outside it is refused with the rule it broke, rather than written and left
+	 * for a browser to interpret.
 	 */
 	public function test_css_outside_the_safe_subset_is_refused() {
 		$result = Pattern_Builder_Block_Style_Variations::add(
@@ -306,9 +272,7 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * One `css`, at the top of the variation's own styles tree. A `css` on an
-	 * element or an inner block is refused rather than checked, so what has to
-	 * be audited is one string per variation.
+	 * One `css`, at the top of the variation's own styles tree.
 	 */
 	public function test_css_deeper_in_the_tree_is_refused() {
 		$result = Pattern_Builder_Block_Style_Variations::add(
@@ -327,9 +291,9 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Global styles are a different question and the answer there has not
-	 * changed: a `css` at the root or on an element is scoped to nothing a
-	 * pattern brought with it, so `set-global-styles` still refuses one.
+	 * Global styles are a different question and the answer there has not changed: a `css`
+	 * at the root or on an element is scoped to nothing a pattern brought with it, so `set-
+	 * global-styles` still refuses one.
 	 */
 	public function test_global_styles_still_refuse_raw_css_altogether() {
 		$result = Pattern_Builder_Theme_Styles::apply(
@@ -342,9 +306,8 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The rules a variation's CSS describes have to reach the front end, or
-	 * the feature does nothing. Everything else only proves the checker agrees
-	 * with itself; this proves core emits what was written.
+	 * The rules a variation's CSS describes have to reach the front end, or the feature
+	 * does nothing.
 	 */
 	public function test_a_variation_carrying_css_renders_its_rules_on_the_front_end() {
 		$written = Pattern_Builder_Block_Style_Variations::add(
@@ -373,14 +336,6 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 
 		$after = wp_styles()->get_data( 'block-style-variation-styles', 'after' );
 		$css   = is_array( $after ) ? implode( "\n", $after ) : (string) $after;
-
-		/*
-		 * `WP_Styles` is one object for the whole process, and the handle core
-		 * just registered names `global-styles` as a dependency — which only a
-		 * block theme registers. Left behind, it would follow the suite into
-		 * tests that print a head under a classic theme. A real render is its
-		 * own request; this says so.
-		 */
 		$GLOBALS['wp_styles'] = null;
 
 		$this->assertStringContainsString( 'position: relative', $css );

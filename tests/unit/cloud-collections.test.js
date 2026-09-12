@@ -1,7 +1,7 @@
 /**
- * The collection arithmetic behind the cloud tabs: the token union a
- * whole-collection save checks once, which patterns it skips, what its
- * results add up to, and which collection an upload offers first.
+ * The collection arithmetic behind the cloud tabs: the token union a whole-collection save
+ * checks once, which patterns it skips, what its results add up to, and which collection an
+ * upload offers first.
  */
 
 import {
@@ -89,7 +89,6 @@ describe( 'installedFromCollection', () => {
 			'studio/starter-sections/hero',
 			'studio/other/hero',
 			'studio/starter-sections/footer',
-			// A different collection whose slug merely starts the same way.
 			'studio/starter-sections-two/hero',
 		];
 
@@ -201,7 +200,6 @@ describe( 'needsNewerWordPress', () => {
 	} );
 
 	it( 'compares segment by segment, not as a decimal', () => {
-		// 6.10 is newer than 6.9, which a numeric comparison gets backwards.
 		expect( needsNewerWordPress( { minWordPress: '6.10' }, '6.9' ) ).toBe(
 			'6.10'
 		);
@@ -211,8 +209,6 @@ describe( 'needsNewerWordPress', () => {
 	} );
 
 	it( 'does not count a release suffix as older', () => {
-		// A site on 7.2-RC1 has the 7.2 blocks; only the release number
-		// counts, or every RC would be refused its own release's patterns.
 		expect(
 			needsNewerWordPress( { minWordPress: '7.2' }, '7.2-RC1' )
 		).toBe( '' );

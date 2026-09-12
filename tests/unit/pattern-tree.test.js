@@ -1,6 +1,6 @@
 /**
- * The dependency walk: what a pattern references, in what order it has to
- * be carried, and how its references are renamespaced on the way up.
+ * The dependency walk: what a pattern references, in what order it has to be carried, and
+ * how its references are renamespaced on the way up.
  */
 
 import {

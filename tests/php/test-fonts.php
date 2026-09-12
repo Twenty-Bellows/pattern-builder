@@ -2,12 +2,6 @@
 /**
  * Installing a typeface by name.
  *
- * The collection and the font files are mocked at the HTTP layer, as every
- * test here that talks to something remote is. The assertion that matters
- * most is the preset: `wp_print_font_faces()` builds its `@font-face` rules
- * from the merged theme.json, so a font installed without a `fontFamily`
- * preset carrying `fontFace` is a font that never renders.
- *
  * @package PatternBuilder
  */
 
@@ -15,7 +9,6 @@ use TwentyBellows\PatternBuilder\Pattern_Builder_Abilities;
 use TwentyBellows\PatternBuilder\Pattern_Builder_Fonts;
 
 class Test_Fonts extends WP_UnitTestCase {
-
 	/**
 	 * The writable theme directory these tests treat as the active theme.
 	 *
@@ -33,8 +26,6 @@ class Test_Fonts extends WP_UnitTestCase {
 		if ( ! is_dir( $this->theme_dir ) ) {
 			mkdir( $this->theme_dir, 0777, true );
 		}
-
-		// A theme.json for the preset to be written into.
 		file_put_contents( // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 			$this->theme_dir . '/theme.json',
 			wp_json_encode( array( 'version' => 3 ) )
@@ -74,15 +65,14 @@ class Test_Fonts extends WP_UnitTestCase {
 	 * Stand in for the font collection and for Google's file server.
 	 *
 	 * @param mixed  $preempt Short-circuit value.
-	 * @param array  $args    Request arguments.
-	 * @param string $url     Request URL.
+	 * @param array  $args Request arguments.
+	 * @param string $url Request URL.
 	 * @return array
 	 */
 	public function mock_http( $preempt, $args, $url ) {
 		if ( false !== strpos( $url, 'fonts.gstatic.com' ) ) {
 			return array(
 				'headers'  => array(),
-				// Not a real font; nothing here parses one.
 				'body'     => 'wOF2-stand-in-' . md5( $url ),
 				'response' => array(
 					'code'    => 200,
@@ -106,9 +96,8 @@ class Test_Fonts extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A collection with the two cases that matter: a family whose weights
-	 * are separate files, and a variable family that answers a range with
-	 * one file.
+	 * A collection with the two cases that matter: a family whose weights are separate
+	 * files, and a variable family that answers a range with one file.
 	 *
 	 * @return array
 	 */
@@ -218,10 +207,10 @@ class Test_Fonts extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Installing into the theme writes the files under assets/fonts and the
-	 * preset into theme.json, with `file:./` sources — the placeholder core
-	 * rewrites into a theme URI, which is what lets the font travel with the
-	 * theme rather than depend on this site's uploads.
+	 * Installing into the theme writes the files under assets/fonts and the preset into
+	 * theme.json, with `file:./` sources — the placeholder core rewrites into a theme URI,
+	 * which is what lets the font travel with the theme rather than depend on this site's
+	 * uploads.
 	 */
 	public function test_installing_into_the_theme_writes_files_and_the_preset() {
 		$result = Pattern_Builder_Fonts::install( 'Testerly', array( '400', '700' ), array( 'normal' ), 'theme' );
@@ -249,8 +238,8 @@ class Test_Fonts extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The answer says how to reference the font, which is the whole point of
-	 * registering the preset.
+	 * The answer says how to reference the font, which is the whole point of registering
+	 * the preset.
 	 */
 	public function test_the_answer_says_how_to_reference_the_font() {
 		$result = Pattern_Builder_Fonts::install( 'Testerly', array( '400' ), array( 'normal' ), 'theme' );
@@ -272,8 +261,8 @@ class Test_Fonts extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A variable font covers a range of weights with one file, so asking for
-	 * three weights downloads it once rather than three times.
+	 * A variable font covers a range of weights with one file, so asking for three weights
+	 * downloads it once rather than three times.
 	 */
 	public function test_a_variable_font_is_installed_once_for_a_range() {
 		$result = Pattern_Builder_Fonts::install( 'Variabilia', array( '300', '400', '800' ), array( 'normal' ), 'theme' );
@@ -281,13 +270,12 @@ class Test_Fonts extends WP_UnitTestCase {
 		$this->assertNotWPError( $result );
 		$this->assertCount( 1, $result['faces'] );
 		$this->assertSame( '100 900', $result['faces'][0]['weight'] );
-		// The space in the range would be escaped in every URL naming it.
 		$this->assertFileExists( $this->theme_dir . '/assets/fonts/variabilia-100-900-normal.woff2' );
 	}
 
 	/**
-	 * A weight the family does not have is refused, naming what was asked
-	 * for rather than installing something else.
+	 * A weight the family does not have is refused, naming what was asked for rather than
+	 * installing something else.
 	 */
 	public function test_a_weight_the_family_lacks_is_refused() {
 		$result = Pattern_Builder_Fonts::install( 'Testerly', array( '950' ), array( 'normal' ), 'theme' );
@@ -298,8 +286,8 @@ class Test_Fonts extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Installing the same family twice leaves one preset: the token writer
-	 * never overwrites a slug the site already defines.
+	 * Installing the same family twice leaves one preset: the token writer never overwrites
+	 * a slug the site already defines.
 	 */
 	public function test_installing_twice_leaves_one_preset() {
 		Pattern_Builder_Fonts::install( 'Testerly', array( '400' ), array( 'normal' ), 'theme' );
@@ -313,8 +301,8 @@ class Test_Fonts extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Installing into Global Styles writes the preset there, with the files
-	 * served from this site's uploads rather than from Google.
+	 * Installing into Global Styles writes the preset there, with the files served from
+	 * this site's uploads rather than from Google.
 	 */
 	public function test_installing_into_global_styles_writes_the_user_preset() {
 		$result = Pattern_Builder_Fonts::install( 'Testerly', array( '400' ), array( 'normal' ), 'user' );
@@ -332,8 +320,8 @@ class Test_Fonts extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The theme.json this site has is left alone where it already defines the
-	 * slug — a font the theme designed with is not replaced by a lookalike.
+	 * The theme.json this site has is left alone where it already defines the slug — a font
+	 * the theme designed with is not replaced by a lookalike.
 	 */
 	public function test_an_existing_slug_is_not_overwritten() {
 		file_put_contents( // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
@@ -367,9 +355,9 @@ class Test_Fonts extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Which weights a family offers is the first thing an agent needs and the
-	 * one thing a listing did not say, so it could only find out by asking for
-	 * a weight and reading the refusal.
+	 * Which weights a family offers is the first thing an agent needs and the one thing a
+	 * listing did not say, so it could only find out by asking for a weight and reading the
+	 * refusal.
 	 */
 	public function test_a_named_family_reports_its_weights_and_styles() {
 		$described = Pattern_Builder_Fonts::describe( 'Testerly' );
@@ -382,10 +370,9 @@ class Test_Fonts extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A family served as one file per weight cannot supply a variable axis, and
-	 * a design built on one — optical sizing especially — will set wider or
-	 * narrower than the original with nothing to say why. The answer says so
-	 * rather than leaving it to be discovered by measuring.
+	 * A family served as one file per weight cannot supply a variable axis, and a design
+	 * built on one — optical sizing especially — will set wider or narrower than the
+	 * original with nothing to say why.
 	 */
 	public function test_a_family_says_whether_it_has_a_variable_face() {
 		$fixed = Pattern_Builder_Fonts::describe( 'Testerly' );
@@ -405,8 +392,8 @@ class Test_Fonts extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The refusal has to name something that exists: it used to send the caller
-	 * to a `get-font` ability that was never registered.
+	 * The refusal has to name something that exists: it used to send the caller to a `get-
+	 * font` ability that was never registered.
 	 */
 	public function test_a_refused_weight_names_a_real_ability() {
 		$result = Pattern_Builder_Fonts::install( 'Testerly', array( '900' ) );
@@ -417,8 +404,7 @@ class Test_Fonts extends WP_UnitTestCase {
 	}
 
 	/**
-	 * An install reports what kind of faces landed, for the same reason the
-	 * listing does.
+	 * An install reports what kind of faces landed, for the same reason the listing does.
 	 */
 	public function test_an_install_says_whether_the_faces_are_variable() {
 		$installed = Pattern_Builder_Fonts::install( 'Testerly', array( '400' ) );
@@ -428,9 +414,9 @@ class Test_Fonts extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The listing is where an agent looks, so the detail has to be reachable
-	 * from it — naming a family turns it on, the way naming blocks turns on
-	 * their supports in list-block-types.
+	 * The listing is where an agent looks, so the detail has to be reachable from it —
+	 * naming a family turns it on, the way naming blocks turns on their supports in list-
+	 * block-types.
 	 */
 	public function test_list_fonts_describes_one_named_family() {
 		$abilities = new Pattern_Builder_Abilities();

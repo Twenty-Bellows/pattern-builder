@@ -12,31 +12,9 @@ use WP_REST_Request;
 use WP_REST_Response;
 
 /**
- * Anonymous usage reporting, only ever with the site administrator's
- * explicit say-so.
- *
- * WordPress.org's guidelines forbid tracking without opt-in, and this is
- * built to make the rule easy to keep: nothing is sent until an
- * administrator has clicked Allow on the prompt the pattern browser shows
- * once, and one click on the prompt (or the connect panel, which offers
- * it again to a site that declined) turns it off. The answer is a site
- * option — one decision per site, recorded with who made it and when.
- *
- * What is sent: a random install id minted at opt-in (never the site's
- * URL, name or address), the environment (WordPress, PHP and plugin
- * versions, locale, theme slug, multisite, environment type), and named
- * events — the browser opened, a pattern created, the community browsed,
- * an upload — each with a small fixed set of properties. Nothing about
- * content, ever. It goes to patternbuilderwp.com, which relays it to the
- * analytics project: the plugin therefore names one service, and never
- * loads a script from anyone.
- *
- * Events recorded during a request are buffered and posted once, on
- * shutdown, without waiting for the answer. A lost batch is lost; this is
- * analytics, not accounting.
+ * Anonymous usage reporting, only ever with the site administrator's explicit say-so.
  */
 class Pattern_Builder_Telemetry {
-
 	const OPTION = 'pattern_builder_telemetry';
 
 	const ALLOWED  = 'allowed';
@@ -105,10 +83,6 @@ class Pattern_Builder_Telemetry {
 	/**
 	 * Record the decision.
 	 *
-	 * Allowing mints the install id if there is none; declining keeps it,
-	 * so a site that allows again later is the same site in the numbers.
-	 * Each change is itself the last (or first) event sent.
-	 *
 	 * @param bool $allow The answer.
 	 * @return array The new state.
 	 */
@@ -125,7 +99,7 @@ class Pattern_Builder_Telemetry {
 		}
 
 		if ( ! $allow && $was ) {
-			self::record( 'telemetry_disabled' ); // Buffered while still allowed.
+			self::record( 'telemetry_disabled' );
 		}
 
 		update_option( self::OPTION, $state, false );
@@ -140,7 +114,7 @@ class Pattern_Builder_Telemetry {
 	/**
 	 * Record an event, if the site allows it.
 	 *
-	 * @param string $event      Event name, from the service's fixed list.
+	 * @param string $event Event name, from the service's fixed list.
 	 * @param array  $properties Event properties, from the service's fixed list.
 	 */
 	public static function record( $event, $properties = array() ) {
@@ -175,7 +149,7 @@ class Pattern_Builder_Telemetry {
 		/**
 		 * Filters whether a batch is sent, and lets tests see it.
 		 *
-		 * @param bool  $send   Whether to send.
+		 * @param bool  $send Whether to send.
 		 * @param array $events The batch.
 		 */
 		if ( ! apply_filters( 'pattern_builder_telemetry_send', true, $events ) ) {
@@ -227,8 +201,8 @@ class Pattern_Builder_Telemetry {
 	}
 
 	/**
-	 * The connected account, when there is one, so cloud usage joins the
-	 * website's events under the same account.
+	 * The connected account, when there is one, so cloud usage joins the website's events
+	 * under the same account.
 	 *
 	 * @return array
 	 */
@@ -261,7 +235,7 @@ class Pattern_Builder_Telemetry {
 	 */
 	public static function on_activation() {
 		self::record( 'plugin_activated' );
-		self::flush(); // No shutdown to wait for on an activation request.
+		self::flush();
 	}
 
 	/**
@@ -273,8 +247,7 @@ class Pattern_Builder_Telemetry {
 	}
 
 	/**
-	 * REST routes for the browse app: read the state, answer the prompt,
-	 * report an event. Gated like every other management route.
+	 * REST routes for the browse app: read the state, answer the prompt, report an event.
 	 */
 	public function register_routes() {
 		$can_manage = function () {
@@ -329,9 +302,6 @@ class Pattern_Builder_Telemetry {
 
 	/**
 	 * POST /telemetry/event — the browse app saw something happen.
-	 *
-	 * The service keeps its own allowlist; this passes only string and
-	 * scalar properties through, so the wire never carries content.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response

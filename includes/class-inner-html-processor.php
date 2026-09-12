@@ -14,15 +14,9 @@ use WP_HTML_Text_Replacement;
 /**
  * Adds inner-HTML replacement to the HTML API.
  *
- * `WP_HTML_Processor` has no `set_inner_html()` yet, so core reaches for the
- * same workaround when it resolves a block binding: subclass the processor,
- * find the matching closer, and splice the range between the two tags. This is
- * that workaround, kept to itself.
- *
  * @see WP_Block::replace_html()
  */
 class Inner_HTML_Processor extends WP_HTML_Processor {
-
 	/**
 	 * Name of the bookmark used to record tag positions.
 	 */
@@ -31,8 +25,8 @@ class Inner_HTML_Processor extends WP_HTML_Processor {
 	/**
 	 * Replaces the content of the first element matching one of the selectors.
 	 *
-	 * @param string   $html        HTML to update.
-	 * @param string[] $selectors   Tag names to look for, in order.
+	 * @param string   $html HTML to update.
+	 * @param string[] $selectors Tag names to look for, in order.
 	 * @param string   $replacement HTML to put inside the element.
 	 * @return string|null The updated HTML, or null if nothing was replaced.
 	 */
@@ -55,11 +49,7 @@ class Inner_HTML_Processor extends WP_HTML_Processor {
 	/**
 	 * Removes the first element matching one of the selectors, tags and all.
 	 *
-	 * An element a block's `save()` omits when its value is empty — a caption,
-	 * a citation — has to go away entirely rather than be left standing empty,
-	 * or the markup stops being anything the block would have written.
-	 *
-	 * @param string   $html      HTML to update.
+	 * @param string   $html HTML to update.
 	 * @param string[] $selectors Tag names to look for, in order.
 	 * @return string|null The updated HTML, or null if nothing was removed.
 	 */
@@ -127,12 +117,8 @@ class Inner_HTML_Processor extends WP_HTML_Processor {
 	/**
 	 * Finds where the current element opens and closes in the source HTML.
 	 *
-	 * Leaves the processor sitting on the closing tag, which is what both
-	 * callers want and neither needs to walk back from.
-	 *
-	 * @return WP_HTML_Span[]|null The opening and closing spans, or null when
-	 *                             the current token is not an element with a
-	 *                             closer of its own.
+	 * @return WP_HTML_Span[]|null The opening and closing spans, or null when the current
+	 * token is not an element with a closer of its own.
 	 */
 	private function element_bounds(): ?array {
 		if ( $this->is_tag_closer() || ! $this->expects_closer() ) {
@@ -147,8 +133,6 @@ class Inner_HTML_Processor extends WP_HTML_Processor {
 		if ( null === $opener ) {
 			return null;
 		}
-
-		// Walk out of the element. The token left behind is its closer.
 		while ( $this->next_token() && $this->get_current_depth() >= $depth ) {
 			continue;
 		}
@@ -175,8 +159,6 @@ class Inner_HTML_Processor extends WP_HTML_Processor {
 		if ( ! $this->set_bookmark( self::BOOKMARK ) ) {
 			return null;
 		}
-
-		// `WP_HTML_Processor::set_bookmark()` prefixes the name it is given.
 		$span = $this->bookmarks[ '_' . self::BOOKMARK ] ?? null;
 
 		return $span instanceof WP_HTML_Span ? $span : null;

@@ -6,17 +6,8 @@ use WP_Block_Editor_Context;
 
 /**
  * The Appearance → Pattern Builder screen.
- *
- * Two modes, decided by the URL's `pattern` parameter:
- *
- * - Browse (no parameter): the pattern grid — search, filter, create.
- * - Edit (`&pattern={id}`, `&type=user|theme`): the WordPress editor itself. The page boots
- *   core's `@wordpress/edit-post` editor (the one that powers post.php)
- *   bound to the `pb_pattern` entity, so theme pattern edits save straight
- *   to the pattern files with the full core editing experience.
  */
 class Pattern_Builder_Admin {
-
 	private const PAGE_SLUG = 'pattern-builder';
 
 	/**
@@ -52,8 +43,8 @@ class Pattern_Builder_Admin {
 	}
 
 	/**
-	 * Marks the edit-mode screen as a block editor screen, as core's own
-	 * editor pages do — admin body classes and asset behavior key off it.
+	 * Marks the edit-mode screen as a block editor screen, as core's own editor pages do —
+	 * admin body classes and asset behavior key off it.
 	 */
 	public function setup_screen(): void {
 		if ( $this->get_requested_pattern() ) {
@@ -99,9 +90,6 @@ class Pattern_Builder_Admin {
 
 		$asset   = include $asset_path;
 		$pattern = $this->get_requested_pattern();
-
-		// The block editor's client-side registry needs the server's block
-		// definitions and categories, exactly as core's editor screens set up.
 		wp_add_inline_script(
 			'wp-blocks',
 			'wp.blocks.unstable__bootstrapServerSideBlockDefinitions(' . wp_json_encode( get_block_editor_server_block_settings() ) . ');',
@@ -115,20 +103,6 @@ class Pattern_Builder_Admin {
 			sprintf( 'wp.blocks.setCategories( %s );', wp_json_encode( get_block_categories( $editor_context ) ) ),
 			'after'
 		);
-
-		/*
-		 * The server-registered block bindings sources, which every core editor
-		 * screen preloads the same way.
-		 *
-		 * This one is easy to miss and fails quietly. The client half of a
-		 * source carries no label, and `registerBlockBindingsSource()` refuses
-		 * a source that has neither its own label nor one on an already
-		 * registered stub — so without these stubs the editor's own
-		 * `core/pattern-overrides` registration bails with a console warning
-		 * and nothing else. Everything renders; a pattern that fills another
-		 * pattern's slots just shows that pattern's placeholder copy, in the
-		 * browse grid's previews and in the pattern editor alike.
-		 */
 		$binding_sources = array();
 		foreach ( get_all_registered_block_bindings_sources() as $source ) {
 			$binding_sources[] = array(
@@ -160,7 +134,6 @@ class Pattern_Builder_Admin {
 		wp_set_script_translations( 'pattern-builder-admin', 'pattern-builder' );
 
 		if ( $pattern ) {
-			// The full editor skin — the same stylesheet stack post.php loads.
 			wp_enqueue_style( 'wp-edit-post' );
 		}
 
@@ -186,13 +159,6 @@ class Pattern_Builder_Admin {
 			),
 			$editor_context
 		);
-
-		/*
-		 * A pattern has no post title of its own — its name is edited in the
-		 * Pattern Metadata panel — so core's title field is hidden in the
-		 * canvas. It lives inside the canvas iframe, which page styles never
-		 * reach; an editor style is the way in.
-		 */
 		if ( $pattern ) {
 			$settings['styles'][] = array(
 				'css' => '.editor-visual-editor__post-title-wrapper { display: none; }',
@@ -215,14 +181,7 @@ class Pattern_Builder_Admin {
 						'adminUrl'         => $browse_url,
 						'backUrl'          => $back_url ? $back_url : $browse_url,
 						'telemetry'        => Pattern_Builder_Telemetry::client_state(),
-						// What this site can render. A cloud pattern says
-						// which WordPress it needs, and the browser says so
-						// before the download rather than after — the
-						// server refuses either way.
 						'wordPressVersion' => Pattern_Builder_Cloud_Porter::wordpress_version(),
-						// Where the grid's tiles are drawn — the site's own front
-						// end — and the part of each tile's cache key that is the
-						// same for every tile. Only the browse screen has tiles.
 						'tileBase'         => $pattern ? '' : Pattern_Builder_Preview::tile_base(),
 						'designVersion'    => $pattern ? '' : Pattern_Builder_Preview::design_version(),
 					)
@@ -230,8 +189,6 @@ class Pattern_Builder_Admin {
 			),
 			'before'
 		);
-
-		// Fire the core action so editor integrations (ours and third-party) load.
 		do_action( 'enqueue_block_editor_assets' );
 	}
 
@@ -240,7 +197,6 @@ class Pattern_Builder_Admin {
 	 */
 	public function render_admin_menu_page(): void {
 		if ( $this->get_requested_pattern() ) {
-			// The div core's editor takes over — mirrors post.php's markup.
 			echo '<div class="block-editor">';
 			echo '<div id="pattern-builder-admin" class="block-editor__container hide-if-no-js"></div>';
 			echo '</div>';

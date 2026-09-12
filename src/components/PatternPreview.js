@@ -37,7 +37,7 @@ export const PatternPreview = ( { pattern, onClick, onEditClick } ) => {
 				<Button
 					variant="primary"
 					onClick={ ( event ) => {
-						event.stopPropagation(); // Prevent the card click event
+						event.stopPropagation();
 						if ( onEditClick ) {
 							onEditClick( pattern );
 						}

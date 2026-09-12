@@ -1,18 +1,5 @@
 /**
  * The Freemius overlay checkout, opened from inside wp-admin.
- *
- * The service's `/me` (via `/cloud/status`) hands over the checkout's
- * configuration — product, plan, public key, and the account's email as
- * read-only, so the licence comes back under an address the service
- * knows. Freemius's checkout script is loaded on the first click and
- * never before: it is the one third-party script this plugin loads, it
- * is a documented service on its own domain (what the wp.org guidelines
- * permit), and a site that is already Pro never fetches it.
- *
- * `purchaseCompleted` fires the moment Freemius has the subscription, so
- * the purchase is reported to the service right then (`/cloud/billing/
- * sync`) and the account is Pro before the overlay closes. The status
- * poll that was already watching for the webhook stays as the fallback.
  */
 
 import apiFetch from '@wordpress/api-fetch';
@@ -50,10 +37,12 @@ function loadCheckoutScript( src ) {
  *
  * @param {Object}   config             Checkout configuration from the service.
  * @param {Object}   callbacks          Callbacks.
- * @param {Function} callbacks.onSynced Called with the new status once the purchase is reported.
+ * @param {Function} callbacks.onSynced Called with the new status once the purchase is
+ *                                      reported.
  * @param {Function} callbacks.onClosed Called when the overlay closes after a purchase.
  * @param {Function} callbacks.onCancel Called when the overlay is closed without one.
- * @return {Promise<void>} Resolves once the overlay is open; rejects if the script would not load.
+ * @return {Promise<void>} Resolves once the overlay is open; rejects if the script would
+ * not load.
  */
 export function openCheckout( config, callbacks = {} ) {
 	return loadCheckoutScript( config.script ).then( () => {
@@ -78,7 +67,7 @@ export function openCheckout( config, callbacks = {} ) {
 					data: { licenseId: Number( licenseId ) },
 				} )
 					.then( ( status ) => callbacks.onSynced?.( status ) )
-					.catch( () => {} ); // The webhook still lands; the poll sees it.
+					.catch( () => {} );
 			},
 			success: () => callbacks.onClosed?.(),
 			cancel: () => callbacks.onCancel?.(),

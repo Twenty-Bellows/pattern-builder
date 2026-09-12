@@ -1,19 +1,6 @@
 /**
  * Load a WordPress install's own block editor code into Node.
  *
- * The alternative is a few hundred megabytes of npm packages, or a bundle of
- * them shipped alongside this script — 21MB, because every block's `save()`
- * imports `@wordpress/block-editor`, whose index registers the supports hooks
- * as a side effect and so pulls the entire editor UI with it. There is no
- * seam to cut along: core keeps each support's `addSaveProps` in the same
- * module as that support's editor interface.
- *
- * None of that is necessary, because every WordPress install already has this
- * code — about 4MB of `wp-includes/js/dist` — and it is the *exact* version
- * that site runs. That matters more than convenience: whether markup is what
- * a block writes "today" is a question only a specific block library can
- * answer, and block library 10.5 answers it differently from 9.22.
- *
  * @package
  */
 
@@ -27,9 +14,6 @@ const require = createRequire( import.meta.url );
 
 /**
  * Handles that are not packages, and where their files live.
- *
- * Everything else is resolved from the manifest as `wp-{name}` →
- * `js/dist/{name}.min.js`.
  */
 const VENDOR = {
 	react: 'js/dist/vendor/react.min.js',
@@ -41,10 +25,8 @@ const VENDOR = {
 };
 
 /**
- * What the vendor handles need, which the manifest does not record because
- * they are not packages. The JSX runtime reads `globalThis.React` as it
- * loads, so getting this order wrong costs every JSX call in the editor
- * bundles — and it fails silently, as a missing `jsx` function.
+ * What the vendor handles need, which the manifest does not record because they are not
+ * packages.
  */
 const VENDOR_DEPS = {
 	'react-dom': [ 'react' ],
@@ -53,19 +35,6 @@ const VENDOR_DEPS = {
 
 /**
  * Declare the `content` attribute on `core/pattern`, as the site does.
- *
- * `content` is not core's: Pattern Builder (and Synced Patterns for Themes)
- * add it — on the server through `register_block_type_args`, in the editor
- * through this same `blocks.registerBlockType` filter — and it is the whole
- * design/content split: a page pattern fills a design pattern's Pattern
- * Overrides slots through it. The scripts loaded here are core's, so without
- * this the block type has no such attribute, `parse()` silently drops it,
- * and `createBlock()`/`serialize()` would write a reference with the slot
- * values gone. The site the pattern is destined for has the attribute; the
- * check should see what the site sees.
- *
- * Mirrors `src/runtime/pattern-content-attribute.js`, minus the list-view
- * label, which is editor UI.
  *
  * @param {Object} settings Block type settings.
  * @param {string} name     Block type name.
@@ -105,26 +74,17 @@ export function findWordPress( hint ) {
 		if ( looksRight( resolved ) ) {
 			return resolved;
 		}
-		// A path inside the install is just as good a hint as its root.
 		for ( const up of ancestors( resolved ) ) {
 			if ( looksRight( up ) ) {
 				return up;
 			}
 		}
 	}
-
-	// A theme or plugin directory sits inside the install it belongs to.
 	for ( const up of ancestors( process.cwd() ) ) {
 		if ( looksRight( up ) ) {
 			return up;
 		}
 	}
-
-	/*
-	 * And so does this script: it ships inside the plugin, which lives in
-	 * wp-content/plugins. So the install is usually overhead even when the
-	 * caller is working somewhere else entirely.
-	 */
 	for ( const up of ancestors(
 		path.dirname( new URL( import.meta.url ).pathname )
 	) ) {
@@ -151,10 +111,6 @@ function* ancestors( from ) {
 /**
  * The script handles a set of packages needs, in load order.
  *
- * Read out of `wp-includes/assets/script-loader-packages.php`, the manifest
- * core generates at build time, so no WordPress bootstrap is needed and the
- * answer always matches the install rather than our idea of it.
- *
  * @param {string} wpRoot WordPress root.
  * @param {Array}  wanted Handles to resolve.
  * @return {Array} Handles, dependencies first.
@@ -172,8 +128,6 @@ export function scriptOrder( wpRoot, wanted ) {
 
 	const php = fs.readFileSync( manifest, 'utf8' );
 	const deps = new Map();
-
-	// Each entry is `'name.js' => array( 'dependencies' => array( … ) … )`.
 	const entry =
 		/'([\w-]+)\.js'\s*=>\s*array\(\s*'dependencies'\s*=>\s*array\(([^)]*)\)/g;
 	let match;
@@ -220,7 +174,6 @@ export function handleToFile( wpRoot, handle ) {
 		return path.join( wpRoot, 'wp-includes', VENDOR[ handle ] );
 	}
 	if ( ! handle.startsWith( 'wp-' ) ) {
-		// jquery and friends. Nothing here needs them.
 		return null;
 	}
 	return path.join(
@@ -269,12 +222,6 @@ export function loadWordPressBlocks( wpRoot ) {
 /**
  * The same, for a site reachable only over HTTP.
  *
- * WordPress serves its editor scripts to anyone, so the code is a fetch away
- * — but the dependency graph is not: core's manifest is a PHP file, so asking
- * for it over HTTP executes it and returns nothing. The order has to come
- * from the site itself, which is what `pattern-builder/get-editor-scripts`
- * is for.
- *
  * @param {Array}  urls    Script URLs, dependencies first.
  * @param {Object} options cacheDir, and a label for messages.
  * @return {Promise<Object>} The block API.
@@ -292,8 +239,6 @@ export async function loadWordPressBlocksFromUrls( urls, options = {} ) {
 	const sources = [];
 	let fetched = 0;
 	for ( const url of urls ) {
-		// The URL carries a version, so a changed file is a changed name and
-		// a stale cache cannot outlive an upgrade.
 		const cached = path.join( cacheDir, digest( url ) + '.js' );
 		if ( ! fs.existsSync( cached ) ) {
 			const response = await fetch( url );
@@ -327,12 +272,6 @@ function bootBlocks( sources, missing ) {
 	try {
 		( { JSDOM, VirtualConsole } = require( 'jsdom' ) );
 	} catch {
-		/*
-		 * The one thing WordPress cannot supply. Its editor code is browser
-		 * code and expects a document to exist as it loads, so something has
-		 * to play the browser. One package, rather than the two hundred
-		 * megabytes of npm the alternative costs.
-		 */
 		throw new Error(
 			"jsdom is required to run WordPress's editor code outside a browser.\n" +
 				'  npm i --no-save jsdom'
@@ -341,10 +280,6 @@ function bootBlocks( sources, missing ) {
 
 	const dom = new JSDOM( '<!doctype html><html><body></body></html>', {
 		url: 'http://localhost',
-		// These files are strict-mode, and a strict `eval` keeps its own `var`
-		// declarations to itself — which is how `ReactJSXRuntime` goes missing
-		// and every JSX call fails. Real script elements do not have that
-		// problem, so the scripts are injected rather than evaluated.
 		runScripts: 'dangerously',
 		pretendToBeVisual: true,
 		virtualConsole: new VirtualConsole(),
@@ -384,8 +319,6 @@ function bootBlocks( sources, missing ) {
 					: '' )
 		);
 	}
-
-	// Before the core blocks register, so the filter sees core/pattern go by.
 	wp.hooks.addFilter(
 		'blocks.registerBlockType',
 		'pattern-builder/pattern-content-attribute',

@@ -5,24 +5,10 @@ namespace TwentyBellows\PatternBuilder;
 use WP_Error;
 
 /**
- * Converts between local patterns (theme files / wp_block posts) and the
- * Portable Pattern Package (PBP) wire format used by patternbuilderwp.com.
- *
- * Export: local pattern → PBP + asset files (local image URLs become
- * `pbp-asset://{key}` placeholders; the files travel with the upload).
- *
- * Import: PBP → local pattern. Assets are fetched from the service into the
- * media library first; a theme-destination pattern then flows through
- * Pattern_File_Store::update_theme_pattern(), which moves home-URL images
- * into theme assets exactly as user→theme conversion always has. A pattern
- * installed from a cloud collection lands under a local pattern category
- * named for that collection — its footprint on this site.
- *
- * Installing a whole collection is one method, install_collection(), used by
- * the REST route's caller and by the agent ability alike.
+ * Converts between local patterns (theme files / wp_block posts) and the Portable Pattern
+ * Package (PBP) wire format used by patternbuilderwp.com.
  */
 class Pattern_Builder_Cloud_Porter {
-
 	/**
 	 * File store instance.
 	 *
@@ -41,9 +27,9 @@ class Pattern_Builder_Cloud_Porter {
 	 * Export a local pattern to PBP form.
 	 *
 	 * @param string     $type 'theme' or 'user'.
-	 * @param string|int $id   Theme pattern name or wp_block post ID.
-	 * @param string     $target_namespace  Target `{handle}/{collection}` to point this
-	 *                               pattern's references at, or '' to leave them.
+	 * @param string|int $id Theme pattern name or wp_block post ID.
+	 * @param string     $target_namespace Target `{handle}/{collection}` to point this
+	 * pattern's references at, or '' to leave them.
 	 * @return array|WP_Error { pbp: array, files: array (key => path) }
 	 */
 	public function export_local( $type, $id, $target_namespace = '' ) {
@@ -72,36 +58,13 @@ class Pattern_Builder_Cloud_Porter {
 			);
 		}
 
-		$content = $this->strip_attachment_identity( $content );
-
-		/*
-		 * The variations this markup applies, gathered under their local
-		 * slugs — the definitions live in the theme, not in the file, so a
-		 * pattern that travels without them arrives with the class intact and
-		 * nothing styling it.
-		 */
+		$content    = $this->strip_attachment_identity( $content );
 		$variations = Pattern_Builder_Block_Style_Variations::carried_by( $content );
 		if ( is_wp_error( $variations ) ) {
 			return $variations;
 		}
-
-		/*
-		 * The pattern's references have to name the collection it is going
-		 * into, because that is where its dependencies are being uploaded
-		 * to.
-		 */
 		if ( '' !== $target_namespace ) {
-			$content = self::rewrite_references( $content, $target_namespace );
-
-			/*
-			 * A variation slug is a name in a shared namespace, exactly as a
-			 * preset slug is, so two designs that both call something
-			 * `button-secondary` would collide at any site holding both. The
-			 * collection is the unit that travels together, so that is what
-			 * the name hangs under — and, like an origin, it is stamped once
-			 * and never rewritten: renaming on a re-upload would install a
-			 * second identical variation beside the first.
-			 */
+			$content                      = self::rewrite_references( $content, $target_namespace );
 			list( $content, $variations ) = self::rewrite_variations( $content, $variations, $target_namespace );
 		}
 
@@ -113,9 +76,6 @@ class Pattern_Builder_Cloud_Porter {
 			'slug'               => $slug,
 			'description'        => (string) $pattern->description,
 			'keywords'           => array_values( (array) $pattern->keywords ),
-			// The pattern file's own Categories: header travels along as
-			// classification for the inserter. Which cloud collection the
-			// pattern goes into is the request's business, not the package's.
 			'inserterCategories' => array_values( (array) $pattern->categories ),
 			'viewportWidth'      => (int) $pattern->viewportWidth, // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 			'synced'             => (bool) $pattern->synced,
@@ -129,8 +89,6 @@ class Pattern_Builder_Cloud_Porter {
 			'origin'             => array(
 				'site'    => home_url(),
 				'kind'    => $type,
-				// Whose work this started as, if it started as somebody
-				// else's. Carried, never invented here (D38).
 				'pattern' => (string) $pattern->origin,
 			),
 		);
@@ -144,11 +102,8 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * A local pattern, by type and identifier.
 	 *
-	 * The porter loads these for its own work; the tree route needs the
-	 * same lookup to hand each member's markup to the panel.
-	 *
 	 * @param string     $type 'theme' or 'user'.
-	 * @param string|int $id   Local identifier.
+	 * @param string|int $id Local identifier.
 	 * @return Abstract_Pattern|WP_Error
 	 */
 	public function local_pattern( $type, $id ) {
@@ -157,11 +112,6 @@ class Pattern_Builder_Cloud_Porter {
 
 	/**
 	 * The patterns a piece of markup references, at any depth.
-	 *
-	 * The browser has this too (`src/utils/patternTree.js`), because the
-	 * upload panel has to show the tree and run the block-validity gate over
-	 * every member before anything is sent. This copy is the one that
-	 * decides what actually goes up.
 	 *
 	 * @param string $content Block markup.
 	 * @return string[] Referenced pattern names, deduplicated, in document order.
@@ -202,18 +152,8 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * A local pattern and everything it references, leaves first.
 	 *
-	 * Leaves first because that is the order the service can accept: a
-	 * collection is a closed world (D38), so a pattern naming another is
-	 * refused until the other is stored. There is no batch and no
-	 * transaction — the ordering is the transaction.
-	 *
-	 * Every dependency is a theme pattern, and not by choice: `core/pattern`
-	 * resolves against the block-pattern registry and a `wp_block` post is
-	 * not in it, so a user pattern can be the root of a tree but never a
-	 * member of one.
-	 *
 	 * @param string     $type 'theme' or 'user'.
-	 * @param string|int $id   Local identifier.
+	 * @param string|int $id Local identifier.
 	 * @return array|WP_Error { order: array of { type, id, name }, missing: string[] }
 	 */
 	public function local_tree( $type, $id ) {
@@ -225,13 +165,7 @@ class Pattern_Builder_Cloud_Porter {
 		$order   = array();
 		$missing = array();
 		$seen    = array();
-
-		/*
-		 * Depth-first, pushing each pattern after everything it needs. The
-		 * closure recurses through a variable because PHP has no name for an
-		 * anonymous function inside itself.
-		 */
-		$walk = function ( $pattern, $member_type, $member_id, $path ) use ( &$walk, &$order, &$missing, &$seen ) {
+		$walk    = function ( $pattern, $member_type, $member_id, $path ) use ( &$walk, &$order, &$missing, &$seen ) {
 			foreach ( self::references_of( (string) $pattern->content ) as $reference ) {
 				if ( in_array( $reference, $path, true ) ) {
 					return new WP_Error(
@@ -300,18 +234,7 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * Point a pattern's references at a namespace.
 	 *
-	 * Uploading never renames a pattern; the namespace it hangs under is
-	 * what changes, so `mytheme/hero` becomes `{handle}/{collection}/hero`
-	 * and the last segment is carried across untouched.
-	 *
-	 * The `slug` attribute is rewritten in the markup as a string rather
-	 * than by reserializing the parsed tree: a round trip through
-	 * `parse_blocks()` and `serialize_blocks()` rewrites nothing it
-	 * understands, but it does normalize whitespace and attribute order,
-	 * and changing markup nobody asked to change is how a pattern quietly
-	 * stops matching what its `save()` writes.
-	 *
-	 * @param string $content   Block markup.
+	 * @param string $content Block markup.
 	 * @param string $target_namespace The target `{handle}/{collection}`.
 	 * @return string
 	 */
@@ -333,26 +256,8 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * Point a pattern's block style variations at the collection carrying it.
 	 *
-	 * Three halves, really: the `is-style-{slug}` class in the markup — which
-	 * appears in the block comment's `className` and again in the saved HTML —
-	 * the `slug` of the definition travelling beside it, and any
-	 * `is-style-{slug}` inside that definition's own `css`, where a variation
-	 * reaches for another by class (`& .is-style-other`). All three move by
-	 * the same anchored substitution, so a rename cannot leave one of them
-	 * pointing at a name that is no longer there. Only the slugs actually
-	 * travelling are rewritten, which is what leaves a reference to one of
-	 * WordPress's own — `is-style-outline` — alone.
-	 *
-	 * By string substitution rather than a reserialize, for the same reason
-	 * `rewrite_references()` is: reserializing would normalize markup nobody
-	 * asked to change.
-	 *
-	 * The namespace is `{handle}/{collection}` and a variation slug may hold
-	 * no slash, so it is flattened. That makes the result unparseable back
-	 * into its parts, which is fine — it is a unique name, not a path.
-	 *
-	 * @param string $content          Block markup.
-	 * @param array  $variations       The definitions travelling with it.
+	 * @param string $content Block markup.
+	 * @param array  $variations The definitions travelling with it.
 	 * @param string $target_namespace The target `{handle}/{collection}`.
 	 * @return array [ $content, $variations ]
 	 */
@@ -364,11 +269,8 @@ class Pattern_Builder_Cloud_Porter {
 
 		$renamed = array();
 		foreach ( $variations as $variation ) {
-			$from = (string) $variation['slug'];
-			$to   = $prefix . '-' . $from;
-
-			// The negative lookahead keeps `is-style-card` from matching
-			// inside `is-style-card-wide`, which is a different variation.
+			$from    = (string) $variation['slug'];
+			$to      = $prefix . '-' . $from;
 			$content = preg_replace(
 				'/\bis-style-' . preg_quote( $from, '/' ) . '(?![a-z0-9-])/',
 				'is-style-' . $to,
@@ -378,12 +280,6 @@ class Pattern_Builder_Cloud_Porter {
 			$variation['slug'] = $to;
 			$renamed[]         = $variation;
 		}
-
-		/*
-		 * The definitions are rewritten in a second pass, over the *renamed*
-		 * list, so that a variation whose CSS names a sibling is stamped for
-		 * every slug travelling rather than only the ones seen so far.
-		 */
 		foreach ( $renamed as $index => $variation ) {
 			if ( ! isset( $variation['styles']['css'] ) || ! is_string( $variation['styles']['css'] ) ) {
 				continue;
@@ -406,11 +302,11 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * Record on a local pattern which cloud pattern is its copy, or forget
-	 * it — the `Cloud:` header or its post meta.
+	 * Record on a local pattern which cloud pattern is its copy, or forget it — the
+	 * `Cloud:` header or its post meta.
 	 *
 	 * @param string     $type 'theme' or 'user'.
-	 * @param string|int $id   Local identifier.
+	 * @param string|int $id Local identifier.
 	 * @param string     $name `{handle}/{collection}/{slug}`, or '' to forget.
 	 * @return true|WP_Error
 	 */
@@ -425,12 +321,10 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * Import a PBP as a local pattern.
 	 *
-	 * @param array  $pbp         Package from the service.
+	 * @param array  $pbp Package from the service.
 	 * @param string $destination 'user' or 'theme'.
-	 * @param array  $collection  The cloud collection it came from, as
-	 *                            { owner, slug, title }, or empty. When
-	 *                            given, the pattern lands under a local
-	 *                            category named for the collection.
+	 * @param array  $collection The cloud collection it came from, as { owner, slug, title
+	 * }, or empty.
 	 * @return array|WP_Error { type: string, id: string|int, title: string }
 	 */
 	public function import_pbp( $pbp, $destination, $collection = array() ) {
@@ -476,13 +370,7 @@ class Pattern_Builder_Cloud_Porter {
 		$description = sanitize_textarea_field( isset( $pbp['description'] ) ? (string) $pbp['description'] : '' );
 		$categories  = array_map( 'sanitize_text_field', isset( $pbp['inserterCategories'] ) && is_array( $pbp['inserterCategories'] ) ? $pbp['inserterCategories'] : array() );
 		$synced      = ! empty( $pbp['synced'] );
-
-		/*
-		 * The collection's footprint: a category slug `pbwp-{owner}-{slug}`
-		 * on the installed pattern, and the collection's title remembered
-		 * so the inserter shows "Starter Sections" rather than the slug.
-		 */
-		$collection = Pattern_Builder_Cloud::describe_collection( $collection );
+		$collection  = Pattern_Builder_Cloud::describe_collection( $collection );
 		if ( $collection ) {
 			$categories[] = Pattern_Builder_Cloud::collection_category_slug( $collection['owner'], $collection['slug'] );
 			$categories   = array_values( array_unique( $categories ) );
@@ -490,24 +378,11 @@ class Pattern_Builder_Cloud_Porter {
 		}
 
 		$origin = $this->origin_for( $pbp );
-
-		// The cloud pattern this is a copy of, kept on the pattern: what
-		// answers "is this installed here?" and, for the account's own
-		// patterns, what lets an edit here go back up as an update.
-		$cloud = self::cloud_name_of_package( $pbp );
+		$cloud  = self::cloud_name_of_package( $pbp );
 
 		if ( 'theme' === $destination ) {
-			/*
-			 * No attachments to name: a theme pattern's images are moved into
-			 * the theme's own assets directory and referenced from there
-			 * (Pattern_File_Store::update_theme_pattern), so the package's
-			 * blocks stay as they arrived — an id would name nothing.
-			 */
 			return $this->import_as_theme_pattern( $pbp, $title, $this->install_name( $pbp, $slug ), $description, $categories, $synced, $content, $origin, $cloud );
 		}
-
-		// A user pattern's images did land in the media library, so its blocks
-		// can name them — the identity the export dropped, in local terms.
 		$content = $this->attach_media_library_ids( $content, $attachments );
 
 		return $this->import_as_user_pattern( $title, $slug, $description, $categories, $synced, $content, $origin, $cloud );
@@ -534,7 +409,7 @@ class Pattern_Builder_Cloud_Porter {
 	 * Load a local pattern as an Abstract_Pattern.
 	 *
 	 * @param string     $type 'theme' or 'user'.
-	 * @param string|int $id   Local identifier.
+	 * @param string|int $id Local identifier.
 	 * @return Abstract_Pattern|WP_Error
 	 */
 	private function load_local( $type, $id ) {
@@ -554,8 +429,8 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * The image types a package may carry — the service accepts these and
-	 * nothing else (mirrors PBP::allowed_asset_mimes on the service).
+	 * The image types a package may carry — the service accepts these and nothing else
+	 * (mirrors PBP::allowed_asset_mimes on the service).
 	 *
 	 * @return string[]
 	 */
@@ -564,42 +439,21 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * Find every image the pattern points at and resolve it to a file on
-	 * disk, so it can travel with the package as a `pbp-asset://` placeholder.
-	 *
-	 * The scan matches what the service checks — `src`, a block attribute's
-	 * `"url"`, and CSS `url()` — because anything left pointing at this site
-	 * is refused there ("Patterns may only reference images uploaded with
-	 * them"), and refused without naming the culprit. A reference this site
-	 * cannot bundle therefore fails here instead, where the URL and the
-	 * reason can be named. Links (`href`) are not images: a local one is
-	 * bundled when it resolves, and anything else is left alone.
+	 * Find every image the pattern points at and resolve it to a file on disk, so it can
+	 * travel with the package as a `pbp-asset://` placeholder.
 	 *
 	 * @param string $content Block markup.
 	 * @return array|WP_Error url => { key, path, mime }
 	 */
 	private function collect_local_assets( $content ) {
 		$images = '(?:jpg|jpeg|png|gif|webp)';
-
-		// Media the browser fetches to render the pattern: the service refuses
-		// any of it that it can't reach, so it has to travel along.
 		preg_match_all( '/(?:src="|url\(\s*[\'"]?)(https?:(?:\\?\/|\/)[^"\')]+)/i', $content, $required );
-
-		/*
-		 * A block attribute named `url` only sometimes holds media: a social
-		 * link, an embed and a button keep their destination there, and a
-		 * pattern that links to wordpress.org references no image at all.
-		 * Only an attribute naming a media file counts — whatever really
-		 * renders as media appears in the markup's src or url() as well.
-		 */
 		preg_match_all( '/"url"\s*:\s*"(https?:(?:\\?\/|\/)[^"]+)"/i', $content, $attributes );
 		foreach ( $attributes[1] as $attribute_url ) {
 			if ( $this->is_media_url( str_replace( '\\/', '/', $attribute_url ) ) ) {
 				$required[1][] = $attribute_url;
 			}
 		}
-
-		// Links to a local image (a lightbox, say): bundled when resolvable.
 		preg_match_all( '/href="(https?:\/\/[^"]+\.' . $images . '(?:\?[^"]*)?)"/i', $content, $links );
 
 		$assets = array();
@@ -666,12 +520,6 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * Forget which attachment an image was here.
 	 *
-	 * An attachment id means nothing on another site: id 57 is this site's
-	 * avatar and somebody else's letterhead. The image itself travels in the
-	 * package, so the ids and the `wp-image-57` classes that name it are
-	 * dropped on the way out, leaving blocks that render from their src —
-	 * which is how a theme's own pattern files are written anyway.
-	 *
 	 * @param string $content Block markup.
 	 * @return string
 	 */
@@ -690,17 +538,12 @@ class Pattern_Builder_Cloud_Porter {
 				foreach ( $this->attachment_attributes()[ 'core/' . $matches[1] ] as $key ) {
 					unset( $attributes[ $key ] );
 				}
-
-				// Core's own serializer: the escaping rules that keep a block
-				// comment a block comment are its business, not ours.
 				return $attributes
 					? '<!-- wp:' . $matches[1] . ' ' . serialize_block_attributes( $attributes ) . ' ' . $matches[3] . '-->'
 					: '<!-- wp:' . $matches[1] . ' ' . $matches[3] . '-->';
 			},
 			$content
 		);
-
-		// The same id, spelled as a class or a data attribute in the markup.
 		$content = preg_replace( '/\s*\bwp-image-\d+\b/', '', $content );
 		$content = preg_replace( '/\s+class="\s*"/', '', $content );
 		$content = preg_replace( '/\s+data-id="\d+"/', '', $content );
@@ -711,12 +554,7 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * Name the attachments a downloaded pattern's images just became.
 	 *
-	 * The mirror of strip_attachment_identity(): the package carries no ids,
-	 * because the sender's ids meant nothing here — but the images have now
-	 * been sideloaded, so the blocks can point at the local attachments and
-	 * the editor sees an image it knows rather than a bare URL.
-	 *
-	 * @param string $content     Block markup, placeholders already resolved.
+	 * @param string $content Block markup, placeholders already resolved.
 	 * @param array  $attachments Local URL => attachment id.
 	 * @return string
 	 */
@@ -727,9 +565,7 @@ class Pattern_Builder_Cloud_Porter {
 
 		$blocks  = $this->name_attachments_in_blocks( parse_blocks( $content ), $attachments );
 		$content = serialize_blocks( $blocks );
-
-		// The same id, as the class core writes on the image itself.
-		$images = new \WP_HTML_Tag_Processor( $content );
+		$images  = new \WP_HTML_Tag_Processor( $content );
 		while ( $images->next_tag( 'img' ) ) {
 			$src = $images->get_attribute( 'src' );
 			if ( is_string( $src ) && isset( $attachments[ $src ] ) ) {
@@ -741,10 +577,10 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * Set the attachment attribute on every media block that shows one of
-	 * these images, innermost blocks included.
+	 * Set the attachment attribute on every media block that shows one of these images,
+	 * innermost blocks included.
 	 *
-	 * @param array $blocks      Parsed blocks.
+	 * @param array $blocks Parsed blocks.
 	 * @param array $attachments Local URL => attachment id.
 	 * @return array
 	 */
@@ -755,7 +591,6 @@ class Pattern_Builder_Cloud_Porter {
 				: array();
 
 			foreach ( $keys as $key ) {
-				// `ids` is the legacy gallery's list, not one image's identity.
 				if ( 'ids' === $key ) {
 					continue;
 				}
@@ -775,10 +610,10 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * The attachment a media block shows, by the URL in its own markup or
-	 * in its `url` attribute — never one an inner block brought with it.
+	 * The attachment a media block shows, by the URL in its own markup or in its `url`
+	 * attribute — never one an inner block brought with it.
 	 *
-	 * @param array $block       One parsed block.
+	 * @param array $block One parsed block.
 	 * @param array $attachments Local URL => attachment id.
 	 * @return int 0 when the block shows none of them.
 	 */
@@ -809,8 +644,7 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * Whether a URL names a media file, by its extension. Mirrors the rule
-	 * the service applies, so the two agree on what counts as an image.
+	 * Whether a URL names a media file, by its extension.
 	 *
 	 * @param string $url The URL.
 	 * @return bool
@@ -824,7 +658,7 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * The package entry for one resolved asset.
 	 *
-	 * @param string $url  The URL as it appears in the markup.
+	 * @param string $url The URL as it appears in the markup.
 	 * @param string $path The file on disk.
 	 * @param string $mime The file's MIME type.
 	 * @return array
@@ -842,13 +676,6 @@ class Pattern_Builder_Cloud_Porter {
 
 	/**
 	 * Map a URL to the file it names on this site.
-	 *
-	 * Matching is by host and path, not by string prefix: the same image is
-	 * written http:// in one pattern and https:// in another, with or without
-	 * www, and a prefix comparison would call a perfectly local image
-	 * foreign. An image that really is on another site gets its own error —
-	 * it can't travel with the package, and saying so here is the only place
-	 * the URL can be named.
 	 *
 	 * @param string $url Image URL.
 	 * @return string|WP_Error
@@ -884,8 +711,6 @@ class Pattern_Builder_Cloud_Porter {
 			if ( '' === $base || 0 !== strpos( $path, $base . '/' ) ) {
 				continue;
 			}
-
-			// realpath, and inside the root: a path is not a promise (../).
 			$candidate = realpath( untrailingslashit( $dir ) . substr( $path, strlen( $base ) ) );
 			$root      = realpath( $dir );
 
@@ -938,10 +763,9 @@ class Pattern_Builder_Cloud_Porter {
 		$url = (string) $asset['url'];
 
 		/**
-		 * Pre-empt the remote fetch (tests, mirrors). Return a readable file
-		 * path to use instead of downloading.
+		 * Pre-empt the remote fetch (tests, mirrors).
 		 *
-		 * @param string|null $path  Local file path or null.
+		 * @param string|null $path Local file path or null.
 		 * @param array       $asset Asset entry.
 		 */
 		$pre = apply_filters( 'pattern_builder_cloud_pre_fetch_asset', null, $asset );
@@ -1019,14 +843,14 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * Land a package as a wp_block user pattern.
 	 *
-	 * @param string   $title       Title.
-	 * @param string   $slug        Slug.
+	 * @param string   $title Title.
+	 * @param string   $slug Slug.
 	 * @param string   $description Description.
-	 * @param string[] $categories  Category names.
-	 * @param bool     $synced      Synced flag.
-	 * @param string   $content     Sanitized markup with local URLs.
-	 * @param string   $origin      Attribution to record, or ''.
-	 * @param string   $cloud       The cloud pattern this is a copy of, or ''.
+	 * @param string[] $categories Category names.
+	 * @param bool     $synced Synced flag.
+	 * @param string   $content Sanitized markup with local URLs.
+	 * @param string   $origin Attribution to record, or ''.
+	 * @param string   $cloud The cloud pattern this is a copy of, or ''.
 	 * @return array|WP_Error
 	 */
 	private function import_as_user_pattern( $title, $slug, $description, $categories, $synced, $content, $origin = '', $cloud = '' ) {
@@ -1076,10 +900,7 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * The wp_pattern_category term for a category name or slug, created
-	 * when missing. A collection's category is created by slug with the
-	 * collection's title as its name, so the editor's own lists show the
-	 * title too.
+	 * The wp_pattern_category term for a category name or slug, created when missing.
 	 *
 	 * @param string $category A category name or slug.
 	 * @return int Term ID, or 0.
@@ -1103,19 +924,11 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * Install a whole cloud collection onto this site.
 	 *
-	 * Fetches the collection, then imports each pattern in turn through the
-	 * single-pattern path: one already here under its cloud name is skipped,
-	 * a failure is recorded and the rest carry on, and every pattern lands
-	 * under the collection's local category.
-	 * The browser drives the same steps itself through /cloud/download so it
-	 * can show progress; the agent ability calls this.
-	 *
-	 * @param int    $owner       The collection owner's account id.
-	 * @param string $slug        The collection's plain slug.
+	 * @param int    $owner The collection owner's account id.
+	 * @param string $slug The collection's plain slug.
 	 * @param string $destination 'user' or 'theme'.
-	 * @param string $tokens      'add' to write the design tokens this site
-	 *                            lacks into the destination, 'skip' to leave
-	 *                            them.
+	 * @param string $tokens 'add' to write the design tokens this site lacks into the
+	 * destination, 'skip' to leave them.
 	 * @return array|WP_Error { collection, results: array, installed, skipped, failed }
 	 */
 	public function install_collection( $owner, $slug, $destination, $tokens = 'add' ) {
@@ -1168,10 +981,6 @@ class Pattern_Builder_Cloud_Porter {
 				$result['type']   = $outcome['type'];
 				$result['id']     = $outcome['id'];
 				++$counts['installed'];
-
-				// It is here now, and so are the sections it brought — always
-				// theme patterns, under their own names — so a later pattern
-				// in the list that is one of them is skipped.
 				if ( '' !== $name ) {
 					$installed[ $name ] = array(
 						'type'  => $outcome['type'],
@@ -1206,12 +1015,6 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * This site's WordPress version, without a release suffix.
 	 *
-	 * `get_bloginfo( 'version' )` reports things like `7.2-RC1` and
-	 * `version_compare()` sorts a release candidate *below* the release it
-	 * leads to, so a site already running 7.2-RC1 would be told it is too
-	 * old for a pattern needing 7.2. The suffix is dropped rather than
-	 * compared.
-	 *
 	 * @return string
 	 */
 	public static function wordpress_version() {
@@ -1220,10 +1023,6 @@ class Pattern_Builder_Cloud_Porter {
 
 	/**
 	 * Whether this WordPress is too old for what a package carries.
-	 *
-	 * The service works out the version from the blocks a pattern actually
-	 * holds and sends it as `minWordPress`; a package that names none needs
-	 * nothing newer than the plugin's own floor and passes.
 	 *
 	 * @param array $pbp A Portable Pattern Package.
 	 * @return WP_Error|null An error naming both versions, or null.
@@ -1256,17 +1055,15 @@ class Pattern_Builder_Cloud_Porter {
 	}
 
 	/**
-	 * Download one directory pattern and land it here: the single-pattern
-	 * path the REST route and install_collection() share. Missing design
-	 * tokens go to the same destination as the pattern, and the pattern
-	 * keeps the name of the cloud pattern it is a copy of.
+	 * Download one directory pattern and land it here: the single-pattern path the REST
+	 * route and install_collection() share.
 	 *
-	 * @param int    $cloud_id   Cloud pattern ID.
+	 * @param int    $cloud_id Cloud pattern ID.
 	 * @param string $destination 'user' or 'theme'.
 	 * @param bool   $add_tokens Whether to write the design tokens this site lacks.
 	 * @param array  $collection { owner, slug, title } or empty.
-	 * @param string $source     'directory' or 'library'.
-	 * @param array  $seen       Cloud ids already being installed, for the recursion.
+	 * @param string $source 'directory' or 'library'.
+	 * @param array  $seen Cloud ids already being installed, for the recursion.
 	 * @return array|WP_Error { type, id, title, tokensWritten, dependencies }
 	 */
 	public function install_cloud_pattern( $cloud_id, $destination, $add_tokens, $collection = array(), $source = 'directory', $seen = array() ) {
@@ -1282,31 +1079,10 @@ class Pattern_Builder_Cloud_Porter {
 		if ( is_wp_error( $pbp ) ) {
 			return $pbp;
 		}
-
-		/*
-		 * Before anything is written. A package says which WordPress it
-		 * needs, and installing one this site is too old for is not merely
-		 * disappointing: the import re-sanitizes with `wp_kses_post()`
-		 * against *this* site's KSES, which on an older release does not
-		 * know some of the markup and removes it — the pattern lands
-		 * looking installed and is missing what it was for. Checked here
-		 * rather than after the tokens and dependencies, so a refusal
-		 * leaves nothing half-applied, and on the way down each dependency
-		 * passes through this same call.
-		 */
 		$too_new = self::version_problem( $pbp );
 		if ( $too_new ) {
 			return $too_new;
 		}
-
-		/*
-		 * Which collection the pattern is in: a caller that already knows
-		 * (a whole-collection install, the browser with the summary in
-		 * hand) says so; otherwise the directory is asked, so a pattern an
-		 * agent names by id alone still lands under its collection's
-		 * category. A pattern from the account's own library carries no
-		 * footprint — it is the account's own work, not something installed.
-		 */
 		$collection = Pattern_Builder_Cloud::describe_collection( $collection );
 		if ( ! $collection && 'directory' === $source ) {
 			$summary = Pattern_Builder_Cloud::request( 'GET', "/directory/patterns/{$cloud_id}" );
@@ -1322,28 +1098,11 @@ class Pattern_Builder_Cloud_Porter {
 				return $tokens_written;
 			}
 		}
-
-		/*
-		 * The looks the markup applies by class. Always into the theme, since
-		 * a variation is registered by a `styles/*.json` partial and Global
-		 * Styles has no partials mechanism to put one in — the same reason a
-		 * dependency always lands as a theme pattern. A name already here is
-		 * left alone: a pattern arriving from somewhere else must not repaint
-		 * what this site already calls by that name.
-		 */
 		$variations_written = array();
 		$variations_refused = array();
 		if ( ! empty( $pbp['variations'] ) && is_array( $pbp['variations'] ) ) {
 			foreach ( $pbp['variations'] as $variation ) {
 				$installed = Pattern_Builder_Block_Style_Variations::install( $variation );
-
-				/*
-				 * A variation whose CSS this site will not write costs that
-				 * one look, not the pattern: the markup still carries the
-				 * class, everything else installs, and the refusal is reported
-				 * with its reason rather than swallowed. Any other failure is
-				 * still fatal, because it means the write itself went wrong.
-				 */
 				if ( is_wp_error( $installed ) ) {
 					if ( 'pb_variation_css_refused' !== $installed->get_error_code() ) {
 						return $installed;
@@ -1361,13 +1120,6 @@ class Pattern_Builder_Cloud_Porter {
 				}
 			}
 		}
-
-		/*
-		 * The sections this pattern places, first. A collection is a closed
-		 * world (D38), so every one of them is in this same collection and
-		 * the service guarantees they exist; installing them first is what
-		 * keeps the page from rendering its sections' placeholder copy.
-		 */
 		$dependencies = $this->install_dependencies( $pbp, $collection, $add_tokens, $source, $seen );
 		if ( is_wp_error( $dependencies ) ) {
 			return $dependencies;
@@ -1388,21 +1140,11 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * Install the patterns a downloaded package references, first.
 	 *
-	 * Dependencies are always installed as **theme** patterns, and not by
-	 * choice: `core/pattern` resolves against the block-pattern registry
-	 * and a `wp_block` post is not in it, so a page installed as a user
-	 * pattern still needs its sections in the theme. The page can be
-	 * whatever the person asked for; its sections cannot.
-	 *
-	 * A dependency already on this site under that name is left alone, so
-	 * installing two pages that share a hero installs the hero once.
-	 * Installs are idempotent by name, which is what namespacing bought.
-	 *
-	 * @param array  $pbp        The package being installed.
+	 * @param array  $pbp The package being installed.
 	 * @param array  $collection { owner, slug, title } the pattern came from.
 	 * @param bool   $add_tokens Whether to write missing design tokens.
-	 * @param string $source     'directory' or 'library'.
-	 * @param array  $seen       Cloud ids already being installed.
+	 * @param string $source 'directory' or 'library'.
+	 * @param array  $seen Cloud ids already being installed.
 	 * @return array|WP_Error Names installed, leaves first.
 	 */
 	private function install_dependencies( $pbp, $collection, $add_tokens, $source, $seen ) {
@@ -1419,7 +1161,6 @@ class Pattern_Builder_Cloud_Porter {
 		$installed = array();
 
 		foreach ( $references as $reference ) {
-			// Already here under that name: the same pattern, by definition.
 			if ( $this->store->find_theme_pattern( $reference ) ) {
 				continue;
 			}
@@ -1457,17 +1198,9 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * The patterns in the collection a package came from, as name => cloud id.
 	 *
-	 * One listing answers every reference a package makes, since they are
-	 * all in its collection (D38). The directory lists a collection by owner
-	 * and slug, which the caller has from the summary it installed from. The
-	 * library lists one by id, which nobody here has — but the package names
-	 * its collection and the account's collections say which id that is, so
-	 * a library install finds its tree whether or not the caller said where
-	 * the pattern came from, and an agent never does.
-	 *
-	 * @param array  $pbp        The package whose references these answer.
+	 * @param array  $pbp The package whose references these answer.
 	 * @param array  $collection { owner, slug } the pattern came from.
-	 * @param string $source     'directory' or 'library'.
+	 * @param string $source 'directory' or 'library'.
 	 * @return array|WP_Error
 	 */
 	private function collection_members( $pbp, $collection, $source ) {
@@ -1508,8 +1241,8 @@ class Pattern_Builder_Cloud_Porter {
 	 * Which of the connected account's collections a library package is in.
 	 *
 	 * @param array $pbp Package.
-	 * @return int|WP_Error The collection's id, or 0 when the package names
-	 *                      none of the account's collections.
+	 * @return int|WP_Error The collection's id, or 0 when the package names none of the
+	 * account's collections.
 	 */
 	private function library_collection_id( $pbp ) {
 		$name = self::cloud_name_of_package( $pbp );
@@ -1535,16 +1268,7 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * The name a downloaded pattern is installed under.
 	 *
-	 * The package carries the name the pattern has on the service —
-	 * `{handle}/{collection}/{slug}` — and that is the name it keeps here,
-	 * because it is the name anything referring to this pattern uses. It
-	 * is also why two accounts can both publish a `hero` and this site can
-	 * hold both: they are different names, in different directories.
-	 *
-	 * A package from before namespacing carries no name, and falls back to
-	 * the theme's own namespace, which is where such a download landed.
-	 *
-	 * @param array  $pbp  Package.
+	 * @param array  $pbp Package.
 	 * @param string $slug Sanitized slug.
 	 * @return string
 	 */
@@ -1559,9 +1283,6 @@ class Pattern_Builder_Cloud_Porter {
 			$segments
 		);
 		$segments = array_values( array_filter( $segments, 'strlen' ) );
-
-		// Two segments and a slug, or the package is not naming a namespace
-		// this site should file anything under.
 		if ( count( $segments ) < 2 ) {
 			return get_stylesheet() . '/' . $slug;
 		}
@@ -1571,19 +1292,6 @@ class Pattern_Builder_Cloud_Porter {
 
 	/**
 	 * The attribution to write into a pattern being installed (D38).
-	 *
-	 * Three cases, and the third is the one that matters:
-	 *
-	 * - The package already carries an origin: keep it, unchanged. That is
-	 *   what makes credit survive any number of hops and any amount of
-	 *   editing — a pattern three copies down still names the original.
-	 * - It carries none and came from another account: this is the moment
-	 *   the pattern first leaves the account that authored it, so stamp its
-	 *   cloud name.
-	 * - It carries none and is the account's own work: stamp nothing.
-	 *   Self-attribution says nothing, and refusing to write it is what
-	 *   keeps a private collection's name from travelling into a public one
-	 *   later on.
 	 *
 	 * @param array $pbp Package.
 	 * @return string A pattern name, or '' for original work.
@@ -1610,15 +1318,15 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * Land a package as a theme pattern file.
 	 *
-	 * @param array    $pbp         Package (for viewport/keywords extras).
-	 * @param string   $title       Title.
-	 * @param string   $name        Namespaced pattern name to install under.
+	 * @param array    $pbp Package (for viewport/keywords extras).
+	 * @param string   $title Title.
+	 * @param string   $name Namespaced pattern name to install under.
 	 * @param string   $description Description.
-	 * @param string[] $categories  Category names.
-	 * @param bool     $synced      Synced flag.
-	 * @param string   $content     Sanitized markup with local URLs.
-	 * @param string   $origin      Attribution to record, or ''.
-	 * @param string   $cloud       The cloud pattern this is a copy of, or ''.
+	 * @param string[] $categories Category names.
+	 * @param bool     $synced Synced flag.
+	 * @param string   $content Sanitized markup with local URLs.
+	 * @param string   $origin Attribution to record, or ''.
+	 * @param string   $cloud The cloud pattern this is a copy of, or ''.
 	 * @return array|WP_Error
 	 */
 	private function import_as_theme_pattern( $pbp, $title, $name, $description, $categories, $synced, $content, $origin = '', $cloud = '' ) {

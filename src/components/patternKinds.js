@@ -1,15 +1,5 @@
 /**
  * The kinds of pattern the Create Pattern modal offers.
- *
- * A "kind" is a starting point, not a stored property: each one names the
- * job a pattern is being made for and fixes the metadata that job implies —
- * whether inserted copies stay linked to the original, which blocks, post
- * types or templates WordPress should offer it for — so the modal only ever
- * asks for what that kind genuinely leaves open. Everything a kind decides
- * can still be changed afterwards in the pattern's own metadata panels.
- *
- * The metadata each kind fixes follows the theme handbook's pattern pages:
- * https://developer.wordpress.org/themes/patterns/
  */
 
 import { __ } from '@wordpress/i18n';
@@ -33,8 +23,8 @@ export const DESIGN_GROUP = 'design';
 export const STARTER_GROUP = 'starter';
 
 /**
- * The two halves of the list: patterns made to be used, and patterns made
- * to be offered somewhere.
+ * The two halves of the list: patterns made to be used, and patterns made to be offered
+ * somewhere.
  */
 export const PATTERN_KIND_GROUPS = [
 	{ key: DESIGN_GROUP, label: __( 'Design', 'pattern-builder' ) },
@@ -42,25 +32,18 @@ export const PATTERN_KIND_GROUPS = [
 ];
 
 /**
- * The block type WordPress reads to offer a pattern as starter content for
- * new posts and pages.
+ * The block type WordPress reads to offer a pattern as starter content for new posts and
+ * pages.
  */
 export const POST_CONTENT_BLOCK = 'core/post-content';
 
 /**
- * The width a full-width pattern is previewed at. Template and template
- * part patterns are designed against the whole page, so they are previewed
- * against it too — the same width the pattern grid renders at.
+ * The width a full-width pattern is previewed at.
  */
 export const FULL_WIDTH_VIEWPORT = 1400;
 
 /**
  * The template part areas a pattern can belong to.
- *
- * Only these two: the handbook is explicit that "only parts that use the
- * Header and Footer template part areas are supported", and a pattern for a
- * custom area is simply never offered. Each carries the pattern category
- * that goes with it, as the handbook's own example does.
  */
 export const TEMPLATE_PART_AREAS = [
 	{
@@ -78,9 +61,8 @@ export const TEMPLATE_PART_AREAS = [
 ];
 
 /**
- * The template types the `Template Types` header takes — WordPress core's
- * default block template types, which are what the Site Editor offers to
- * create.
+ * The template types the `Template Types` header takes — WordPress core's default block
+ * template types, which are what the Site Editor offers to create.
  */
 export const TEMPLATE_TYPES = [
 	{ slug: 'index', label: __( 'Index', 'pattern-builder' ) },
@@ -106,11 +88,6 @@ export const TEMPLATE_TYPES = [
 
 /**
  * Extra inputs a kind asks the user for, beyond name and description.
- *
- * `storage` — theme file or database. `postTypes` — which post types get
- * offered the pattern when new content is created. `blockTypes` — which
- * blocks offer the pattern when they are inserted. `templateTypes` — which
- * templates it is offered for. `templatePartArea` — header or footer.
  */
 export const STORAGE_FIELD = 'storage';
 export const POST_TYPES_FIELD = 'postTypes';
@@ -119,9 +96,8 @@ export const TEMPLATE_TYPES_FIELD = 'templateTypes';
 export const TEMPLATE_PART_AREA_FIELD = 'templatePartArea';
 
 /**
- * Fields whose whole point is the list they collect: a kind that asks for
- * one cannot be created until something is in it, because the pattern would
- * never be offered anywhere.
+ * Fields whose whole point is the list they collect: a kind that asks for one cannot be
+ * created until something is in it, because the pattern would never be offered anywhere.
  */
 const REQUIRED_LIST_FIELDS = [
 	POST_TYPES_FIELD,
@@ -175,9 +151,6 @@ export const PATTERN_KINDS = [
 			'These patterns are offered to the user when a new page is created. They often have Design Patterns in them as starter content. They must be stored in your theme.',
 			'pattern-builder'
 		),
-		// The contexts a starter pattern is offered in are pattern-file
-		// headers, which a database pattern has nowhere to put — so this
-		// kind is always a theme pattern and never asks where to store it.
 		fields: [ POST_TYPES_FIELD ],
 		defaults: {
 			source: 'theme',
@@ -196,8 +169,6 @@ export const PATTERN_KINDS = [
 			'These patterns belong to a block. WordPress offers them when that block is inserted and still empty, so an untouched Query Loop or Cover asks which one to start from. The block’s toolbar offers them too, to swap one design for another. They must be stored in your theme.',
 			'pattern-builder'
 		),
-		// Same story as a starter pattern: Block Types is a pattern-file
-		// header, so this kind is always a theme pattern.
 		fields: [ BLOCK_TYPES_FIELD ],
 		defaults: { source: 'theme', synced: false, blockTypes: [] },
 	},
@@ -216,8 +187,6 @@ export const PATTERN_KINDS = [
 			source: 'theme',
 			synced: false,
 			templateTypes: [],
-			// A whole template is noise in the block inserter, and the
-			// themes that ship these keep it out of there.
 			inserter: false,
 			viewportWidth: FULL_WIDTH_VIEWPORT,
 		},
@@ -327,8 +296,8 @@ export function canCreate( kind, values ) {
 }
 
 /**
- * What a list-valued header ends up as: the user's choice where the kind
- * asks for one, and what the kind fixed where it does not.
+ * What a list-valued header ends up as: the user's choice where the kind asks for one, and
+ * what the kind fixed where it does not.
  *
  * @param {Object} kind   A kind.
  * @param {Object} values The collected values.
@@ -345,10 +314,6 @@ function listFor( kind, values, field ) {
 
 /**
  * The REST request that creates a pattern of this kind.
- *
- * Theme patterns are file-backed `pb_pattern` entities with a controller of
- * their own; user patterns are `wp_block` posts, where an unsynced pattern is
- * expressed as post meta rather than a header.
  *
  * @param {Object} kind   A kind.
  * @param {Object} values The collected values.
@@ -377,10 +342,6 @@ export function buildCreateRequest( kind, values ) {
 	}
 
 	const data = { title, description, synced };
-
-	// A template part pattern is a block type pattern underneath: the area
-	// decides both the block type that offers it and the category it files
-	// itself under.
 	const area = kindHasField( kind, TEMPLATE_PART_AREA_FIELD )
 		? getTemplatePartArea( values.templatePartArea )
 		: null;

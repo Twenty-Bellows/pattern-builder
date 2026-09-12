@@ -12,55 +12,28 @@ use WP_HTML_Tag_Processor;
 
 /**
  * Sets an attribute on a parsed block.
- *
- * Most attributes a pattern's content fills — a paragraph's text, a button's
- * link, an image's source — do not live in the block comment. They live in the
- * block's saved HTML, and where exactly is described by the attribute's own
- * schema. This follows that schema the same way `WP_Block::replace_html()`
- * does when it resolves a block binding at render time.
  */
 class Block_Markup {
-
 	/**
 	 * Elements a block's `save()` leaves out rather than writing empty.
-	 *
-	 * Writing an empty value into an element-sourced attribute has to end up
-	 * with the markup that block would have saved, and for most of them that is
-	 * the element with nothing inside it: `core/paragraph` writes `<p></p>`,
-	 * `core/button` an empty `<a>`, `core/code` an empty `<code>`. These two are
-	 * the exceptions. Core wraps them in an emptiness check, so an empty value
-	 * means no element at all, and an empty one left behind is markup no version
-	 * of the block would write — which the editor reports as invalid content the
-	 * moment the surrounding bindings are resolved away.
-	 *
-	 * `figcaption` covers `core/image`, `core/audio` and `core/video`; `cite`
-	 * covers `core/quote` and `core/pullquote`. Of those only `core/image`'s
-	 * caption can be bound today, which is how this was found.
 	 */
 	const OPTIONAL_ELEMENTS = array( 'figcaption', 'cite' );
 
 	/**
 	 * Sets an attribute's value on a parsed block.
 	 *
-	 * Returns the block unchanged when the value cannot be written, which keeps
-	 * the pattern's own default content in place rather than losing it.
-	 *
-	 * @param array  $block     A parsed block.
+	 * @param array  $block A parsed block.
 	 * @param string $attribute Attribute name.
-	 * @param mixed  $value     Attribute value.
+	 * @param mixed  $value Attribute value.
 	 * @return array The updated block.
 	 */
 	public static function set_attribute( array $block, string $attribute, $value ): array {
 		$attributes = self::get_block_type_attributes( $block['blockName'] ?? '' );
-
-		// A registered block type with no such attribute has nothing to fill.
 		if ( null !== $attributes && ! isset( $attributes[ $attribute ] ) ) {
 			return $block;
 		}
 
 		$definition = $attributes[ $attribute ] ?? null;
-
-		// No HTML source: the value belongs in the block comment.
 		if ( ! is_array( $definition ) || ! isset( $definition['source'] ) ) {
 			$block['attrs'][ $attribute ] = $value;
 
@@ -136,9 +109,6 @@ class Block_Markup {
 	/**
 	 * Returns the markup an attribute can be written into.
 	 *
-	 * Blocks with inner blocks are skipped: their saved markup is split across
-	 * `innerContent`, and no block that supports pattern content has any.
-	 *
 	 * @param array $block A parsed block.
 	 * @return string|null The block's markup, or null if it cannot be written to.
 	 */
@@ -152,10 +122,6 @@ class Block_Markup {
 
 	/**
 	 * Splits an attribute schema's selector into usable tag names.
-	 *
-	 * Selectors in block schemas are a comma-separated list of tag names, apart
-	 * from a handful that use CSS combinators. The HTML API cannot match those,
-	 * so — as in core — they are dropped and the attribute is left alone.
 	 *
 	 * @param string $selector An attribute schema's selector.
 	 * @return string[] Tag names.
@@ -177,11 +143,6 @@ class Block_Markup {
 	/**
 	 * Whether an empty value means removing these elements rather than emptying them.
 	 *
-	 * Every selector has to be one of the optional elements. A block whose
-	 * attribute can land in more than one place — `core/button`'s text, in an
-	 * `a` or a `button` — is structural in both, and nothing in
-	 * `OPTIONAL_ELEMENTS` shares a selector list with an element like that.
-	 *
 	 * @param string[] $selectors Tag names from the attribute's schema.
 	 * @return bool Whether all of them are elements `save()` omits when empty.
 	 */
@@ -202,10 +163,10 @@ class Block_Markup {
 	/**
 	 * Sets an HTML attribute on the first tag matching one of the selectors.
 	 *
-	 * @param string   $markup    The block's markup.
+	 * @param string   $markup The block's markup.
 	 * @param string[] $selectors Tag names to look for, in order.
-	 * @param string   $name      HTML attribute name.
-	 * @param string   $value     HTML attribute value.
+	 * @param string   $name HTML attribute name.
+	 * @param string   $value HTML attribute value.
 	 * @return string|null The updated markup, or null if nothing matched.
 	 */
 	private static function set_html_attribute( string $markup, array $selectors, string $name, string $value ): ?string {

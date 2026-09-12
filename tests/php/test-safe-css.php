@@ -2,18 +2,12 @@
 /**
  * The safe subset of CSS a block style variation may carry.
  *
- * The accept/reject corpus is a JSON fixture shared byte-for-byte with
- * patternbuilderwp.com, where the second copy of `Safe_Css` runs the same
- * cases. That is what keeps the two copies honest: a rule loosened on one
- * side and not the other turns red here or there on the next run.
- *
  * @package PatternBuilder
  */
 
 use TwentyBellows\PatternBuilder\Safe_Css;
 
 class Test_Safe_Css extends WP_UnitTestCase {
-
 	/**
 	 * The shared corpus.
 	 *
@@ -30,8 +24,7 @@ class Test_Safe_Css extends WP_UnitTestCase {
 
 	/**
 	 * Everything the subset is for, including all twelve CSS strings the
-	 * patternbuilderwp.com theme's own variations carry. A rejection here
-	 * means the checker is wrong, not the CSS.
+	 * patternbuilderwp.com theme's own variations carry.
 	 */
 	public function test_the_corpus_accepts_what_a_variation_legitimately_writes() {
 		foreach ( $this->corpus()['accept'] as $case ) {
@@ -64,9 +57,7 @@ class Test_Safe_Css extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A refusal has to say enough to be acted on. An agent told "raw CSS is
-	 * not accepted" learns nothing; one told which function it reached for,
-	 * in which declaration, fixes it and calls again.
+	 * A refusal has to say enough to be acted on.
 	 */
 	public function test_a_refusal_names_the_rule_and_the_fragment() {
 		$refused = Safe_Css::check( 'background: url(https://evil.test/x.png);' );
@@ -77,8 +68,8 @@ class Test_Safe_Css extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The one case that has to keep passing so nobody "fixes" it: a string
-	 * spelling out a fetch is a string, and nothing fetches a string.
+	 * The one case that has to keep passing so nobody "fixes" it: a string spelling out a
+	 * fetch is a string, and nothing fetches a string.
 	 */
 	public function test_a_string_that_only_looks_like_a_fetch_is_accepted() {
 		$this->assertTrue( Safe_Css::check( 'content: "\\75 rl(x)";' ) );
@@ -86,13 +77,6 @@ class Test_Safe_Css extends WP_UnitTestCase {
 
 	/**
 	 * What this subset is a subset *of*.
-	 *
-	 * `WP_Theme_JSON::process_blocks_custom_css()` is a crude parser — it
-	 * splits on `&`, strips every `}`, then explodes on `{` and skips any
-	 * part that does not come out in two pieces. Everything accepted here has
-	 * to be something it reads *correctly*, so that what was validated is
-	 * what core emits. Asserting one representative expansion is what makes a
-	 * core change that moves the goalposts fail loudly rather than silently.
 	 */
 	public function test_an_accepted_string_expands_the_way_core_documents() {
 		$css = 'position: relative; & > * { z-index: 1; } &::before { content: ""; } & a:hover { color: red; }';
@@ -110,14 +94,8 @@ class Test_Safe_Css extends WP_UnitTestCase {
 
 	/**
 	 * And the two shapes core gets wrong, which is why they are refused.
-	 *
-	 * Both are scoped rather than dangerous — that is the point. They are out
-	 * because accepting them would approve something other than what core
-	 * emits, and a checker that disagrees with the thing it is checking for
-	 * is how the dangerous cases get in later.
 	 */
 	public function test_the_shapes_core_mis_parses_are_refused() {
-		// A declaration after a nested rule is folded into that rule.
 		$folded = '&:hover { color: red; } background: blue;';
 		$this->assertWPError( Safe_Css::check( $folded ) );
 		$this->assertStringContainsString(
@@ -125,8 +103,6 @@ class Test_Safe_Css extends WP_UnitTestCase {
 			WP_Theme_JSON::process_blocks_custom_css( $folded, '.is-style-card' ),
 			'Core still folds a trailing declaration into the rule above it.'
 		);
-
-		// A second level of nesting loses the outer rule's body.
 		$nested = '& div { & p { color: red; } }';
 		$this->assertWPError( Safe_Css::check( $nested ) );
 		$this->assertStringContainsString(
@@ -137,10 +113,7 @@ class Test_Safe_Css extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The escape a comma buys. `scope_selector()` distributes over one and
-	 * `append_to_selector()` does not, so a selector that begins with no
-	 * space puts whatever follows the comma at the top level of the emitted
-	 * list — styling the destination's whole document, from a variation.
+	 * The escape a comma buys.
 	 */
 	public function test_a_comma_in_a_selector_would_escape_the_variation() {
 		$escape = '&.a, body { background: red; }';
@@ -158,9 +131,9 @@ class Test_Safe_Css extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Nothing accepted can carry `<`, so nothing accepted can end the style
-	 * element it is printed into — which is what lets a preview print the
-	 * generated CSS through `wp_strip_all_tags()` without it being mangled.
+	 * Nothing accepted can carry `<`, so nothing accepted can end the style element it is
+	 * printed into — which is what lets a preview print the generated CSS through
+	 * `wp_strip_all_tags()` without it being mangled.
 	 */
 	public function test_nothing_accepted_survives_into_a_style_element_as_markup() {
 		foreach ( $this->corpus()['accept'] as $case ) {
@@ -173,10 +146,6 @@ class Test_Safe_Css extends WP_UnitTestCase {
 
 	/**
 	 * Text a byte at a time from here on, so it has to *be* text.
-	 *
-	 * An invalid sequence is not dangerous on its own — a browser reads one as
-	 * U+FFFD — but `wp_json_encode()` drops it silently on the way into the
-	 * file or the package, so what was checked would not be what got written.
 	 */
 	public function test_css_that_is_not_valid_utf8_is_refused() {
 		$this->assertWPError( Safe_Css::check( "color: \xC3\x28;" ) );

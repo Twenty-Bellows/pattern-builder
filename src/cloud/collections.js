@@ -1,8 +1,7 @@
 /**
- * The collection arithmetic the cloud tabs share, kept free of React so it
- * can be tested on its own: which tokens a whole collection needs, which of
- * its patterns to skip, what the results add up to, and which collection an
- * upload should default to.
+ * The collection arithmetic the cloud tabs share, kept free of React so it can be tested on
+ * its own: which tokens a whole collection needs, which of its patterns to skip, what the
+ * results add up to, and which collection an upload should default to.
  */
 
 import { __, sprintf } from '@wordpress/i18n';
@@ -21,10 +20,8 @@ export function collectionKey( collection ) {
 }
 
 /**
- * The union of the design tokens a set of patterns references — what a
- * whole-collection install has to check once rather than once per pattern.
- * A token is identified by its type and slug; the first value seen wins,
- * since the destination's own definition wins over any of them anyway.
+ * The union of the design tokens a set of patterns references — what a whole-collection
+ * install has to check once rather than once per pattern.
  *
  * @param {Array} patterns Pattern summaries, each with a `tokens` list.
  * @return {Array} The distinct tokens.
@@ -43,9 +40,8 @@ export function unionTokens( patterns ) {
 }
 
 /**
- * Which of a collection's patterns to install and which to skip: one
- * already here under its cloud name is skipped. The name carries the
- * collection, so "installed" already means "installed from this one".
+ * Which of a collection's patterns to install and which to skip: one already here under its
+ * cloud name is skipped.
  *
  * @param {Array} patterns Pattern summaries with an `installed` field.
  * @return {{toInstall: Array, skipped: Array}} The plan.
@@ -62,9 +58,9 @@ export function planInstall( patterns ) {
 /**
  * What a run of per-pattern results adds up to.
  *
- * @param {Array} results Entries of { pattern, status, message? }.
- * @return {{installed: number, skipped: number, failed: Array}} The totals
- *         and the failures, each as { title, message }.
+ * @param {Array} results Entries of { pattern, status, message?
+ * @return {{installed: number, skipped: number, failed: Array}} The totals and the
+ * failures, each as { title, message }.
  */
 export function summarizeInstall( results ) {
 	const summary = { installed: 0, skipped: 0, failed: [] };
@@ -84,8 +80,8 @@ export function summarizeInstall( results ) {
 }
 
 /**
- * How many of a collection's patterns are installed here: the cloud names
- * this site's patterns answer to that sit under the collection's namespace.
+ * How many of a collection's patterns are installed here: the cloud names this site's
+ * patterns answer to that sit under the collection's namespace.
  *
  * @param {Array}  names      Cloud names, as /cloud/installed lists them.
  * @param {Object} collection The collection, with its `{handle}/{slug}` namespace.
@@ -101,8 +97,8 @@ export function installedFromCollection( names, collection ) {
 }
 
 /**
- * The collection an upload should offer first: the one used last, when it
- * still exists; otherwise Personal; otherwise the first there is.
+ * The collection an upload should offer first: the one used last, when it still exists;
+ * otherwise Personal; otherwise the first there is.
  *
  * @param {Array}  collections The account's collections.
  * @param {number} lastUsedId  The id used last, or 0.
@@ -121,8 +117,8 @@ export function pickDefaultCollection( collections, lastUsedId ) {
 }
 
 /**
- * Whether a collection is one the account is told nothing about on upload:
- * with only Personal, nothing is asked.
+ * Whether a collection is one the account is told nothing about on upload: with only
+ * Personal, nothing is asked.
  *
  * @param {Array} collections The account's collections.
  * @return {boolean} Whether an upload should ask which collection.
@@ -145,18 +141,15 @@ export function isListed( collection ) {
 }
 
 /**
- * The shape a slug has to have: lower-case letters, numbers and single
- * hyphens, starting with a letter. The service's `Slug` class is where
- * this rule lives; this is the copy that lets a form say no before the
- * round trip, and the service is the check that counts.
+ * The shape a slug has to have: lower-case letters, numbers and single hyphens, starting
+ * with a letter.
  */
 const SLUG_SHAPE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const SLUG_MIN = 3;
 const SLUG_MAX = 32;
 
 /**
- * A slug suggested from a collection's name, for a field the author is
- * free to overwrite.
+ * A slug suggested from a collection's name, for a field the author is free to overwrite.
  *
  * @param {string} name The collection's name.
  * @return {string} A slug, or '' when nothing usable is left.
@@ -215,10 +208,6 @@ export function slugProblem( slug ) {
 /**
  * Compare two WordPress version numbers, segment by segment.
  *
- * Small enough to write out: the alternative is a dependency for one
- * comparison, and WordPress versions are plain dotted numbers once any
- * release suffix is off.
- *
  * @param {string} a First version.
  * @param {string} b Second version.
  * @return {number} Negative when a < b, positive when a > b, 0 when equal.
@@ -241,15 +230,6 @@ function compareVersions( a, b ) {
 /**
  * The WordPress version a pattern needs, when this site is older than it.
  *
- * The service works out `minWordPress` from the blocks a pattern actually
- * holds. Installing one this site is too old for is not merely
- * disappointing: the import re-sanitizes against this site's own KSES,
- * which on an older release does not know some of the markup and strips
- * it, so the pattern lands looking installed and missing what it was for.
- *
- * The server refuses these regardless. This is what lets the browser say
- * so first, and say what to do about it.
- *
  * @param {Object} pattern     A cloud pattern summary.
  * @param {string} siteVersion This site's WordPress version.
  * @return {string} The version needed, or '' when this site can render it.
@@ -259,12 +239,7 @@ export function needsNewerWordPress( pattern, siteVersion ) {
 	if ( ! needs ) {
 		return '';
 	}
-
-	// A release suffix (7.2-RC1) sorts below the release it leads to, so
-	// it is dropped rather than compared.
 	const here = String( siteVersion || '' ).replace( /[-+].*$/, '' );
-
-	// Nothing known about this site: leave it to the server, which knows.
 	if ( ! here ) {
 		return '';
 	}

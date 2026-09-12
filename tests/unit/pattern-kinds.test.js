@@ -1,7 +1,6 @@
 /**
- * The kinds the Create Pattern modal offers: what each one fixes, what it
- * still asks for, and the request it turns into. A kind's whole job is the
- * metadata it decides on the user's behalf, so that is what is asserted here.
+ * The kinds the Create Pattern modal offers: what each one fixes, what it still asks for,
+ * and the request it turns into.
  */
 
 import {
@@ -280,8 +279,6 @@ describe( 'buildCreateRequest', () => {
 			description: '',
 			synced: false,
 			templateTypes: [ 'archive', 'category' ],
-			// A whole template belongs in the Site Editor's template
-			// chooser, not in the block inserter.
 			inserter: false,
 			viewportWidth: FULL_WIDTH_VIEWPORT,
 		} );
@@ -309,7 +306,6 @@ describe( 'buildCreateRequest', () => {
 
 		expect( header.blockTypes ).toEqual( [ 'core/template-part/header' ] );
 		expect( header.categories ).toEqual( [ 'header' ] );
-		// Unlike a whole template, a header is worth inserting by hand.
 		expect( header.inserter ).toBeUndefined();
 	} );
 

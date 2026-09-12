@@ -32,8 +32,6 @@ import {
 } from '../cloud/collections';
 
 const BASE = '/pattern-builder/v1/cloud';
-
-// Which collection the last upload went into, so the next one offers it.
 const LAST_COLLECTION_KEY = 'cloud-last-collection';
 
 /**
@@ -63,10 +61,9 @@ export function useCloudCollections( connected ) {
 }
 
 /**
- * One pattern's cloud standing: null while loading, then the
- * /cloud/pattern-state payload — `linked` when the pattern's `Cloud:`
- * reference names one of the connected account's patterns that still
- * exists, with its `cloudId` and `collection`.
+ * One pattern's cloud standing: null while loading, then the /cloud/pattern-state payload —
+ * `linked` when the pattern's `Cloud:` reference names one of the connected account's
+ * patterns that still exists, with its `cloudId` and `collection`.
  *
  * @param {string}        patternType 'theme' or 'user'.
  * @param {string|number} patternId   Local pattern identifier.
@@ -99,17 +96,7 @@ export function usePatternCloudState( patternType, patternId, refreshKey ) {
 }
 
 /**
- * The Cloud panel's controls. A pattern whose copy is in the connected
- * account's library can push an update to it or delete it; any other —
- * never uploaded, somebody else's, or a copy since deleted — can be
- * uploaded into a collection.
- *
- * Uploading is gated on the editor's own block validation. Markup a block
- * type would not have written itself renders correctly here — it is only
- * when an editor opens it that it reads as "unexpected or invalid content",
- * and by then it is on somebody else's site. That check can only happen in
- * a browser (a block's `save()` is JavaScript, so no server can run it), and
- * this panel is already in one with the block types loaded.
+ * The Cloud panel's controls.
  *
  * @param {Object}        props             Component props.
  * @param {Object}        props.state       State from usePatternCloudState.
@@ -125,7 +112,7 @@ export function PatternCloudControls( {
 	patternId,
 	content,
 } ) {
-	const [ busy, setBusy ] = useState( '' ); // '', 'upload' or 'delete'.
+	const [ busy, setBusy ] = useState( '' );
 	const [ error, setError ] = useState( '' );
 	const [ collectionId, setCollectionId ] = useState( 0 );
 	const { createSuccessNotice } = useDispatch( noticesStore );
@@ -133,9 +120,6 @@ export function PatternCloudControls( {
 	const { collections, reload: reloadCollections } = useCloudCollections(
 		!! state?.connected
 	);
-
-	// With only Personal, nothing is asked; with more, the picker defaults
-	// to the collection used last.
 	const asks = shouldAskForCollection( collections );
 	useEffect( () => {
 		if ( ! collections || collectionId ) {
@@ -149,13 +133,6 @@ export function PatternCloudControls( {
 			setCollectionId( chosen.id );
 		}
 	}, [ collections, collectionId ] );
-
-	/*
-	 * A pattern that references others brings them with it (D38), so the
-	 * panel says so before the upload and checks every member, not just
-	 * this one. The cheap local read decides whether to ask at all: a
-	 * pattern that references nothing costs no request.
-	 */
 	const [ tree, setTree ] = useState( null );
 	const hasReferences = useMemo(
 		() => referencesOf( content ).length > 0,
@@ -182,10 +159,6 @@ export function PatternCloudControls( {
 			live = false;
 		};
 	}, [ hasReferences, state?.connected, patternType, patternId ] );
-
-	// The saved markup is what the server uploads, so that is what gets
-	// checked — not whatever is unsaved in the canvas. Every member of the
-	// tree is checked, because every member is uploaded.
 	const invalid = useMemo( () => {
 		if ( ! tree?.members?.length ) {
 			return findInvalidBlocks( content );
@@ -194,9 +167,6 @@ export function PatternCloudControls( {
 			findInvalidBlocks( member.content )
 		);
 	}, [ content, tree ] );
-
-	// Not a fault the service will refuse, and not one an editor complains
-	// about either — which is exactly why it is worth saying here.
 	const outdated = useMemo(
 		() => findOutdatedBlocks( content ),
 		[ content ]
@@ -215,7 +185,6 @@ export function PatternCloudControls( {
 		setBusy( 'upload' );
 		setError( '' );
 		const data = { patternType, patternId };
-		// An update keeps its collection; a first upload names one.
 		if ( ! isUpdate ) {
 			data.collection = collectionId || 'personal';
 		}
@@ -242,8 +211,6 @@ export function PatternCloudControls( {
 			} )
 			.catch( ( err ) => {
 				setBusy( '' );
-				// The service names what it objected to (an image it can't
-				// reach, say); say it too, or the message can't be acted on.
 				const details = err.data?.violations?.length
 					? ' ' + err.data.violations.join( ' ' )
 					: '';
@@ -256,9 +223,6 @@ export function PatternCloudControls( {
 				);
 			} );
 	};
-
-	// The pattern stays here; only its copy goes, and the pattern stops
-	// carrying its name.
 	const deleteFromCloud = () => {
 		if ( busy ) {
 			return;

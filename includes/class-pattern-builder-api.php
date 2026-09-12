@@ -9,13 +9,8 @@ require_once __DIR__ . '/class-pattern-file-store.php';
 
 /**
  * First-party REST endpoints that are not part of the patterns controller.
- *
- * Pattern CRUD lives in `Pattern_Builder_REST_Patterns_Controller` (registered
- * through the `pb_pattern` post type). What remains here is the bulk
- * "process theme" action used by the configuration panel.
  */
 class Pattern_Builder_API {
-
 	/**
 	 * Pattern file store.
 	 *
@@ -78,8 +73,8 @@ class Pattern_Builder_API {
 	}
 
 	/**
-	 * Re-writes every theme pattern file, applying localization and image
-	 * import options across the whole theme at once.
+	 * Re-writes every theme pattern file, applying localization and image import options
+	 * across the whole theme at once.
 	 *
 	 * @param \WP_REST_Request $request The request.
 	 * @return WP_REST_Response

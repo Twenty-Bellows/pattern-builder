@@ -2,19 +2,6 @@
 /**
  * Media and static assets a pattern draws on.
  *
- * A pattern is markup plus the files it points at, and an agent writing one
- * over the wire has the markup covered and nothing else. This is the other
- * half: finding what the site already has, and getting a new file onto it.
- *
- * The one thing that cannot ride an ability is the file itself. Abilities are
- * JSON in and JSON out under an `input` key, so bytes would have to be
- * base64 inside that JSON — which for anything but a small SVG means the
- * agent reading the file into its own context and paying for it twice.
- * `POST /pattern-builder/v1/assets` exists so the bytes go from disk to the
- * site without passing through the agent at all, exactly as core's own
- * `/wp/v2/media` accepts them, and `Pattern_Builder_Abilities` documents the
- * route so it is discovered through the registry rather than rediscovered.
- *
  * @package PatternBuilder
  */
 
@@ -24,18 +11,14 @@ namespace TwentyBellows\PatternBuilder;
  * Finds, receives and stores the files a pattern references.
  */
 class Pattern_Builder_Assets {
-
 	/**
-	 * The REST namespace the binary route lives in, shared with the rest of
-	 * the plugin's routes.
+	 * The REST namespace the binary route lives in, shared with the rest of the plugin's
+	 * routes.
 	 */
 	const REST_NAMESPACE = 'pattern-builder/v1';
 
 	/**
-	 * Where a theme's static images live, relative to the stylesheet
-	 * directory. The same directory `Pattern_File_Store` localises into, so a
-	 * file put here by an agent and one pulled in by saving a pattern land
-	 * together.
+	 * Where a theme's static images live, relative to the stylesheet directory.
 	 */
 	const THEME_IMAGE_DIR = '/assets/images/';
 
@@ -46,23 +29,11 @@ class Pattern_Builder_Assets {
 
 	/**
 	 * The longest edge a stored image keeps, in pixels.
-	 *
-	 * Nothing resizes a file written straight into a theme — the media
-	 * library's size set is generated on upload and a theme asset never goes
-	 * through it — so without a cap here a pattern ships whatever came off
-	 * the camera. 2400 is twice the width the pattern grid renders at, which
-	 * covers a full-bleed hero on a 2x display and stops at that.
 	 */
 	const MAX_DIMENSION = 2400;
 
 	/**
 	 * Image types a pattern may carry, by extension.
-	 *
-	 * SVG is here and is deliberately not offered to the media library: core
-	 * does not allow SVG uploads, and overriding that for the whole site to
-	 * satisfy a pattern would be a poor trade. A theme asset is a file
-	 * written by somebody with `edit_theme_options`, which is a different
-	 * question, and `sanitize_svg()` still runs over it.
 	 */
 	const IMAGE_TYPES = array( 'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg' );
 
@@ -75,11 +46,6 @@ class Pattern_Builder_Assets {
 
 	/**
 	 * The one route that takes bytes.
-	 *
-	 * Deliberately shaped like `POST /wp/v2/media`: a raw body plus a
-	 * `Content-Disposition` naming the file, or a multipart form. An agent
-	 * that already knows how to upload to WordPress knows how to call this,
-	 * and `curl --data-binary @file` needs nothing encoded.
 	 */
 	public function register_routes() {
 		register_rest_route(
@@ -110,11 +76,10 @@ class Pattern_Builder_Assets {
 	}
 
 	/**
-	 * Writing into the theme is the same authority the pattern routes ask
-	 * for, and a media upload additionally needs core's own capability.
+	 * Writing into the theme is the same authority the pattern routes ask for, and a media
+	 * upload additionally needs core's own capability.
 	 *
-	 * @param \WP_REST_Request|null $request Request, when called as a
-	 *                                       permission callback.
+	 * @param \WP_REST_Request|null $request Request, when called as a permission callback.
 	 * @return bool
 	 */
 	public function can_write( $request = null ) {
@@ -141,8 +106,6 @@ class Pattern_Builder_Assets {
 		$filename    = (string) $request->get_param( 'filename' );
 
 		if ( ! empty( $files ) ) {
-			// A multipart form: take the first file whatever it was named,
-			// since an agent has no reason to guess our field name.
 			$file = reset( $files );
 
 			if ( ! isset( $file['tmp_name'] ) || ! is_uploaded_file( $file['tmp_name'] ) ) {
@@ -195,13 +158,8 @@ class Pattern_Builder_Assets {
 	/**
 	 * Record alternative text on a stored attachment.
 	 *
-	 * Only the media library has somewhere to keep it: a file in the theme
-	 * carries no metadata, so for a theme asset the pattern's own `alt`
-	 * attribute is the only place alt text lives. Shared by the upload route
-	 * and the add-asset ability so both behave the same way.
-	 *
 	 * @param array|\WP_Error $stored What store() returned.
-	 * @param string          $alt    Alternative text, if any was given.
+	 * @param string          $alt Alternative text, if any was given.
 	 * @return array|\WP_Error The stored array, with alt recorded where it could be.
 	 */
 	public static function apply_alt( $stored, $alt ) {
@@ -220,12 +178,8 @@ class Pattern_Builder_Assets {
 	/**
 	 * Put bytes on the site and describe what a pattern should point at.
 	 *
-	 * The type is decided by sniffing the file rather than trusting its name,
-	 * because the name came over the wire. Everything else — the size cap,
-	 * the SVG scrub — follows from the destination.
-	 *
-	 * @param string $filename    Proposed filename.
-	 * @param string $bytes       File contents.
+	 * @param string $filename Proposed filename.
+	 * @param string $bytes File contents.
 	 * @param string $destination 'theme' or 'media'.
 	 * @return array|\WP_Error
 	 */
@@ -245,8 +199,6 @@ class Pattern_Builder_Assets {
 				array( 'status' => 400 )
 			);
 		}
-
-		// An SVG is text, and the one image type whose contents can execute.
 		if ( 'svg' === $extension ) {
 			if ( 'media' === $destination ) {
 				return new \WP_Error(
@@ -275,12 +227,6 @@ class Pattern_Builder_Assets {
 			wp_delete_file( $temp );
 			return $written;
 		}
-
-		/*
-		 * The name says .webp; this asks the file. `wp_check_filetype_and_ext`
-		 * is what core's own upload runs, and it catches both a mislabelled
-		 * file and one whose real type this site cannot accept.
-		 */
 		if ( 'svg' !== $extension ) {
 			$checked = wp_check_filetype_and_ext( $temp, $filename, self::image_mimes() );
 
@@ -296,8 +242,6 @@ class Pattern_Builder_Assets {
 					array( 'status' => 400 )
 				);
 			}
-
-			// Core hands back a corrected name where the extension was wrong.
 			if ( ! empty( $checked['proper_filename'] ) ) {
 				$filename = $checked['proper_filename'];
 			}
@@ -308,13 +252,6 @@ class Pattern_Builder_Assets {
 				wp_delete_file( $temp );
 				return $resized;
 			}
-
-			/*
-			 * The editor names its output from the mime type rather than
-			 * from the path it was handed, so a resize writes a second file
-			 * beside the temporary one instead of over it. Carry on with
-			 * whichever file holds the image now.
-			 */
 			if ( $resized !== $temp ) {
 				wp_delete_file( $temp );
 				$temp = $resized;
@@ -335,7 +272,7 @@ class Pattern_Builder_Assets {
 	/**
 	 * Move a prepared file into the theme's images directory.
 	 *
-	 * @param string $temp     Path to the prepared file.
+	 * @param string $temp Path to the prepared file.
 	 * @param string $filename Filename to store it under.
 	 * @return array|\WP_Error
 	 */
@@ -380,7 +317,7 @@ class Pattern_Builder_Assets {
 	/**
 	 * Sideload a prepared file into the media library.
 	 *
-	 * @param string $temp     Path to the prepared file.
+	 * @param string $temp Path to the prepared file.
 	 * @param string $filename Filename to store it under.
 	 * @return array|\WP_Error
 	 */
@@ -388,12 +325,6 @@ class Pattern_Builder_Assets {
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		require_once ABSPATH . 'wp-admin/includes/media.php';
 		require_once ABSPATH . 'wp-admin/includes/image.php';
-
-		/*
-		 * `wp_handle_sideload` moves the file rather than copying it, and
-		 * insists the file is not an HTTP upload — which is exactly our case,
-		 * since the bytes arrived as a request body.
-		 */
 		$id = media_handle_sideload(
 			array(
 				'name'     => $filename,
@@ -414,9 +345,6 @@ class Pattern_Builder_Assets {
 				'filename'    => $filename,
 				'id'          => (int) $id,
 				'url'         => $url,
-				// A media library URL is the reference: a pattern saved to a
-				// theme file has its local URLs localised on save, so this
-				// works for either kind of pattern.
 				'reference'   => $url,
 			),
 			self::dimensions_of( get_attached_file( $id ) )
@@ -426,9 +354,9 @@ class Pattern_Builder_Assets {
 	/**
 	 * Fetch a URL and store what comes back.
 	 *
-	 * @param string $url         Source URL.
+	 * @param string $url Source URL.
 	 * @param string $destination 'theme' or 'media'.
-	 * @param string $filename    Optional filename override.
+	 * @param string $filename Optional filename override.
 	 * @return array|\WP_Error
 	 */
 	public static function store_from_url( $url, $destination = 'theme', $filename = '' ) {
@@ -477,15 +405,6 @@ class Pattern_Builder_Assets {
 
 	/**
 	 * What the site already has to draw on.
-	 *
-	 * Two sources, because a pattern can reference either: attachments in the
-	 * media library, and the files already sitting in the theme's own assets
-	 * directory — which is where every image a theme pattern references
-	 * lives, and which no core route lists.
-	 *
-	 * `search` matches title, filename and alt text; `type` is a mime or
-	 * prefix, defaulting to `image`; `per_page` bounds the media library
-	 * query; `source` is `all`, `media` or `theme`.
 	 *
 	 * @param array $args Arguments as described above.
 	 * @return array
@@ -545,28 +464,10 @@ class Pattern_Builder_Assets {
 
 		if ( '' !== $search ) {
 			$query['s'] = $search;
-
-			/*
-			 * Core does not search an attachment's filename unless asked, and
-			 * for media the filename is the likeliest thing to match — a
-			 * search for "hero" should find hero.webp whatever its title
-			 * says. The hook is read once and then cleared by core, so it is
-			 * added immediately before the query rather than kept installed.
-			 */
 			add_filter( 'wp_allow_query_attachment_by_filename', '__return_true' );
-
-			// Keyed by id so the second pass below merges rather than
-			// appending the same attachment twice.
 			foreach ( get_posts( $query ) as $attachment ) {
 				$found[ $attachment->ID ] = $attachment;
 			}
-
-			/*
-			 * Alt text lives in postmeta, which `s` never reaches, and it is
-			 * where a site records what an image actually shows. `s` and
-			 * `meta_query` are combined with AND, so this is a second pass
-			 * merged by id rather than one cleverer query.
-			 */
 			$by_alt = get_posts(
 				array_merge(
 					$query,
@@ -617,16 +518,11 @@ class Pattern_Builder_Assets {
 	/**
 	 * List the image files in the theme's assets directory.
 	 *
-	 * Both themes, parent first, so a child theme's own file wins where the
-	 * names collide — which is how the theme would resolve them.
-	 *
 	 * @param string $search Substring to match against the filename.
 	 * @return array
 	 */
 	private static function find_in_theme( $search = '' ) {
 		$directories = array( get_template_directory() => get_template_directory_uri() );
-
-		// A child theme is listed second so its entry replaces the parent's.
 		if ( get_stylesheet_directory() !== get_template_directory() ) {
 			$directories[ get_stylesheet_directory() ] = get_stylesheet_directory_uri();
 		}
@@ -676,15 +572,6 @@ class Pattern_Builder_Assets {
 	/**
 	 * Draw a placeholder image.
 	 *
-	 * SVG because it is the one image an agent can author outright: no bytes
-	 * to move, no library to have, and it scales to whatever the pattern
-	 * asks of it. The drawing is deliberately plain — a muted ground, a
-	 * diagonal, and its own dimensions as a label — because a placeholder
-	 * that tries to look like a photograph reads as a broken photograph.
-	 *
-	 * `width` and `height` are pixels; `label` is the text drawn in the
-	 * middle, defaulting to the dimensions.
-	 *
 	 * @param array $args Arguments as described above.
 	 * @return string SVG markup.
 	 */
@@ -698,14 +585,11 @@ class Pattern_Builder_Assets {
 			)
 		);
 
-		$width  = max( 16, min( 8000, (int) $args['width'] ) );
-		$height = max( 16, min( 8000, (int) $args['height'] ) );
-		$label  = '' !== (string) $args['label']
+		$width     = max( 16, min( 8000, (int) $args['width'] ) );
+		$height    = max( 16, min( 8000, (int) $args['height'] ) );
+		$label     = '' !== (string) $args['label']
 			? (string) $args['label']
 			: $width . ' × ' . $height;
-
-		// Sized off the shorter edge so the label stays proportionate whether
-		// the placeholder is a wide banner or a narrow portrait.
 		$type_size = max( 12, (int) round( min( $width, $height ) / 14 ) );
 		$stroke    = max( 1, (int) round( min( $width, $height ) / 400 ) );
 
@@ -726,11 +610,6 @@ class Pattern_Builder_Assets {
 	/**
 	 * The PHP a theme pattern file uses to point at one of its own assets.
 	 *
-	 * A theme pattern is a PHP file, and its images have to resolve wherever
-	 * the theme is installed — so the path is composed at render rather than
-	 * written as a URL. This is the same form `Pattern_File_Store` writes
-	 * when it localises a pattern's images on save.
-	 *
 	 * @param string $relative Path from the stylesheet directory, leading slash.
 	 * @return string
 	 */
@@ -742,13 +621,9 @@ class Pattern_Builder_Assets {
 	 * Shrink an image whose longest edge is over the cap.
 	 *
 	 * @param string $file Path to the image, modified in place.
-	 * @param string $mime The image's real mime type, as sniffed from the
-	 *                     file. Passed explicitly because the file is still
-	 *                     under its temporary `.tmp` name at this point, and
-	 *                     the editor would otherwise derive the output format
-	 *                     from that extension and fail to save.
-	 * @return string|\WP_Error Path holding the image to go on with, which is
-	 *                          not necessarily the path passed in.
+	 * @param string $mime The image's real mime type, as sniffed from the file.
+	 * @return string|\WP_Error Path holding the image to go on with, which is not
+	 * necessarily the path passed in.
 	 */
 	private static function constrain( $file, $mime ) {
 		$max = (int) apply_filters( 'pattern_builder_max_asset_dimension', self::MAX_DIMENSION );
@@ -760,8 +635,6 @@ class Pattern_Builder_Assets {
 		$size = self::dimensions_of( $file );
 
 		if ( empty( $size['width'] ) || empty( $size['height'] ) ) {
-			// Not something this server can measure — GD and Imagick both
-			// decline some formats. Storing it unresized beats refusing it.
 			return $file;
 		}
 
@@ -772,8 +645,6 @@ class Pattern_Builder_Assets {
 		$editor = wp_get_image_editor( $file, array( 'mime_type' => $mime ) );
 
 		if ( is_wp_error( $editor ) ) {
-			// No image editor on this server. An unresized file is a worse
-			// asset than a resized one, and a better outcome than a refusal.
 			return $file;
 		}
 
@@ -822,10 +693,6 @@ class Pattern_Builder_Assets {
 	/**
 	 * The mime map `wp_check_filetype_and_ext` is held to.
 	 *
-	 * Built from core's own list so a site that has filtered its upload
-	 * types — added AVIF, removed GIF — is respected, with SVG left out
-	 * because it never reaches that check.
-	 *
 	 * @return array
 	 */
 	private static function image_mimes() {
@@ -843,11 +710,11 @@ class Pattern_Builder_Assets {
 	}
 
 	/**
-	 * An unused filename in a directory, numbering a collision rather than
-	 * overwriting it — two patterns may each bring a `hero.webp`.
+	 * An unused filename in a directory, numbering a collision rather than overwriting it —
+	 * two patterns may each bring a `hero.webp`.
 	 *
 	 * @param string $directory Directory to check, with trailing slash.
-	 * @param string $filename  Proposed filename.
+	 * @param string $filename Proposed filename.
 	 * @return string
 	 */
 	private static function unique_filename( $directory, $filename ) {
@@ -867,12 +734,6 @@ class Pattern_Builder_Assets {
 	/**
 	 * Strip what an SVG must not carry.
 	 *
-	 * Somebody with `edit_theme_options` can generally already run code on
-	 * the site, so this is hygiene rather than a security boundary: the file
-	 * is served to every visitor, and a pattern has no use for a script, an
-	 * external reference or an event handler. A file that is not SVG at all
-	 * is refused outright.
-	 *
 	 * @param string $svg SVG markup.
 	 * @return string|\WP_Error
 	 */
@@ -886,22 +747,14 @@ class Pattern_Builder_Assets {
 				array( 'status' => 400 )
 			);
 		}
-
-		// Elements that execute, load, or reach off-site.
 		$svg = preg_replace( '#<\s*(script|foreignObject|iframe|embed|object|use|image|audio|video|animate|set|handler)\b[^>]*>.*?<\s*/\s*\1\s*>#is', '', $svg );
 		$svg = preg_replace( '#<\s*(script|foreignObject|iframe|embed|object|use|image|audio|video|animate|set|handler)\b[^>]*/?>#i', '', $svg );
-
-		// Doctype and entity declarations, which is how XXE arrives.
 		$svg = preg_replace( '#<!DOCTYPE.*?>#is', '', $svg );
 		$svg = preg_replace( '#<!ENTITY.*?>#is', '', $svg );
 		$svg = preg_replace( '#<\?xml-stylesheet.*?\?>#is', '', $svg );
-
-		// on* handlers, in either quoting style or none.
 		$svg = preg_replace( '#\son[a-z-]+\s*=\s*"[^"]*"#i', '', $svg );
 		$svg = preg_replace( '#\son[a-z-]+\s*=\s*\'[^\']*\'#i', '', $svg );
 		$svg = preg_replace( '#\son[a-z-]+\s*=\s*[^\s>]+#i', '', $svg );
-
-		// javascript: and data: in any attribute value.
 		$svg = preg_replace( '#(href|xlink:href|src|from|to|values)\s*=\s*"\s*(javascript|data|vbscript):[^"]*"#i', '', $svg );
 		$svg = preg_replace( '#(href|xlink:href|src|from|to|values)\s*=\s*\'\s*(javascript|data|vbscript):[^\']*\'#i', '', $svg );
 
@@ -918,10 +771,6 @@ class Pattern_Builder_Assets {
 
 	/**
 	 * Read a filename out of a Content-Disposition header.
-	 *
-	 * Core has this as a protected method on its attachments controller, so
-	 * this is the same parse rather than a different one: the header may
-	 * arrive quoted or bare, and only `filename` is of interest.
 	 *
 	 * @param array $headers Content-Disposition header values.
 	 * @return string

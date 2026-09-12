@@ -19,12 +19,11 @@ const BASE = '/pattern-builder/v1/cloud';
 const NEW = '__new__';
 
 /**
- * Create a collection on the account. A free account's collections are
- * public from the moment they exist; the service decides and says so.
+ * Create a collection on the account.
  *
  * @param {string} name        Collection name.
- * @param {string} slug        Collection slug — permanent, and the middle
- *                             segment of every pattern name in it.
+ * @param {string} slug        Collection slug — permanent, and the middle segment of every
+ *                             pattern name in it.
  * @param {string} description Description (optional).
  * @param {string} visibility  'public' or 'private', or '' to leave it to the service.
  * @return {Promise<Object>} The created collection summary.
@@ -47,15 +46,16 @@ export function createCollection(
 }
 
 /**
- * Which of the account's collections a pattern goes into, with "New
- * collection…" inline: pick it and a name field appears, and the
- * collection is created there and then and selected.
+ * Which of the account's collections a pattern goes into, with "New collection…" inline.
+ * pick it and a name field appears, and the collection is created there and then and
+ * selected.
  *
  * @param {Object}   props             Component props.
  * @param {Array}    props.collections The account's collections.
  * @param {number}   props.value       The selected collection id.
  * @param {Function} props.onChange    Called with the selected collection id.
- * @param {Function} props.onCreated   Called with a collection just created, so the caller's list can grow.
+ * @param {Function} props.onCreated   Called with a collection just created, so the
+ *                                     caller's list can grow.
  * @param {string}   props.label       The field label.
  * @param {boolean}  props.disabled    Whether the control is disabled.
  */
@@ -69,9 +69,6 @@ export function CollectionPicker( {
 } ) {
 	const [ creating, setCreating ] = useState( false );
 	const [ name, setName ] = useState( '' );
-	// The slug follows the name until it is typed into, after which it is
-	// the author's: it is permanent, so it is worth being able to say what
-	// it will be rather than accepting whatever a title turns into.
 	const [ slug, setSlug ] = useState( '' );
 	const [ slugTouched, setSlugTouched ] = useState( false );
 	const [ busy, setBusy ] = useState( false );

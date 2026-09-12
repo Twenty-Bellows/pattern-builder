@@ -2,12 +2,6 @@
 /**
  * The two themes pattern work is checked against.
  *
- * They are a matched pair and only useful as one: Blank Theme says whether a
- * pattern's own design is right, Opinionated Theme says whether it survives a
- * design system that is not its own. Both claims are the kind that rot
- * silently — a core release adds a default preset group, and the control quietly
- * stops being a control — so they are asserted rather than trusted.
- *
  * @package PatternBuilder
  */
 
@@ -15,7 +9,6 @@
  * Blank Theme and Opinionated Theme.
  */
 class Test_Lab_Themes extends WP_UnitTestCase {
-
 	/**
 	 * Read a theme's theme.json from the fixture directory.
 	 *
@@ -32,10 +25,6 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 
 	/**
 	 * Blank Theme opts out of every default preset group core ships.
-	 *
-	 * Without these a theme that declares no palette still gets core's, and the
-	 * control would be quietly testing a pattern against a design system after
-	 * all — which is the one thing it exists not to do.
 	 */
 	public function test_blank_theme_declines_every_core_default() {
 		$settings = $this->theme_json( 'blank-theme' )['settings'];
@@ -61,11 +50,8 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Its templates constrain nothing, so a full-bleed band is full-bleed
-	 * because the pattern said so.
-	 *
-	 * A constrained wrapper around post-content caps every band inside it at the
-	 * content width — the failure that reads as a broken pattern and is not one.
+	 * Its templates constrain nothing, so a full-bleed band is full-bleed because the
+	 * pattern said so.
 	 */
 	public function test_blank_theme_templates_impose_no_layout() {
 		$dir = dirname( __DIR__, 2 ) . '/themes/blank-theme/templates/';
@@ -84,23 +70,13 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 
 	/**
 	 * Opinionated Theme follows the conventions the guide documents.
-	 *
-	 * It is the worked example: a pattern that references these slugs adapts to
-	 * it and looks different but correct, while one that hard-codes looks wrong.
-	 * That only holds if the slugs are the ones patterns are told to use, so the
-	 * guide and the theme are asserted against each other rather than kept in
-	 * step by hand.
 	 */
 	public function test_opinionated_theme_uses_the_documented_slugs() {
 		$settings = $this->theme_json( 'opinionated-theme' )['settings'];
 
 		$colors = wp_list_pluck( $settings['color']['palette'], 'color', 'slug' );
-		// base and contrast are the only two every recent default theme agrees on.
 		$this->assertArrayHasKey( 'base', $colors );
 		$this->assertArrayHasKey( 'contrast', $colors );
-		// A tier-1 slug renamed is a tier-1 slug lost: a theme calling its body
-		// colour `text-default` teaches patterns a name that resolves nowhere
-		// else, which is the portability bug this pair exists to catch.
 		$this->assertArrayNotHasKey( 'text-default', $colors );
 		$this->assertArrayNotHasKey( 'secondary', $colors );
 
@@ -119,11 +95,6 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 
 	/**
 	 * And it carries the tier-2 roles the guide asks themes to agree on.
-	 *
-	 * These are the ones nothing standard covers — no default theme names a
-	 * border colour or a muted text colour — so there is no portable answer to
-	 * inherit and a convention has to be chosen. The theme is where that choice
-	 * is written down in a form something can check.
 	 */
 	public function test_opinionated_theme_carries_the_tier_two_roles() {
 		$colors = wp_list_pluck(
@@ -139,10 +110,6 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 
 	/**
 	 * Semantics live in the name, never in the slug.
-	 *
-	 * `xs`/`sm`/`md` read better and exist on no default theme, so a pattern
-	 * padded with one loses every spacing value the moment it leaves the site it
-	 * was written on. The numeric slug travels; the name is what a person reads.
 	 */
 	public function test_opinionated_theme_keeps_semantics_out_of_the_slugs() {
 		$spacing = $this->theme_json( 'opinionated-theme' )['settings']['spacing']['spacingSizes'];
@@ -175,11 +142,6 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 
 	/**
 	 * Opinionated Theme collides on the slugs everybody reaches for.
-	 *
-	 * A pattern that assumes `medium` is a familiar size, or that `primary` is
-	 * some particular colour, is a pattern that will look wrong on somebody's
-	 * site. Tokens are never overwritten, so a colliding slug resolves to the
-	 * theme's value and the pattern gets a size it did not choose.
 	 */
 	public function test_opinionated_theme_collides_on_the_usual_slugs() {
 		$settings = $this->theme_json( 'opinionated-theme' )['settings'];
@@ -196,11 +158,6 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 
 	/**
 	 * It is opinionated, not broken: an alignfull band still escapes.
-	 *
-	 * The distinction matters. A theme whose post-content sits in a flow group
-	 * inside a constrained one caps every band at the content width, which is a
-	 * fault rather than a view — and a harness that shipped it would teach the
-	 * wrong lesson.
 	 */
 	public function test_opinionated_theme_still_lets_a_band_go_full_bleed() {
 		$markup = file_get_contents(
@@ -216,8 +173,6 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 	 */
 	public function test_opinionated_theme_is_narrow() {
 		$layout = $this->theme_json( 'opinionated-theme' )['settings']['layout'];
-
-		// rem rather than px, so the measure scales with the reader's root size.
 		$this->assertStringEndsWith( 'rem', $layout['contentSize'] );
 
 		$theirs = (float) $layout['contentSize'] * 16;
@@ -232,16 +187,6 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 
 	/**
 	 * The claim that matters, asserted the only way that settles it.
-	 *
-	 * theme.json cannot make a theme blank on its own, which is worth knowing
-	 * because it reads as though it can. `settings.color.defaultPalette: false`
-	 * hides core's colours from the editor's picker and governs whether a theme
-	 * may reuse their slugs — it does not stop
-	 * `--wp--preset--color--vivid-red` being emitted, so a pattern can still
-	 * depend on one without either party noticing. Core's presets arrive
-	 * through `wp_theme_json_data_default`, and emptying them there is what
-	 * actually leaves nothing behind; the theme's functions.php does that, and
-	 * this is the test that says whether it worked.
 	 */
 	public function test_blank_theme_really_resolves_to_nothing() {
 		register_theme_directory( dirname( __DIR__, 2 ) . '/themes' );
@@ -252,9 +197,6 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 		}
 
 		switch_theme( 'blank-theme' );
-
-		// The test harness does not load a theme's functions.php on
-		// switch_theme(), so apply what it registers.
 		require_once dirname( __DIR__, 2 ) . '/themes/blank-theme/functions.php';
 		wp_clean_theme_json_cache();
 
@@ -283,26 +225,19 @@ class Test_Lab_Themes extends WP_UnitTestCase {
 	 * Both are real themes WordPress would list.
 	 */
 	/**
-	 * The theme is the worked example of the guide, and the guide now covers
-	 * three layers rather than one — so it carries a block style variation
-	 * too, in the only form that registers one without PHP: a partial in the
-	 * theme's `styles/` directory with a `blockTypes` key. A pattern applying
-	 * `is-style-inset-panel` should look different but right here.
+	 * The theme is the worked example of the guide, and the guide now covers three layers
+	 * rather than one — so it carries a block style variation too, in the only form that
+	 * registers one without PHP: a partial in the theme's `styles/` directory with a
+	 * `blockTypes` key.
 	 */
 	public function test_opinionated_theme_ships_a_block_style_variation() {
 		$path = dirname( __DIR__, 2 ) . '/themes/opinionated-theme/styles/inset-panel.json';
 		$this->assertFileExists( $path );
 
 		$partial = json_decode( (string) file_get_contents( $path ), true );
-
-		// `blockTypes` is what makes this a *block* style variation rather
-		// than a whole-site one, and core skips a partial carrying no styles.
 		$this->assertSame( array( 'core/group' ), $partial['blockTypes'] );
 		$this->assertNotEmpty( $partial['styles'] );
 		$this->assertSame( 'inset-panel', $partial['slug'] );
-
-		// It must reference the theme's own presets rather than hard-code,
-		// or the example teaches the opposite of what the guide says.
 		$encoded = wp_json_encode( $partial['styles'] );
 		$this->assertStringContainsString( 'var(--wp--preset--color--surface)', $encoded );
 		$this->assertStringNotContainsString( '#', $encoded );

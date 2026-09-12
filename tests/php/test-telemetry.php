@@ -1,7 +1,7 @@
 <?php
 /**
- * Opt-in usage telemetry: nothing without consent, and only what the
- * class says it sends with it.
+ * Opt-in usage telemetry: nothing without consent, and only what the class says it sends
+ * with it.
  *
  * @package PatternBuilder
  */
@@ -9,7 +9,6 @@
 use TwentyBellows\PatternBuilder\Pattern_Builder_Telemetry;
 
 class Test_Telemetry extends WP_UnitTestCase {
-
 	/**
 	 * Batches that would have been sent.
 	 *

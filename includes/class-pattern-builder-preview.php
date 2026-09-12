@@ -2,28 +2,6 @@
 /**
  * Serve a pattern as a page, so its design can be looked at rather than inferred.
  *
- * `render-pattern` answers with HTML, which settles whether the right classes
- * are on the right elements and nothing else. It cannot show that a band meant
- * to span the viewport is rendering at the content width, because that is
- * decided by stylesheets the answer does not carry — and an agent working over
- * HTTP has no other way to see the result.
- *
- * So this route returns a whole document with the site's own styles in it, at a
- * URL a browser can open. Two contexts, because they answer different questions:
- *
- *   standalone  The pattern by itself. Is its own design right?
- *   page        The pattern where a page would put it, inside the template's
- *               own wrappers. Does the theme let it be what it is? An
- *               `alignfull` band only escapes the content width if the chain
- *               above it allows one to, and nothing in a pattern says whether
- *               it does.
- *
- * The browse grid's tiles are the same standalone render, served from the
- * front end rather than over REST (see serve_tile()): the site's own renderer
- * draws every tile, so a tile shows what the site shows — block style
- * variations, bindings and references included — with nothing re-created in
- * the browser.
- *
  * @package PatternBuilder
  */
 
@@ -37,14 +15,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  * The preview document.
  */
 class Pattern_Builder_Preview {
-
 	const REST_NAMESPACE = 'pattern-builder/v1';
 
 	/**
 	 * A post id no site will have, for the page a preview poses as.
-	 *
-	 * Well above any real auto-increment, and never written anywhere: the post
-	 * is primed into the object cache for one request and discarded with it.
 	 */
 	const STAND_IN_ID = 999000001;
 
@@ -54,8 +28,8 @@ class Pattern_Builder_Preview {
 	const TILE_QUERY_VAR = 'pattern_builder_tile';
 
 	/**
-	 * The document to serve, held between the route callback and the filter
-	 * that writes it, because a REST response would otherwise be JSON.
+	 * The document to serve, held between the route callback and the filter that writes it,
+	 * because a REST response would otherwise be JSON.
 	 *
 	 * @var string|null
 	 */
@@ -76,8 +50,8 @@ class Pattern_Builder_Preview {
 	private $carried = array();
 
 	/**
-	 * Hook the route, and the tile ahead of the admin bar's own setup (which
-	 * runs at 0) so a tile is never drawn with one.
+	 * Hook the route, and the tile ahead of the admin bar's own setup (which runs at 0) so
+	 * a tile is never drawn with one.
 	 */
 	public function __construct() {
 		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
@@ -123,8 +97,8 @@ class Pattern_Builder_Preview {
 	}
 
 	/**
-	 * Previewing shows the site's own content, so it takes the same capability
-	 * as reading a pattern does.
+	 * Previewing shows the site's own content, so it takes the same capability as reading a
+	 * pattern does.
 	 *
 	 * @return bool
 	 */
@@ -135,9 +109,9 @@ class Pattern_Builder_Preview {
 	/**
 	 * The URL that renders a pattern.
 	 *
-	 * @param string $id      Pattern id.
+	 * @param string $id Pattern id.
 	 * @param string $context 'standalone' or 'page'.
-	 * @param string $theme   Optional theme slug to render against instead of the active one.
+	 * @param string $theme Optional theme slug to render against instead of the active one.
 	 * @return string
 	 */
 	public static function url_for( $id, $context = 'standalone', $theme = '' ) {
@@ -154,8 +128,8 @@ class Pattern_Builder_Preview {
 	}
 
 	/**
-	 * Where the browse grid asks for tiles: the front end, which the grid adds
-	 * the pattern and its cache key to.
+	 * Where the browse grid asks for tiles: the front end, which the grid adds the pattern
+	 * and its cache key to.
 	 *
 	 * @return string
 	 */
@@ -164,11 +138,10 @@ class Pattern_Builder_Preview {
 	}
 
 	/**
-	 * What every tile's render depends on besides the patterns in it: the
-	 * theme and its design system (theme.json, its style partials — block
-	 * style variations among them — its stylesheet and functions.php), the
-	 * site's Global Styles, and the software drawing it all. Part of each
-	 * tile's cache key, so a change to any of it redraws every tile.
+	 * What every tile's render depends on besides the patterns in it: the theme and its
+	 * design system (theme.json, its style partials — block style variations among them —
+	 * its stylesheet and functions.php), the site's Global Styles, and the software drawing
+	 * it all.
 	 *
 	 * @return string
 	 */
@@ -201,20 +174,11 @@ class Pattern_Builder_Preview {
 
 	/**
 	 * Serve a tile, when the front-end request asks for one.
-	 *
-	 * A front-end request rather than a REST one, because an iframe can send
-	 * the login cookie but not the REST nonce, and a nonce in the URL would
-	 * change every twelve hours and take the browser's cache with it. Leaving
-	 * the nonce out is safe here for three reasons: the tile changes nothing,
-	 * so there is no request for another site to forge; it answers only a user
-	 * who may edit posts; and only this site may frame it.
 	 */
 	public function serve_tile() {
 		if ( ! isset( $_GET[ self::TILE_QUERY_VAR ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only; see above.
 			return;
 		}
-
-		// Private to whoever asked, so no page cache may keep it.
 		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
 			define( 'DONOTCACHEPAGE', true );
 		}
@@ -225,8 +189,6 @@ class Pattern_Builder_Preview {
 		);
 
 		if ( ! headers_sent() ) {
-			// WordPress sends no-cache headers to anyone logged in; a versioned
-			// tile replaces them with its own.
 			header_remove( 'Expires' );
 			header_remove( 'Pragma' );
 			status_header( $tile['status'] );
@@ -240,13 +202,9 @@ class Pattern_Builder_Preview {
 	}
 
 	/**
-	 * A pattern's tile: the response serve_tile() sends, built without
-	 * sending it.
+	 * A pattern's tile: the response serve_tile() sends, built without sending it.
 	 *
-	 * With a cache key (`v`), the URL changes whenever anything the tile
-	 * depends on does, so the browser may keep it for as long as it likes.
-	 *
-	 * @param string $id        Pattern id.
+	 * @param string $id Pattern id.
 	 * @param bool   $versioned Whether the request carries a cache key.
 	 * @return array { status: int, headers: array, body: string }
 	 */
@@ -305,8 +263,8 @@ class Pattern_Builder_Preview {
 	}
 
 	/**
-	 * A tile is a picture of a pattern: the site's front-end scripts would run
-	 * once per tile and do nothing a picture needs, so they are left out.
+	 * A tile is a picture of a pattern: the site's front-end scripts would run once per
+	 * tile and do nothing a picture needs, so they are left out.
 	 *
 	 * @param string $html The document.
 	 * @return string
@@ -319,10 +277,6 @@ class Pattern_Builder_Preview {
 
 	/**
 	 * The themes this plugin carries for pattern work.
-	 *
-	 * They are not registered as a theme directory, so WordPress does not list
-	 * them and nobody can activate one by accident; the preview reaches them by
-	 * path for the length of one request.
 	 *
 	 * @return array Slug => absolute directory.
 	 */
@@ -355,13 +309,6 @@ class Pattern_Builder_Preview {
 		$theme = (string) $request->get_param( 'theme' );
 
 		if ( '' !== $theme ) {
-			/*
-			 * Collected before the swap, because the values are this site's:
-			 * they are exactly what an upload would ship. A download installs
-			 * the ones the destination lacks and leaves the rest alone, so
-			 * carrying them here renders what the pattern would actually look
-			 * like over there rather than what is left of it.
-			 */
 			$carry = $request->get_param( 'tokens' );
 			$carry = null === $carry ? true : (bool) $carry;
 			$bring = $carry ? Pattern_Builder_Cloud_Tokens::collect_tree( (string) $pattern->content ) : array();
@@ -392,16 +339,6 @@ class Pattern_Builder_Preview {
 
 	/**
 	 * Render as though a different theme were active, for this request only.
-	 *
-	 * Nothing is switched: `switch_theme()` would change the site for everyone,
-	 * and the point is to look at a pattern against another design system
-	 * without touching what visitors see. Filtering the four values that decide
-	 * which theme WordPress reads is enough, provided the theme.json caches are
-	 * cleared on the way in and on the way out — they are keyed on nothing that
-	 * knows about this.
-	 *
-	 * A bundled theme's own `functions.php` is loaded as well, because that is
-	 * where blank-theme empties core's presets and a theme.json cannot.
 	 *
 	 * @param string $slug Theme slug.
 	 * @return true|\WP_Error
@@ -437,19 +374,6 @@ class Pattern_Builder_Preview {
 				'directory' => untrailingslashit( $theme->get_stylesheet_directory() ),
 			);
 		}
-
-		/*
-		 * The directory has to be a theme root before any of this works.
-		 * WP_Theme_JSON_Resolver goes through wp_get_theme() to read a theme's
-		 * text domain and its parent, and a theme WordPress cannot construct
-		 * comes back with its presets, its layout and appearanceTools all
-		 * silently dropped — the settings survive, emptied, which reads as a
-		 * theme that declared nothing rather than one that could not be found.
-		 *
-		 * Registering inside the request is contained: $wp_theme_directories is
-		 * request state, and nothing renders Appearance → Themes from here, so
-		 * the themes stay unlisted where a person would look for them.
-		 */
 		if ( isset( $bundled[ $slug ] ) ) {
 			register_theme_directory( plugin_dir_path( PATTERN_BUILDER_FILE ) . 'themes' );
 		}
@@ -458,22 +382,12 @@ class Pattern_Builder_Preview {
 			add_filter( $which, array( $this, 'worn_slug' ), 99 );
 			add_filter( $which . '_directory', array( $this, 'worn_directory' ), 99 );
 		}
-
-		// The theme root cache is keyed per stylesheet and was primed without ours.
 		delete_site_transient( 'theme_roots' );
 
 		$functions = $this->worn['directory'] . '/functions.php';
 
 		if ( isset( $bundled[ $slug ] ) && file_exists( $functions ) ) {
 			require_once $functions;
-
-			/*
-			 * `require_once` runs a file once per process, so a theme that
-			 * attaches its filters in the file body attaches them for the first
-			 * preview and no other. A bundled theme therefore exposes
-			 * `{slug}_boot()` and `_unboot()`, and the swap calls them either
-			 * side — which is also what keeps it contained to this request.
-			 */
 			$this->worn['boot'] = str_replace( '-', '_', $slug );
 
 			if ( function_exists( $this->worn['boot'] . '_boot' ) ) {
@@ -488,11 +402,6 @@ class Pattern_Builder_Preview {
 
 	/**
 	 * Give the worn theme the presets the pattern brought, where it has none.
-	 *
-	 * The same rule a download follows: what the destination already defines
-	 * wins, and only the gaps are filled. Against blank-theme that means every
-	 * one of them lands, which is the point — a pattern rendered there with its
-	 * own values and nothing on top is the pattern as it was designed.
 	 *
 	 * @param array $tokens Tokens collected from the authoring site.
 	 */
@@ -598,9 +507,6 @@ class Pattern_Builder_Preview {
 			header( 'Content-Type: text/html; charset=' . get_option( 'blog_charset' ) );
 			header( 'X-Robots-Tag: noindex' );
 		}
-
-		// The document is assembled from rendered blocks, which are already
-		// escaped by the blocks that produced them.
 		echo $this->document; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 
 		return true;
@@ -619,11 +525,6 @@ class Pattern_Builder_Preview {
 	/**
 	 * The pattern inside the page template, wrappers and all.
 	 *
-	 * The point of this context is the wrappers, so the pattern goes in as a
-	 * page's content and `core/post-content` renders it — which means there has
-	 * to be a post. Rather than write one, a stand-in is primed into the object
-	 * cache for this request and handed to the blocks through their context.
-	 *
 	 * @param Abstract_Pattern $pattern The pattern.
 	 * @return string
 	 */
@@ -631,8 +532,6 @@ class Pattern_Builder_Preview {
 		$template = $this->page_template();
 
 		if ( '' === $template ) {
-			// No block template to render into. Saying so beats silently
-			// answering a different question than the one that was asked.
 			return $this->document_around(
 				'<!-- pattern-builder: this theme has no block template for a page; rendered standalone -->'
 					. do_blocks( $pattern->content ),
@@ -711,11 +610,7 @@ class Pattern_Builder_Preview {
 		wp_cache_add( self::STAND_IN_ID, $post, 'posts' );
 
 		$this->displaced_post = isset( $GLOBALS['post'] ) ? $GLOBALS['post'] : null;
-
-		// Deliberate and paired with stop_posing(): core/post-content reads the
-		// global rather than its own context, so this is the only way to tell it
-		// what to render. The previous value is put back before the request ends.
-		$GLOBALS['post'] = $post; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+		$GLOBALS['post']      = $post; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 
 		$GLOBALS['pattern_builder_preview_post'] = $post;
 		setup_postdata( $post );
@@ -734,7 +629,6 @@ class Pattern_Builder_Preview {
 		if ( null === $this->displaced_post ) {
 			unset( $GLOBALS['post'] );
 		} else {
-			// Restoring what pose_as_a_page() displaced.
 			$GLOBALS['post'] = $this->displaced_post; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 		}
 
@@ -760,12 +654,9 @@ class Pattern_Builder_Preview {
 	/**
 	 * Wrap rendered blocks in a document carrying the site's styles.
 	 *
-	 * `wp_head()` is what makes this worth serving at all: it brings the theme's
-	 * global styles, the block library's stylesheets and the layout rules that
-	 * decide what an alignment does.
-	 *
-	 * @param string           $html    Rendered blocks.
+	 * @param string           $html Rendered blocks.
 	 * @param Abstract_Pattern $pattern The pattern.
+	 * @param bool             $tile Whether this is a grid tile rather than a full preview.
 	 * @return string
 	 */
 	private function document_around( $html, $pattern, $tile = false ) {
@@ -781,18 +672,9 @@ class Pattern_Builder_Preview {
 		<?php wp_head(); ?>
 		<?php if ( $tile ) : ?>
 <style id="pattern-builder-tile">
-	/*
-	 * The grid frames this document at a fixed size and scales it into its
-	 * tile, exactly as it does the cloud's preview documents, so it centres
-	 * its own content the way those do: a pattern shorter than the frame sits
-	 * in the middle, a taller one starts at the top and runs off the bottom,
-	 * where the tile crops it (`safe` keeps it from being centred out through
-	 * the top edge). Whatever the footer prints lands below the frame.
-	 */
 	html, body { margin: 0; padding: 0; background: #fff; }
 	body { pointer-events: none; }
 	.pattern-builder-tile { min-height: 100vh; display: grid; align-content: safe center; }
-	/* flow-root so the pattern's own margins stay inside the centring. */
 	.pattern-builder-tile__content { display: flow-root; }
 	.pattern-builder-tile__content > * { margin-top: 0 !important; }
 </style>
@@ -803,7 +685,6 @@ class Pattern_Builder_Preview {
 		if ( $tile ) {
 			echo '<div class="pattern-builder-tile"><div class="pattern-builder-tile__content">';
 		}
-		// Rendered block output, escaped by the blocks that produced it.
 		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		if ( $tile ) {
 			echo '</div></div>';

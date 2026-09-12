@@ -8,14 +8,8 @@ use WP_REST_Response;
 
 /**
  * REST proxy for patternbuilderwp.com: `/pattern-builder/v1/cloud/*`.
- *
- * The browser only ever talks to these site endpoints (cookie + nonce, the
- * standard REST auth); this site's PHP talks to the service with the current
- * user's stored token. The token never reaches the browser and no CORS
- * surface exists.
  */
 class Pattern_Builder_Cloud_Controller {
-
 	const NS = 'pattern-builder/v1';
 
 	/**
@@ -56,8 +50,6 @@ class Pattern_Builder_Cloud_Controller {
 		);
 
 		foreach ( $routes as $route => $handlers ) {
-			// One handler, or a list of (method, callback) pairs for a route
-			// that answers more than one method.
 			$handlers = is_array( $handlers[0] ) ? $handlers : array( $handlers );
 			$args     = array();
 			foreach ( $handlers as $handler ) {
@@ -127,7 +119,6 @@ class Pattern_Builder_Cloud_Controller {
 
 		$me = Pattern_Builder_Cloud::request( 'GET', '/me' );
 		if ( is_wp_error( $me ) ) {
-			// A dead token was already forgotten by the client; report state.
 			return rest_ensure_response(
 				array(
 					'connected'  => Pattern_Builder_Cloud::is_connected(),
@@ -136,9 +127,6 @@ class Pattern_Builder_Cloud_Controller {
 				)
 			);
 		}
-
-		// Kept current, because the handle in it is what decides whether a
-		// pattern's `Cloud:` reference is this account's.
 		if ( ! empty( $me['account'] ) && is_array( $me['account'] ) ) {
 			update_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_ACCOUNT, $me['account'] );
 		}
@@ -150,16 +138,10 @@ class Pattern_Builder_Cloud_Controller {
 				'account'      => $me['account'],
 				'tier'         => $me['tier'],
 				'usage'        => isset( $me['usage'] ) ? $me['usage'] : array(),
-				// The tiers as the service cuts them: the Personal cap, whether
-				// a private collection may be made, the fair-use ceilings.
 				'entitlements' => isset( $me['entitlements'] ) ? $me['entitlements'] : array(),
-				// Personal's meter: { id, count, cap } with cap -1 for none.
 				'personal'     => isset( $me['personal'] ) ? $me['personal'] : array(),
-				// A lapsed Pro holding more than a free account may.
 				'overPolicy'   => ! empty( $me['over_policy'] ),
 				'upgradeUrl'   => isset( $me['upgrade_url'] ) ? $me['upgrade_url'] : '',
-				// What the overlay checkout needs, or null once Pro (or
-				// until the service's product is configured).
 				'checkout'     => isset( $me['checkout'] ) ? $me['checkout'] : null,
 				'portalUrl'    => isset( $me['portal_url'] ) ? $me['portal_url'] : '',
 				'telemetry'    => Pattern_Builder_Telemetry::client_state(),
@@ -209,8 +191,6 @@ class Pattern_Builder_Cloud_Controller {
 	/**
 	 * POST /cloud/password/forgot — have the service email a reset link.
 	 *
-	 * The link opens on patternbuilderwp.com; the plugin only starts it.
-	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
 	 */
@@ -257,7 +237,7 @@ class Pattern_Builder_Cloud_Controller {
 	 * @return WP_REST_Response
 	 */
 	public function disconnect() {
-		Pattern_Builder_Telemetry::record( 'account_disconnected' ); // While the account is still known.
+		Pattern_Builder_Telemetry::record( 'account_disconnected' );
 		Pattern_Builder_Cloud::disconnect();
 		return rest_ensure_response( array( 'connected' => false ) );
 	}
@@ -273,8 +253,8 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * GET /cloud/library/collections — the account's collections, Personal
-	 * first, with counts.
+	 * GET /cloud/library/collections — the account's collections, Personal first, with
+	 * counts.
 	 *
 	 * @return WP_REST_Response|WP_Error
 	 */
@@ -286,11 +266,7 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * POST /cloud/library/collections — create one. The service decides
-	 * what an account may make (free: public only) and its refusal is
-	 * relayed as it came, upgrade link included.
-	 *
-	 * Params: name, description, visibility (optional).
+	 * POST /cloud/library/collections — create one.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -302,8 +278,6 @@ class Pattern_Builder_Cloud_Controller {
 
 		$body = array(
 			'name'        => sanitize_text_field( (string) $request->get_param( 'name' ) ),
-			// The collection's permanent slug. Its shape is the service's
-			// to judge; this only stops obvious rubbish reaching it.
 			'slug'        => sanitize_key( (string) $request->get_param( 'slug' ) ),
 			'description' => sanitize_textarea_field( (string) $request->get_param( 'description' ) ),
 		);
@@ -337,14 +311,7 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * DELETE /cloud/library/collections/{id} — the collection and its
-	 * patterns.
-	 *
-	 * There is no keeping them: a pattern's collection is the middle
-	 * segment of its permanent name (D38), so moving one to Personal would
-	 * rename it. Nothing here needs forgetting: a local pattern whose copy
-	 * went with the collection reads as not on the cloud the next time it
-	 * is asked.
+	 * DELETE /cloud/library/collections/{id} — the collection and its patterns.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -353,9 +320,6 @@ class Pattern_Builder_Cloud_Controller {
 		if ( ! Pattern_Builder_Cloud::is_connected() ) {
 			return self::disconnected();
 		}
-
-		// Its patterns go with it (D38): moving one to Personal would rename
-		// it, so there is nothing to ask and nothing to relay.
 		$result = Pattern_Builder_Cloud::request(
 			'DELETE',
 			'/library/collections/' . (int) $request['id']
@@ -393,10 +357,6 @@ class Pattern_Builder_Cloud_Controller {
 	/**
 	 * The community is browsed as an account.
 	 *
-	 * The service lists its directory to anyone; this plugin asks people
-	 * to sign in first, so what is downloaded onto a site is downloaded
-	 * by somebody. The proxy enforces it, not just the tab.
-	 *
 	 * @return true|WP_Error
 	 */
 	private static function require_connection() {
@@ -421,9 +381,9 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * GET /cloud/collections/{owner}/{slug} — one collection with its
-	 * pattern summaries (tokens included, so the union check needs no
-	 * second pass), each marked with whether it is installed here already.
+	 * GET /cloud/collections/{owner}/{slug} — one collection with its pattern summaries
+	 * (tokens included, so the union check needs no second pass), each marked with whether
+	 * it is installed here already.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -452,9 +412,8 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * GET /cloud/installed — every cloud name a pattern on this site answers
-	 * to, which is what a collection tile counts to say how much of it is
-	 * here.
+	 * GET /cloud/installed — every cloud name a pattern on this site answers to, which is
+	 * what a collection tile counts to say how much of it is here.
 	 *
 	 * @return WP_REST_Response
 	 */
@@ -465,14 +424,6 @@ class Pattern_Builder_Cloud_Controller {
 	/**
 	 * GET /cloud/pattern-tree — what an upload of this pattern would carry.
 	 *
-	 * The panel has to say "this uploads five patterns" before it uploads
-	 * five patterns, and it has to run the block-validity gate over every
-	 * one of them, so each member comes back with its markup. Answered
-	 * locally: the walk is over pattern files on this site and asks the
-	 * service nothing.
-	 *
-	 * Params: patternType + patternId.
-	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
 	 */
@@ -482,10 +433,6 @@ class Pattern_Builder_Cloud_Controller {
 
 		$porter = new Pattern_Builder_Cloud_Porter();
 		$tree   = $porter->local_tree( $type, $id );
-
-		// A missing dependency or a loop is the answer, not a failure: the
-		// panel says what is wrong instead of offering an upload that cannot
-		// work.
 		if ( is_wp_error( $tree ) ) {
 			return rest_ensure_response(
 				array(
@@ -523,13 +470,6 @@ class Pattern_Builder_Cloud_Controller {
 
 	/**
 	 * GET /cloud/pattern-state — one pattern's standing on the cloud.
-	 *
-	 * With patternType + patternId: whether the pattern's `Cloud:` reference
-	 * names one of the connected account's patterns that still exists. The
-	 * service is asked now rather than anything being remembered, so a
-	 * pattern deleted there, or another account connected here, simply reads
-	 * as not on the cloud. With name: which local pattern, if any, answers to
-	 * that cloud name.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -573,7 +513,6 @@ class Pattern_Builder_Cloud_Controller {
 				'linked'     => true,
 				'cloudId'    => (int) $copy['id'],
 				'name'       => (string) $pattern->cloud,
-				// The collection the copy is in, as the service says now.
 				'collection' => isset( $copy['collection'] ) && is_array( $copy['collection'] ) ? $copy['collection'] : array(),
 			)
 		);
@@ -581,10 +520,6 @@ class Pattern_Builder_Cloud_Controller {
 
 	/**
 	 * POST /cloud/upload — send a local pattern to the account's library.
-	 *
-	 * Params: patternType (theme|user), patternId, collection (a collection
-	 * id or `personal`, for a pattern with no copy of its own on the cloud
-	 * yet; `personal` when left out — the one case nothing asks).
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -611,25 +546,13 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * Send a local pattern to the account's library: the work behind the
-	 * upload route, shared with the upload-pattern ability.
+	 * Send a local pattern to the account's library: the work behind the upload route,
+	 * shared with the upload-pattern ability.
 	 *
-	 * A pattern brings its dependencies with it (D38). A page pattern is
-	 * `core/pattern` references to the sections it is built out of, and a
-	 * collection is a closed world, so uploading one uploads the tree below
-	 * it — leaves first, with every reference rewritten to name the
-	 * collection they are all going into.
-	 *
-	 * The pattern's `Cloud:` reference decides where that is. One naming a
-	 * pattern of the connected account's that still exists makes this an
-	 * update, in that pattern's collection; anything else — no reference,
-	 * somebody else's, or a copy since deleted — makes it a new upload into
-	 * the collection asked for, or Personal when none is. The pattern is
-	 * left carrying the name of its copy.
-	 *
-	 * @param string     $type       'theme' or 'user'.
-	 * @param string|int $id         Local identifier.
-	 * @param mixed      $collection A collection id or `personal` for a new upload, or null to leave it unsaid.
+	 * @param string     $type 'theme' or 'user'.
+	 * @param string|int $id Local identifier.
+	 * @param mixed      $collection A collection id or `personal` for a new upload, or null
+	 * to leave it unsaid.
 	 * @return array|WP_Error { pattern, updated, members, cloud }
 	 */
 	public static function upload_pattern( $type, $id, $collection = null ) {
@@ -644,14 +567,6 @@ class Pattern_Builder_Cloud_Controller {
 		if ( is_wp_error( $plan ) ) {
 			return $plan;
 		}
-
-		/*
-		 * Leaves first, so every reference resolves by the time the pattern
-		 * making it arrives. A member that fails stops the upload and is
-		 * reported; the members already up are left where they are, since
-		 * each is a valid pattern on its own and deleting somebody's work
-		 * over a network blip is worse than leaving it.
-		 */
 		$members = array();
 		$result  = null;
 
@@ -688,30 +603,20 @@ class Pattern_Builder_Cloud_Controller {
 		return array(
 			'pattern' => $result,
 			'updated' => $updated,
-			// Everything that went up, the root last. A page pattern is
-			// several patterns and the panel says so.
 			'members' => $members,
-			// The name the pattern now carries as its `Cloud:` reference.
 			'cloud'   => Pattern_Builder_Cloud::name_of( $result ),
 		);
 	}
 
 	/**
-	 * Decide, before anything is sent, where a tree goes and whether each
-	 * member updates a copy there or creates one.
+	 * Decide, before anything is sent, where a tree goes and whether each member updates a
+	 * copy there or creates one.
 	 *
-	 * The root decides the collection, as upload_pattern() says. Every other
-	 * member goes into the same one — a collection is a closed world (D38) —
-	 * and is addressed there by name, since that is the name the rewritten
-	 * references point at: updated when it is there, created when it is not.
-	 * The one thing refused is a member whose name there is already the
-	 * cloud copy of a different pattern on this site, which the update would
-	 * overwrite.
-	 *
-	 * @param Pattern_Builder_Cloud_Porter $porter     The porter.
-	 * @param array                        $order      The tree, leaves first.
+	 * @param Pattern_Builder_Cloud_Porter $porter The porter.
+	 * @param array                        $order The tree, leaves first.
 	 * @param mixed                        $collection What a new upload asked for, or null.
-	 * @return array|WP_Error { collection: string|int, namespace: string, members: array[] }
+	 * @return array|WP_Error { collection: string|int, namespace: string, members: array[]
+	 * }
 	 */
 	private static function plan_upload( $porter, $order, $collection ) {
 		$last = count( $order ) - 1;
@@ -725,27 +630,17 @@ class Pattern_Builder_Cloud_Controller {
 		if ( is_wp_error( $copy ) ) {
 			return $copy;
 		}
-
-		// An update stays in its collection; a new upload goes where it was asked.
 		if ( $copy ) {
 			$collection_param = ! empty( $copy['collection']['id'] ) ? (int) $copy['collection']['id'] : 'personal';
 		} else {
 			$collection_param = null === $collection ? 'personal' : ( is_numeric( $collection ) ? (int) $collection : sanitize_key( $collection ) );
 		}
 
-		$plan = array(
+		$plan   = array(
 			'collection' => $collection_param,
 			'namespace'  => '',
 			'members'    => array(),
 		);
-
-		/*
-		 * A pattern that references nothing needs no namespace: there is
-		 * nothing to rewrite, so an ordinary upload costs exactly what it
-		 * always did. A tree has to ask the service where it is going,
-		 * because only the service knows the account's handle and the
-		 * collection's slug.
-		 */
 		$target = null;
 		if ( $last > 0 ) {
 			$target = self::resolve_upload_collection( $collection_param );
@@ -815,17 +710,12 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * Send one member of a planned upload, and leave it carrying the name of
-	 * its copy.
-	 *
-	 * The root always takes the name of where it just went. Any other member
-	 * takes it unless it already carries a copy of this account's elsewhere:
-	 * a section shared by pages in two collections keeps the copy it was
-	 * given first.
+	 * Send one member of a planned upload, and leave it carrying the name of its copy.
 	 *
 	 * @param Pattern_Builder_Cloud_Porter $porter The porter.
-	 * @param array                        $member { type, id, name, cloudId, root, reference }.
-	 * @param array                        $plan   The plan it belongs to.
+	 * @param array                        $member { type, id, name, cloudId, root,
+	 * reference }.
+	 * @param array                        $plan The plan it belongs to.
 	 * @return array|WP_Error The cloud pattern as the service summarizes it.
 	 */
 	private static function upload_member( $porter, $member, $plan ) {
@@ -833,8 +723,6 @@ class Pattern_Builder_Cloud_Controller {
 		if ( is_wp_error( $exported ) ) {
 			return $exported;
 		}
-
-		// POST, not PUT, for an update too: PHP only parses multipart bodies on POST.
 		$result = $member['cloudId']
 			? Pattern_Builder_Cloud::upload( 'POST', '/library/patterns/' . $member['cloudId'], $exported['pbp'], $exported['files'] )
 			: Pattern_Builder_Cloud::upload( 'POST', '/library/patterns', $exported['pbp'], $exported['files'], array( 'collection' => $plan['collection'] ) );
@@ -854,13 +742,8 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * The collection an upload is going into, with the namespace its
-	 * patterns will be named under.
-	 *
-	 * The namespace is what every reference in the tree is rewritten to
-	 * point at, so it has to be known before anything is sent — which means
-	 * asking the service, since only it knows the account's handle and the
-	 * collection's slug.
+	 * The collection an upload is going into, with the namespace its patterns will be named
+	 * under.
 	 *
 	 * @param string|int $wanted A collection id, or `personal`.
 	 * @return array|WP_Error { id, namespace, count, personal }
@@ -896,13 +779,9 @@ class Pattern_Builder_Cloud_Controller {
 	/**
 	 * Whether a whole tree fits where it is going.
 	 *
-	 * The service refuses past the cap anyway, but it refuses one pattern at
-	 * a time — which for a tree means stopping half way. Counting first turns
-	 * that into one refusal before anything is sent. The service is still the
-	 * check that counts.
-	 *
-	 * @param array $members The planned members, each with the cloud id it updates (0 to create).
-	 * @param array $target  The collection they are going into.
+	 * @param array $members The planned members, each with the cloud id it updates (0 to
+	 * create).
+	 * @param array $target The collection they are going into.
 	 * @return true|WP_Error
 	 */
 	private static function room_for_tree( $members, $target ) {
@@ -912,15 +791,13 @@ class Pattern_Builder_Cloud_Controller {
 
 		$me = Pattern_Builder_Cloud::request( 'GET', '/me' );
 		if ( is_wp_error( $me ) ) {
-			return true; // Not our question to answer offline; let the upload try.
+			return true;
 		}
 
 		$cap = isset( $me['entitlements']['personal_cap'] ) ? (int) $me['entitlements']['personal_cap'] : -1;
 		if ( -1 === $cap ) {
 			return true;
 		}
-
-		// Only members with no copy there yet will be created.
 		$new = 0;
 		foreach ( $members as $member ) {
 			if ( ! $member['cloudId'] ) {
@@ -946,12 +823,6 @@ class Pattern_Builder_Cloud_Controller {
 
 	/**
 	 * POST /cloud/download — bring a cloud pattern onto this site.
-	 *
-	 * Params: source (library|directory), cloudId, destination (user|theme),
-	 * addTokens (whether to add the design tokens the site is missing, which
-	 * go to the same destination as the pattern), collection (the
-	 * { owner, slug, title } the pattern is in, so the porter can file it
-	 * under the collection's local category).
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -995,8 +866,8 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * POST /cloud/tokens/check — which of a pattern's tokens this site
-	 * lacks, so the download flow knows whether to ask where to put them.
+	 * POST /cloud/tokens/check — which of a pattern's tokens this site lacks, so the
+	 * download flow knows whether to ask where to put them.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response
@@ -1013,10 +884,6 @@ class Pattern_Builder_Cloud_Controller {
 	/**
 	 * DELETE /cloud/library/{id} — remove a cloud pattern (frees a slot).
 	 *
-	 * Params: patternType + patternId, optionally — the local pattern whose
-	 * copy it was, which then stops carrying its name, so that a different
-	 * pattern uploaded under that name later is not taken for its copy.
-	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
 	 */
@@ -1029,8 +896,6 @@ class Pattern_Builder_Cloud_Controller {
 		$local_id = $request->get_param( 'patternId' );
 		if ( null !== $local_id && '' !== $local_id ) {
 			$type = 'user' === $request->get_param( 'patternType' ) ? 'user' : 'theme';
-			// Best effort: the copy is gone either way, and a reference to a
-			// pattern that no longer exists already reads as not on the cloud.
 			( new Pattern_Builder_Cloud_Porter() )->remember_cloud_copy( $type, 'user' === $type ? (int) $local_id : (string) $local_id, '' );
 		}
 
@@ -1040,7 +905,7 @@ class Pattern_Builder_Cloud_Controller {
 	/**
 	 * Proxy a paged listing endpoint.
 	 *
-	 * @param string          $path    Service path.
+	 * @param string          $path Service path.
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
 	 */

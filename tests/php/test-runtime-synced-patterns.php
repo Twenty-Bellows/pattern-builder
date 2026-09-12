@@ -13,7 +13,6 @@ use TwentyBellows\PatternBuilder\Synced_Patterns;
  * @covers \TwentyBellows\PatternBuilder\Synced_Patterns
  */
 class Test_Synced_Patterns extends Pattern_Test_Case {
-
 	/**
 	 * Directory standing in for the active theme.
 	 *
@@ -70,8 +69,8 @@ class Test_Synced_Patterns extends Pattern_Test_Case {
 	/**
 	 * Writes a pattern file into the stand-in theme.
 	 *
-	 * @param string $name    File name, without extension.
-	 * @param string $slug    Pattern slug.
+	 * @param string $name File name, without extension.
+	 * @param string $slug Pattern slug.
 	 * @param string $headers Extra header lines.
 	 * @return void
 	 */
@@ -97,8 +96,6 @@ class Test_Synced_Patterns extends Pattern_Test_Case {
 
 	/**
 	 * The header is read the way a theme author is likely to write it.
-	 *
-	 * Version 1 documented `Synced: true` but only ever tested for `yes`.
 	 */
 	public function test_header_spellings() {
 		$this->write_pattern_file( 'a', 'test/a', " * Synced: true\n" );

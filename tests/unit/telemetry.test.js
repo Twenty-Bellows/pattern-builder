@@ -1,6 +1,5 @@
 /**
- * The browse app's side of telemetry: nothing leaves the browser unless
- * the site said yes.
+ * The browse app's side of telemetry: nothing leaves the browser unless the site said yes.
  */
 
 import apiFetch from '@wordpress/api-fetch';

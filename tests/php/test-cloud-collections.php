@@ -1,10 +1,9 @@
 <?php
 /**
- * Collections through the proxy: the routes relay the service's answers —
- * refusals verbatim, upgrade link included — and a whole collection installs
- * in one action, skipping what is already here, carrying on past a failure,
- * and filing every pattern under the collection's local category. The
- * service is mocked at the HTTP layer, as every cloud test is.
+ * Collections through the proxy: the routes relay the service's answers — refusals
+ * verbatim, upgrade link included — and a whole collection installs in one action, skipping
+ * what is already here, carrying on past a failure, and filing every pattern under the
+ * collection's local category.
  *
  * @package PatternBuilder
  */
@@ -14,7 +13,6 @@ use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Porter;
 use TwentyBellows\PatternBuilder\Pattern_File_Store;
 
 class Test_Cloud_Collections extends WP_UnitTestCase {
-
 	/**
 	 * Every service request the mock saw: method, decoded path, body.
 	 *
@@ -47,9 +45,9 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Mock the service: the callback gets the decoded pbwp/v1 path, the
-	 * method and the request, and returns the response body (an array) or
-	 * an error as { code, message, data, status }.
+	 * Mock the service: the callback gets the decoded pbwp/v1 path, the method and the
+	 * request, and returns the response body (an array) or an error as { code, message,
+	 * data, status }.
 	 *
 	 * @param callable $callback function ( $path, $method, $args ) : array
 	 */
@@ -233,8 +231,6 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 
 		$mine = $this->request( 'GET', '/pattern-builder/v1/cloud/library/collections' )->get_data();
 		$this->assertTrue( $mine[0]['personal'] );
-
-		// The directory and library listings pass the collection filter on.
 		$this->request( 'GET', '/pattern-builder/v1/cloud/directory', array( 'collection' => '2/starter-sections' ) );
 		$this->assertSame( '2/starter-sections', end( $this->seen )['query']['collection'] );
 		$this->request( 'GET', '/pattern-builder/v1/cloud/library', array( 'collection' => '9' ) );
@@ -279,16 +275,12 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 
 		$response = $this->request( 'POST', '/pattern-builder/v1/cloud/upload', array( 'patternType' => 'user', 'patternId' => $post_id, 'collection' => 31 ) );
 		$this->assertSame( 200, $response->get_status() );
-
-		// The multipart body carries the collection beside the package.
 		$sent = end( $this->seen );
 		$this->assertStringContainsString( 'name="collection"' . "\r\n\r\n31", $sent['body'] );
 		$this->assertStringContainsString( '"inserterCategories"', $sent['body'] );
 		$this->assertStringNotContainsString( '"categories"', $sent['body'] );
 
 		$this->assertSame( 'studio/starter-sections/local-one', get_post_meta( $post_id, Pattern_File_Store::META_CLOUD, true ) );
-
-		// The panel's collection line comes from the service, asked by name.
 		$state = $this->request( 'GET', '/pattern-builder/v1/cloud/pattern-state', array( 'patternType' => 'user', 'patternId' => $post_id ) )->get_data();
 		$this->assertTrue( $state['linked'] );
 		$this->assertSame( 'starter-sections', $state['collection']['slug'] );
@@ -320,14 +312,10 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 				return array();
 			}
 		);
-
-		// The route that moved a cloud pattern between collections is gone:
-		// a collection is the middle segment of a permanent name (D38).
 		$moved = $this->request( 'PUT', '/pattern-builder/v1/cloud/library/42', array( 'collection' => 'personal' ) );
 		$this->assertSame( 404, $moved->get_status() );
 		$this->assertSame( array(), $this->seen );
 	}
-
 
 	public function test_download_files_the_pattern_under_the_collection_category() {
 		$this->mock_service(
@@ -354,16 +342,12 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		$terms = wp_get_object_terms( $result['id'], 'wp_pattern_category', array( 'fields' => 'slugs' ) );
 		$this->assertContains( 'pbwp-2-starter-sections', $terms );
 		$this->assertContains( 'banner', $terms );
-
-		// The inserter learns the collection's title for that slug.
 		$this->assertSame( array( 'pbwp-2-starter-sections' => 'Starter Sections' ), Pattern_Builder_Cloud::collection_categories() );
 		Pattern_Builder_Cloud::register_collection_categories();
 		$registered = WP_Block_Pattern_Categories_Registry::get_instance()->get_registered( 'pbwp-2-starter-sections' );
 		$this->assertSame( 'Starter Sections', $registered['label'] );
 		$term = get_term_by( 'slug', 'pbwp-2-starter-sections', 'wp_pattern_category' );
 		$this->assertSame( 'Starter Sections', $term->name );
-
-		// And it keeps the name of the cloud pattern it is a copy of.
 		$this->assertSame( 'studio/starter-sections/bold-hero', get_post_meta( $result['id'], Pattern_File_Store::META_CLOUD, true ) );
 	}
 
@@ -388,7 +372,6 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 	}
 
 	public function test_install_collection_skips_installed_continues_past_failure_and_files_each() {
-		// One pattern of the collection is already installed from it.
 		$already = wp_insert_post(
 			array(
 				'post_title'   => 'Already Here',
@@ -437,8 +420,6 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		$this->assertSame( 'installed', $by_id[101] );
 		$this->assertSame( 'failed', $by_id[102] );
 		$this->assertSame( 'Upgrade to Pro.', $result['results'][2]['message'] );
-
-		// The download of 102 was attempted after 101 landed: no stop on failure.
 		$paths = wp_list_pluck( $this->seen, 'path' );
 		$this->assertContains( '/directory/patterns/102/download', $paths );
 		$this->assertNotContains( '/directory/patterns/100/download', $paths );
@@ -447,8 +428,6 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		$terms     = wp_get_object_terms( $installed['id'], 'wp_pattern_category', array( 'fields' => 'slugs' ) );
 		$this->assertContains( 'pbwp-2-starter-sections', $terms );
 		$this->assertSame( 'studio/starter-sections/bold-hero', get_post_meta( $installed['id'], Pattern_File_Store::META_CLOUD, true ) );
-
-		// Installing it again skips what the first run put here.
 		$again = $porter->install_collection( 2, 'starter-sections', 'user', 'skip' );
 		$this->assertSame( 0, $again['installed'] );
 		$this->assertSame( 2, $again['skipped'] );
@@ -478,8 +457,6 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		$this->assertSame( 'user', $one['patterns'][0]['installed']['type'] );
 		$this->assertSame( $already, $one['patterns'][0]['installed']['id'] );
 		$this->assertNull( $one['patterns'][1]['installed'] );
-
-		// The tiles count the same names.
 		$names = $this->request( 'GET', '/pattern-builder/v1/cloud/installed' )->get_data();
 		$this->assertContains( 'studio/starter-sections/already-here', $names );
 		$this->assertNotContains( 'studio/starter-sections/bold-hero', $names );
