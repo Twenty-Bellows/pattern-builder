@@ -12,6 +12,7 @@
 		"lint:css": "wp-scripts lint-style",
 		"lint:js": "wp-scripts lint-js",
 		"lint:php": "composer lint",
+		"check:docs": "node scripts/check-docs.mjs",
 		"packages-update": "wp-scripts packages-update",
 		"plugin-zip": "wp-scripts plugin-zip",
 		"plugin-unpack": "rm -rf ./release && mkdir -p ./release && unzip -o ./pattern-builder.zip -d ./release/pattern-builder",

@@ -106,6 +106,48 @@ The things that bite. Each is expanded in the document beside it.
   the nonce- and capability-gated proxy. ([cloud](docs/cloud.md))
 - **The plugin is fully functional disconnected.** ([cloud](docs/cloud.md))
 
+## Keeping the documentation true
+
+**A change is not finished until the documents describing it are right.** That
+is a step in the work, not a follow-up: correct them in place, in the same
+commit, and never annotate a stale passage with a note saying it is stale.
+
+Before you open a pull request:
+
+1. **Find what your change touched** in the table above, and read that
+   document. Ask whether any sentence in it is now wrong — a renamed class, a
+   moved file, a behaviour that changed, a count that shifted, a mechanism
+   replaced by another.
+2. **Update `readme.md`** if you changed what the plugin *is*, what it
+   requires, or how it is run. It is deliberately minimal; keep it that way and
+   put the detail in `docs/`.
+3. **Update this file** if you changed a command, an invariant, or a standard.
+   It is an index, not a manual — if a paragraph starts explaining a mechanism,
+   that paragraph belongs in `docs/`.
+4. **Run `npm run check:docs`.**
+
+```
+npm run check:docs          # every identifier the docs name must exist
+npm run check:docs -- --list
+```
+
+The check reads every backticked token in `CLAUDE.md`, `readme.md` and `docs/`
+and verifies it against the source: a path has to exist, a symbol has to appear
+somewhere in the tree. It catches the way these documents actually rot — a
+class that was renamed, a file that moved, a method that was never built.
+
+**It cannot check prose.** A sentence can be wrong with every identifier in it
+spelled correctly, so a green run means the names are real, not that the
+document is true. The reading in step 1 is the part that matters; the check is
+the backstop.
+
+Two notes on using it. A name this repository only talks about — WordPress
+core, another repository, an illustrative path — belongs in `ALLOW` in
+`scripts/check-docs.mjs`, and a line carrying `check-docs:ignore` is skipped.
+And do not write a removed symbol in backticks in order to say it was removed;
+describe it in words, or the check has to be told to ignore a name that is
+correctly absent.
+
 ## Coding standards
 
 - **`docs/` is living.** Every document there describes how the system works
