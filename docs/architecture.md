@@ -55,7 +55,7 @@ Pattern Metadata panel.
 ## The browse page
 
 Appearance → Pattern Builder is a Site-Editor-style library: a header with four
-collection tabs (User, Theme, Uploaded, Community — the last two served by the
+collection tabs (User, Theme, Uploaded, Directory — the last two served by the
 cloud browser), each with its own search and category rail, over a grid of
 fixed-size square tiles, plus an always-present details sidebar whose Save and
 Edit actions sit above the same panels the editor shows.

@@ -28,8 +28,8 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 * **Sync Status** - Manage synced and unsynced patterns effortlessly
 
 **Your Patterns, on Every Site**
-* **Collections** - Keep patterns on patternbuilderwp.com in collections: a private Personal for yourself, public ones for the community
-* **Install a whole collection** - Save any community collection to a site in one action, as theme patterns or user patterns, images included
+* **Collections** - Keep patterns on patternbuilderwp.com in collections: a private Personal for yourself, private collections of your own on Pro, and the curated collections Twenty Bellows and partner studios publish
+* **Install a whole collection** - Save any directory collection to a site in one action, as theme patterns or user patterns, images included
 * **Agents welcome** - An agent connected to your site can browse, install and upload through your account, and never holds a cloud credential
 
 **Developer-Friendly**
@@ -86,7 +86,7 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 
 Everything local works without an account and without sending anything anywhere. Three services are involved only when you choose to use them:
 
-**patternbuilderwp.com** — the cloud library and community directory, and the account behind them. When you sign in or create an account from Appearance → Pattern Builder, your email and password are relayed once, server-side, to patternbuilderwp.com; only the returned access token is stored, on this site, for your WordPress user. Browsing the Uploaded and Community tabs, managing your collections, uploading patterns and installing patterns or whole collections, starting a password reset, and confirming a purchase all talk to patternbuilderwp.com through this site. Pattern Builder is the only way to install anything from patternbuilderwp.com: the website shows collections and sends people here. Anonymous usage reporting, if you allow it, goes there too (see below). Terms: https://patternbuilderwp.com/terms/ — Privacy: https://patternbuilderwp.com/privacy/
+**patternbuilderwp.com** — the cloud library and its directory of curated collections, and the account behind them. When you sign in or create an account from Appearance → Pattern Builder, your email and password are relayed once, server-side, to patternbuilderwp.com; only the returned access token is stored, on this site, for your WordPress user. Browsing the Uploaded and Directory tabs, managing your collections, uploading patterns and installing patterns or whole collections, starting a password reset, and confirming a purchase all talk to patternbuilderwp.com through this site. Pattern Builder is the only way to install anything from patternbuilderwp.com: the website shows collections and sends people here. Anonymous usage reporting, if you allow it, goes there too (see below). Terms: https://patternbuilderwp.com/terms/ — Privacy: https://patternbuilderwp.com/privacy/
 
 **Freemius** — the checkout for Pattern Builder Pro. Choosing Go Pro loads Freemius's checkout script (https://checkout.freemius.com/js/v1/) on the Pattern Builder screen and opens their checkout; nothing from Freemius loads anywhere else or before that click. Terms: https://freemius.com/terms/ — Privacy: https://freemius.com/privacy/
 
@@ -113,8 +113,8 @@ Yes, Pattern Builder provides a unified interface to manage both theme patterns 
 = 2.1.0 =
 * Patterns can carry images and fonts: find what the site already has, add a file, draw a placeholder, or install a self-hosted font family — and get back the exact reference to use
 * Font families install from the collection WordPress ships, with the files copied to your site and served from it rather than fetched from Google on every page view
-* Collections: every pattern on patternbuilderwp.com lives in exactly one collection. Every account has a private Personal; free accounts share the rest publicly, Pro builds collections in private
-* The Community tab is collections first: open one, save a single pattern, or save the whole collection to this site in one action, with one design-tokens step and a progress count
+* Collections: every pattern on patternbuilderwp.com lives in exactly one collection. Every account has a private Personal; Pro adds private collections of your own; publishing is by invitation, for Twenty Bellows and partner studios
+* The Directory tab is collections first: open one, save a single pattern, or save the whole collection to this site in one action, with one design-tokens step and a progress count
 * The Uploaded tab manages your collections — create, rename, describe, set the visibility, delete with everything in it — and uploads ask which collection when there is more than Personal
 * A page pattern brings the patterns it uses: uploading one uploads its sections into the same collection, installing one installs them first, and a pattern copied from somebody else's collection records where it came from
 * Patterns installed from a collection land under a local pattern category named for it
@@ -125,7 +125,7 @@ Yes, Pattern Builder provides a unified interface to manage both theme patterns 
 * render-pattern hands back preview URLs against the two bundled lab themes as well as the site's own; list-patterns reports the pattern categories the site has registered and every pattern's placement headers; get-design-system carries the definition of each block style variation the theme defines
 * add-block-style-variation says where a hover state goes, since a styles partial cannot hold one; refuses a variation for a block the site does not have
 * The authoring guides were checked against WordPress 7.1's own block library and corrected where they disagreed with it or with each other
-* Community patterns are browsed as an account: the Community tab asks you to sign in or create a free account first
+* Directory collections are browsed as an account: the Directory tab asks you to sign in or create a free account first
 * Creating an account from wp-admin now asks for a stronger password (eight characters, with an upper-case letter, a number and a symbol), asks whether we may email you news and offers, and sends a confirmation email
 * Forgot your password? The connect panel starts a reset; the link in the email finishes it on patternbuilderwp.com
 * Go Pro opens Freemius's checkout right on the Pattern Builder screen, and Pro is active the moment the purchase completes
