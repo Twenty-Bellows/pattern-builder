@@ -1,8 +1,14 @@
 import apiFetch from '@wordpress/api-fetch';
 import { __, _n, sprintf } from '@wordpress/i18n';
-import { useState, useEffect, useCallback } from '@wordpress/element';
+import {
+	createInterpolateElement,
+	useState,
+	useEffect,
+	useCallback,
+} from '@wordpress/element';
 import {
 	Button,
+	ExternalLink,
 	Flex,
 	FlexItem,
 	Modal,
@@ -123,8 +129,9 @@ const PASSWORD_RULE = __(
  * @param {Function} props.onConnected Receives the fresh status payload.
  * @param {string}   props.intro       Why to connect, for this tab.
  * @param {string}   props.title       The title for the panel.
+ * @param {string}   props.serviceUrl  The service's origin, which the terms and privacy links point at.
  */
-function ConnectPanel( { onConnected, intro, title } ) {
+function ConnectPanel( { onConnected, intro, title, serviceUrl } ) {
 	const [ mode, setMode ] = useState( 'login' );
 	const [ email, setEmail ] = useState( '' );
 	const [ password, setPassword ] = useState( '' );
@@ -140,6 +147,10 @@ function ConnectPanel( { onConnected, intro, title } ) {
 
 	const isSignup = mode === 'signup';
 	const isForgot = mode === 'forgot';
+
+	// The terms and the privacy policy live on the service the site is configured
+	// for, so a development service shows its own; the public site is the fallback.
+	const legalBase = serviceUrl || 'https://patternbuilderwp.com';
 
 	const switchMode = ( next ) => {
 		setMode( next );
@@ -332,6 +343,28 @@ function ConnectPanel( { onConnected, intro, title } ) {
 							</Button>
 						</HStack>
 					</fieldset>
+				) }
+				{ isSignup && (
+					<p className="pattern-builder-cloud__legal">
+						{ createInterpolateElement(
+							__(
+								'By creating an account you agree to the <terms>Terms of Service</terms> and the <privacy>Privacy Policy</privacy>.',
+								'pattern-builder'
+							),
+							{
+								terms: (
+									<ExternalLink
+										href={ `${ legalBase }/terms/` }
+									/>
+								),
+								privacy: (
+									<ExternalLink
+										href={ `${ legalBase }/privacy/` }
+									/>
+								),
+							}
+						) }
+					</p>
 				) }
 				{ error && (
 					<Notice status="error" isDismissible={ false }>
@@ -1184,6 +1217,7 @@ export function CloudBrowser( {
 		return (
 			<main className="pattern-builder-browser__main">
 				<ConnectPanel
+					serviceUrl={ status.serviceUrl }
 					intro={
 						isLibrary
 							? __(

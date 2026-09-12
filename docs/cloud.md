@@ -190,8 +190,10 @@ with an upper-case letter, a digit and a symbol — `passwordProblem()` mirrors
 it so the form says what is missing before the round trip), asks the marketing
 question as two buttons with neither preselected (a pre-checked box is not
 consent under GDPR and reads as opt-out to the wp.org review team; no answer
-relays as `no`), and leaves the account unverified until the emailed link is
-opened. *Forgot your password?* posts the address to
+relays as `no`), links the service's Terms of Service and Privacy Policy above
+the button (at the configured service's own `/terms/` and `/privacy/`, so a
+development service shows its own), and leaves the account unverified until
+the emailed link is opened. *Forgot your password?* posts the address to
 `/cloud/password/forgot`; the emailed link finishes the reset on
 patternbuilderwp.com, never here.
 
