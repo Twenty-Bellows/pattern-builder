@@ -44,7 +44,7 @@ Node 18+, PHP 7.4+ with Composer, Docker for `wp-env` and the PHP tests.
 | `npm run test:php` | PHP tests in wp-env (**Docker**). |
 | `npm run start` / `npm run stop` / `npm run clean` | wp-env lifecycle. |
 | `npm run plugin-test` | Build, zip and open in WP Playground. |
-| `npm run version-bump` | Bump the version everywhere it is tracked. |
+| `npm run version-bump` | Bump the patch version everywhere it is tracked; `npm run version-bump -- 2.2.0` sets one outright. |
 
 **No Docker?** The PHP suite runs host-native on SQLite: download WordPress and
 the `sqlite-database-integration` plugin, copy that plugin's `db.copy` to
@@ -173,4 +173,5 @@ correctly absent.
 ## Versioning
 
 The version is tracked in `pattern-builder.php`, `package.json` and
-`readme.txt`. `npm run version-bump` changes all three.
+`readme.txt`. `npm run version-bump` changes all three: the patch number by
+default, or the version given as its argument.

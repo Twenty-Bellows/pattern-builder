@@ -190,8 +190,10 @@ with an upper-case letter, a digit and a symbol — `passwordProblem()` mirrors
 it so the form says what is missing before the round trip), asks the marketing
 question as two buttons with neither preselected (a pre-checked box is not
 consent under GDPR and reads as opt-out to the wp.org review team; no answer
-relays as `no`), and leaves the account unverified until the emailed link is
-opened. *Forgot your password?* posts the address to
+relays as `no`), links the service's Terms of Service and Privacy Policy above
+the button (at the configured service's own `/terms/` and `/privacy/`, so a
+development service shows its own), and leaves the account unverified until
+the emailed link is opened. *Forgot your password?* posts the address to
 `/cloud/password/forgot`; the emailed link finishes the reset on
 patternbuilderwp.com, never here.
 
@@ -215,12 +217,14 @@ or name, never content. Events are buffered per request and posted once on
 `shutdown` to the service's public `/telemetry` relay, non-blocking; a lost
 batch is lost. The plugin loads no analytics script and names one service.
 
-## AI generation is not in the plugin
+## Nothing generates patterns, at either end
 
-The service still offers it (`/ai/generations`), but nothing here calls it: the
-create-pattern modal makes blank patterns only, and there is no
-`/cloud/generate` proxy. Pulled deliberately, to be reconsidered as a feature
-rather than carried half-wired.
+Neither the plugin nor the service runs a model; the service carried a pipeline
+for a while and has removed it (its decision log, D47). Generation is what an
+agent the user already runs does through the abilities — create, edit, upload,
+install, read the authoring guide — with the `pattern-author` and
+`design-reproduction` skills, on the user's own provider. The create-pattern
+modal makes blank patterns only, and there is no generate proxy.
 
 ## Code map
 

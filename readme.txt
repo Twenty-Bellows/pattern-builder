@@ -2,8 +2,8 @@
 Contributors:      twentybellows, pbking
 Tags:              block-patterns, patterns, block-editor, gutenberg, design
 Requires at least: 6.8
-Tested up to:      6.9
-Stable tag:        2.0.0
+Tested up to:      7.1
+Stable tag:        2.1.0
 Requires PHP:      7.4
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -111,25 +111,13 @@ Yes, Pattern Builder provides a unified interface to manage both theme patterns 
 == Changelog ==
 
 = 2.1.0 =
-* Patterns can carry images and fonts: find what the site already has, add a file, draw a placeholder, or install a self-hosted font family — and get back the exact reference to use
-* Font families install from the collection WordPress ships, with the files copied to your site and served from it rather than fetched from Google on every page view
-* Collections: every pattern on patternbuilderwp.com lives in exactly one collection. Every account has a private Personal; Pro adds private collections of your own; publishing is by invitation, for Twenty Bellows and partner studios
-* The Directory tab is collections first: open one, save a single pattern, or save the whole collection to this site in one action, with one design-tokens step and a progress count
-* The Uploaded tab manages your collections — create, rename, describe, set the visibility, delete with everything in it — and uploads ask which collection when there is more than Personal
-* A page pattern brings the patterns it uses: uploading one uploads its sections into the same collection, installing one installs them first, and a pattern copied from somebody else's collection records where it came from
-* Patterns installed from a collection land under a local pattern category named for it
-* Seven new abilities for agents: list and search collections and patterns, install a pattern or a collection, upload into a collection, create a private collection — all through the WordPress user's own connection
-* Agents can extend the design system rather than hard-code values into a pattern: a new ability adds colors, gradients, spacing sizes, font sizes and font families to the active theme's theme.json or to Site styles, leaving any token you already define alone
-* The create-pattern and update-pattern abilities now refuse, by name, what a server can see is wrong before anything is written: attribute JSON that does not parse, a heading or list contradicting its attributes, a block the site has not registered, a reference to a pattern that does not exist (or to the pattern itself), and a Pattern Overrides slot nothing can fill — so a page cannot be stored before the sections it references
-* A user pattern created by an agent keeps everything it was given: synced or not, description, categories and keywords
-* render-pattern hands back preview URLs against the two bundled lab themes as well as the site's own; list-patterns reports the pattern categories the site has registered and every pattern's placement headers; get-design-system carries the definition of each block style variation the theme defines
-* add-block-style-variation says where a hover state goes, since a styles partial cannot hold one; refuses a variation for a block the site does not have
-* The authoring guides were checked against WordPress 7.1's own block library and corrected where they disagreed with it or with each other
-* Directory collections are browsed as an account: the Directory tab asks you to sign in or create a free account first
-* Creating an account from wp-admin now asks for a stronger password (eight characters, with an upper-case letter, a number and a symbol), asks whether we may email you news and offers, and sends a confirmation email
-* Forgot your password? The connect panel starts a reset; the link in the email finishes it on patternbuilderwp.com
-* Go Pro opens Freemius's checkout right on the Pattern Builder screen, and Pro is active the moment the purchase completes
-* Opt-in anonymous usage reporting, asked once with Allow and No thanks, and never on by default
+* Cloud collections: sign in to a free patternbuilderwp.com account from Appearance → Pattern Builder and keep your patterns in a private Personal collection, on every site you connect; Pro adds private collections of your own
+* The Directory tab browses curated collections; save one pattern or a whole collection to this site, with the design tokens it needs, and the Uploaded tab manages your own collections
+* A page pattern travels with the patterns it references, uploading and installing them alongside it, and a copy records the pattern it came from
+* Images and fonts for patterns: find what the site has, add a file, draw a placeholder, or install a self-hosted font family, and get back the exact reference to use
+* Agents: seven cloud abilities, an ability that extends the theme's design tokens, create and update checks that refuse invalid markup by name, and authoring guides checked against WordPress 7.1
+* Accounts: stronger passwords, email confirmation, a password reset from the connect panel, and Go Pro through Freemius's checkout on the Pattern Builder screen
+* Opt-in anonymous usage reporting, asked once, never on by default
 
 = 2.0.0 =
 * Complete architectural overhaul: theme pattern files are now the single source of truth — no more database mirror posts, no more custom post type rows, and no more interception of the /wp/v2/blocks REST API
