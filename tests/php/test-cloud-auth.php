@@ -189,7 +189,7 @@ class Test_Cloud_Auth extends WP_UnitTestCase {
 		$this->assertSame( 403, $response->get_status() );
 	}
 
-	public function test_the_community_is_browsed_as_an_account() {
+	public function test_the_directory_is_browsed_as_an_account() {
 		$this->mock_service(
 			function () {
 				$this->fail( 'A disconnected site must not reach the service for the directory.' );

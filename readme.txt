@@ -48,7 +48,7 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 **For Site Builders**
 * Build custom patterns without coding
 * Reuse patterns across multiple pages
-* Share patterns between sites
+* Carry patterns between sites
 * Maintain pattern library
 
 **For Agencies**
