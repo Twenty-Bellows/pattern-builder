@@ -215,12 +215,14 @@ or name, never content. Events are buffered per request and posted once on
 `shutdown` to the service's public `/telemetry` relay, non-blocking; a lost
 batch is lost. The plugin loads no analytics script and names one service.
 
-## AI generation is not in the plugin
+## Nothing generates patterns, at either end
 
-The service still offers it (`/ai/generations`), but nothing here calls it: the
-create-pattern modal makes blank patterns only, and there is no
-`/cloud/generate` proxy. Pulled deliberately, to be reconsidered as a feature
-rather than carried half-wired.
+Neither the plugin nor the service runs a model; the service carried a pipeline
+for a while and has removed it (its decision log, D47). Generation is what an
+agent the user already runs does through the abilities — create, edit, upload,
+install, read the authoring guide — with the `pattern-author` and
+`design-reproduction` skills, on the user's own provider. The create-pattern
+modal makes blank patterns only, and there is no generate proxy.
 
 ## Code map
 
