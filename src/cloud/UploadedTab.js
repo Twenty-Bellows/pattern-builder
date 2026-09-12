@@ -57,23 +57,28 @@ export function railFor( collections, personal ) {
 }
 
 /**
- * The New collection dialog: a name and a description, and the visibility only where the
- * account may choose.
+ * The New collection dialog: a name and a description, the visibility only for a
+ * publisher, and the upgrade in place of the form on an account without collections.
  *
  * @param {Object}   props            Component props.
- * @param {boolean}  props.canPrivate Whether the account may build in private.
+ * @param {boolean}  props.canCreate  Whether the account may have collections of its own.
+ * @param {boolean}  props.canPublish Whether the account may make one public.
  * @param {Function} props.onCreated  Called with the created collection.
  * @param {Function} props.onClose    Closes the dialog.
  * @param {Function} props.onGoPro    Opens the upgrade, or null.
  */
-function NewCollectionModal( { canPrivate, onCreated, onClose, onGoPro } ) {
+function NewCollectionModal( {
+	canCreate,
+	canPublish,
+	onCreated,
+	onClose,
+	onGoPro,
+} ) {
 	const [ name, setName ] = useState( '' );
 	const [ slug, setSlug ] = useState( '' );
 	const [ slugTouched, setSlugTouched ] = useState( false );
 	const [ description, setDescription ] = useState( '' );
-	const [ visibility, setVisibility ] = useState(
-		canPrivate ? 'private' : 'public'
-	);
+	const [ visibility, setVisibility ] = useState( 'private' );
 	const [ busy, setBusy ] = useState( false );
 	const [ error, setError ] = useState( '' );
 
@@ -94,7 +99,7 @@ function NewCollectionModal( { canPrivate, onCreated, onClose, onGoPro } ) {
 			name.trim(),
 			wanted,
 			description.trim(),
-			canPrivate ? visibility : ''
+			canPublish ? visibility : ''
 		)
 			.then( ( created ) => onCreated( created ) )
 			.catch( ( err ) => {
@@ -108,6 +113,35 @@ function NewCollectionModal( { canPrivate, onCreated, onClose, onGoPro } ) {
 				);
 			} );
 	};
+
+	if ( ! canCreate ) {
+		return (
+			<Modal
+				title={ __( 'New collection', 'pattern-builder' ) }
+				onRequestClose={ onClose }
+				className="pattern-builder-cloud__destination-modal"
+			>
+				<VStack spacing={ 3 }>
+					<p className="pattern-builder-cloud__meta">
+						{ __(
+							'Collections of your own are a Pattern Builder Pro feature: private, as many as you like, to organise work by client, by project or by kind. A free account keeps its patterns in Personal.',
+							'pattern-builder'
+						) }
+					</p>
+					<HStack spacing={ 2 } alignment="left">
+						{ onGoPro && (
+							<Button variant="primary" onClick={ onGoPro }>
+								{ __( 'Go Pro', 'pattern-builder' ) }
+							</Button>
+						) }
+						<Button variant="tertiary" onClick={ onClose }>
+							{ __( 'Not now', 'pattern-builder' ) }
+						</Button>
+					</HStack>
+				</VStack>
+			</Modal>
+		);
+	}
 
 	return (
 		<Modal
@@ -152,7 +186,7 @@ function NewCollectionModal( { canPrivate, onCreated, onClose, onGoPro } ) {
 						onChange={ setDescription }
 						rows={ 3 }
 					/>
-					{ canPrivate ? (
+					{ canPublish ? (
 						<SelectControl
 							__nextHasNoMarginBottom
 							__next40pxDefaultSize
@@ -170,27 +204,19 @@ function NewCollectionModal( { canPrivate, onCreated, onClose, onGoPro } ) {
 								{
 									value: 'public',
 									label: __(
-										'Public — listed in the community',
+										'Public — listed in the directory',
 										'pattern-builder'
 									),
 								},
 							] }
 						/>
 					) : (
-						<Notice status="info" isDismissible={ false }>
+						<Text variant="muted" size="12px">
 							{ __(
-								'This collection will be public: on a free account, every collection other than Personal is listed in the community as soon as its patterns pass the checks. Building a collection in private is a Pattern Builder Pro feature — or keep the work local.',
+								'Private: only you, on every site you connect.',
 								'pattern-builder'
 							) }
-							{ onGoPro && (
-								<>
-									{ ' ' }
-									<Button variant="link" onClick={ onGoPro }>
-										{ __( 'Go Pro', 'pattern-builder' ) }
-									</Button>
-								</>
-							) }
-						</Notice>
+						</Text>
 					) }
 					{ error && (
 						<Notice status="error" isDismissible={ false }>
@@ -312,16 +338,16 @@ function DeleteCollectionModal( { collection, onDeleted, onClose, onGoPro } ) {
 }
 
 /**
- * The selected collection's header: rename, describe, visibility (as the account may),
- * delete.
+ * The selected collection's header: rename, describe, visibility (for a publisher, or to
+ * take an inherited public collection private), delete.
  *
  * @param {Object}   props            Component props.
  * @param {Object}   props.collection The collection.
- * @param {boolean}  props.canPrivate Whether the account may make it private.
+ * @param {boolean}  props.canPublish Whether the account may make it public.
  * @param {Function} props.onChanged  Called with the updated collection.
  * @param {Function} props.onDelete   Opens the delete prompt.
  */
-function CollectionHeader( { collection, canPrivate, onChanged, onDelete } ) {
+function CollectionHeader( { collection, canPublish, onChanged, onDelete } ) {
 	const [ editing, setEditing ] = useState( false );
 	const [ name, setName ] = useState( collection.title );
 	const [ description, setDescription ] = useState(
@@ -360,14 +386,14 @@ function CollectionHeader( { collection, canPrivate, onChanged, onDelete } ) {
 
 	const visibilityOptions = [
 		{
-			value: 'public',
-			label: __( 'Public', 'pattern-builder' ),
-		},
-	];
-	if ( canPrivate || collection.visibility === 'private' ) {
-		visibilityOptions.unshift( {
 			value: 'private',
 			label: __( 'Private', 'pattern-builder' ),
+		},
+	];
+	if ( canPublish || collection.visibility === 'public' ) {
+		visibilityOptions.push( {
+			value: 'public',
+			label: __( 'Public', 'pattern-builder' ),
 		} );
 	}
 	if ( collection.visibility === 'premium' ) {
@@ -460,7 +486,7 @@ function CollectionHeader( { collection, canPrivate, onChanged, onDelete } ) {
 					className="pattern-builder-collection-view__actions"
 					wrap
 				>
-					{ ! collection.personal && (
+					{ ! collection.personal && visibilityOptions.length > 1 && (
 						<SelectControl
 							__nextHasNoMarginBottom
 							__next40pxDefaultSize
@@ -542,7 +568,8 @@ export function UploadedTab( {
 		onDownloaded,
 	} );
 
-	const canPrivate = !! status?.entitlements?.can_create_private;
+	const canCreate = !! status?.entitlements?.can_create_collections;
+	const canPublish = !! status?.entitlements?.can_publish;
 	const selectedId = Number( collection ) || 0;
 	const current = ( collections || [] ).find(
 		( item ) => item.id === selectedId
@@ -649,7 +676,7 @@ export function UploadedTab( {
 				{ status?.overPolicy && (
 					<Notice status="warning" isDismissible={ false }>
 						{ __(
-							'This account holds more than a free account may: a private collection, or a Personal over the cap. Nothing is taken away, and nothing more can be added to what is over. Make a collection public, delete, or go Pro.',
+							'This account holds more than a free account may: a collection other than Personal, or a Personal over the cap. Nothing is taken away, and nothing more can be added to what is over. Delete, or go Pro.',
 							'pattern-builder'
 						) }
 						{ onGoPro && (
@@ -676,7 +703,7 @@ export function UploadedTab( {
 				{ current && (
 					<CollectionHeader
 						collection={ current }
-						canPrivate={ canPrivate }
+						canPublish={ canPublish }
 						onChanged={ () => changed() }
 						onDelete={ () => setDeleting( current ) }
 					/>
@@ -749,7 +776,8 @@ export function UploadedTab( {
 
 				{ creating && (
 					<NewCollectionModal
-						canPrivate={ canPrivate }
+						canCreate={ canCreate }
+						canPublish={ canPublish }
 						onGoPro={ onGoPro }
 						onClose={ () => setCreating( false ) }
 						onCreated={ ( created ) => {

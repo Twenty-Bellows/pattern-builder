@@ -14,7 +14,7 @@ import { arrowLeft } from '@wordpress/icons';
 import { CloudCard } from './CloudBrowser';
 
 /**
- * One community collection opened: a header with its title, owner, description and count,
+ * One directory collection opened: a header with its title, owner, description and count,
  * "Save collection to this site", and then its patterns as the grid the rest of the browser
  * uses.
  *

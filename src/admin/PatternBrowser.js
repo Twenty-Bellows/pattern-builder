@@ -42,7 +42,7 @@ const COLLECTIONS = [
 	{ key: THEME, label: __( 'Theme', 'pattern-builder' ) },
 	{ key: USER, label: __( 'User', 'pattern-builder' ) },
 	{ key: UPLOADED, label: __( 'Uploaded', 'pattern-builder' ) },
-	{ key: COMMUNITY, label: __( 'Community', 'pattern-builder' ) },
+	{ key: COMMUNITY, label: __( 'Directory', 'pattern-builder' ) },
 ];
 
 const CLOUD_COLLECTIONS = [ UPLOADED, COMMUNITY ];
@@ -120,7 +120,7 @@ function CategoryRail( { categories, active, onSelect } ) {
 
 /**
  * The browse screen: a header with the four collection tabs, a category rail scoped to the
- * active tab (none on Community, whose landing is its collections), a grid, and a details
+ * active tab (none on Directory, whose landing is its collections), a grid, and a details
  * sidebar that is always present.
  *
  * @param {Object}   props                Component props.

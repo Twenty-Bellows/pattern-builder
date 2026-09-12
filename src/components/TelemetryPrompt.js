@@ -16,7 +16,7 @@ import { setTelemetryConsent } from '../utils/telemetry';
 export function telemetryFacts() {
 	return [
 		__(
-			'What is sent: which parts of Pattern Builder are used (the browser opened, a pattern created, the community browsed), and the environment — WordPress, PHP and plugin versions, locale, theme, multisite.',
+			'What is sent: which parts of Pattern Builder are used (the browser opened, a pattern created, the directory browsed), and the environment — WordPress, PHP and plugin versions, locale, theme, multisite.',
 			'pattern-builder'
 		),
 		__(

@@ -6,7 +6,7 @@ How collections work in the plugin. The service side — definitions, tiers, dat
 
 A **collection** is the unit of organisation, publishing and installation on the cloud. Every uploaded pattern is in exactly one; every account has a locked private **Personal** collection; and **Pattern Builder is the only way to install anything** — a single pattern or a whole collection — for people and for agents. In the plugin that means:
 
-- **Community tab**: collections first. Open one, save one pattern or save the whole collection.
+- **Directory tab**: collections first — the collections Twenty Bellows and partner studios publish. Open one, save one pattern or save the whole collection.
 - **Uploaded tab**: your collections, managed here and nowhere else. Upload asks which one.
 - **Installed patterns** land under a local pattern category named for the collection they came from.
 - **Agents** get abilities for all of it, through the connection the WordPress user made.
@@ -30,10 +30,10 @@ Every route stays nonce- and capability-gated and answers 401 disconnected, as t
 | `GET /cloud/collections/{owner}/{slug}` | One collection with its pattern summaries (tokens included, so the union check needs no second pass). |
 | `GET /cloud/directory` | Unchanged; gains `collection` filter. |
 | `POST /cloud/download` | Unchanged: one cloud pattern into theme or user, with tokens. Gains `collection` in the request so the porter can file it. |
-| `GET /cloud/library/collections` · `POST` · `PUT /{id}` · `DELETE /{id}` | The account's collections. Create relays the service's rule (free: public only). Delete takes the collection's patterns with it — there is nowhere to move them (D38). |
+| `GET /cloud/library/collections` · `POST` · `PUT /{id}` · `DELETE /{id}` | The account's collections. Create relays the service's rule (collections of your own are Pro; public only for a publisher; private is the default). Delete takes the collection's patterns with it — there is nowhere to move them (D38). |
 | `GET /cloud/library` | Unchanged; gains `collection` filter. |
 | `POST /cloud/upload` | Gains `collection` (required; `personal` accepted). |
-| `GET /cloud/status` | `/me` relayed; now carries `entitlements` (personal cap, can_create_private, fair use), `personal { count, cap }` and `over_policy`. |
+| `GET /cloud/status` | `/me` relayed; now carries `entitlements` (personal cap, `can_create_collections`, `can_publish`, fair use), `personal { count, cap }` and `over_policy`. |
 | `GET /cloud/pattern-state` | Whether the pattern's `Cloud:` reference is in the connected account's library, asked of the service by name; the answer names the collection. With `name`, which local pattern answers to that cloud name. |
 | `GET /cloud/installed` | Every cloud name a pattern on this site answers to — what a collection tile counts. |
 
@@ -41,7 +41,7 @@ Every route stays nonce- and capability-gated and answers 401 disconnected, as t
 
 **Installing a collection** is one PHP method used by the REST route and by the ability alike: `Pattern_Builder_Cloud_Porter::install_collection( $owner, $slug, $destination, $tokens )` fetches the collection, then imports each pattern in turn through the existing single-pattern path, skipping ones already here under their cloud name, collecting per-pattern results, and never stopping on one failure. The browser calls `POST /cloud/download` per pattern itself so it can show progress; the ability calls the method.
 
-## 3. Community tab (`src/cloud/`)
+## 3. Directory tab (`src/cloud/`)
 
 - **Landing**: a grid of **collection tiles** — a collage of up to four of the collection's previews rendered the way pattern tiles are (fixed design width, scaled), title, owner, count, and a Premium badge. The collections rail goes; the landing *is* the collections.
 - **Search** shows two groups: matching collections as a row of tiles, then matching patterns as the existing grid, each pattern labelled with its collection.
@@ -53,9 +53,9 @@ Every route stays nonce- and capability-gated and answers 401 disconnected, as t
 ## 4. Uploaded tab
 
 - **Rail**: the account's collections, Personal first with a lock icon and its meter ("7 of 25", or the count alone on Pro). Selecting one filters the grid.
-- **New collection**: name, slug (permanent — part of the name of every pattern in the collection), description; visibility only where the account may choose (Pro). A free account is told, in the same dialog, that the collection will be public and why.
-- **Collection header**: Rename, Describe, Visibility (as allowed; Personal offers only Describe), **Delete**, which says plainly that the collection's patterns go with it and offers no alternative — a move would rewrite the middle segment of a permanent name (D38), so the work is downloaded first or not at all.
-- **Over policy** (a lapsed Pro): a banner from `/me` saying what is locked and the three ways out, matching the service's rule.
+- **New collection**: name, slug (permanent — part of the name of every pattern in the collection), description; visibility only for a publisher, private otherwise. A free account is told, in place of the form, that collections of its own are a Pro feature, with Go Pro.
+- **Collection header**: Rename, Describe, Visibility (for a publisher, or to take an inherited public collection private; Personal offers only Describe), **Delete**, which says plainly that the collection's patterns go with it and offers no alternative — a move would rewrite the middle segment of a permanent name (D38), so the work is downloaded first or not at all.
+- **Over policy** (a lapsed Pro): a banner from `/me` saying what is locked and the way out — delete, or go Pro — matching the service's rule.
 
 ## 5. Upload (`PatternCloudPanel`, inside the Pattern Source panel)
 
@@ -77,7 +77,7 @@ All run as the WordPress user the application password names and use that user's
 | `install-collection` | POST | `owner` + `slug`, `destination` (`theme`\|`user`), `tokens` (`add`\|`skip`) → per-pattern results |
 | `install-cloud-pattern` | POST | `id`, `destination`, `tokens` → the local pattern |
 | `upload-pattern` | POST | a local pattern `id` (or `title` + `content`), `collection` (default `personal`) → the cloud pattern and its state |
-| `create-collection` | POST | `name`, `description` → the collection. Always private; on a free account the service refuses with the upgrade message, since an agent never publishes |
+| `create-collection` | POST | `name`, `description` → the collection. Always private; on a free account the service refuses with the upgrade message, since collections of your own are Pro, and an agent never publishes |
 
 No ability changes visibility or deletes a collection. The authoring guide's `abilities.md` gains the seven, and the guide index's `validate` block still names what to run before `upload-pattern`.
 

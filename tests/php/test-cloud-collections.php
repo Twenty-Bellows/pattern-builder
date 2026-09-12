@@ -157,7 +157,7 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 					'account'      => array( 'id' => 7, 'name' => 'Tester' ),
 					'tier'         => 'free',
 					'usage'        => array( 'stored' => 3 ),
-					'entitlements' => array( 'personal_cap' => 25, 'can_create_private' => false, 'fair_use' => array( 'patterns' => 2000, 'collections' => 200 ) ),
+					'entitlements' => array( 'personal_cap' => 25, 'can_create_collections' => false, 'can_publish' => false, 'fair_use' => array( 'patterns' => 2000, 'collections' => 200 ) ),
 					'personal'     => array( 'id' => 9, 'count' => 3, 'cap' => 25 ),
 					'over_policy'  => true,
 				);
@@ -167,7 +167,8 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 		$status = $this->request( 'GET', '/pattern-builder/v1/cloud/status' )->get_data();
 
 		$this->assertSame( 25, $status['entitlements']['personal_cap'] );
-		$this->assertFalse( $status['entitlements']['can_create_private'] );
+		$this->assertFalse( $status['entitlements']['can_create_collections'] );
+		$this->assertFalse( $status['entitlements']['can_publish'] );
 		$this->assertSame( array( 'id' => 9, 'count' => 3, 'cap' => 25 ), $status['personal'] );
 		$this->assertTrue( $status['overPolicy'] );
 	}
@@ -178,8 +179,8 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 				if ( '/library/collections' === $path && 'POST' === $method ) {
 					return array(
 						'status'  => 403,
-						'code'    => 'pbwp_private_requires_pro',
-						'message' => 'Private collections are a Pattern Builder Pro feature.',
+						'code'    => 'pbwp_collections_require_pro',
+						'message' => 'Collections other than Personal are a Pattern Builder Pro feature.',
 						'data'    => array( 'status' => 403, 'upgrade_url' => 'https://patternbuilderwp.com/go-pro/' ),
 					);
 				}
@@ -197,8 +198,8 @@ class Test_Cloud_Collections extends WP_UnitTestCase {
 
 		$created = $this->request( 'POST', '/pattern-builder/v1/cloud/library/collections', array( 'name' => 'Secret', 'visibility' => 'private' ) );
 		$this->assertSame( 403, $created->get_status() );
-		$this->assertSame( 'pbwp_private_requires_pro', $created->get_data()['code'] );
-		$this->assertSame( 'Private collections are a Pattern Builder Pro feature.', $created->get_data()['message'] );
+		$this->assertSame( 'pbwp_collections_require_pro', $created->get_data()['code'] );
+		$this->assertSame( 'Collections other than Personal are a Pattern Builder Pro feature.', $created->get_data()['message'] );
 		$this->assertSame( 'https://patternbuilderwp.com/go-pro/', $created->get_data()['data']['upgrade_url'] );
 
 	}

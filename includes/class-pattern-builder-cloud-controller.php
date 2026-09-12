@@ -355,7 +355,7 @@ class Pattern_Builder_Cloud_Controller {
 	}
 
 	/**
-	 * The community is browsed as an account.
+	 * The directory is browsed as an account.
 	 *
 	 * @return true|WP_Error
 	 */
@@ -363,7 +363,7 @@ class Pattern_Builder_Cloud_Controller {
 		if ( Pattern_Builder_Cloud::is_connected() ) {
 			return true;
 		}
-		return new WP_Error( 'pb_cloud_disconnected', __( 'Sign in to patternbuilderwp.com to browse community patterns.', 'pattern-builder' ), array( 'status' => 401 ) );
+		return new WP_Error( 'pb_cloud_disconnected', __( 'Sign in to patternbuilderwp.com to browse the directory.', 'pattern-builder' ), array( 'status' => 401 ) );
 	}
 
 	/**
