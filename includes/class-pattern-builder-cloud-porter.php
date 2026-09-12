@@ -333,9 +333,16 @@ class Pattern_Builder_Cloud_Porter {
 	/**
 	 * Point a pattern's block style variations at the collection carrying it.
 	 *
-	 * Both halves have to move together: the `is-style-{slug}` class in the
-	 * markup — which appears in the block comment's `className` and again in
-	 * the saved HTML — and the `slug` of the definition travelling beside it.
+	 * Three halves, really: the `is-style-{slug}` class in the markup — which
+	 * appears in the block comment's `className` and again in the saved HTML —
+	 * the `slug` of the definition travelling beside it, and any
+	 * `is-style-{slug}` inside that definition's own `css`, where a variation
+	 * reaches for another by class (`& .is-style-other`). All three move by
+	 * the same anchored substitution, so a rename cannot leave one of them
+	 * pointing at a name that is no longer there. Only the slugs actually
+	 * travelling are rewritten, which is what leaves a reference to one of
+	 * WordPress's own — `is-style-outline` — alone.
+	 *
 	 * By string substitution rather than a reserialize, for the same reason
 	 * `rewrite_references()` is: reserializing would normalize markup nobody
 	 * asked to change.
@@ -370,6 +377,29 @@ class Pattern_Builder_Cloud_Porter {
 
 			$variation['slug'] = $to;
 			$renamed[]         = $variation;
+		}
+
+		/*
+		 * The definitions are rewritten in a second pass, over the *renamed*
+		 * list, so that a variation whose CSS names a sibling is stamped for
+		 * every slug travelling rather than only the ones seen so far.
+		 */
+		foreach ( $renamed as $index => $variation ) {
+			if ( ! isset( $variation['styles']['css'] ) || ! is_string( $variation['styles']['css'] ) ) {
+				continue;
+			}
+
+			$css = $variation['styles']['css'];
+			foreach ( $variations as $original ) {
+				$from = (string) $original['slug'];
+				$css  = preg_replace(
+					'/\bis-style-' . preg_quote( $from, '/' ) . '(?![a-z0-9-])/',
+					'is-style-' . $prefix . '-' . $from,
+					$css
+				);
+			}
+
+			$renamed[ $index ]['styles']['css'] = $css;
 		}
 
 		return array( $content, $renamed );
@@ -1302,12 +1332,30 @@ class Pattern_Builder_Cloud_Porter {
 		 * what this site already calls by that name.
 		 */
 		$variations_written = array();
+		$variations_refused = array();
 		if ( ! empty( $pbp['variations'] ) && is_array( $pbp['variations'] ) ) {
 			foreach ( $pbp['variations'] as $variation ) {
 				$installed = Pattern_Builder_Block_Style_Variations::install( $variation );
+
+				/*
+				 * A variation whose CSS this site will not write costs that
+				 * one look, not the pattern: the markup still carries the
+				 * class, everything else installs, and the refusal is reported
+				 * with its reason rather than swallowed. Any other failure is
+				 * still fatal, because it means the write itself went wrong.
+				 */
 				if ( is_wp_error( $installed ) ) {
-					return $installed;
+					if ( 'pb_variation_css_refused' !== $installed->get_error_code() ) {
+						return $installed;
+					}
+
+					$variations_refused[] = array(
+						'slug'   => (string) $variation['slug'],
+						'reason' => $installed->get_error_message(),
+					);
+					continue;
 				}
+
 				if ( 'written' === $installed ) {
 					$variations_written[] = (string) $variation['slug'];
 				}
@@ -1333,6 +1381,7 @@ class Pattern_Builder_Cloud_Porter {
 		$result['dependencies']      = $dependencies;
 		$result['tokensWritten']     = $tokens_written;
 		$result['variationsWritten'] = $variations_written;
+		$result['variationsRefused'] = $variations_refused;
 		return $result;
 	}
 

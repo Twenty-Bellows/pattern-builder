@@ -20,6 +20,7 @@ require_once __DIR__ . '/class-pattern-builder-editor.php';
 require_once __DIR__ . '/class-pattern-builder-migration.php';
 require_once __DIR__ . '/class-pattern-builder-cloud.php';
 require_once __DIR__ . '/class-pattern-builder-theme-json.php';
+require_once __DIR__ . '/class-safe-css.php';
 require_once __DIR__ . '/class-pattern-builder-theme-styles.php';
 require_once __DIR__ . '/class-pattern-builder-block-style-variations.php';
 require_once __DIR__ . '/class-pattern-builder-markup-checks.php';

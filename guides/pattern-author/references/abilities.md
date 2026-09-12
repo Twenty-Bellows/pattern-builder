@@ -221,11 +221,31 @@ the root a left/right padding in `set-global-styles`: without it the padding
 sits on the body, and every `alignfull` band is inset by it instead of reaching
 the edges of the window.
 
-**Neither accepts raw CSS.** WordPress does not sanitize a theme.json `css`
-property; it gates it on the `edit_css` capability instead, because a string
-that closes its own selector writes rules for the whole document. Both refuse
-it, and the service will not store one either, so a variation carrying CSS
-cannot travel with a pattern.
+**`set-global-styles` does not accept raw CSS.** WordPress does not sanitize a
+theme.json `css` property; it gates it on the `edit_css` capability instead,
+because a string that closes its own selector writes rules for the whole
+document — and a `css` at the root or on an element is scoped to nothing a
+pattern brought with it.
+
+**`add-block-style-variation` does**, at the top of its `styles` and nowhere
+deeper, because there the selector is a class the pattern's own markup carries.
+It is the only way to write a pseudo-element, a descendant rule or a hover
+state into a variation, and it travels with the pattern. What goes in is a
+sequence of declarations and then nested rules anchored on `&`:
+
+```json
+{"styles": {"css": "position: relative; & > * { z-index: 1; } &::before { content: \"\"; inset: 0; }"}}
+```
+
+A safe-subset check decides what is accepted, and it refuses rather than
+strips: no function outside a fixed allow list (so no `url()`, no
+`image-set()`, no `attr()`), no at-rule so no `@media`, no comments, no `<`
+anywhere at all, no `,`, `+` or `~` in a selector, no backslash outside a
+quoted string, no rule nested inside a rule, and a declaration must come
+before the first nested rule. A refusal names the rule and the offending
+fragment, so read it rather than guessing. Full details, including the caps
+and why each ban exists, are in
+[`references/design-system.md`](design-system.md).
 
 ## The cloud, through the site's connection
 

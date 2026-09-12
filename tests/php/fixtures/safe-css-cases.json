@@ -1,0 +1,242 @@
+{
+	"accept": [
+		{
+			"name": "theme-band-dark",
+			"css": "position: relative; overflow: hidden; & > * { position: relative; z-index: 1; } &::before { content: \"\"; position: absolute; inset: 0; z-index: 0; background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px); background-size: 22px 22px; -webkit-mask-image: radial-gradient(80% 100% at 50% 50%, #000 0%, transparent 80%); mask-image: radial-gradient(80% 100% at 50% 50%, #000 0%, transparent 80%); } & .wp-block-button.is-style-outline .wp-block-button__link { color: var(--wp--preset--color--surface); border-color: rgba(255, 255, 255, 0.4); }"
+		},
+		{
+			"name": "theme-card-featured",
+			"css": "height: 100%; box-shadow: 0 16px 40px -20px rgba(79, 70, 229, 0.35);"
+		},
+		{
+			"name": "theme-card",
+			"css": "height: 100%; transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease; &:hover { border-color: rgba(79, 70, 229, 0.35); box-shadow: 0 12px 32px -16px rgba(79, 70, 229, 0.25); transform: translateY(-2px); }"
+		},
+		{
+			"name": "theme-check-line",
+			"css": "position: relative; padding: 6px 0 6px 30px; &::before { content: \"\\2713\"; position: absolute; left: 0; top: 6px; width: 20px; height: 20px; border-radius: 50%; background: var(--wp--preset--color--surface-accent); color: var(--wp--preset--color--accent); font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }"
+		},
+		{
+			"name": "theme-check-list",
+			"css": "list-style: none; padding: 0; & li { position: relative; padding: 6px 0 6px 30px; } & li::before { content: \"\\2713\"; position: absolute; left: 0; top: 6px; width: 20px; height: 20px; border-radius: 50%; background: var(--wp--preset--color--surface-accent); color: var(--wp--preset--color--accent); font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }"
+		},
+		{
+			"name": "theme-docs-nav",
+			"css": "list-style: none; padding: 0; margin: 0; & li { margin: 0; } & a { display: block; padding: 6px 12px; border-left: 2px solid transparent; color: var(--wp--preset--color--text-muted); text-decoration: none; } & a:hover { color: var(--wp--preset--color--ink); } & a[aria-current='page'] { color: var(--wp--preset--color--accent); border-left-color: var(--wp--preset--color--accent); font-weight: 600; }"
+		},
+		{
+			"name": "theme-hero",
+			"css": "position: relative; overflow: hidden; & > * { position: relative; z-index: 1; } &::before { content: \"\"; position: absolute; inset: 0; z-index: 0; background-image: radial-gradient(rgba(20, 20, 31, 0.07) 1px, transparent 1px); background-size: 22px 22px; -webkit-mask-image: radial-gradient(70% 90% at 50% 0%, #000 0%, transparent 75%); mask-image: radial-gradient(70% 90% at 50% 0%, #000 0%, transparent 75%); } &::after { content: \"\"; position: absolute; inset: 0; z-index: 0; background: radial-gradient(60% 80% at 50% 0%, rgba(79, 70, 229, 0.09) 0%, rgba(79, 70, 229, 0) 70%); }"
+		},
+		{
+			"name": "theme-icon-tile",
+			"css": "display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px;"
+		},
+		{
+			"name": "theme-pill",
+			"css": "display: inline-block; width: fit-content;"
+		},
+		{
+			"name": "theme-plain-list",
+			"css": "list-style: none; padding: 0; & li { margin: 0 0 10px; }"
+		},
+		{
+			"name": "theme-price",
+			"css": "& small { font-size: 0.9375rem; font-weight: 500; color: var(--wp--preset--color--text-muted); letter-spacing: 0; }"
+		},
+		{
+			"name": "theme-screenshot",
+			"css": "overflow: hidden; background: var(--wp--preset--color--surface); box-shadow: 0 24px 60px -24px rgba(20, 20, 31, 0.25), 0 4px 16px rgba(20, 20, 31, 0.06); & img { display: block; width: 100%; height: auto; border-radius: 11px; }"
+		},
+		{
+			"name": "bare-declaration-list",
+			"css": "display: flex; gap: 12px; align-items: center;"
+		},
+		{
+			"name": "pseudo-element-rule",
+			"css": "&::after { content: \"\"; display: block; inset: 0; }"
+		},
+		{
+			"name": "hover-rule",
+			"css": "opacity: 1; &:hover { opacity: 0.8; }"
+		},
+		{
+			"name": "child-combinator-rule",
+			"css": "& > * { margin: 0; }"
+		},
+		{
+			"name": "attribute-selector-rule",
+			"css": "& a[aria-current='page'] { font-weight: 600; }"
+		},
+		{
+			"name": "escaped-glyph-in-a-string",
+			"css": "&::before { content: \"\\2713\"; }"
+		},
+		{
+			"name": "single-argument-selector-function",
+			"css": "& li:not(.is-hidden) { display: block; }"
+		},
+		{
+			"name": "custom-property-and-var",
+			"css": "--pb-gap: 12px; & > * { margin-block: var(--pb-gap); }"
+		},
+		{
+			"name": "important",
+			"css": "display: block !important;"
+		},
+		{
+			"name": "a-string-that-only-looks-like-a-fetch",
+			"css": "content: \"\\75 rl(x)\";"
+		},
+		{
+			"name": "written-across-several-lines",
+			"css": "position: relative;\n\n& > * {\n\tz-index: 1;\n}\n\n&::before {\n\tcontent: \"\";\n\tinset: 0;\n}\n"
+		},
+		{
+			"name": "non-ascii-in-a-string",
+			"css": "content: \"→\";"
+		}
+	],
+	"reject": [
+		{
+			"name": "selector-escape",
+			"css": "color: red; } body { background: red; } .x {",
+			"because": "a declaration cannot close a block and open another"
+		},
+		{
+			"name": "remote-fetch",
+			"css": "background: url(https://evil.test/x.png);",
+			"because": "url() is not a function a variation may call"
+		},
+		{
+			"name": "escape-obfuscation",
+			"css": "background: u\\72l(https://evil.test/x.png);",
+			"because": "a backslash outside a string can spell url( past a name check"
+		},
+		{
+			"name": "at-rule-import",
+			"css": "@import url(https://evil.test/x.css);",
+			"because": "@ is not allowed anywhere"
+		},
+		{
+			"name": "at-rule-media",
+			"css": "@media (min-width: 600px) { color: red; }",
+			"because": "@ is not allowed anywhere, and core cannot place an at-rule here in any case"
+		},
+		{
+			"name": "element-break-out",
+			"css": "content: \"</style><script>alert(1)</script>\";",
+			"because": "< ends the style element whatever CSS thinks a string is"
+		},
+		{
+			"name": "sibling-reach",
+			"css": "& + p { display: none; }",
+			"because": "a sibling combinator reaches outside the block the pattern carries"
+		},
+		{
+			"name": "general-sibling-reach",
+			"css": "& ~ p { display: none; }",
+			"because": "a sibling combinator reaches outside the block the pattern carries"
+		},
+		{
+			"name": "unanchored-rule",
+			"css": "body { background: red; }",
+			"because": "a nested rule must be anchored on &"
+		},
+		{
+			"name": "comma-escape-scoped",
+			"css": "& , body { background: red; }",
+			"because": "core's scope_selector() distributes over a comma"
+		},
+		{
+			"name": "comma-escape-appended",
+			"css": "&.a, body { background: red; }",
+			"because": "the comma puts body at the top level of the emitted selector list"
+		},
+		{
+			"name": "legacy-execution",
+			"css": "width: expression(alert(1));",
+			"because": "expression() is not a function a variation may call"
+		},
+		{
+			"name": "unknown-function",
+			"css": "background: image-set(\"x.png\" 1x);",
+			"because": "a function that is not on the allow list is refused, not ignored"
+		},
+		{
+			"name": "attr-function",
+			"css": "content: attr(href);",
+			"because": "attr() reads the destination document"
+		},
+		{
+			"name": "bare-parenthesis",
+			"css": "width: (10px);",
+			"because": "a parenthesis with no function name in front of it"
+		},
+		{
+			"name": "nested-braces",
+			"css": "& div { & p { color: red; } }",
+			"because": "core reads one level of nesting and drops the rest"
+		},
+		{
+			"name": "unterminated-string",
+			"css": "content: \"oops;",
+			"because": "a quoted string was never closed"
+		},
+		{
+			"name": "comment",
+			"css": "color: red; /* } body { background: blue; } */",
+			"because": "comments are refused rather than stripped"
+		},
+		{
+			"name": "ampersand-in-a-value",
+			"css": "content: \"a & b\";",
+			"because": "core splits the string on every &, quoted or not"
+		},
+		{
+			"name": "declaration-after-a-rule",
+			"css": "&:hover { color: red; } background: blue;",
+			"because": "core folds it into the rule above it"
+		},
+		{
+			"name": "unclosed-rule",
+			"css": "& li { color: red;",
+			"because": "a nested rule was never closed"
+		},
+		{
+			"name": "not-a-declaration",
+			"css": "color red;",
+			"because": "a declaration is \"property: value\""
+		},
+		{
+			"name": "stray-exclamation",
+			"css": "color: red !important !;",
+			"because": "! is only allowed as !important"
+		},
+		{
+			"name": "oversized",
+			"css": "margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; margin-block-start: 1px; ",
+			"because": "past the 2000-character limit"
+		},
+		{
+			"name": "too-many-rules",
+			"css": "& .r0 { color: red; }& .r1 { color: red; }& .r2 { color: red; }& .r3 { color: red; }& .r4 { color: red; }& .r5 { color: red; }& .r6 { color: red; }& .r7 { color: red; }& .r8 { color: red; }& .r9 { color: red; }& .r10 { color: red; }& .r11 { color: red; }& .r12 { color: red; }& .r13 { color: red; }& .r14 { color: red; }& .r15 { color: red; }& .r16 { color: red; }& .r17 { color: red; }& .r18 { color: red; }& .r19 { color: red; }& .r20 { color: red; }",
+			"because": "past the 20-rule limit"
+		},
+		{
+			"name": "too-many-declarations",
+			"css": "& p { margin: 0px; margin: 1px; margin: 2px; margin: 3px; margin: 4px; margin: 5px; margin: 6px; margin: 7px; margin: 8px; margin: 9px; margin: 10px; margin: 11px; margin: 12px; margin: 13px; margin: 14px; margin: 15px; margin: 16px; margin: 17px; margin: 18px; margin: 19px; margin: 20px; margin: 21px; margin: 22px; margin: 23px; margin: 24px; margin: 25px; margin: 26px; margin: 27px; margin: 28px; margin: 29px; margin: 30px; margin: 31px; margin: 32px; margin: 33px; margin: 34px; margin: 35px; margin: 36px; margin: 37px; margin: 38px; margin: 39px; margin: 40px; }",
+			"because": "past the 40-declaration limit"
+		},
+		{
+			"name": "control-byte",
+			"css": "color: red;\u0000",
+			"because": "a CSS tokenizer substitutes or ignores a control byte rather than reading it literally"
+		},
+		{
+			"name": "form-feed",
+			"css": "color:\f red;",
+			"because": "the same, for the one whitespace character nobody writes"
+		}
+	]
+}

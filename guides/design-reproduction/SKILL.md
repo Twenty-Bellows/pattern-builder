@@ -167,9 +167,15 @@ what and where.
 - **Templates and template parts.** Nothing here writes them. A header and
   footer become patterns referenced by each page — same rendering, not the same
   block-theme structure.
-- **Anything needing CSS theme.json has no property for** — pseudo-elements,
-  `list-style`, transforms, transitions. Rebuild from real blocks and say what
-  changed.
+- **Anything needing CSS outside a block style variation.** A variation may
+  carry a `css` string, which covers most of what theme.json has no property
+  for — pseudo-elements, `list-style`, transforms, transitions, hover states —
+  scoped to the blocks carrying its class. Reach for that first;
+  `pattern-author`'s `references/design-system.md` has the subset and what it
+  refuses. What stays out of reach is anything needing a media query (core
+  cannot place an at-rule there), a comma or a sibling combinator in a
+  selector, or a rule on something the pattern's own markup does not carry.
+  Rebuild those from real blocks and say what changed.
 - **Variable font axes.** The font collection serves fixed instances, one file
   per weight. Ask `list-fonts` for the family before promising a match.
 - **Images you only have a picture of.** Use placeholders and hand back the

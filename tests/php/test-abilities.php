@@ -1101,6 +1101,63 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * What an agent is *told* about CSS has to match what the site accepts.
+	 *
+	 * The guides are the only thing an agent reaching this site over HTTP
+	 * reads before it writes, and a stale refusal is the expensive kind of
+	 * wrong: it does not error, it makes the agent build around a limit that
+	 * is no longer there — restating a hover state on every block, or
+	 * declining a pseudo-element it could have had. So the design-system
+	 * guide has to name the `css` property, and no served guide may still
+	 * say a variation's CSS cannot travel.
+	 *
+	 * Asserted on the served text rather than on the files, because the
+	 * serving path is what an agent actually receives, and a theme's filter
+	 * can replace any of it.
+	 */
+	public function test_no_guide_still_tells_an_agent_a_variations_css_is_refused() {
+		/*
+		 * Two guides have to carry it, for different reasons. The
+		 * design-system one is where an agent learns what a variation may
+		 * hold. The reproduction one is the document whose *job* is to
+		 * enumerate what cannot be rebuilt, so a limit that has been lifted
+		 * and left listed there is the expensive kind of stale.
+		 */
+		foreach ( array( 'design-system', 'reproduction' ) as $name ) {
+			$this->assertStringContainsString(
+				'`css`',
+				$this->abilities->execute_authoring_guide( array( 'guide' => $name ) )['content'],
+				'The ' . $name . ' guide no longer tells an agent a block style variation may carry CSS.'
+			);
+		}
+
+		/*
+		 * Claims that were true before the subset existed and are wrong now.
+		 * `set-global-styles` still refuses a `css` outright, so the blanket
+		 * wording is deliberately not on this list — only the variation ones.
+		 */
+		$stale = array(
+			'cannot travel with a pattern',
+			'Neither accepts raw CSS',
+			'Both refuse raw CSS',
+		);
+
+		$names = wp_list_pluck( $this->abilities->execute_authoring_guide()['guides'], 'name' );
+
+		foreach ( $names as $name ) {
+			$content = $this->abilities->execute_authoring_guide( array( 'guide' => $name ) )['content'];
+
+			foreach ( $stale as $claim ) {
+				$this->assertStringNotContainsString(
+					$claim,
+					$content,
+					'The ' . $name . ' guide still tells an agent "' . $claim . '", which stopped being true when block style variations began carrying CSS.'
+				);
+			}
+		}
+	}
+
+	/**
 	 * A guide the index cannot serve is worse than one that does not exist:
 	 * the skill tells the reader to go and read it, and over the wire there
 	 * is nothing there. So every reference the index document makes to
