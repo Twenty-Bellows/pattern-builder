@@ -70,6 +70,7 @@ class Pattern_Builder_Entity {
 				'rest_namespace'          => 'pattern-builder/v1',
 				'rest_base'               => 'patterns',
 				'rest_controller_class'   => Pattern_Builder_REST_Patterns_Controller::class,
+				// Registers the REST routes after the built-in post type routes, as wp_template does.
 				'late_route_registration' => true,
 				'capability_type'         => array( 'pb_pattern', 'pb_patterns' ),
 				'capabilities'            => array(

@@ -1131,6 +1131,8 @@ class Pattern_Builder_Abilities {
 				'meta'                => array(
 					'show_in_rest' => true,
 					'annotations'  => array(
+						// These annotations select the HTTP method: readonly is GET,
+						// destructive and idempotent together are DELETE, anything else POST.
 						'readonly'    => false,
 						'destructive' => false,
 						'idempotent'  => false,

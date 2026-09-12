@@ -1,6 +1,6 @@
 # Collections in Pattern Builder
 
-*Decided 2026-09-02, and kept current since. How collections work in the plugin. The service side — definitions, tiers, data model, REST contract, decisions D30–D36 — is in the [patternbuilderwp.com repository's `docs/collections.md`](https://github.com/Twenty-Bellows/patternbuilderwp.com/blob/main/docs/collections.md); this document is what the plugin builds on top of that contract.*
+How collections work in the plugin. The service side — definitions, tiers, data model and REST contract — is in the [patternbuilderwp.com repository's `docs/collections.md`](https://github.com/Twenty-Bellows/patternbuilderwp.com/blob/main/docs/collections.md); this is what the plugin builds on top of that contract.
 
 ## 1. What changes for the user
 
@@ -95,22 +95,3 @@ No ability changes visibility or deletes a collection. The authoring guide's `ab
 - **PHP** (`tests/php/`, `pre_http_request` mocked as the cloud tests do today): every new proxy route relays the service's refusals verbatim; `install_collection()` skips installed patterns, continues past a failure and files the category; an installed pattern carries its cloud name; each ability is registered, refuses disconnected, and `install-collection` produces per-pattern results.
 - **JS** (`tests/unit/`): the collection picker's default and inline create; the save-collection flow's progress and failure list; the token-union computation.
 - **Manual**: `tests/e2e/cloud-roundtrip.php` extended to upload into a collection and install that collection on a second site.
-
-## 9. Order of work (one pull request, commits in this order)
-
-1. Proxy routes, `/cloud/status` shape, the categories option.
-2. Community tab: tiles, collection view, search groups.
-3. Save collection: porter method, the flow, the footprint.
-4. Uploaded tab: rail, create, header actions, meter, over-policy banner.
-5. Upload picker in the cloud panel.
-6. Abilities and the authoring guide.
-7. `CLAUDE.md`, `readme.txt`, and the docs pages on the website (in that repository).
-
-## 10. Acceptance
-
-- Disconnected, every cloud route and every new ability refuses with the connect message; nothing installs without a connection.
-- A whole collection installs in one action into the chosen destination, with one tokens step, progress, skipped-if-installed, and a failure list; the patterns carry the collection's local category and the inserter shows its title.
-- Upload into a second collection asks; upload with only Personal does not; a public target says so.
-- A free account cannot create a private collection from the plugin or from an agent, and sees the cap on Personal; Pro can.
-- Delete says the patterns go with the collection, and offers no move.
-- `npm run lint:js`, `composer lint`, `npm run test:unit` and the PHP suite (SQLite route in `CLAUDE.md`) pass.

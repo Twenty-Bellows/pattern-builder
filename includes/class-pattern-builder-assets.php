@@ -621,7 +621,9 @@ class Pattern_Builder_Assets {
 	 * Shrink an image whose longest edge is over the cap.
 	 *
 	 * @param string $file Path to the image, modified in place.
-	 * @param string $mime The image's real mime type, as sniffed from the file.
+	 * @param string $mime The image's real mime type, as sniffed from the file. Passed
+	 *                     explicitly: the file is still under a .tmp name, and the editor
+	 *                     would otherwise take the output format from that extension.
 	 * @return string|\WP_Error Path holding the image to go on with, which is not
 	 * necessarily the path passed in.
 	 */

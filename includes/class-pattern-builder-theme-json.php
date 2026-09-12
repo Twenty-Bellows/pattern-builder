@@ -89,6 +89,7 @@ class Pattern_Builder_Theme_Json {
 				return new WP_Error( 'pb_cloud_theme_json_write', __( 'theme.json could not be written.', 'pattern-builder' ), array( 'status' => 500 ) );
 			}
 		}
+		// Whatever just changed, the merged data every reader sees is now stale.
 		wp_clean_theme_json_cache();
 
 		return true;

@@ -375,6 +375,7 @@ class Pattern_Builder_Preview {
 			);
 		}
 		if ( isset( $bundled[ $slug ] ) ) {
+			// Without a theme root, WP_Theme_JSON_Resolver returns the theme with every preset emptied.
 			register_theme_directory( plugin_dir_path( PATTERN_BUILDER_FILE ) . 'themes' );
 		}
 
@@ -609,6 +610,8 @@ class Pattern_Builder_Preview {
 
 		wp_cache_add( self::STAND_IN_ID, $post, 'posts' );
 
+		// core/post-content reads the global rather than its context, so this is the only way
+		// to tell it what to render. The previous value goes back before the request ends.
 		$this->displaced_post = isset( $GLOBALS['post'] ) ? $GLOBALS['post'] : null;
 		$GLOBALS['post']      = $post; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 

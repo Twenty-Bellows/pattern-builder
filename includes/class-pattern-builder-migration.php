@@ -78,6 +78,7 @@ class Pattern_Builder_Migration {
 			"SELECT ID, post_name FROM {$wpdb->posts} WHERE post_type = 'tbell_pattern_block'"
 		);
 
+		// The mirror rows are the ID -> slug map; read them before anything deletes them.
 		$ref_map = array();
 
 		foreach ( $mirrors as $mirror ) {

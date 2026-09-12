@@ -699,6 +699,7 @@ class Pattern_Builder_Fonts {
 
 		add_filter( 'upload_mimes', array( '\WP_Font_Utils', 'get_allowed_font_mime_types' ) );
 		add_filter( 'upload_dir', '_wp_filter_font_directory' );
+		// wp_handle_sideload() takes this by reference, so it has to be a variable.
 		$file = array(
 			'name'     => $filename,
 			'tmp_name' => $temp,
@@ -790,6 +791,7 @@ class Pattern_Builder_Fonts {
 		if ( ! in_array( $extension, self::FILE_TYPES, true ) ) {
 			$extension = 'woff2';
 		}
+		// A variable font's weight is a range; the space would be escaped in every URL naming the file.
 		$weight = str_replace( ' ', '-', (string) $face['weight'] );
 
 		return sanitize_file_name( $slug . '-' . $weight . '-' . $face['style'] . '.' . $extension );
