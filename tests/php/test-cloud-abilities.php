@@ -316,8 +316,8 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 				if ( '/library/collections' === $path && 'POST' === $method ) {
 					return array(
 						'status'  => 403,
-						'code'    => 'pbwp_private_requires_pro',
-						'message' => 'Private collections are a Pattern Builder Pro feature.',
+						'code'    => 'pbwp_collections_require_pro',
+						'message' => 'Collections other than Personal are a Pattern Builder Pro feature.',
 						'data'    => array( 'status' => 403, 'upgrade_url' => 'https://patternbuilderwp.com/go-pro/' ),
 					);
 				}
@@ -328,7 +328,7 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 		$result = $this->abilities->execute_create_collection( array( 'name' => 'Secret', 'slug' => 'secret', 'description' => 'Mine.' ) );
 
 		$this->assertWPError( $result );
-		$this->assertSame( 'pbwp_private_requires_pro', $result->get_error_code() );
+		$this->assertSame( 'pbwp_collections_require_pro', $result->get_error_code() );
 		$this->assertSame( 'https://patternbuilderwp.com/go-pro/', $result->get_error_data()['upgrade_url'] );
 
 		$sent = json_decode( end( $this->seen )['body'], true );

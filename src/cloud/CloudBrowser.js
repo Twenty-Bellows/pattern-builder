@@ -577,7 +577,7 @@ export function CloudDetails( {
 				<Text variant="muted" size="12px">
 					{ source === 'library'
 						? __( 'Cloud pattern', 'pattern-builder' )
-						: __( 'Community pattern', 'pattern-builder' ) }
+						: __( 'Directory pattern', 'pattern-builder' ) }
 				</Text>
 
 				<Flex className="pattern-builder-details__actions" gap={ 2 }>
@@ -848,7 +848,7 @@ export function TokensList( { missing } ) {
 
 /**
  * The single-pattern save: a destination, then the tokens the site lacks, then the download
- * — as a hook, so the Community and Uploaded tabs share one flow and render its two modals
+ * — as a hook, so the Directory and Uploaded tabs share one flow and render its two modals
  * where they like.
  *
  * @param {Object}   options              Hook options.
@@ -1021,7 +1021,7 @@ export function useDownloadFlow( { source, onDownloaded } ) {
 
 /**
  * The cloud browsing surface: connect state and the account bar, then the Uploaded tab (the
- * account's collections and patterns) or the Community tab (public collections first, then
+ * account's collections and patterns) or the Directory tab (published collections first, then
  * patterns) — rendered in place of the local grid when a cloud tab is active.
  *
  * @param {Object}   props               Component props.
@@ -1187,11 +1187,11 @@ export function CloudBrowser( {
 					intro={
 						isLibrary
 							? __(
-									'Keep a pattern library on patternbuilderwp.com: upload patterns from this site, download them anywhere, and share collections with the community. Private by default, public if you want to share.',
+									'Keep a pattern library on patternbuilderwp.com: upload patterns from this site and install them on any other. Private, always.',
 									'pattern-builder'
 							  )
 							: __(
-									'Sign in to browse community collections and add them to this site. A free account you can use to keep your own patterns in the cloud too.',
+									'Sign in to browse the collections Twenty Bellows and partner studios publish, and add them to this site. A free account you can use to keep your own patterns in the cloud too.',
 									'pattern-builder'
 							  )
 					}
@@ -1201,7 +1201,7 @@ export function CloudBrowser( {
 									'Take your patterns with you',
 									'pattern-builder'
 							  )
-							: __( 'Community Collections', 'pattern-builder' )
+							: __( 'Curated Collections', 'pattern-builder' )
 					}
 					onConnected={ ( data ) => {
 						setStatus( data );
@@ -1300,7 +1300,7 @@ export function CloudBrowser( {
 				] }
 			>
 				{ __(
-					'Confirm your email address to upload patterns, install from the community, and go Pro. The link is in your inbox.',
+					'Confirm your email address to upload patterns, install from the directory, and go Pro. The link is in your inbox.',
 					'pattern-builder'
 				) }
 			</Notice>

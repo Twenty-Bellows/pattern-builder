@@ -161,7 +161,7 @@ class Pattern_Builder_Cloud_Abilities {
 			'pattern-builder/list-collections',
 			array(
 				'label'               => __( 'List cloud collections', 'pattern-builder' ),
-				'description'         => __( 'Lists collections on patternbuilderwp.com through this site’s connection: the community’s public and premium collections (scope "community", the default), or the connected account’s own, Personal first (scope "mine"). Each carries its owner, count, visibility and, for the community, a public URL. Requires the WordPress user to have connected Pattern Builder to a patternbuilderwp.com account.', 'pattern-builder' ),
+				'description'         => __( 'Lists collections on patternbuilderwp.com through this site’s connection: the directory’s public and premium collections (scope "community", the default), or the connected account’s own, Personal first (scope "mine"). Each carries its owner, count, visibility and, for the directory, a public URL. Requires the WordPress user to have connected Pattern Builder to a patternbuilderwp.com account.', 'pattern-builder' ),
 				'category'            => Pattern_Builder_Abilities::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -172,7 +172,7 @@ class Pattern_Builder_Cloud_Abilities {
 						),
 						'search' => array(
 							'type'        => 'string',
-							'description' => 'Community only: match collection titles and descriptions.',
+							'description' => 'Directory only: match collection titles and descriptions.',
 						),
 						'page'   => array( 'type' => 'integer' ),
 					),
@@ -320,7 +320,7 @@ class Pattern_Builder_Cloud_Abilities {
 	}
 
 	/**
-	 * Search the community's patterns.
+	 * Search the directory's patterns.
 	 */
 	private function register_search_cloud_patterns() {
 		wp_register_ability(
@@ -399,7 +399,7 @@ class Pattern_Builder_Cloud_Abilities {
 			'pattern-builder/install-collection',
 			array(
 				'label'               => __( 'Install a cloud collection', 'pattern-builder' ),
-				'description'         => __( 'Installs every pattern of a community collection onto this site in one action, as theme patterns or user patterns, images included and under a local pattern category named for the collection. Patterns already installed from it are skipped; a failure is reported and the rest carry on. A premium collection needs a Pattern Builder Pro account. Returns per-pattern results.', 'pattern-builder' ),
+				'description'         => __( 'Installs every pattern of a directory collection onto this site in one action, as theme patterns or user patterns, images included and under a local pattern category named for the collection. Patterns already installed from it are skipped; a failure is reported and the rest carry on. A premium collection needs a Pattern Builder Pro account. Returns per-pattern results.', 'pattern-builder' ),
 				'category'            => Pattern_Builder_Abilities::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -463,7 +463,7 @@ class Pattern_Builder_Cloud_Abilities {
 			'pattern-builder/install-cloud-pattern',
 			array(
 				'label'               => __( 'Install a cloud pattern', 'pattern-builder' ),
-				'description'         => __( 'Installs one pattern from patternbuilderwp.com onto this site, as a theme pattern or a user pattern, images included. A community pattern lands under a local category named for its collection; one from the connected account’s own library (source "library") does not. Returns the local pattern.', 'pattern-builder' ),
+				'description'         => __( 'Installs one pattern from patternbuilderwp.com onto this site, as a theme pattern or a user pattern, images included. A directory pattern lands under a local category named for its collection; one from the connected account’s own library (source "library") does not. Returns the local pattern.', 'pattern-builder' ),
 				'category'            => Pattern_Builder_Abilities::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -476,7 +476,7 @@ class Pattern_Builder_Cloud_Abilities {
 							'source' => array(
 								'type'        => 'string',
 								'enum'        => array( 'directory', 'library' ),
-								'description' => 'Where the pattern lives: the community directory (default), or the connected account’s own library.',
+								'description' => 'Where the pattern lives: the directory (default), or the connected account’s own library.',
 							),
 						),
 						$this->install_properties()
@@ -652,7 +652,7 @@ class Pattern_Builder_Cloud_Abilities {
 			'pattern-builder/create-collection',
 			array(
 				'label'               => __( 'Create a cloud collection', 'pattern-builder' ),
-				'description'         => __( 'Creates a private collection on the connected account. The slug is permanent and becomes part of the name of every pattern in the collection ({handle}/{collection}/{pattern}), so choose it deliberately: it cannot be changed, only replaced by making another collection. Always private: an agent never publishes, and nothing here makes a collection public, changes a visibility or deletes one — the account holder does that in Pattern Builder. On a free account the service refuses with an upgrade message, since free accounts only create public collections; upload into Personal instead.', 'pattern-builder' ),
+				'description'         => __( 'Creates a private collection on the connected account. The slug is permanent and becomes part of the name of every pattern in the collection ({handle}/{collection}/{pattern}), so choose it deliberately: it cannot be changed, only replaced by making another collection. Private, as every collection is unless a publisher makes it public: an agent never publishes, and nothing here makes a collection public, changes a visibility or deletes one — the account holder does that in Pattern Builder. On a free account the service refuses with an upgrade message, since collections of your own are a Pattern Builder Pro feature; upload into Personal instead.', 'pattern-builder' ),
 				'category'            => Pattern_Builder_Abilities::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',

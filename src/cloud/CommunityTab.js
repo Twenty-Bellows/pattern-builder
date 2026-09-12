@@ -67,7 +67,7 @@ function Pagination( { page, pages, onPage } ) {
 }
 
 /**
- * The Community tab: collections first.
+ * The Directory tab: collections first.
  *
  * @param {Object}   props              Component props.
  * @param {Element}  props.chrome       The account bar and notices the shell renders.
