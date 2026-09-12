@@ -11,10 +11,6 @@ import { useState, useEffect } from '@wordpress/element';
 /**
  * Toggles a pattern between synced and unsynced.
  *
- * For a theme pattern (pb_pattern) the choice is the `synced` entity field,
- * persisted as the pattern file's `Synced: yes` header on the next save. For
- * a user pattern (wp_block) it is core's `wp_pattern_sync_status` meta.
- *
  * @param {Object} root0             Component props.
  * @param {Object} root0.patternPost The pattern's entity record.
  * @param {string} root0.postType    The pattern's post type.
@@ -59,12 +55,6 @@ export const PatternSyncedStatusPanel = ( { patternPost, postType } ) => {
 			);
 			return;
 		}
-
-		/*
-		 * Core registers the meta with enum [partial, unsynced] — an empty
-		 * string fails REST validation. Synced is the ABSENCE of the meta,
-		 * and null is the REST meta API's delete.
-		 */
 		dispatch( 'core' ).editEntityRecord(
 			'postType',
 			'wp_block',

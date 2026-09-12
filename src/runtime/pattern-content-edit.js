@@ -1,13 +1,5 @@
 /**
  * Expands a pattern block that carries content, in the editor canvas.
- *
- * Most of the time the editor never sees one of these: core composes patterns
- * and templates on the server, and this plugin composes the content into them
- * before that happens. This covers what's left — a pattern block written by
- * hand into post content, or one added while editing a template.
- *
- * It mirrors core's own `PatternEdit`, which replaces a pattern block with the
- * blocks it stands for, and adds one step: the content goes in first.
  */
 
 import { cloneBlock } from '@wordpress/blocks';
@@ -69,11 +61,6 @@ export function PatternContentEdit( { attributes, clientId } ) {
 			const rootEditingMode = getBlockEditingMode( rootClientId );
 
 			registry.batch( () => {
-				/*
-				 * The root block is briefly set to its default editing mode, so
-				 * the replacement is allowed even where edits to non-content
-				 * blocks are disabled. Core's `PatternEdit` does the same.
-				 */
 				__unstableMarkNextChangeAsNotPersistent();
 				setBlockEditingMode( rootClientId, 'default' );
 				__unstableMarkNextChangeAsNotPersistent();
@@ -108,12 +95,9 @@ export const withPatternContent = createHigherOrderComponent(
 		const { name, attributes } = props;
 
 		if ( name === 'core/pattern' && attributes?.slug ) {
-			// A synced pattern stays linked, the way a synced pattern should.
 			if ( isSyncedPattern( attributes.slug ) ) {
 				return <SyncedPatternEditWithRecursionCheck { ...props } />;
 			}
-
-			// Any other pattern is a starting point: expand it, content and all.
 			if ( attributes.content ) {
 				return <PatternContentEdit { ...props } />;
 			}

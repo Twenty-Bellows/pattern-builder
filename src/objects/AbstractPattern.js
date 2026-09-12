@@ -2,11 +2,6 @@ import { parse } from '@wordpress/blocks';
 
 /**
  * This is a class that unifies the different types of patterns.
- *
- * Theme patterns are identified by their namespaced name (string `id`); user
- * patterns by their wp_block post ID (numeric `id`). The REST layer serves
- * `title` and `content` in `{ raw }` envelopes (the shape the editor's entity
- * layer expects); this class flattens them for display use.
  */
 export class AbstractPattern {
 	id = null;

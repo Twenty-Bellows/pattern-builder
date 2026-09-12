@@ -5,19 +5,14 @@ namespace TwentyBellows\PatternBuilder;
 use WP_Error;
 
 /**
- * The patternbuilderwp.com connection: per-WP-user token storage, the
- * in-admin credential connect, and HTTP to the service. Tokens are only
- * ever used server-side; the browser never talks to the service.
+ * The patternbuilderwp.com connection: per-WP-user token storage, the in-admin credential
+ * connect, and HTTP to the service.
  */
 class Pattern_Builder_Cloud {
-
 	const OPTION_URL = 'pattern_builder_cloud_url';
 
 	/**
-	 * The local pattern categories that stand for cloud collections:
-	 * slug => title. A pattern installed from a collection carries a
-	 * category named for it, and this is how the inserter learns the title
-	 * rather than showing the slug.
+	 * The local pattern categories that stand for cloud collections: slug => title.
 	 */
 	const OPTION_COLLECTION_CATEGORIES = 'pattern_builder_collection_categories';
 
@@ -34,12 +29,11 @@ class Pattern_Builder_Cloud {
 	}
 
 	/**
-	 * The slug of the local pattern category that stands for a cloud
-	 * collection: `pbwp-{owner}-{slug}`, unique across accounts the way the
-	 * collection's own URL is.
+	 * The slug of the local pattern category that stands for a cloud collection.
+	 * `pbwp-{owner}-{slug}`, unique across accounts the way the collection's own URL is.
 	 *
 	 * @param int    $owner Account id of the collection's owner.
-	 * @param string $slug  The collection's plain slug.
+	 * @param string $slug The collection's plain slug.
 	 * @return string
 	 */
 	public static function collection_category_slug( $owner, $slug ) {
@@ -47,8 +41,7 @@ class Pattern_Builder_Cloud {
 	}
 
 	/**
-	 * Remember a collection's title for its local category, so the inserter
-	 * can show it. Called whenever a pattern is installed from a collection.
+	 * Remember a collection's title for its local category, so the inserter can show it.
 	 *
 	 * @param array $collection { owner, slug, title }.
 	 */
@@ -77,9 +70,9 @@ class Pattern_Builder_Cloud {
 	}
 
 	/**
-	 * Register every remembered collection category with its title, on
-	 * init, so the browse grid and the block inserter show the collection's
-	 * name over a pattern installed from it rather than `pbwp-5-heroes`.
+	 * Register every remembered collection category with its title, on init, so the browse
+	 * grid and the block inserter show the collection's name over a pattern installed from
+	 * it rather than `pbwp-5-heroes`.
 	 */
 	public static function register_collection_categories() {
 		foreach ( self::collection_categories() as $slug => $title ) {
@@ -90,7 +83,7 @@ class Pattern_Builder_Cloud {
 	/**
 	 * Register one collection category, unless something already did.
 	 *
-	 * @param string $slug  Category slug.
+	 * @param string $slug Category slug.
 	 * @param string $title Category label.
 	 */
 	private static function register_collection_category( $slug, $title ) {
@@ -101,11 +94,11 @@ class Pattern_Builder_Cloud {
 	}
 
 	/**
-	 * Add the service's port to core's safe-port list when the service runs
-	 * on a nonstandard one (development instances).
+	 * Add the service's port to core's safe-port list when the service runs on a
+	 * nonstandard one (development instances).
 	 *
 	 * @param int[]  $ports Allowed ports.
-	 * @param string $host  Host being validated.
+	 * @param string $host Host being validated.
 	 * @return int[]
 	 */
 	public static function allow_service_port( $ports, $host ) {
@@ -121,13 +114,13 @@ class Pattern_Builder_Cloud {
 	}
 
 	/**
-	 * Let core's hardened URL validation (which rejects loopback/private
-	 * hosts) through for the admin-configured service origin — required for
-	 * asset downloads from development service instances on localhost.
+	 * Let core's hardened URL validation (which rejects loopback/private hosts) through for
+	 * the admin-configured service origin — required for asset downloads from development
+	 * service instances on localhost.
 	 *
 	 * @param bool   $external Whether the host is already considered external.
-	 * @param string $host     Host being validated.
-	 * @param string $url      Full URL being validated.
+	 * @param string $host Host being validated.
+	 * @param string $url Full URL being validated.
 	 * @return bool
 	 */
 	public static function allow_service_host( $external, $host, $url ) {
@@ -156,8 +149,6 @@ class Pattern_Builder_Cloud {
 	 */
 	public static function service_url() {
 		$url = get_option( self::OPTION_URL );
-
-		// The constant outranks the option so declarative dev setups survive DB resets.
 		if ( defined( 'PATTERN_BUILDER_CLOUD_URL' ) && PATTERN_BUILDER_CLOUD_URL ) {
 			$url = PATTERN_BUILDER_CLOUD_URL;
 		}
@@ -176,9 +167,6 @@ class Pattern_Builder_Cloud {
 
 	/**
 	 * A REST endpoint URL on the service.
-	 *
-	 * Uses the ?rest_route= form so it works regardless of the service's
-	 * permalink configuration.
 	 *
 	 * @param string $path Route path within pbwp/v1 (leading slash).
 	 * @return string
@@ -207,12 +195,8 @@ class Pattern_Builder_Cloud {
 	}
 
 	/**
-	 * The connected account's handle — the first segment of every pattern
-	 * name it publishes (D37).
-	 *
-	 * What an installed pattern is checked against before it is given an
-	 * attribution — a pattern from your own account gets none — and what
-	 * decides whether a pattern's `Cloud:` reference is yours to update.
+	 * The connected account's handle — the first segment of every pattern name it publishes
+	 * (D37).
 	 *
 	 * @return string Empty when disconnected, or on a service too old to say.
 	 */
@@ -222,8 +206,7 @@ class Pattern_Builder_Cloud {
 	}
 
 	/**
-	 * Whether a cloud name — `{handle}/{collection}/{slug}` — is the connected
-	 * account's.
+	 * Whether a cloud name — `{handle}/{collection}/{slug}` — is the connected account's.
 	 *
 	 * @param string $name Cloud pattern name.
 	 * @return bool
@@ -236,14 +219,13 @@ class Pattern_Builder_Cloud {
 	}
 
 	/**
-	 * The connected account's pattern with this name, as the service
-	 * summarizes it — asked each time, never remembered, so an account
-	 * switch or a pattern deleted on the cloud needs no bookkeeping here.
+	 * The connected account's pattern with this name, as the service summarizes it — asked
+	 * each time, never remembered, so an account switch or a pattern deleted on the cloud
+	 * needs no bookkeeping here.
 	 *
 	 * @param string $name Cloud pattern name.
-	 * @return array|null|WP_Error The summary; null when the name is not this
-	 *                             account's or the service has no such
-	 *                             pattern; an error when it could not answer.
+	 * @return array|null|WP_Error The summary; null when the name is not this account's or
+	 * the service has no such pattern; an error when it could not answer.
 	 */
 	public static function own_pattern( $name ) {
 		if ( ! self::is_own_name( $name ) ) {
@@ -288,7 +270,7 @@ class Pattern_Builder_Cloud {
 	/**
 	 * Sign in to an existing service account with credentials.
 	 *
-	 * @param string $email    Email (or username) on the service.
+	 * @param string $email Email (or username) on the service.
 	 * @param string $password Password.
 	 * @return array|WP_Error Account info.
 	 */
@@ -305,11 +287,11 @@ class Pattern_Builder_Cloud {
 	/**
 	 * Create a service account and connect as it.
 	 *
-	 * @param string $email     Email address.
-	 * @param string $password  Password.
-	 * @param string $handle    The account's permanent handle: the first
-	 *                          segment of every pattern name it publishes.
-	 * @param string $name      Display name (optional).
+	 * @param string $email Email address.
+	 * @param string $password Password.
+	 * @param string $handle The account's permanent handle: the first segment of every
+	 * pattern name it publishes.
+	 * @param string $name Display name (optional).
 	 * @param bool   $marketing Whether the person said yes to news and offers.
 	 * @return array|WP_Error Account info.
 	 */
@@ -328,9 +310,8 @@ class Pattern_Builder_Cloud {
 
 	/**
 	 * Relay credentials to the service and store the returned grant.
-	 * Credentials pass through unlogged and unstored; only the token is kept.
 	 *
-	 * @param string $path   Service auth route.
+	 * @param string $path Service auth route.
 	 * @param array  $fields Credential fields.
 	 * @return array|WP_Error Account info.
 	 */
@@ -363,9 +344,6 @@ class Pattern_Builder_Cloud {
 	/**
 	 * Ask the service to email a password reset link.
 	 *
-	 * Unauthenticated on purpose — the person cannot sign in — and the
-	 * service answers the same whether or not the address is an account.
-	 *
 	 * @param string $email Email address.
 	 * @return array|WP_Error The service's message.
 	 */
@@ -391,8 +369,8 @@ class Pattern_Builder_Cloud {
 	}
 
 	/**
-	 * Tell the service the overlay checkout completed a purchase, so the
-	 * licence is granted now rather than when the webhook lands.
+	 * Tell the service the overlay checkout completed a purchase, so the licence is granted
+	 * now rather than when the webhook lands.
 	 *
 	 * @param int $license_id Licence ID the checkout reported.
 	 * @return array|WP_Error The account as the service now describes it.
@@ -416,8 +394,8 @@ class Pattern_Builder_Cloud {
 	 * Authenticated request to the service.
 	 *
 	 * @param string $method HTTP method.
-	 * @param string $path   Route path within pbwp/v1.
-	 * @param array  $args   { query?: array, body?: array (JSON) }.
+	 * @param string $path Route path within pbwp/v1.
+	 * @param array  $args { query?: array, body?: array (JSON) }.
 	 * @return array|WP_Error Decoded response.
 	 */
 	public static function request( $method, $path, $args = array() ) {
@@ -445,11 +423,11 @@ class Pattern_Builder_Cloud {
 	 * Multipart upload request (the PBP JSON plus asset files).
 	 *
 	 * @param string $method HTTP method (POST/PUT).
-	 * @param string $path   Route path within pbwp/v1.
-	 * @param array  $pbp    Package array.
-	 * @param array  $files  key => absolute file path.
-	 * @param array  $fields Plain fields sent beside the package, e.g. the
-	 *                       collection the pattern goes into.
+	 * @param string $path Route path within pbwp/v1.
+	 * @param array  $pbp Package array.
+	 * @param array  $files key => absolute file path.
+	 * @param array  $fields Plain fields sent beside the package, e.g. the collection the
+	 * pattern goes into.
 	 * @return array|WP_Error Decoded response.
 	 */
 	public static function upload( $method, $path, $pbp, $files, $fields = array() ) {
@@ -501,9 +479,9 @@ class Pattern_Builder_Cloud {
 	 * Generic multipart form request (plain fields plus named file fields).
 	 *
 	 * @param string $method HTTP method.
-	 * @param string $path   Route path within pbwp/v1.
+	 * @param string $path Route path within pbwp/v1.
 	 * @param array  $fields field => string value.
-	 * @param array  $files  field => { path, name, type }.
+	 * @param array  $files field => { path, name, type }.
 	 * @return array|WP_Error Decoded response.
 	 */
 	public static function form_request( $method, $path, $fields, $files = array() ) {
@@ -548,11 +526,11 @@ class Pattern_Builder_Cloud {
 	}
 
 	/**
-	 * The three things an install keeps about a collection: enough to file
-	 * the pattern under the collection's local category.
+	 * The three things an install keeps about a collection: enough to file the pattern
+	 * under the collection's local category.
 	 *
-	 * @param mixed $collection A collection summary from the service, or a
-	 *                          request's { owner, slug, title }.
+	 * @param mixed $collection A collection summary from the service, or a request's {
+	 * owner, slug, title }.
 	 * @return array { owner: int, slug: string, title: string }, or empty.
 	 */
 	public static function describe_collection( $collection ) {
@@ -609,8 +587,6 @@ class Pattern_Builder_Cloud {
 				? $data['message']
 				: __( 'The pattern service returned an error.', 'pattern-builder' );
 			$error_code = is_array( $data ) && ! empty( $data['code'] ) ? $data['code'] : 'pb_cloud_error';
-
-			// An invalid token means the connection is gone; forget it.
 			if ( 401 === $code && self::is_connected() ) {
 				delete_user_meta( get_current_user_id(), self::META_TOKEN );
 				delete_user_meta( get_current_user_id(), self::META_ACCOUNT );
@@ -620,8 +596,6 @@ class Pattern_Builder_Cloud {
 			if ( is_array( $data ) && ! empty( $data['data']['upgrade_url'] ) ) {
 				$error_data['upgrade_url'] = $data['data']['upgrade_url'];
 			}
-			// What exactly the service objected to — a rejection that names
-			// nothing is a rejection nobody can act on.
 			if ( is_array( $data ) && ! empty( $data['data']['violations'] ) ) {
 				$error_data['violations'] = array_map( 'sanitize_text_field', (array) $data['data']['violations'] );
 			}

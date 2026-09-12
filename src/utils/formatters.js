@@ -34,20 +34,14 @@ export function formatBlockMarkup( blockMarkup ) {
 }
 
 function addNewLinesToBlockMarkup( blockMarkup ) {
-	return (
-		blockMarkup
+	return blockMarkup
+		.replace(
+			/<!--(.*?)-->/gs,
+			( _, content ) => `\n<!-- ${ content.trim() } -->\n`
+		)
 
-			// Add newlines before and after each comment
-			.replace(
-				/<!--(.*?)-->/gs,
-				( _, content ) => `\n<!-- ${ content.trim() } -->\n`
-			)
-
-			.replace( /\/ -->/g, '/-->' )
-
-			// Normalize multiple newlines into a single one
-			.replace( /\n{2,}/g, '\n' )
-	);
+		.replace( /\/ -->/g, '/-->' )
+		.replace( /\n{2,}/g, '\n' );
 }
 
 function indentBlockMarkup( blockMarkup ) {
@@ -57,7 +51,6 @@ function indentBlockMarkup( blockMarkup ) {
 	const output = [];
 
 	for ( const line of lines ) {
-		// Detect closing tags/comments (should reduce indent before rendering)
 		const isClosingComment = /^<!--\s*\/[\w:-]+\s*-->$/.test( line );
 		const isClosingTag = /^<\/[\w:-]+>$/.test( line );
 
@@ -66,19 +59,11 @@ function indentBlockMarkup( blockMarkup ) {
 		}
 
 		output.push( indentStr.repeat( indentLevel ) + line );
-
-		// Detect opening comment (not self-closing)
 		const isOpeningComment =
 			/^<!--\s*[\w:-]+\b.*-->$/.test( line ) &&
 			! line.endsWith( '/ -->' );
-
-		// Detect opening tag (not self-closing)
 		const isOpeningTag = /^<([\w:-]+)(\s[^>]*)?>$/.test( line );
-
-		// Self-closing HTML tag
 		const isSelfClosingTag = /^<[^>]+\/>$/.test( line );
-
-		// Self-closing block markup
 		const isSelfClosingComment = /^<!--.*\/\s*-->$/.test( line );
 
 		if (

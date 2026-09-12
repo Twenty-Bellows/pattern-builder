@@ -1,8 +1,7 @@
 import { Icon } from '@wordpress/components';
 
 /**
- * The Pattern Builder mark: two blocks over a full-width block. Drawn in
- * currentColor so it inherits admin, editor, and dark-mode colors.
+ * The Pattern Builder mark: two blocks over a full-width block.
  *
  * @param {Object} props      Component props.
  * @param {number} props.size Pixel size of the square mark.

@@ -1,8 +1,7 @@
 <?php
 /**
- * Block style variations travelling with a pattern: what a package carries,
- * what it deliberately does not, how the names are kept apart, and what an
- * install writes.
+ * Block style variations travelling with a pattern: what a package carries, what it
+ * deliberately does not, how the names are kept apart, and what an install writes.
  *
  * @package PatternBuilder
  */
@@ -13,7 +12,6 @@ use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Porter;
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Tokens;
 
 class Test_Cloud_Variations extends WP_UnitTestCase {
-
 	/**
 	 * The writable theme directory these tests write into.
 	 *
@@ -42,18 +40,6 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 				unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 			}
 		}
-
-		/*
-		 * Two process-wide caches core never clears, both of which would
-		 * otherwise leak between these tests. `WP_Block_Styles_Registry` is a
-		 * singleton the test case does not reset, so a registered name would
-		 * follow the suite — hence the unregister below. And
-		 * `WP_Theme_JSON_Resolver::$theme_json_file_cache` keys a read partial
-		 * by *path*, and `clean_cached_data()` leaves it alone, so a second
-		 * partial written to the same filename reads as the first one for the
-		 * rest of the process — hence a distinct slug per test rather than
-		 * `card` throughout.
-		 */
 		foreach ( array( 'card', 'card-wide', 'card-ns', 'card-token', 'card-css', 'card-bad-css', 'card-css-ns', 'card-ns-inner', 'card-css-install', 'card-css-refused', 'card-install', 'studio-a-heroes-card', 'studio-a-heroes-card-ns', 'studio-a-heroes-card-css-ns', 'studio-a-heroes-card-ns-inner' ) as $slug ) {
 			if ( WP_Block_Styles_Registry::get_instance()->is_registered( 'core/group', $slug ) ) {
 				unregister_block_style( 'core/group', $slug );
@@ -78,7 +64,7 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 	/**
 	 * Write a variation partial, as `add-block-style-variation` does.
 	 *
-	 * @param string $slug   Variation slug.
+	 * @param string $slug Variation slug.
 	 * @param array  $styles Its styles.
 	 */
 	private function make_variation( $slug, $styles = array( 'border' => array( 'radius' => '999px' ) ) ) {
@@ -97,7 +83,7 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 	/**
 	 * Write a theme pattern file.
 	 *
-	 * @param string $slug    Pattern slug.
+	 * @param string $slug Pattern slug.
 	 * @param string $content Block markup.
 	 */
 	private function make_theme_pattern( $slug, $content ) {
@@ -132,9 +118,8 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A variation declared in a block's own block.json ships with WordPress,
-	 * so carrying it would be redundant at best and would collide with core's
-	 * at the far end at worst.
+	 * A variation declared in a block's own block.json ships with WordPress, so carrying it
+	 * would be redundant at best and would collide with core's at the far end at worst.
 	 */
 	public function test_a_variation_wordpress_already_has_is_not_carried() {
 		$this->make_theme_pattern(
@@ -152,9 +137,9 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A variation slug is a name in a shared namespace, so it hangs under the
-	 * collection carrying it — and both halves have to move: the class in the
-	 * markup and the slug of the definition beside it.
+	 * A variation slug is a name in a shared namespace, so it hangs under the collection
+	 * carrying it — and both halves have to move: the class in the markup and the slug of
+	 * the definition beside it.
 	 */
 	public function test_the_namespace_rewrite_moves_the_class_and_the_slug_together() {
 		$this->make_variation( 'card-ns' );
@@ -170,9 +155,9 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * `is-style-card` must not match inside `is-style-card-wide`: they are two
-	 * variations, and renaming one by prefix-match would rename the other's
-	 * class into something nothing defines.
+	 * `is-style-card` must not match inside `is-style-card-wide`: they are two variations,
+	 * and renaming one by prefix-match would rename the other's class into something
+	 * nothing defines.
 	 */
 	public function test_a_rename_does_not_reach_into_a_longer_sibling() {
 		list( $content, $variations ) = Pattern_Builder_Cloud_Porter::rewrite_variations(
@@ -188,9 +173,8 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The markup carries the class and no colour at all — the preset the
-	 * variation resolves to lives in its definition. Collecting only the
-	 * markup would ship a variation referencing a token nothing defines.
+	 * The markup carries the class and no colour at all — the preset the variation resolves
+	 * to lives in its definition.
 	 */
 	public function test_a_token_referenced_only_inside_a_variation_is_still_collected() {
 		add_filter( 'wp_theme_json_data_theme', array( $this, 'inject_accent' ) );
@@ -243,9 +227,6 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 		$this->assertTrue( file_exists( $this->theme_dir . '/styles/card-install.json' ) );
 
 		wp_clean_theme_json_cache();
-
-		// A pattern arriving from somewhere else must not repaint what this
-		// site already calls by that name.
 		$again = Pattern_Builder_Block_Style_Variations::install(
 			array_merge( $variation, array( 'styles' => array( 'border' => array( 'radius' => '0px' ) ) ) )
 		);
@@ -256,12 +237,11 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Write a partial by hand, which is how a variation gets CSS the ability
-	 * would have refused — and how one gets CSS at all in a theme nobody
-	 * built with these abilities.
+	 * Write a partial by hand, which is how a variation gets CSS the ability would have
+	 * refused — and how one gets CSS at all in a theme nobody built with these abilities.
 	 *
 	 * @param string $slug Variation slug.
-	 * @param string $css  Its `css` string.
+	 * @param string $css Its `css` string.
 	 */
 	private function make_partial_with_css( $slug, $css ) {
 		file_put_contents( // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
@@ -280,9 +260,9 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The CSS is most of what a variation does — a pseudo-element, a
-	 * descendant rule, a hover state — so a package that left it behind would
-	 * carry a look that does almost nothing at the far end.
+	 * The CSS is most of what a variation does — a pseudo-element, a descendant rule, a
+	 * hover state — so a package that left it behind would carry a look that does almost
+	 * nothing at the far end.
 	 */
 	public function test_a_package_carries_the_css_its_variation_defines() {
 		$css = 'position: relative; &::before { content: ""; inset: 0; }';
@@ -297,9 +277,9 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * CSS outside the subset still refuses the export, and says which
-	 * variation and which rule — better than letting the upload fail at the
-	 * far end with nothing local to point at.
+	 * CSS outside the subset still refuses the export, and says which variation and which
+	 * rule — better than letting the upload fail at the far end with nothing local to point
+	 * at.
 	 */
 	public function test_a_variation_carrying_unsafe_css_refuses_the_export() {
 		$this->make_partial_with_css( 'card-bad-css', 'background: url(https://evil.test/x.png);' );
@@ -315,14 +295,11 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A variation's own CSS can name a variation by class — `& .is-style-x` —
-	 * so the namespace stamp has to reach inside the string too, or the two
-	 * halves of a rename drift apart and the rule styles a class that is no
-	 * longer there.
+	 * A variation's own CSS can name a variation by class — `& .is-style-x` — so the
+	 * namespace stamp has to reach inside the string too, or the two halves of a rename
+	 * drift apart and the rule styles a class that is no longer there.
 	 */
 	public function test_the_namespace_rewrite_reaches_inside_the_css() {
-		// The outer band, whose CSS reaches for the inner piece by class, and
-		// the inner piece itself — both applied by the markup, so both travel.
 		$this->make_partial_with_css(
 			'card-css-ns',
 			'& .is-style-card-ns-inner { color: red; } & .wp-block-button.is-style-outline .wp-block-button__link { color: blue; }'
@@ -344,9 +321,6 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 
 		$carried = $exported['pbp']['variations'][ array_search( 'studio-a-heroes-card-css-ns', $slugs, true ) ];
 		$this->assertStringContainsString( 'is-style-studio-a-heroes-card-ns-inner', $carried['styles']['css'] );
-
-		// A variation WordPress itself ships is not travelling, so its class
-		// is left exactly as it was.
 		$this->assertStringContainsString( 'is-style-outline', $carried['styles']['css'] );
 		$this->assertStringNotContainsString( 'is-style-studio-a-heroes-outline', $carried['styles']['css'] );
 	}
@@ -373,10 +347,7 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The check that matters most, because this is the machine that will run
-	 * the CSS. A package can say anything; the destination decides. What it
-	 * refuses costs that one look rather than the pattern — the markup still
-	 * installs, and the refusal is reported with its reason.
+	 * The check that matters most, because this is the machine that will run the CSS.
 	 */
 	public function test_an_install_skips_a_variation_whose_css_this_site_will_not_write() {
 		$refused = Pattern_Builder_Block_Style_Variations::install(

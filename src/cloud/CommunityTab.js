@@ -67,10 +67,7 @@ function Pagination( { page, pages, onPage } ) {
 }
 
 /**
- * The Community tab: collections first. The landing is a grid of collection
- * tiles; a search shows matching collections as a row of tiles and then
- * matching patterns as the grid; opening a collection shows its patterns
- * with a whole-collection save beside the single-pattern one.
+ * The Community tab: collections first.
  *
  * @param {Object}   props              Component props.
  * @param {Element}  props.chrome       The account bar and notices the shell renders.
@@ -94,8 +91,8 @@ export function CommunityTab( {
 	const [ patterns, setPatterns ] = useState( null );
 	const [ patternsPage, setPatternsPage ] = useState( 1 );
 	const [ patternsPages, setPatternsPages ] = useState( 1 );
-	const [ open, setOpen ] = useState( null ); // { owner, slug } of the opened collection.
-	const [ opened, setOpened ] = useState( null ); // Its payload, with patterns.
+	const [ open, setOpen ] = useState( null );
+	const [ opened, setOpened ] = useState( null );
 	const [ selected, setSelected ] = useState( null );
 	const [ installedNames, setInstalledNames ] = useState( [] );
 	const [ saving, setSaving ] = useState( false );
@@ -114,9 +111,6 @@ export function CommunityTab( {
 	} );
 
 	const isSearching = search.trim() !== '';
-
-	// The cloud names this site's patterns answer to, for "installed n of m"
-	// on the tiles.
 	useEffect( () => {
 		apiFetch( { path: `${ BASE }/installed` } )
 			.then( ( data ) =>
@@ -124,8 +118,6 @@ export function CommunityTab( {
 			)
 			.catch( () => setInstalledNames( [] ) );
 	}, [ reloadKey ] );
-
-	// A new search restarts paging and closes whatever was open.
 	useEffect( () => {
 		setCollectionsPage( 1 );
 		setPatternsPage( 1 );
@@ -134,8 +126,6 @@ export function CommunityTab( {
 			setOpen( null );
 		}
 	}, [ search ] );
-
-	// The collections: the landing, or the matching ones.
 	useEffect( () => {
 		if ( open ) {
 			return;
@@ -162,8 +152,6 @@ export function CommunityTab( {
 				);
 			} );
 	}, [ open, isSearching, search, collectionsPage, createErrorNotice ] );
-
-	// The matching patterns, only while searching.
 	useEffect( () => {
 		if ( open || ! isSearching ) {
 			setPatterns( null );
@@ -181,10 +169,6 @@ export function CommunityTab( {
 			} )
 			.catch( () => setPatterns( [] ) );
 	}, [ open, isSearching, search, patternsPage ] );
-
-	// The opened collection with its patterns. A reload after an install
-	// refetches in place — the view (and a save flow showing its results)
-	// stays mounted; only opening a different collection clears it.
 	useEffect( () => {
 		if ( ! open ) {
 			setOpened( null );

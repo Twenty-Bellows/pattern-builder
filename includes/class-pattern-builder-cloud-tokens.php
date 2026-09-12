@@ -6,22 +6,11 @@ use WP_Error;
 
 /**
  * Design tokens: the preset references a pattern carries between sites.
- *
- * On upload, collect() scans the pattern's markup for every theme.json
- * preset it references (colors, gradients, spacing sizes, font sizes, font
- * families) and resolves each slug against this site's merged global
- * settings — the pattern travels with the values it actually had here.
- *
- * On download, missing() reports which referenced tokens the destination
- * site doesn't define (the destination's own definitions always win), and
- * apply() writes those into the chosen home: the theme's user Global
- * Styles post, or the active theme's theme.json file.
  */
 class Pattern_Builder_Cloud_Tokens {
-
 	/**
-	 * Token types, with the settings path their presets live under and the
-	 * key holding the value in a preset entry.
+	 * Token types, with the settings path their presets live under and the key holding the
+	 * value in a preset entry.
 	 *
 	 * @return array type => { path: string[], valueKey: string }
 	 */
@@ -53,28 +42,12 @@ class Pattern_Builder_Cloud_Tokens {
 	/**
 	 * Collect a pattern's tokens and everything its references need.
 	 *
-	 * A page pattern is mostly `core/pattern` references, and almost none of the
-	 * presets it depends on appear in its own markup — they are in the sections
-	 * it composes. Collecting only the top level under-reports what the page
-	 * uses and, worse, renders it against another theme carrying a fraction of
-	 * what it needs. An upload does not have this problem, because it sends the
-	 * whole tree and each member brings its own; anything that looks at one
-	 * composed pattern does.
-	 *
 	 * @param string $content The pattern's markup.
-	 * @param array  $seen    Slugs already walked, against a reference loop.
+	 * @param array  $seen Slugs already walked, against a reference loop.
 	 * @return array Tokens, one entry per type and slug.
 	 */
 	public static function collect_tree( $content, $seen = array() ) {
 		$tokens = self::collect( $content );
-
-		/*
-		 * A block style variation is the other place a preset reference hides.
-		 * The markup carries `is-style-{slug}` and no colour at all; the
-		 * `var:preset|color|accent` the variation resolves to lives in its
-		 * definition. Collecting only the markup ships the variation with a
-		 * token it references and nothing defining it at the far end.
-		 */
 		foreach ( Pattern_Builder_Block_Style_Variations::used_in( $content ) as $variation_slug ) {
 			$definition = Pattern_Builder_Block_Style_Variations::definition( $variation_slug );
 			if ( null === $definition || empty( $definition['styles'] ) ) {
@@ -119,9 +92,8 @@ class Pattern_Builder_Cloud_Tokens {
 	}
 
 	/**
-	 * Collect the tokens a pattern's markup references, resolved to this
-	 * site's current values. References this site can't resolve are
-	 * dropped (there is no default to carry).
+	 * Collect the tokens a pattern's markup references, resolved to this site's current
+	 * values.
 	 *
 	 * @param string $content Serialized block markup.
 	 * @return array PBP token list.
@@ -156,21 +128,13 @@ class Pattern_Builder_Cloud_Tokens {
 	/**
 	 * Every preset reference in a pattern's markup, by token type.
 	 *
-	 * Sources: named block attributes, `var:preset|…` style paths,
-	 * `var(--wp--preset--…)` custom properties, and the derived
-	 * `has-…` classes.
-	 *
 	 * @param string $content Serialized block markup.
 	 * @return array type => slug[]
 	 */
 	public static function referenced( $content ) {
-		$found = array();
-		$note  = function ( $type, $slug ) use ( &$found ) {
+		$found      = array();
+		$note       = function ( $type, $slug ) use ( &$found ) {
 			$slug = strtolower( (string) $slug );
-			// `custom` is core's word for "not a preset": a block carrying an
-			// explicit value renders `has-custom-font-size` beside whatever
-			// preset class it also has, so reading it as a slug reports a
-			// token nothing defines and nothing ever will.
 			if ( 'custom' === $slug ) {
 				return;
 			}
@@ -178,8 +142,6 @@ class Pattern_Builder_Cloud_Tokens {
 				$found[ $type ][ $slug ] = true;
 			}
 		};
-
-		// Named attributes inside block comment JSON.
 		$attr_types = array(
 			'textColor'       => 'color',
 			'backgroundColor' => 'color',
@@ -195,9 +157,6 @@ class Pattern_Builder_Cloud_Tokens {
 				}
 			}
 		}
-
-		// Style-object preset paths and rendered custom properties. The
-		// wire spelling of each type is kebab-case.
 		$path_types = array(
 			'color'       => 'color',
 			'gradient'    => 'gradient',
@@ -219,9 +178,6 @@ class Pattern_Builder_Cloud_Tokens {
 				}
 			}
 		}
-
-		// Derived classes; generic support classes (has-text-color et al.) are
-		// not preset references, so their pseudo-slugs are excluded.
 		$class_types = array(
 			'/\bhas-([a-z0-9-]+)-color\b/'               => array( 'color', array( 'text', 'link', 'border', 'icon', 'heading', 'caption', 'button' ) ),
 			'/\bhas-([a-z0-9-]+)-background-color\b/'    => array( 'color', array() ),
@@ -233,8 +189,6 @@ class Pattern_Builder_Cloud_Tokens {
 		foreach ( $class_types as $regex => $spec ) {
 			if ( preg_match_all( $regex, $content, $matches ) ) {
 				foreach ( $matches[1] as $slug ) {
-					// The specific -background-color / -border-color regexes
-					// already captured these with the right slug.
 					if ( preg_match( '/-(background|border)$/', $slug ) ) {
 						continue;
 					}
@@ -271,10 +225,9 @@ class Pattern_Builder_Cloud_Tokens {
 	}
 
 	/**
-	 * Write tokens into the chosen home. Tokens the site already defines
-	 * are skipped; values are re-validated locally (never trust the wire).
+	 * Write tokens into the chosen home.
 	 *
-	 * @param array  $tokens      PBP token list (normally missing() output).
+	 * @param array  $tokens PBP token list (normally missing() output).
 	 * @param string $destination 'user' (Global Styles) or 'theme' (theme.json).
 	 * @return array|WP_Error Slugs written, keyed by type.
 	 */
@@ -321,10 +274,10 @@ class Pattern_Builder_Cloud_Tokens {
 	}
 
 	/**
-	 * Append token presets under a config's settings paths (skipping slugs
-	 * that already exist at that path).
+	 * Append token presets under a config's settings paths (skipping slugs that already
+	 * exist at that path).
 	 *
-	 * @param array $config   theme.json-shaped config.
+	 * @param array $config theme.json-shaped config.
 	 * @param array $to_write type => token[].
 	 * @return array
 	 */
@@ -354,16 +307,6 @@ class Pattern_Builder_Cloud_Tokens {
 					'name'     => $token['name'],
 					$value_key => $token['value'],
 				);
-
-				/*
-				 * A preset occasionally carries more than its value. The one
-				 * case is a `fontFamily` naming a self-hosted font, which
-				 * needs the `fontFace` descriptors beside the stack or the
-				 * browser has nothing to load — see
-				 * `Pattern_Builder_Fonts`. Kept as a merge rather than a
-				 * second write path so there is still one implementation of
-				 * "put a preset in theme.json or in Global Styles".
-				 */
 				if ( isset( $token['extra'] ) && is_array( $token['extra'] ) ) {
 					$preset = array_merge( $preset, $token['extra'] );
 				}
@@ -378,8 +321,8 @@ class Pattern_Builder_Cloud_Tokens {
 	}
 
 	/**
-	 * Find a preset by slug in this site's merged settings, preferring
-	 * user customizations over the theme over core defaults.
+	 * Find a preset by slug in this site's merged settings, preferring user customizations
+	 * over the theme over core defaults.
 	 *
 	 * @param string $type Token type.
 	 * @param string $slug Preset slug.
@@ -395,8 +338,6 @@ class Pattern_Builder_Cloud_Tokens {
 		if ( ! is_array( $presets ) ) {
 			return null;
 		}
-
-		// Origin-keyed (default/theme/custom) or, defensively, a flat list.
 		$origins = array();
 		foreach ( array( 'custom', 'theme', 'default' ) as $origin ) {
 			if ( isset( $presets[ $origin ] ) && is_array( $presets[ $origin ] ) ) {
@@ -420,7 +361,7 @@ class Pattern_Builder_Cloud_Tokens {
 	/**
 	 * The CSS value a preset entry resolves to.
 	 *
-	 * @param string $type   Token type.
+	 * @param string $type Token type.
 	 * @param array  $preset Preset entry.
 	 * @return string
 	 */
@@ -428,7 +369,6 @@ class Pattern_Builder_Cloud_Tokens {
 		$value_key = self::types()[ $type ]['value_key'];
 
 		if ( 'fontSize' === $type && function_exists( 'wp_get_typography_font_size_value' ) ) {
-			// Applies fluid typography, matching what the site renders.
 			$value = wp_get_typography_font_size_value( $preset );
 			return is_string( $value ) ? $value : '';
 		}
@@ -437,10 +377,10 @@ class Pattern_Builder_Cloud_Tokens {
 	}
 
 	/**
-	 * The same strict per-type value grammar the service enforces —
-	 * re-run locally before anything is written (never trust the wire).
+	 * The same strict per-type value grammar the service enforces — re-run locally before
+	 * anything is written (never trust the wire).
 	 *
-	 * @param string $type  Token type.
+	 * @param string $type Token type.
 	 * @param string $value Raw value.
 	 * @return string|false
 	 */

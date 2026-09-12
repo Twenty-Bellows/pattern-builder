@@ -1,8 +1,7 @@
 <?php
 /**
- * The in-admin connect flow: /cloud/login and /cloud/signup relay
- * credentials to the service server-side and store the returned grant.
- * The service itself is mocked at the HTTP layer.
+ * The in-admin connect flow: /cloud/login and /cloud/signup relay credentials to the
+ * service server-side and store the returned grant.
  *
  * @package PatternBuilder
  */
@@ -10,7 +9,6 @@
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud;
 
 class Test_Cloud_Auth extends WP_UnitTestCase {
-
 	public function set_up() {
 		parent::set_up();
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
@@ -35,7 +33,6 @@ class Test_Cloud_Auth extends WP_UnitTestCase {
 		add_filter(
 			'pre_http_request',
 			function ( $pre, $args, $url ) use ( $callback ) {
-				// The client targets ?rest_route= URLs, so the path is encoded.
 				if ( false === strpos( $url, rawurlencode( '/pbwp/v1' ) ) ) {
 					return $pre;
 				}
@@ -71,7 +68,6 @@ class Test_Cloud_Auth extends WP_UnitTestCase {
 					$seen[] = $args['body'];
 					return $this->grant_response();
 				}
-				// The follow-up /me from the status payload.
 				return array(
 					'headers'  => array(),
 					'response' => array( 'code' => 200 ),
@@ -100,15 +96,11 @@ class Test_Cloud_Auth extends WP_UnitTestCase {
 
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertTrue( $response->get_data()['connected'] );
-
-		// Credentials were relayed with this site's identity attached.
 		$this->assertCount( 1, $seen );
 		$this->assertSame( 'demo@example.test', $seen[0]['email'] );
 		$this->assertSame( 'correct-horse-battery', $seen[0]['password'] );
 		$this->assertSame( home_url(), $seen[0]['site'] );
 		$this->assertSame( wp_get_current_user()->user_login, $seen[0]['site_user'] );
-
-		// The grant landed in user meta.
 		$this->assertTrue( Pattern_Builder_Cloud::is_connected() );
 		$account = Pattern_Builder_Cloud::account();
 		$this->assertSame( 'Demo Person', $account['name'] );

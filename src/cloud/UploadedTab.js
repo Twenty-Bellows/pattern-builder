@@ -28,8 +28,8 @@ import { isListed, slugProblem, suggestSlug } from './collections';
 const BASE = '/pattern-builder/v1/cloud';
 
 /**
- * The rail entries the browser chrome shows for the Uploaded tab: the
- * account's collections, Personal first with its meter.
+ * The rail entries the browser chrome shows for the Uploaded tab: the account's
+ * collections, Personal first with its meter.
  *
  * @param {Array}  collections The account's collections.
  * @param {Object} personal    The /cloud/status personal meter, or undefined.
@@ -57,9 +57,8 @@ export function railFor( collections, personal ) {
 }
 
 /**
- * The New collection dialog: a name and a description, and the visibility
- * only where the account may choose. A free account is told the
- * collection will be public, and why.
+ * The New collection dialog: a name and a description, and the visibility only where the
+ * account may choose.
  *
  * @param {Object}   props            Component props.
  * @param {boolean}  props.canPrivate Whether the account may build in private.
@@ -69,9 +68,6 @@ export function railFor( collections, personal ) {
  */
 function NewCollectionModal( { canPrivate, onCreated, onClose, onGoPro } ) {
 	const [ name, setName ] = useState( '' );
-	// The slug follows the name until it is typed into. It is permanent —
-	// it is the middle segment of every pattern name in the collection —
-	// so it is a field rather than something a title decides.
 	const [ slug, setSlug ] = useState( '' );
 	const [ slugTouched, setSlugTouched ] = useState( false );
 	const [ description, setDescription ] = useState( '' );
@@ -225,10 +221,7 @@ function NewCollectionModal( { canPrivate, onCreated, onClose, onGoPro } ) {
 }
 
 /**
- * The delete prompt. The collection's patterns go with it: a pattern's
- * collection is the middle segment of its permanent name (D38), so there
- * is nowhere to move them to that would still be them, and the prompt says
- * to download anything worth keeping first.
+ * The delete prompt.
  *
  * @param {Object}   props            Component props.
  * @param {Object}   props.collection The collection.
@@ -319,8 +312,8 @@ function DeleteCollectionModal( { collection, onDeleted, onClose, onGoPro } ) {
 }
 
 /**
- * The selected collection's header: rename, describe, visibility (as the
- * account may), delete. Personal offers only a description.
+ * The selected collection's header: rename, describe, visibility (as the account may),
+ * delete.
  *
  * @param {Object}   props            Component props.
  * @param {Object}   props.collection The collection.
@@ -507,10 +500,9 @@ function CollectionHeader( { collection, canPrivate, onChanged, onDelete } ) {
 }
 
 /**
- * The Uploaded tab: the account's collections down the rail (Personal
- * first, with its meter), the selected collection's header and actions,
- * its patterns as the grid, and a details sidebar with Save,
- * collection, and Delete from cloud.
+ * The Uploaded tab: the account's collections down the rail (Personal first, with its
+ * meter), the selected collection's header and actions, its patterns as the grid, and a
+ * details sidebar with Save, collection, and Delete from cloud.
  *
  * @param {Object}   props               Component props.
  * @param {Element}  props.chrome        The account bar and notices the shell renders.
@@ -600,14 +592,10 @@ export function UploadedTab( {
 	}, [ page, search, selectedId, createErrorNotice ] );
 
 	useEffect( loadItems, [ loadItems ] );
-
-	// A new search or rail selection restarts paging.
 	useEffect( () => {
 		setPage( 1 );
 		setSelected( null );
 	}, [ search, selectedId ] );
-
-	// Everything that changes counts: reload the rail and the meter.
 	const changed = () => {
 		loadCollections();
 		refreshStatus();
@@ -656,7 +644,6 @@ export function UploadedTab( {
 	return (
 		<>
 			<main className="pattern-builder-browser__main pattern-builder-cloud">
-
 				{ chrome }
 
 				{ status?.overPolicy && (

@@ -13,7 +13,6 @@ use TwentyBellows\PatternBuilder\Synced_Patterns;
  * @covers \TwentyBellows\PatternBuilder\Editor_Support
  */
 class Test_Editor_Support extends Pattern_Test_Case {
-
 	/**
 	 * Sets the test up.
 	 */
@@ -40,7 +39,7 @@ class Test_Editor_Support extends Pattern_Test_Case {
 	 * Finds one pattern in a REST response.
 	 *
 	 * @param array[] $patterns Patterns from the response.
-	 * @param string  $name     Pattern name.
+	 * @param string  $name Pattern name.
 	 * @return array|null The pattern.
 	 */
 	private function find_pattern( array $patterns, string $name ): ?array {
@@ -73,10 +72,6 @@ class Test_Editor_Support extends Pattern_Test_Case {
 
 	/**
 	 * A reference to a synced pattern survives the list, content and all.
-	 *
-	 * Core's resolver would inline it — the design unlocked, the link gone —
-	 * so the editor could never show a page pattern's synced sections as the
-	 * instances they are. The reference stays; the editor renders it.
 	 */
 	public function test_patterns_endpoint_keeps_synced_references() {
 		$hero = $this->register_pattern( 'test/hero', $this->bound_heading() );
@@ -182,8 +177,8 @@ class Test_Editor_Support extends Pattern_Test_Case {
 	}
 
 	/**
-	 * Template content is left alone outside the editor, where the pattern
-	 * block renders the content itself.
+	 * Template content is left alone outside the editor, where the pattern block renders
+	 * the content itself.
 	 */
 	public function test_template_content_is_untouched_on_the_front_end() {
 		$hero   = $this->register_pattern( 'test/hero', $this->bound_heading() );
@@ -218,11 +213,6 @@ class Test_Editor_Support extends Pattern_Test_Case {
 
 	/**
 	 * A synced pattern is offered to the inserter as a reference to itself.
-	 *
-	 * This goes through a real request rather than calling the plugin's own
-	 * helpers: the first version of this feature worked when called directly
-	 * and did nothing at all over REST, because it was wired to `init`, where
-	 * `wp_is_serving_rest_request()` is still false.
 	 */
 	public function test_synced_pattern_is_offered_as_a_reference() {
 		$this->register_pattern( 'test/hero', $this->bound_heading(), array( 'title' => 'Hero' ) );
@@ -240,15 +230,8 @@ class Test_Editor_Support extends Pattern_Test_Case {
 		);
 		$this->assertSame( 'Hero', $companion['title'] );
 		$this->assertTrue( $companion['inserter'] );
-
-		// The pattern itself steps aside so the inserter offers it only once.
 		$this->assertNotNull( $design );
 		$this->assertFalse( $design['inserter'] );
-
-		/*
-		 * It still carries its blocks and their bindings, which is what the
-		 * editor renders the instance from.
-		 */
 		$this->assertStringContainsString( 'core/pattern-overrides', $design['content'] );
 		$this->assertStringContainsString( 'Default headline', $design['content'] );
 	}

@@ -1,7 +1,7 @@
 /**
- * The block picker's vocabulary: the field talks in block titles, the
- * pattern file records block names, and the two have to survive the round
- * trip — including a block this site does not have.
+ * The block picker's vocabulary: the field talks in block titles, the pattern file records
+ * block names, and the two have to survive the round trip — including a block this site
+ * does not have.
  */
 
 import {

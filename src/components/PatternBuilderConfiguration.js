@@ -29,16 +29,12 @@ export const PatternBuilderConfiguration = () => {
 
 	const { createSuccessNotice, createErrorNotice } =
 		useDispatch( noticesStore );
-
-	// Load the settings from localStorage on component mount
 	useEffect( () => {
 		const savedLocalizeValue = getLocalizePatternsSetting();
 		const savedImportValue = getImportImagesSetting();
 		setLocalizePatterns( savedLocalizeValue );
 		setImportImages( savedImportValue );
 	}, [] );
-
-	// Handle toggle changes
 	const handleLocalizeToggle = ( value ) => {
 		setLocalizePatterns( value );
 		setLocalizePatternsSetting( value );
@@ -48,13 +44,10 @@ export const PatternBuilderConfiguration = () => {
 		setImportImages( value );
 		setImportImagesSetting( value );
 	};
-
-	// Handle reprocess all theme patterns
 	const handleReprocessPatterns = async () => {
 		setIsProcessing( true );
 
 		try {
-			// Build query parameters based on current settings
 			const params = [];
 			if ( localizePatterns ) {
 				params.push( 'localize=true' );

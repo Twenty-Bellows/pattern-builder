@@ -1,11 +1,10 @@
 import { __, _n, sprintf } from '@wordpress/i18n';
 
 /**
- * A collection as a tile: a collage of up to four of its previews rendered
- * the way pattern tiles are — the service's preview document at the design
- * width, scaled by a constant the stylesheet knows — or its cover when it
- * has one; then the title, the owner, the count and a Premium badge, and
- * how many of its patterns this site already has.
+ * A collection as a tile: a collage of up to four of its previews rendered the way pattern
+ * tiles are — the service's preview document at the design width, scaled by a constant the
+ * stylesheet knows — or its cover when it has one; then the title, the owner, the count and
+ * a Premium badge, and how many of its patterns this site already has.
  *
  * @param {Object}   props            Component props.
  * @param {Object}   props.collection The collection summary.

@@ -1,11 +1,7 @@
 <?php
 /**
- * The Abilities API registrations: what an agent can read from this site and
- * what it can ask this site to store.
- *
- * These run only where core has the Abilities API. The plugin's floor is
- * older than the API, so the whole surface is conditional and a site without
- * it must simply carry on — which is the first thing asserted here.
+ * The Abilities API registrations: what an agent can read from this site and what it can
+ * ask this site to store.
  *
  * @package PatternBuilder
  */
@@ -13,7 +9,6 @@
 use TwentyBellows\PatternBuilder\Pattern_Builder_Abilities;
 
 class Test_Abilities extends WP_UnitTestCase {
-
 	/**
 	 * @var Pattern_Builder_Abilities
 	 */
@@ -36,12 +31,6 @@ class Test_Abilities extends WP_UnitTestCase {
 	public function set_up() {
 		parent::set_up();
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
-		/*
-		 * The plugin already registered everything on core's hooks during
-		 * bootstrap. This instance exists only to call the execute_* methods
-		 * directly, so unhook it immediately — leaving it hooked would
-		 * register every ability a second time on the next init.
-		 */
 		$this->abilities = new Pattern_Builder_Abilities();
 		remove_action( 'wp_abilities_api_categories_init', array( $this->abilities, 'register_category' ) );
 		remove_action( 'wp_abilities_api_init', array( $this->abilities, 'register_abilities' ) );
@@ -58,8 +47,6 @@ class Test_Abilities extends WP_UnitTestCase {
 			foreach ( (array) glob( $this->theme_dir . '/assets/images/*' ) as $file ) {
 				unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 			}
-			// A namespaced name writes `patterns/{handle}/{collection}/{slug}.php`,
-			// so this has to come back down through directories as well as files.
 			$this->remove_tree( $this->theme_dir . '/patterns' );
 			$this->theme_dir = '';
 		}
@@ -93,9 +80,7 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Point the active theme at a directory this test may write into. The
-	 * storage mechanics are covered in Test_Assets; here it only has to be
-	 * somewhere the write can land.
+	 * Point the active theme at a directory this test may write into.
 	 */
 	private function use_a_writable_theme() {
 		$this->theme_dir = sys_get_temp_dir() . '/pattern-builder-abilities-theme';
@@ -113,8 +98,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The guard is the whole compatibility story: on a site without the API
-	 * the constructor must do nothing rather than fatal.
+	 * The guard is the whole compatibility story: on a site without the API the constructor
+	 * must do nothing rather than fatal.
 	 */
 	public function test_constructing_is_safe_without_the_abilities_api() {
 		$instance = new Pattern_Builder_Abilities();
@@ -132,9 +117,9 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Registration happens on core's hooks during the plugin's own boot —
-	 * core refuses a `wp_register_ability()` called anywhere else — so this
-	 * asserts the real path rather than re-running it.
+	 * Registration happens on core's hooks during the plugin's own boot — core refuses a
+	 * `wp_register_ability()` called anywhere else — so this asserts the real path rather
+	 * than re-running it.
 	 */
 	public function test_every_ability_registers() {
 		$this->require_abilities_api();
@@ -154,13 +139,11 @@ class Test_Abilities extends WP_UnitTestCase {
 			'pattern-builder/set-global-styles',
 			'pattern-builder/add-block-style-variation',
 			'pattern-builder/set-layout',
-			// Media and fonts: what a pattern points at.
 			'pattern-builder/find-media',
 			'pattern-builder/add-asset',
 			'pattern-builder/add-placeholder-image',
 			'pattern-builder/list-fonts',
 			'pattern-builder/add-font',
-			// The cloud, through this site's connection.
 			'pattern-builder/list-collections',
 			'pattern-builder/get-collection',
 			'pattern-builder/search-cloud-patterns',
@@ -176,11 +159,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Annotations are not documentation: core reads them to decide which HTTP
-	 * method a call must arrive on. `readonly` is GET, `destructive` *and*
-	 * `idempotent` together mean DELETE, and everything else is POST. An
-	 * update marked destructive would therefore be reachable only over
-	 * DELETE, which is why it is not marked so.
+	 * Annotations are not documentation: core reads them to decide which HTTP method a call
+	 * must arrive on.
 	 */
 	public function test_annotations_map_to_the_methods_we_intend() {
 		$this->require_abilities_api();
@@ -208,16 +188,14 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'spacing', $result );
 		$this->assertArrayHasKey( 'fontSizes', $result );
 		$this->assertArrayHasKey( 'layout', $result );
-
-		// Core's own presets are always there, so a palette is never empty.
 		$this->assertNotEmpty( $result['palette'] );
 		$slugs = wp_list_pluck( $result['palette'], 'slug' );
 		$this->assertContains( 'black', $slugs );
 	}
 
 	/**
-	 * The pair only works as a pair: an agent sets a style and then reads it
-	 * back to decide what its patterns still have to say for themselves.
+	 * The pair only works as a pair: an agent sets a style and then reads it back to decide
+	 * what its patterns still have to say for themselves.
 	 */
 	public function test_a_style_set_through_the_ability_is_read_back_by_get_design_system() {
 		$path = get_stylesheet_directory() . '/theme.json';
@@ -248,25 +226,21 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A pattern inherits the site's global styles, so an agent that cannot
-	 * read them over-specifies: it restates the heading font on every
-	 * heading because it has no way to know the theme already set one.
+	 * A pattern inherits the site's global styles, so an agent that cannot read them over-
+	 * specifies: it restates the heading font on every heading because it has no way to
+	 * know the theme already set one.
 	 */
 	public function test_design_system_reports_the_styles_a_pattern_inherits() {
 		$result = $this->abilities->execute_design_system();
 
 		$this->assertArrayHasKey( 'styles', $result );
 		$this->assertIsArray( $result['styles'] );
-		// Core's own theme.json styles the elements, so this is never empty.
 		$this->assertArrayHasKey( 'elements', $result['styles'] );
 	}
 
 	/**
-	 * The class travels with a pattern and the definition does not, so which
-	 * registry a variation came from decides whether a pattern using it
-	 * survives the trip. `is-style-outline` is declared in core/button's own
-	 * block.json and resolves everywhere; anything this site registered
-	 * resolves only here.
+	 * The class travels with a pattern and the definition does not, so which registry a
+	 * variation came from decides whether a pattern using it survives the trip.
 	 */
 	public function test_block_styles_say_which_variations_travel() {
 		$result = $this->abilities->execute_design_system();
@@ -304,10 +278,9 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A name and a label say a look exists; only its styles say what it does,
-	 * and an agent deciding between reusing `is-style-card` and adding a
-	 * second card needs the second thing. A partial this theme holds is the
-	 * one place a definition can be read from.
+	 * A name and a label say a look exists; only its styles say what it does, and an agent
+	 * deciding between reusing `is-style-card` and adding a second card needs the second
+	 * thing.
 	 */
 	public function test_a_partial_defined_variation_carries_its_definition() {
 		$this->use_a_writable_theme();
@@ -345,9 +318,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Presets arrive keyed by origin and a later origin wins by slug, which
-	 * is what the editor shows — so a slug must appear once, not once per
-	 * origin that defines it.
+	 * Presets arrive keyed by origin and a later origin wins by slug, which is what the
+	 * editor shows — so a slug must appear once, not once per origin that defines it.
 	 */
 	public function test_a_preset_slug_is_not_repeated_across_origins() {
 		$result = $this->abilities->execute_design_system();
@@ -398,11 +370,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A `wp_block` records its description as the excerpt, its categories as
-	 * terms, its keywords as a meta and its sync status as a meta whose
-	 * *absence* means synced. Every one of those used to be dropped on the
-	 * user path, so an agent asking for an unsynced, categorised design
-	 * pattern got a synced, uncategorised one and was told nothing.
+	 * A `wp_block` records its description as the excerpt, its categories as terms, its
+	 * keywords as a meta and its sync status as a meta whose *absence* means synced.
 	 */
 	public function test_a_user_pattern_keeps_its_metadata() {
 		$created = $this->abilities->execute_create_pattern(
@@ -423,8 +392,6 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertSame( array( 'featured', 'text' ), $created['pattern']['categories'] );
 		$this->assertSame( array( 'card', 'testimonial' ), $created['pattern']['keywords'] );
 		$this->assertSame( 'unsynced', get_post_meta( (int) $created['pattern']['id'], 'wp_pattern_sync_status', true ) );
-
-		// An update that says nothing about them leaves them as they are.
 		$updated = $this->abilities->execute_update_pattern(
 			array(
 				'id'      => (string) $created['pattern']['id'],
@@ -435,8 +402,6 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertFalse( $updated['pattern']['synced'] );
 		$this->assertSame( 'One card, unsynced.', $updated['pattern']['description'] );
 		$this->assertSame( array( 'featured', 'text' ), $updated['pattern']['categories'] );
-
-		// And one that asks for synced gets it: the meta whose absence means synced goes.
 		$synced = $this->abilities->execute_update_pattern(
 			array(
 				'id'      => (string) $created['pattern']['id'],
@@ -450,8 +415,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Both sources answer the same question the same way: a pattern is
-	 * unsynced unless asked for as synced.
+	 * Both sources answer the same question the same way: a pattern is unsynced unless
+	 * asked for as synced.
 	 */
 	public function test_a_user_pattern_is_unsynced_unless_asked() {
 		$created = $this->abilities->execute_create_pattern(
@@ -466,12 +431,7 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The failures PHP can see are refused before anything is written, each
-	 * by name. None of these is block validity — that stays JavaScript's —
-	 * and every one of them is silent at render: WordPress reads attribute
-	 * JSON it cannot parse as no attributes, an unregistered block draws a
-	 * grey box, an unresolved reference draws nothing, and a slot nothing
-	 * can fill ships its placeholder as though it were the copy.
+	 * The failures PHP can see are refused before anything is written, each by name.
 	 */
 	public function test_markup_php_can_see_is_wrong_is_refused_by_name() {
 		$this->use_a_writable_theme();
@@ -531,9 +491,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The one check that needs the other half: a page pattern's content keys
-	 * have to name slots the design pattern declares. A misspelt key is
-	 * simply ignored by core, and the placeholder copy ships in its place.
+	 * The one check that needs the other half: a page pattern's content keys have to name
+	 * slots the design pattern declares.
 	 */
 	public function test_a_content_key_naming_no_slot_is_refused_and_the_slots_are_named() {
 		$this->use_a_writable_theme();
@@ -561,10 +520,6 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertWPError( $typo );
 		$this->assertStringContainsString( 'quesiton', $typo->get_error_message() );
 		$this->assertStringContainsString( 'question, answer', $typo->get_error_message() );
-
-		// The same page with the keys spelled as the slots are, referencing a
-		// pattern written in this very process — the registry has not seen
-		// it yet, so the files are what answer.
 		$page = $this->abilities->execute_create_pattern(
 			array(
 				'title'   => 'Agent FAQ Page',
@@ -634,12 +589,6 @@ class Test_Abilities extends WP_UnitTestCase {
 
 	/**
 	 * Naming blocks returns their supports, which is the half no validator checks.
-	 *
-	 * A block's supports decide which classes its saved markup must carry —
-	 * `"backgroundColor":"x"` obliging `has-x-background-color has-background` —
-	 * and those classes come from filters that only run inside a real editor, so
-	 * the validator is documented as unable to see them. The site knows, and had
-	 * no way to say.
 	 */
 	public function test_naming_blocks_returns_their_supports() {
 		$listed = $this->abilities->execute_block_types( array( 'blocks' => array( 'core/image', 'core/group' ) ) );
@@ -669,10 +618,6 @@ class Test_Abilities extends WP_UnitTestCase {
 
 	/**
 	 * A block this site does not have is named, not silently absent.
-	 *
-	 * Markup naming an unregistered block parses to core/missing and renders as
-	 * a grey box, which is the question this ability exists to settle — so a
-	 * shorter list would be the one answer it must not give.
 	 */
 	public function test_an_unregistered_block_is_reported() {
 		$listed = $this->abilities->execute_block_types(
@@ -694,12 +639,6 @@ class Test_Abilities extends WP_UnitTestCase {
 
 	/**
 	 * A page pattern needs its placement headers, and they only live in the file.
-	 *
-	 * `Block Types: core/post-content` plus `Post Types` is what makes a pattern
-	 * a starting layout WordPress offers for new pages; without them the same
-	 * markup is an ordinary theme pattern. The file store always wrote them —
-	 * only the ability had no way to ask for them, so an agent could not create
-	 * a page template at all.
 	 */
 	public function test_create_writes_the_placement_headers() {
 		$this->use_a_writable_theme();
@@ -728,12 +667,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * WordPress registers a theme pattern under whatever its `Slug:` header
-	 * says, and every `core/pattern` reference is written against the
-	 * documented `{theme}/{slug}`. A bare name therefore used to register a
-	 * pattern nothing could refer to — and an unresolved reference renders as
-	 * nothing at all, so a page assembled from references came out empty with
-	 * no error anywhere.
+	 * WordPress registers a theme pattern under whatever its `Slug:` header says, and every
+	 * `core/pattern` reference is written against the documented `{theme}/{slug}`.
 	 */
 	public function test_a_bare_name_is_namespaced_with_the_theme() {
 		$this->use_a_writable_theme();
@@ -748,8 +683,6 @@ class Test_Abilities extends WP_UnitTestCase {
 		);
 
 		$this->assertSame( get_stylesheet() . '/agent-bare-name', $created['pattern']['name'] );
-
-		// The file keeps the flat layout; only the header is namespaced.
 		$file = get_stylesheet_directory() . '/patterns/agent-bare-name.php';
 		$this->assertFileExists( $file );
 		$this->assertStringContainsString(
@@ -759,9 +692,9 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A name that already carries a namespace is left exactly as it is: the
-	 * theme's own, and a cloud pattern's permanent `{handle}/{collection}/{slug}`,
-	 * which nothing may rewrite.
+	 * A name that already carries a namespace is left exactly as it is: the theme's own,
+	 * and a cloud pattern's permanent `{handle}/{collection}/{slug}`, which nothing may
+	 * rewrite.
 	 */
 	public function test_a_namespaced_name_is_left_alone() {
 		$this->use_a_writable_theme();
@@ -779,9 +712,9 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * An agent that created a pattern by its bare slug asks for it the same
-	 * way, so the lookup answers the namespaced form rather than a 404 whose
-	 * reason nothing on the wire explains.
+	 * An agent that created a pattern by its bare slug asks for it the same way, so the
+	 * lookup answers the namespaced form rather than a 404 whose reason nothing on the wire
+	 * explains.
 	 */
 	public function test_a_pattern_created_bare_is_found_either_way() {
 		$this->use_a_writable_theme();
@@ -827,10 +760,6 @@ class Test_Abilities extends WP_UnitTestCase {
 
 	/**
 	 * An update that does not mention a header must not be what removes it.
-	 *
-	 * Every header is optional on an update, so the naive read — take what the
-	 * input carries — silently strips a page pattern's placement the first time
-	 * an agent edits its markup.
 	 */
 	public function test_update_preserves_headers_it_was_not_given() {
 		$this->use_a_writable_theme();
@@ -862,9 +791,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Attribution and the cloud reference are written by installs and
-	 * uploads, never by an edit, so an agent's update must not be what drops
-	 * them.
+	 * Attribution and the cloud reference are written by installs and uploads, never by an
+	 * edit, so an agent's update must not be what drops them.
 	 */
 	public function test_update_keeps_the_origin_and_the_cloud_reference() {
 		$this->use_a_writable_theme();
@@ -895,8 +823,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A listing is a catalogue, not a payload: an agent choosing between
-	 * patterns should not have to receive every one's markup to do it.
+	 * A listing is a catalogue, not a payload: an agent choosing between patterns should
+	 * not have to receive every one's markup to do it.
 	 */
 	public function test_listing_omits_markup() {
 		$this->abilities->execute_create_pattern(
@@ -917,11 +845,6 @@ class Test_Abilities extends WP_UnitTestCase {
 
 	/**
 	 * Rendering hands back somewhere to look, not just markup.
-	 *
-	 * The HTML says which classes landed where; it cannot say that a band meant
-	 * to span the viewport is rendering at the content width, because that is
-	 * the stylesheets' doing. The URLs are the part an agent over HTTP has no
-	 * other way to get.
 	 */
 	public function test_rendering_offers_somewhere_to_look() {
 		$created = $this->abilities->execute_create_pattern(
@@ -942,9 +865,9 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The two worlds a portable pattern has to survive are one call away: the
-	 * preview route wears a bundled theme for one request, and the answer
-	 * carries a URL for each so nothing has to be composed from a guide.
+	 * The two worlds a portable pattern has to survive are one call away: the preview route
+	 * wears a bundled theme for one request, and the answer carries a URL for each so
+	 * nothing has to be composed from a guide.
 	 */
 	public function test_rendering_offers_the_two_lab_themes() {
 		$created = $this->abilities->execute_create_pattern(
@@ -965,10 +888,9 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The inserter files a pattern under a registered category or under
-	 * Uncategorized, so the listing says which categories exist, a summary
-	 * says what kind of pattern each is, and a write says when its category
-	 * will not show.
+	 * The inserter files a pattern under a registered category or under Uncategorized, so
+	 * the listing says which categories exist, a summary says what kind of pattern each is,
+	 * and a write says when its category will not show.
 	 */
 	public function test_listing_reports_registered_categories_and_the_placement_headers() {
 		$this->use_a_writable_theme();
@@ -1005,8 +927,6 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertSame( array( 'page' ), $mine['postTypes'] );
 		$this->assertTrue( $mine['inserter'] );
 		$this->assertArrayNotHasKey( 'origin', $mine );
-
-		// A registered category alone says nothing.
 		$plain = $this->abilities->execute_create_pattern(
 			array(
 				'title'      => 'Agent Plainly Categorised',
@@ -1022,11 +942,6 @@ class Test_Abilities extends WP_UnitTestCase {
 
 	/**
 	 * Rendering says which tokens this site is missing, before an upload can be.
-	 *
-	 * An upload looks every referenced preset up here and skips what it cannot
-	 * find, so a pattern naming a token the authoring site lacks ships no value
-	 * for it and arrives referencing nothing. Both ends are silent about it;
-	 * this is where it can still be caught.
 	 */
 	public function test_rendering_reports_tokens_this_site_does_not_define() {
 		$created = $this->abilities->execute_create_pattern(
@@ -1080,9 +995,9 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The abilities hand over what is true about this site and somewhere to
-	 * put a result; this one hands over the knowledge, so that an agent whose
-	 * harness has no notion of a "skill" can still be told how to do the job.
+	 * The abilities hand over what is true about this site and somewhere to put a result;
+	 * this one hands over the knowledge, so that an agent whose harness has no notion of a
+	 * "skill" can still be told how to do the job.
 	 */
 	public function test_the_authoring_guide_indexes_itself() {
 		$index = $this->abilities->execute_authoring_guide();
@@ -1102,27 +1017,8 @@ class Test_Abilities extends WP_UnitTestCase {
 
 	/**
 	 * What an agent is *told* about CSS has to match what the site accepts.
-	 *
-	 * The guides are the only thing an agent reaching this site over HTTP
-	 * reads before it writes, and a stale refusal is the expensive kind of
-	 * wrong: it does not error, it makes the agent build around a limit that
-	 * is no longer there — restating a hover state on every block, or
-	 * declining a pseudo-element it could have had. So the design-system
-	 * guide has to name the `css` property, and no served guide may still
-	 * say a variation's CSS cannot travel.
-	 *
-	 * Asserted on the served text rather than on the files, because the
-	 * serving path is what an agent actually receives, and a theme's filter
-	 * can replace any of it.
 	 */
 	public function test_no_guide_still_tells_an_agent_a_variations_css_is_refused() {
-		/*
-		 * Two guides have to carry it, for different reasons. The
-		 * design-system one is where an agent learns what a variation may
-		 * hold. The reproduction one is the document whose *job* is to
-		 * enumerate what cannot be rebuilt, so a limit that has been lifted
-		 * and left listed there is the expensive kind of stale.
-		 */
 		foreach ( array( 'design-system', 'reproduction' ) as $name ) {
 			$this->assertStringContainsString(
 				'`css`',
@@ -1130,12 +1026,6 @@ class Test_Abilities extends WP_UnitTestCase {
 				'The ' . $name . ' guide no longer tells an agent a block style variation may carry CSS.'
 			);
 		}
-
-		/*
-		 * Claims that were true before the subset existed and are wrong now.
-		 * `set-global-styles` still refuses a `css` outright, so the blanket
-		 * wording is deliberately not on this list — only the variation ones.
-		 */
 		$stale = array(
 			'cannot travel with a pattern',
 			'Neither accepts raw CSS',
@@ -1158,19 +1048,11 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A guide the index cannot serve is worse than one that does not exist:
-	 * the skill tells the reader to go and read it, and over the wire there
-	 * is nothing there. So every reference the index document makes to
-	 * another guide has to name one this ability will actually hand over.
-	 *
-	 * This is not hypothetical — `keeping-current.md` shipped in the
-	 * directory, was named in the References list, and was never registered.
+	 * A guide the index cannot serve is worse than one that does not exist: the skill tells
+	 * the reader to go and read it, and over the wire there is nothing there.
 	 */
 	public function test_every_guide_the_index_points_at_can_be_served() {
 		$names = wp_list_pluck( $this->abilities->execute_authoring_guide()['guides'], 'name' );
-
-		// Both skills, since each carries references of its own and a
-		// dangling one costs the same either way.
 		foreach ( array( 'authoring', 'reproduction' ) as $skill ) {
 			$content = $this->abilities->execute_authoring_guide( array( 'guide' => $skill ) )['content'];
 
@@ -1191,10 +1073,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Two of the documents are whole skills and the other twelve are their
-	 * references, which a flat index gives no sign of. An agent handed
-	 * fourteen titles and no shape opens the first one, and the first one is
-	 * the wrong one for half the jobs that arrive.
+	 * Two of the documents are whole skills and the other twelve are their references,
+	 * which a flat index gives no sign of.
 	 */
 	public function test_the_index_says_where_to_start() {
 		$index = $this->abilities->execute_authoring_guide();
@@ -1212,8 +1092,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * And every other document has to say which of the two it belongs to,
-	 * or the index is still a flat list.
+	 * And every other document has to say which of the two it belongs to, or the index is
+	 * still a flat list.
 	 */
 	public function test_every_guide_names_its_skill() {
 		$index = $this->abilities->execute_authoring_guide();
@@ -1232,11 +1112,9 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The reproduction skill's whole first step is deciding whether the
-	 * source's values can be read or must be inferred, because that answer
-	 * decides both how exact the result may claim to be and whether it can
-	 * be checked at the end. A version of this guide that lost that step
-	 * would still read like advice about copying a design.
+	 * The reproduction skill's whole first step is deciding whether the source's values can
+	 * be read or must be inferred, because that answer decides both how exact the result
+	 * may claim to be and whether it can be checked at the end.
 	 */
 	public function test_the_reproduction_guide_classifies_its_source() {
 		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'reproduction' ) );
@@ -1247,52 +1125,26 @@ class Test_Abilities extends WP_UnitTestCase {
 		foreach ( array( 'inferred', 'readable', 'Figma', 'screenshot' ) as $expected ) {
 			$this->assertStringContainsString( $expected, $guide['content'], 'The reproduction guide never mentions ' . $expected . '.' );
 		}
-
-		// It builds on the authoring skill rather than restating it.
 		$this->assertStringContainsString( 'pattern-author', $guide['content'] );
 	}
 
 	/**
-	 * The evidence discipline used to cover only the values that become
-	 * presets — colour, type, spacing — which left alignment, band width,
-	 * column ratios and the rest going straight into block attributes as
-	 * unwritten guesses. That half has no safety net anywhere else: an
-	 * undefined preset slug is reported by render-pattern and a missing
-	 * supports class by the validator, but a wrong textAlign is a valid
-	 * block, a clean validation and the wrong design.
-	 *
-	 * So the structure table, the measurement that decides each fact, and the
-	 * box half of the verification are all load-bearing, and a guide that
-	 * quietly lost any of them would still read like complete advice.
+	 * The evidence discipline used to cover only the values that become presets — colour,
+	 * type, spacing — which left alignment, band width, column ratios and the rest going
+	 * straight into block attributes as unwritten guesses.
 	 */
 	public function test_the_reproduction_guides_measure_structure_not_only_tokens() {
 		$reproduction = $this->abilities->execute_authoring_guide( array( 'guide' => 'reproduction' ) );
-
-		// The second table, keyed on the element and carrying its measurement.
 		foreach ( array( 'Measurement', 'text alignment', 'aspect ratio' ) as $expected ) {
 			$this->assertStringContainsString( $expected, $reproduction['content'], 'The reproduction guide no longer asks for ' . $expected . ' in writing.' );
 		}
 
 		$source = $this->abilities->execute_authoring_guide( array( 'guide' => 'reading-a-source' ) );
-
-		/*
-		 * The diagnostic itself. Writing a structural fact down is not enough
-		 * on its own: "the headline starts near the left margin" is
-		 * evidence-shaped and wrong, because the widest element in a band
-		 * looks identical centred or left-aligned. The rule that catches it is
-		 * to measure the elements that are not the widest.
-		 */
 		$this->assertStringContainsString( 'widest', $source['content'] );
 
 		foreach ( array( 'verticalAlignment', 'mediaPosition', 'textTransform' ) as $expected ) {
 			$this->assertStringContainsString( $expected, $source['content'], 'The source-reading guide gives no measurement for ' . $expected . '.' );
 		}
-
-		/*
-		 * And the verification has to be able to see it. A computed-style diff
-		 * over type and colour alone reports zero differences on a page whose
-		 * every band is centred where the source was left-aligned.
-		 */
 		$verifying = $this->abilities->execute_authoring_guide( array( 'guide' => 'verifying' ) );
 
 		foreach ( array( 'text-align', 'justify-content', 'flex-direction' ) as $expected ) {
@@ -1301,32 +1153,12 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * block-markup.md is the one guide that cannot defer to a machine. Every
-	 * other question about a block — which attributes exist, their types,
-	 * their enums, its supports and context — is answered authoritatively by
-	 * list-block-types, and the guide sends the reader there. What is left is
-	 * the gap the schema does not cover: the interiors of object-typed
-	 * attributes, and strings whose vocabulary is real but unstated.
-	 *
-	 * Both known pattern-authoring disasters landed in that gap — a
-	 * layout.type of "flow", which validates clean and crashes the editor,
-	 * and a contentPosition guessed rather than measured. So these
-	 * vocabularies are hand-written by necessity, and a hand-written
-	 * vocabulary rots silently. This checks them against the WordPress the
-	 * suite runs on.
+	 * block-markup.md is the one guide that cannot defer to a machine.
 	 */
 	public function test_block_markup_vocabularies_still_match_wordpress() {
 		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'block-markup' ) );
 		$content = $guide['content'];
-
-		// It must send the reader to the site for anything the schema covers.
 		$this->assertStringContainsString( 'list-block-types', $content );
-
-		/*
-		 * The four layout types. Core has no accessor for these — the registry
-		 * is private to the editor bundle — but layout.php switches on the
-		 * same names server-side, so that file is the check.
-		 */
 		$layout_php = file_get_contents( ABSPATH . 'wp-includes/block-supports/layout.php' );
 		foreach ( array( 'default', 'constrained', 'flex', 'grid' ) as $type ) {
 			$this->assertStringContainsString(
@@ -1340,16 +1172,8 @@ class Test_Abilities extends WP_UnitTestCase {
 				'WordPress no longer knows the layout type ' . $type . ' — the guide is now wrong.'
 			);
 		}
-
-		// The spelling that caused the crash must never read as a recommendation.
 		$this->assertStringNotContainsString( '{"type":"flow"}', $content );
 		$this->assertStringContainsString( '`flow`', $content, 'The guide no longer warns about the flow trap.' );
-
-		/*
-		 * The unstated string vocabularies. Their *values* are not in the
-		 * schema — that is the whole point — but the attributes carrying them
-		 * are, so a rename or removal is catchable here.
-		 */
 		$registry = WP_Block_Type_Registry::get_instance();
 		$expected = array(
 			'core/cover'      => array( 'contentPosition' ),
@@ -1369,12 +1193,6 @@ class Test_Abilities extends WP_UnitTestCase {
 				$this->assertStringContainsString( $attribute, $content );
 			}
 		}
-
-		/*
-		 * And the premise of the whole document: these are opaque. If core
-		 * ever gives layout or style an inner schema, the guide should stop
-		 * carrying it by hand and read it from the block type instead.
-		 */
 		$group = $registry->get_registered( 'core/group' );
 		foreach ( array( 'layout', 'style' ) as $attribute ) {
 			$this->assertArrayNotHasKey(
@@ -1386,10 +1204,9 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * An agent that goes straight to create-pattern reads no guide at all, so
-	 * the one step it cannot afford to skip has to be on the index — and the
-	 * abilities it names have to be ones that exist, or it is worse than
-	 * saying nothing.
+	 * An agent that goes straight to create-pattern reads no guide at all, so the one step
+	 * it cannot afford to skip has to be on the index — and the abilities it names have to
+	 * be ones that exist, or it is worse than saying nothing.
 	 */
 	public function test_the_index_says_to_validate_and_points_at_the_means() {
 		$index = $this->abilities->execute_authoring_guide();
@@ -1406,14 +1223,11 @@ class Test_Abilities extends WP_UnitTestCase {
 				$name . ' is named on the index but is not registered.'
 			);
 		}
-
-		// And the guide it sends you to has to be one the index lists.
 		$this->assertContains( $validate['guide'], wp_list_pluck( $index['guides'], 'name' ) );
 	}
 
 	/**
-	 * The pointer belongs to the index. A single guide is the document that
-	 * was asked for and nothing else.
+	 * The pointer belongs to the index.
 	 */
 	public function test_a_single_guide_carries_no_index_furniture() {
 		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'block-markup' ) );
@@ -1431,8 +1245,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The main guide doubles as a Claude skill, so it carries YAML front
-	 * matter that means nothing to any other caller.
+	 * The main guide doubles as a Claude skill, so it carries YAML front matter that means
+	 * nothing to any other caller.
 	 */
 	public function test_front_matter_is_stripped() {
 		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'authoring' ) );
@@ -1459,12 +1273,7 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The shipped guides describe WordPress, not your project. What an agent
-	 * most needs on top of them is the house rule — which blocks this build
-	 * settled on, why a section is composed the way it is — that a theme knows
-	 * and the plugin cannot. So the set is filtered, and both amending a
-	 * shipped guide and adding one have to reach whoever asks, by every route
-	 * the ability offers.
+	 * The shipped guides describe WordPress, not your project.
 	 */
 	public function test_a_theme_can_amend_and_add_guides() {
 		add_filter(
@@ -1484,20 +1293,16 @@ class Test_Abilities extends WP_UnitTestCase {
 
 		$added = $this->abilities->execute_authoring_guide( array( 'guide' => 'house-rules' ) );
 		$this->assertStringContainsString( 'Sections are full width.', $added['content'] );
-
-		// An agent that reads only the index still has to find it.
 		$index = $this->abilities->execute_authoring_guide();
 		$this->assertContains( 'house-rules', wp_list_pluck( $index['guides'], 'name' ) );
-
-		// And "all" is what an agent installs wholesale.
 		$all = $this->abilities->execute_authoring_guide( array( 'guide' => 'all' ) );
 		$this->assertStringContainsString( 'Sections are full width.', $all['content'] );
 		$this->assertStringContainsString( 'core blocks only', $all['content'] );
 	}
 
 	/**
-	 * Titles are for the index, so a guide that arrives without one should
-	 * still read as something in a list rather than as its slug.
+	 * Titles are for the index, so a guide that arrives without one should still read as
+	 * something in a list rather than as its slug.
 	 */
 	public function test_a_guide_added_without_a_title_takes_one_from_its_heading() {
 		add_filter(
@@ -1515,8 +1320,7 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A filter is somebody else's code. One that returns nonsense should cost
-	 * the nonsense, not the ability.
+	 * A filter is somebody else's code.
 	 */
 	public function test_a_broken_filter_costs_that_guide_not_the_ability() {
 		add_filter(
@@ -1537,8 +1341,7 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * And one that returns no array at all leaves an empty shelf rather than
-	 * a fatal.
+	 * And one that returns no array at all leaves an empty shelf rather than a fatal.
 	 */
 	public function test_a_filter_that_returns_nothing_does_not_fatal() {
 		add_filter( 'pattern_builder_authoring_guides', '__return_null' );
@@ -1548,10 +1351,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The guides tell an agent to validate before storing anything, and for an
-	 * agent that arrived over HTTP that instruction is unfollowable unless the
-	 * tool travels too. No server can run the check itself — `save()` is
-	 * JavaScript — but it can hand over the thing that can.
+	 * The guides tell an agent to validate before storing anything, and for an agent that
+	 * arrived over HTTP that instruction is unfollowable unless the tool travels too.
 	 */
 	public function test_the_validator_travels() {
 		$result = $this->abilities->execute_validator();
@@ -1565,18 +1366,15 @@ class Test_Abilities extends WP_UnitTestCase {
 		foreach ( $result['files'] as $file ) {
 			$this->assertGreaterThan( 1000, strlen( $file['contents'] ), $file['name'] . ' looks empty.' );
 		}
-
-		// It is the entry point that has to be runnable, and the other file is
-		// what it imports.
 		$by_name = array_column( $result['files'], 'contents', 'name' );
 		$this->assertStringContainsString( 'wp-core.mjs', $by_name['validate-pattern.mjs'] );
 		$this->assertStringContainsString( 'jsdom', $result['usage'] );
 	}
 
 	/**
-	 * WordPress serves its editor scripts to anyone, but not the order they
-	 * load in: the manifest core generates is a PHP file, so a request for it
-	 * executes and returns nothing. Only the site can answer this.
+	 * WordPress serves its editor scripts to anyone, but not the order they load in: the
+	 * manifest core generates is a PHP file, so a request for it executes and returns
+	 * nothing.
 	 */
 	public function test_editor_scripts_come_back_as_ordered_urls() {
 		$result = $this->abilities->execute_editor_scripts();
@@ -1591,20 +1389,11 @@ class Test_Abilities extends WP_UnitTestCase {
 		$joined = implode( ' ', $result['scripts'] );
 		$this->assertStringContainsString( 'blocks.min.js', $joined );
 		$this->assertStringContainsString( 'block-library.min.js', $joined );
-
-		/*
-		 * Order is the whole point of asking. The JSX runtime reads
-		 * `globalThis.React` as it loads, so React has to be there first —
-		 * and when it is not, every JSX call in the editor bundles fails
-		 * with nothing but a missing function to show for it.
-		 */
 		$react = $this->position_of( $result['scripts'], 'vendor/react.min.js' );
 		$jsx   = $this->position_of( $result['scripts'], 'react-jsx-runtime' );
 		$this->assertNotNull( $react );
 		$this->assertNotNull( $jsx );
 		$this->assertLessThan( $jsx, $react, 'React must load before the JSX runtime.' );
-
-		// And the library everything else supports comes last.
 		$blocks  = $this->position_of( $result['scripts'], 'dist/blocks.min.js' );
 		$library = $this->position_of( $result['scripts'], 'block-library.min.js' );
 		$this->assertLessThan( $library, $blocks );
@@ -1613,7 +1402,7 @@ class Test_Abilities extends WP_UnitTestCase {
 	/**
 	 * Where a fragment first appears in a list of URLs.
 	 *
-	 * @param array  $urls     URLs.
+	 * @param array  $urls URLs.
 	 * @param string $fragment Substring to find.
 	 * @return int|null
 	 */
@@ -1635,11 +1424,7 @@ class Test_Abilities extends WP_UnitTestCase {
 
 	public function test_reads_and_writes_ask_for_different_authority() {
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'author' ) ) );
-
-		// An author may edit posts, so may read patterns.
 		$this->assertTrue( $this->abilities->can_read() );
-
-		// Writing a theme pattern writes a file into the theme.
 		$this->assertFalse( $this->abilities->can_write() );
 	}
 
@@ -1651,10 +1436,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A pattern that hard-codes `#4f46e5` opts out of the site's palette, its
-	 * dark mode and every future restyle. This is the way an agent puts the
-	 * value in the design system instead and references it by slug, and it
-	 * has to reach both homes a preset can live in.
+	 * A pattern that hard-codes `#4f46e5` opts out of the site's palette, its dark mode and
+	 * every future restyle.
 	 */
 	public function test_tokens_land_in_global_styles() {
 		$result = $this->abilities->execute_add_design_tokens(
@@ -1693,8 +1476,6 @@ class Test_Abilities extends WP_UnitTestCase {
 		);
 		$this->assertSame( array(), $result['skipped'] );
 		$this->assertSame( 'user', $result['destination'] );
-
-		// The point of writing them: the editor, and the next pattern, see them.
 		$system = $this->abilities->execute_design_system();
 		$this->assertContains( 'kiln-red', wp_list_pluck( $system['palette'], 'slug' ) );
 		$this->assertContains( 'band', wp_list_pluck( $system['spacing'], 'slug' ) );
@@ -1702,8 +1483,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The default destination, because a token written here travels with the
-	 * theme and is versioned with it.
+	 * The default destination, because a token written here travels with the theme and is
+	 * versioned with it.
 	 */
 	public function test_tokens_land_in_theme_json_by_default() {
 		$this->give_the_theme_a_theme_json();
@@ -1730,9 +1511,7 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Never an overwrite. A slug this site already answers for keeps its own
-	 * value, and the agent is told so rather than left to assume its value
-	 * landed — otherwise it would go on to invent `accent-2` beside it.
+	 * Never an overwrite.
 	 */
 	public function test_an_existing_slug_is_reported_not_overwritten() {
 		$result = $this->abilities->execute_add_design_tokens(
@@ -1765,18 +1544,13 @@ class Test_Abilities extends WP_UnitTestCase {
 			),
 			$result['skipped']
 		);
-
-		// Core's own black is still black.
 		$palette = wp_list_pluck( $this->abilities->execute_design_system()['palette'], 'color', 'slug' );
 		$this->assertNotSame( '#ff0000', $palette['black'] );
 	}
 
 	/**
-	 * The cloud path can trust the service's token types; agent input has
-	 * been through nothing. A near miss like "typography" must be refused,
-	 * not dropped: `missing()` skips a type it does not know, so a silent
-	 * drop would answer "wrote nothing" and the agent would go on to
-	 * reference a preset that was never created.
+	 * The cloud path can trust the service's token types; agent input has been through
+	 * nothing.
 	 */
 	public function test_an_unknown_token_type_is_refused() {
 		$result = $this->abilities->execute_add_design_tokens(
@@ -1797,8 +1571,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The same grammar the service enforces, re-run here — an agent's value
-	 * is as untrusted as the wire's.
+	 * The same grammar the service enforces, re-run here — an agent's value is as untrusted
+	 * as the wire's.
 	 */
 	public function test_a_value_that_is_not_a_value_is_refused() {
 		$result = $this->abilities->execute_add_design_tokens(
@@ -1819,10 +1593,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Core derives the CSS custom property from the slug, so a slug with a
-	 * space in it lands in the file and resolves to nothing. And a preset
-	 * with no label reads as a blank swatch in the editor, so the name is
-	 * filled in from the slug rather than written empty.
+	 * Core derives the CSS custom property from the slug, so a slug with a space in it
+	 * lands in the file and resolves to nothing.
 	 */
 	public function test_a_slug_is_normalized_and_a_name_is_optional() {
 		$result = $this->abilities->execute_add_design_tokens(
@@ -1852,8 +1624,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A classic theme has no theme.json to write into, and the refusal has to
-	 * name the way through rather than just failing.
+	 * A classic theme has no theme.json to write into, and the refusal has to name the way
+	 * through rather than just failing.
 	 */
 	public function test_a_theme_without_a_theme_json_says_where_else_to_put_them() {
 		$result = $this->abilities->execute_add_design_tokens(
@@ -1874,11 +1646,9 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The one thing an ability cannot do is take a file, so the route that
-	 * can has to be discoverable from inside the abilities — otherwise every
-	 * agent works it out again, or gives up and inlines a remote URL.
-	 * `find-media` is where an agent looking for an image arrives, so the
-	 * instructions ride along with the answer.
+	 * The one thing an ability cannot do is take a file, so the route that can has to be
+	 * discoverable from inside the abilities — otherwise every agent works it out again, or
+	 * gives up and inlines a remote URL.
 	 */
 	public function test_find_media_says_how_to_send_a_file() {
 		$this->require_abilities_api();
@@ -1889,14 +1659,13 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertSame( 'POST', $found['upload']['method'] );
 		$this->assertStringContainsString( '/pattern-builder/v1/assets', $found['upload']['route'] );
 		$this->assertStringContainsString( 'Content-Disposition', wp_json_encode( $found['upload']['headers'] ) );
-		// An example an agent can run, rather than a shape to infer.
 		$this->assertStringContainsString( '--data-binary', $found['upload']['example'] );
 		$this->assertStringContainsString( 'destination', wp_json_encode( $found['upload']['query'] ) );
 	}
 
 	/**
-	 * The upload limits are reported rather than discovered by a failure: the
-	 * resize cap and the server's own ceiling both change the answer.
+	 * The upload limits are reported rather than discovered by a failure: the resize cap
+	 * and the server's own ceiling both change the answer.
 	 */
 	public function test_find_media_reports_the_upload_limits() {
 		$this->require_abilities_api();
@@ -1907,8 +1676,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * An agent that reaches `add-asset` with a JPEG in hand must be told
-	 * where to send it, in the description it has already been given.
+	 * An agent that reaches `add-asset` with a JPEG in hand must be told where to send it,
+	 * in the description it has already been given.
 	 */
 	public function test_add_asset_names_the_route_in_its_description() {
 		$this->require_abilities_api();
@@ -1920,8 +1689,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Neither form given is an error that says what to do, including the
-	 * route for the case an ability cannot serve.
+	 * Neither form given is an error that says what to do, including the route for the case
+	 * an ability cannot serve.
 	 */
 	public function test_add_asset_refuses_with_nothing_to_store() {
 		$this->require_abilities_api();
@@ -1951,8 +1720,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * An SVG an agent authored is stored, and the answer is the reference to
-	 * put in the markup rather than a path to work one out from.
+	 * An SVG an agent authored is stored, and the answer is the reference to put in the
+	 * markup rather than a path to work one out from.
 	 */
 	public function test_add_asset_stores_an_authored_svg() {
 		$this->require_abilities_api();
@@ -1966,14 +1735,13 @@ class Test_Abilities extends WP_UnitTestCase {
 		);
 
 		$this->assertNotWPError( $result );
-		// The extension is added rather than the file stored without one.
 		$this->assertSame( 'dot.svg', $result['filename'] );
 		$this->assertStringContainsString( 'get_stylesheet_directory_uri', $result['reference'] );
 	}
 
 	/**
-	 * A placeholder is drawn and stored, so a pattern under construction has
-	 * something local in its image slots rather than a remote service's URL.
+	 * A placeholder is drawn and stored, so a pattern under construction has something
+	 * local in its image slots rather than a remote service's URL.
 	 */
 	public function test_a_placeholder_is_drawn_and_stored() {
 		$this->require_abilities_api();
@@ -1992,8 +1760,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * `add-font` is idempotent and says so: installing a family twice leaves
-	 * the same files and the same preset, so core may accept a repeat.
+	 * `add-font` is idempotent and says so: installing a family twice leaves the same files
+	 * and the same preset, so core may accept a repeat.
 	 */
 	public function test_add_font_is_marked_idempotent() {
 		$this->require_abilities_api();
@@ -2004,8 +1772,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Storing an asset is not idempotent — a second call stores a second
-	 * copy — and must not claim to be, since the annotation is behaviour.
+	 * Storing an asset is not idempotent — a second call stores a second copy — and must
+	 * not claim to be, since the annotation is behaviour.
 	 */
 	public function test_add_asset_is_not_marked_idempotent() {
 		$this->require_abilities_api();
@@ -2016,8 +1784,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A font family needs naming; an empty call is an error rather than an
-	 * arbitrary choice.
+	 * A font family needs naming; an empty call is an error rather than an arbitrary
+	 * choice.
 	 */
 	public function test_add_font_needs_a_family() {
 		$this->require_abilities_api();
@@ -2029,8 +1797,8 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Give the active theme a minimal theme.json for the duration of one
-	 * test, and remember it so tear_down takes it away again.
+	 * Give the active theme a minimal theme.json for the duration of one test, and remember
+	 * it so tear_down takes it away again.
 	 */
 	private function give_the_theme_a_theme_json() {
 		$this->theme_json = get_stylesheet_directory() . '/theme.json';

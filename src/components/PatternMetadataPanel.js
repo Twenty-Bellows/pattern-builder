@@ -16,10 +16,6 @@ import { dispatch } from '@wordpress/data';
 /**
  * Edits a pattern's name, slug, and descriptive metadata.
  *
- * For theme patterns these round-trip through the pattern file's header —
- * renaming the slug rewrites the file. Edits stage on the entity and persist
- * with the next save.
- *
  * @param {Object} root0             Component props.
  * @param {Object} root0.patternPost The pattern's entity record.
  * @param {string} root0.postType    'pb_pattern' or 'wp_block'.
@@ -33,7 +29,6 @@ export const PatternMetadataPanel = ( {
 		typeof patternPost.title === 'object'
 			? patternPost.title?.raw || ''
 			: patternPost.title || '';
-	// Theme patterns carry a namespaced name; only the slug half is editable.
 	const namespace = isThemePattern
 		? String( patternPost.name || '' ).split( '/' )[ 0 ]
 		: '';

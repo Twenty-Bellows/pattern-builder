@@ -8,7 +8,6 @@
 use TwentyBellows\PatternBuilder\Pattern_Builder_Theme_Styles;
 
 class Test_Theme_Styles extends WP_UnitTestCase {
-
 	public function set_up() {
 		parent::set_up();
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
@@ -60,23 +59,13 @@ class Test_Theme_Styles extends WP_UnitTestCase {
 		$this->assertContains( 'typography.fontSize', $result['written'] );
 		$this->assertContains( 'elements.heading.typography.fontWeight', $result['written'] );
 		$this->assertSame( array(), $result['skipped'] );
-
-		/*
-		 * Core resolves the theme.json `var:preset|…` shorthand into the CSS
-		 * custom property as it reads it, so that is what lands in the file.
-		 * The two are equivalent and it is the form the themes shipped here
-		 * already use; `Cloud_Tokens::referenced()` scans for both, so a
-		 * style written this way is still one whose tokens can be collected.
-		 */
 		$stored = $this->stored();
 		$this->assertSame( 'var(--wp--preset--font-size--medium)', $stored['styles']['typography']['fontSize'] );
 		$this->assertSame( '700', $stored['styles']['elements']['heading']['typography']['fontWeight'] );
 	}
 
 	/**
-	 * The opposite of a token. `add-design-tokens` leaves an existing slug
-	 * alone because a preset is additive; there is only one
-	 * `elements.link.color.text`, so setting it has to mean setting it.
+	 * The opposite of a token.
 	 */
 	public function test_a_style_replaces_rather_than_being_skipped() {
 		$this->seed_theme_json();
@@ -95,8 +84,8 @@ class Test_Theme_Styles extends WP_UnitTestCase {
 	}
 
 	/**
-	 * An agent sets the one thing it means to change, so naming a link must
-	 * not take the button with it.
+	 * An agent sets the one thing it means to change, so naming a link must not take the
+	 * button with it.
 	 */
 	public function test_setting_one_element_leaves_the_others_alone() {
 		$this->seed_theme_json(
@@ -121,10 +110,10 @@ class Test_Theme_Styles extends WP_UnitTestCase {
 	}
 
 	/**
-	 * WordPress does not sanitize a theme.json `css` property and gates it on
-	 * `edit_css` for exactly that reason, so it is refused here rather than
-	 * written — a string that closes its own selector can write rules for the
-	 * whole document, and this ability's output is meant to be able to travel.
+	 * WordPress does not sanitize a theme.json `css` property and gates it on `edit_css`
+	 * for exactly that reason, so it is refused here rather than written — a string that
+	 * closes its own selector can write rules for the whole document, and this ability's
+	 * output is meant to be able to travel.
 	 */
 	public function test_raw_css_is_refused() {
 		$this->seed_theme_json();
@@ -160,9 +149,7 @@ class Test_Theme_Styles extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Core's schema drops what it does not recognise. Dropping it silently
-	 * would leave an agent believing it had set something and building the
-	 * rest of the design on top of a property that is not there.
+	 * Core's schema drops what it does not recognise.
 	 */
 	public function test_unrecognised_properties_are_reported_rather_than_swallowed() {
 		$this->seed_theme_json();

@@ -2,16 +2,10 @@
 /**
  * Integration tests for the Pattern Builder REST API.
  *
- * Theme patterns are file-backed entities under /pattern-builder/v1/patterns
- * with string IDs (their namespaced pattern name). These tests exercise the
- * whole surface: listing, reading, writing files, metadata round-trips,
- * conversions in both directions, deletion, and permissions.
- *
  * @package Pattern_Builder
  */
 
 class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
-
 	private $test_dir;
 
 	private $admin_id;
@@ -21,8 +15,6 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 
 		$this->admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $this->admin_id );
-
-		// Remove all existing wp_block posts.
 		$all_wp_block_posts = get_posts(
 			array(
 				'post_type'   => 'wp_block',
@@ -33,8 +25,6 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		foreach ( $all_wp_block_posts as $post ) {
 			wp_delete_post( $post->ID, true );
 		}
-
-		// Create a temporary directory for the test patterns.
 		$this->test_dir = sys_get_temp_dir() . '/pattern-builder-test';
 		$this->remove_test_directory( $this->test_dir );
 		mkdir( $this->test_dir );
@@ -95,8 +85,6 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		return null;
 	}
 
-	// TESTS ////////////////////////////////////////////////////
-
 	public function test_list_returns_synced_theme_pattern() {
 		$this->copy_test_pattern( 'theme_synced_pattern.php' );
 
@@ -156,9 +144,6 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		$this->assertFalse( $data['synced'] );
 		$this->assertTrue( $data['inserter'] );
 		$this->assertStringContainsString( 'wp:group', $data['content']['raw'] );
-
-		// The editor's save button reads the publish action link off the
-		// record; without it, it degrades to "Submit for Review".
 		$this->assertArrayHasKey( '_links', $data );
 		$this->assertArrayHasKey( 'wp:action-publish', $data['_links'] );
 	}
@@ -228,8 +213,6 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'Viewport Width: 800', $file_contents );
 		$this->assertStringContainsString( 'Inserter: no', $file_contents );
 		$this->assertStringContainsString( 'Synced: yes', $file_contents );
-
-		// And back out through a fresh read.
 		$request  = $this->create_rest_request( 'GET', '/pattern-builder/v1/patterns/simple-theme/theme-unsynced-pattern' );
 		$response = rest_get_server()->dispatch( $request );
 		$data     = $response->get_data();
@@ -352,7 +335,6 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		$file_contents = file_get_contents( $this->test_dir . '/patterns/centered-header.php' );
 		$this->assertStringContainsString( 'Categories: header', $file_contents );
 		$this->assertStringContainsString( 'Block Types: core/template-part/header', $file_contents );
-		// A header is worth inserting by hand, unlike a whole template.
 		$this->assertStringNotContainsString( 'Inserter: no', $file_contents );
 	}
 
@@ -395,8 +377,6 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		$this->assertEquals( 'user', $data['source'] );
 		$this->assertEquals( 'wp_block', $data['type'] );
 		$this->assertIsInt( $data['id'] );
-
-		// The post exists; the file is gone.
 		$post = get_post( $data['id'] );
 		$this->assertEquals( 'wp_block', $post->post_type );
 		$this->assertEquals( 'Theme Synced Pattern', $post->post_title );
@@ -404,8 +384,8 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Converting is still the same pattern: its attribution and the name of
-	 * its copy on the cloud go with it, from header to post meta.
+	 * Converting is still the same pattern: its attribution and the name of its copy on the
+	 * cloud go with it, from header to post meta.
 	 */
 	public function test_converting_to_a_user_pattern_keeps_its_origin_and_cloud_reference() {
 		$this->copy_test_pattern( 'theme_synced_pattern.php' );
@@ -442,8 +422,6 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		$data = $response->get_data();
 		$this->assertEquals( 'simple-theme/test-user-pattern', $data['id'] );
 		$this->assertEquals( 'theme', $data['source'] );
-
-		// The file exists; the post is gone.
 		$this->assertFileExists( $this->test_dir . '/patterns/test-user-pattern.php' );
 		$this->assertNull( get_post( $post_id ) );
 
@@ -454,13 +432,9 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 
 	public function test_convert_theme_pattern_to_user_pattern_and_back() {
 		$this->copy_test_pattern( 'theme_synced_pattern.php' );
-
-		// Theme -> user.
 		$request = $this->create_rest_request( 'PUT', '/pattern-builder/v1/patterns/simple-theme/theme-synced-pattern' );
 		$request->set_body_params( array( 'source' => 'user' ) );
 		$converted = rest_get_server()->dispatch( $request )->get_data();
-
-		// User -> theme.
 		$request = $this->create_rest_request( 'POST', '/pattern-builder/v1/patterns' );
 		$request->set_body_params( array( 'fromWpBlock' => $converted['id'] ) );
 		$response = rest_get_server()->dispatch( $request );
@@ -517,10 +491,9 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A theme reached through a symlink — the usual shape of a local dev
-	 * setup — resolves to a real path outside the directory the theme
-	 * functions report, which used to read as a traversal attempt and made
-	 * deleting (or writing) a pattern impossible.
+	 * A theme reached through a symlink — the usual shape of a local dev setup — resolves
+	 * to a real path outside the directory the theme functions report, which used to read
+	 * as a traversal attempt and made deleting (or writing) a pattern impossible.
 	 */
 	public function test_delete_theme_pattern_in_a_symlinked_theme() {
 		$link = sys_get_temp_dir() . '/pattern-builder-test-link';
@@ -554,9 +527,9 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The same symlinked theme, writing a pattern that isn't there yet: a
-	 * file being created can't be resolved, and comparing it unresolved
-	 * against resolved theme directories read as a traversal attempt.
+	 * The same symlinked theme, writing a pattern that isn't there yet: a file being
+	 * created can't be resolved, and comparing it unresolved against resolved theme
+	 * directories read as a traversal attempt.
 	 */
 	public function test_create_theme_pattern_in_a_symlinked_theme() {
 		$link = sys_get_temp_dir() . '/pattern-builder-test-link';
@@ -602,8 +575,6 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 			$response = rest_get_server()->dispatch( new WP_REST_Request( $route[0], $route[1] ) );
 			$this->assertEquals( 401, $response->get_status(), "{$route[0]} {$route[1]} should be rejected for anonymous users" );
 		}
-
-		// The file survived every attempt.
 		$this->assertFileExists( $this->test_dir . '/patterns/theme_synced_pattern.php' );
 	}
 
@@ -621,14 +592,11 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 	public function test_core_blocks_route_is_not_intercepted() {
 		$this->copy_test_pattern( 'theme_synced_pattern.php' );
 
-		// No v1-style injection: /wp/v2/blocks lists only real wp_block posts.
 		$request  = $this->create_rest_request( 'GET', '/wp/v2/blocks' );
 		$response = rest_get_server()->dispatch( $request );
 
 		$this->assertEquals( 200, $response->get_status() );
 		$this->assertCount( 0, $response->get_data() );
-
-		// And nothing from this plugin hijacks dispatch anymore.
 		global $wp_filter;
 		$this->assertFalse(
 			isset( $wp_filter['rest_pre_dispatch'] ) && $this->has_plugin_callback( $wp_filter['rest_pre_dispatch'] ),

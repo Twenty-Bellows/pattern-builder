@@ -1,10 +1,8 @@
 <?php
 /**
- * Uploading a pattern that references others: the tree goes leaves first,
- * its references are rewritten to name the collection they land in, and a
- * dependency this site does not have refuses the whole thing before
- * anything is sent. The service is mocked at the HTTP layer, as every cloud
- * test is.
+ * Uploading a pattern that references others: the tree goes leaves first, its references
+ * are rewritten to name the collection they land in, and a dependency this site does not
+ * have refuses the whole thing before anything is sent.
  *
  * @package PatternBuilder
  */
@@ -16,7 +14,6 @@ use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Porter;
 use TwentyBellows\PatternBuilder\Pattern_File_Store;
 
 class Test_Cloud_Tree extends WP_UnitTestCase {
-
 	/**
 	 * Every service request the mock saw: method, decoded path, body.
 	 *
@@ -66,8 +63,6 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 		remove_all_filters( 'pre_http_request' );
 		remove_filter( 'stylesheet_directory', array( $this, 'theme_dir' ) );
 		remove_filter( 'stylesheet', array( $this, 'theme_slug' ) );
-
-		// Patterns land nested now, so sweep the tree rather than one level.
 		foreach ( (array) glob( $this->theme_dir . '/patterns/*.php' ) as $file ) {
 			unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 		}
@@ -101,8 +96,8 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 	/**
 	 * Write a theme pattern file.
 	 *
-	 * @param string $slug    Pattern slug, without the theme namespace.
-	 * @param string $title   Pattern title.
+	 * @param string $slug Pattern slug, without the theme namespace.
+	 * @param string $title Pattern title.
 	 * @param string $content Block markup.
 	 */
 	private function make_theme_pattern( $slug, $title, $content, $cloud = '' ) {
@@ -132,11 +127,11 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Mock the service: Personal, and a library that answers a lookup by name
-	 * with 404 until something is uploaded under it.
+	 * Mock the service: Personal, and a library that answers a lookup by name with 404
+	 * until something is uploaded under it.
 	 *
 	 * @param int $personal_count How many patterns Personal holds already.
-	 * @param int $personal_cap   Its cap, or -1 for none.
+	 * @param int $personal_cap Its cap, or -1 for none.
 	 */
 	private function mock_service( $personal_count = 0, $personal_cap = -1 ) {
 		$next = 100;
@@ -270,26 +265,18 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 			array( 'simple-theme/hero', 'simple-theme/cta', 'simple-theme/page-home' ),
 			$result['members']
 		);
-
-		// Three patterns went up, the page last.
 		$uploads = $this->uploads();
 		$this->assertCount( 3, $uploads );
 		$this->assertStringContainsString( '"slug":"hero"', $uploads[0] );
 		$this->assertStringContainsString( '"slug":"cta"', $uploads[1] );
 		$this->assertStringContainsString( '"slug":"page-home"', $uploads[2] );
-
-		// And the page's references name the collection they landed in.
 		$this->assertStringContainsString( 'studio-a\/personal\/hero', $uploads[2] );
 		$this->assertStringContainsString( 'studio-a\/personal\/cta', $uploads[2] );
 		$this->assertStringNotContainsString( 'simple-theme\/hero', $uploads[2] );
-
-		// Every member now carries the name of its copy…
 		$this->assertSame( 'studio-a/personal/hero', $this->cloud_of( 'simple-theme/hero' ) );
 		$this->assertSame( 'studio-a/personal/cta', $this->cloud_of( 'simple-theme/cta' ) );
 		$this->assertSame( 'studio-a/personal/page-home', $this->cloud_of( 'simple-theme/page-home' ) );
 		$this->assertSame( 'studio-a/personal/page-home', $result['cloud'] );
-
-		// …so a second upload updates all three rather than duplicating any.
 		$this->seen = array();
 		$again      = Pattern_Builder_Cloud_Controller::upload_pattern( 'theme', 'simple-theme/page-home' );
 
@@ -307,9 +294,7 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 	}
 
 	public function test_a_section_whose_name_is_another_patterns_copy_is_refused() {
-		// Another pattern here was uploaded as studio-a/personal/hero…
 		$this->make_theme_pattern( 'hero-copy', 'Older Hero', '<!-- wp:paragraph --><p>Older</p><!-- /wp:paragraph -->', 'studio-a/personal/hero' );
-		// …and this page's hero would go up under that same name.
 		$this->make_theme_pattern( 'hero', 'Hero', '<!-- wp:paragraph --><p>Hero</p><!-- /wp:paragraph -->' );
 		$this->make_theme_pattern( 'page-home', 'Home Page', $this->reference( 'simple-theme/hero' ) );
 
@@ -325,7 +310,6 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 	}
 
 	public function test_a_section_keeps_the_copy_it_already_has() {
-		// The hero went up on its own, into another collection, first.
 		$this->make_theme_pattern( 'hero', 'Hero', '<!-- wp:paragraph --><p>Hero</p><!-- /wp:paragraph -->', 'studio-a/elsewhere/hero' );
 		$this->make_theme_pattern( 'page-home', 'Home Page', $this->reference( 'simple-theme/hero' ) );
 
@@ -334,8 +318,6 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 		$result = Pattern_Builder_Cloud_Controller::upload_pattern( 'theme', 'simple-theme/page-home' );
 
 		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
-		// The page's collection gets a copy of it, since a collection is a
-		// closed world; the hero's own reference is left where it was.
 		$this->assertArrayHasKey( 'studio-a/personal/hero', $this->library );
 		$this->assertSame( 'studio-a/elsewhere/hero', $this->cloud_of( 'simple-theme/hero' ) );
 		$this->assertSame( 'studio-a/personal/page-home', $this->cloud_of( 'simple-theme/page-home' ) );
@@ -397,9 +379,6 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 
 		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
 		$this->assertSame( array( 'simple-theme/hero' ), $result['members'] );
-
-		// One request, the upload itself: a lone pattern needs no namespace,
-		// so it does not pay for a collection lookup it cannot use.
 		$this->assertCount( 1, $this->seen );
 		$this->assertSame( '/library/patterns', $this->seen[0]['path'] );
 	}
@@ -438,8 +417,6 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 					'path'   => $path,
 					'body'   => is_string( $args['body'] ) ? $args['body'] : '',
 				);
-
-				// The collection, so a reference can be resolved to an id.
 				if ( '/directory/collections/7/heroes' === $path ) {
 					$body = array(
 						'id'       => 3,
@@ -498,26 +475,15 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 
 		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
 		$this->assertSame( array( 'studio-b/heroes/hero' ), $result['dependencies'] );
-
-		// The page is fetched first, because its references cannot be known
-		// until its package is in hand — but the section is *written* first,
-		// which is what `install_dependencies()` running before the import
-		// guarantees and what keeps the page from rendering a placeholder.
 		$this->assertSame( array( 102, 101 ), $downloads );
-
-		// Both landed, each under its own name, and the page's reference
-		// resolves without anything being rewritten.
 		$this->assertFileExists( $this->theme_dir . '/patterns/studio-b/heroes/hero.php' );
 		$page = $this->theme_dir . '/patterns/studio-b/heroes/page-home.php';
 		$this->assertFileExists( $page );
 		$this->assertStringContainsString( 'studio-b/heroes/hero', file_get_contents( $page ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
-
-		// Each keeps the name of the cloud pattern it is a copy of.
 		$this->assertStringContainsString( 'Cloud: studio-b/heroes/page-home', file_get_contents( $page ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
 	}
 
 	public function test_a_section_already_here_is_not_installed_again() {
-		// The hero is already on this site under its cloud name.
 		if ( ! is_dir( $this->theme_dir . '/patterns/studio-b/heroes' ) ) {
 			mkdir( $this->theme_dir . '/patterns/studio-b/heroes', 0777, true );
 		}
@@ -590,8 +556,6 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 
 	public function test_installing_a_page_from_the_library_installs_its_sections_first() {
 		$this->mock_library();
-
-		// The collection as the Uploaded tab sends it, from the summary in hand.
 		$porter = new Pattern_Builder_Cloud_Porter();
 		$result = $porter->install_cloud_pattern(
 			102,
@@ -607,9 +571,6 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 
 		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
 		$this->assertSame( array( 'studio-a/heroes/hero' ), $result['dependencies'] );
-
-		// Both come from the account's own library: the page fetched first,
-		// the section written first.
 		$this->assertSame(
 			array( '/library/patterns/102/download', '/library/patterns/101/download' ),
 			$this->download_paths()
@@ -626,8 +587,6 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 
 		$abilities = new Pattern_Builder_Cloud_Abilities();
 		remove_action( 'wp_abilities_api_init', array( $abilities, 'register_abilities' ) );
-
-		// An agent names the pattern and nothing about its collection.
 		$result = $abilities->execute_install_cloud_pattern(
 			array(
 				'id'     => 102,
@@ -645,8 +604,8 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 	 * A downloadable package, as the service hands one over.
 	 *
 	 * @param string $namespace The pattern's cloud name.
-	 * @param string $title     Its title.
-	 * @param string $content   Its markup.
+	 * @param string $title Its title.
+	 * @param string $content Its markup.
 	 * @return array
 	 */
 	private function package( $namespace, $title, $content ) {
@@ -664,10 +623,8 @@ class Test_Cloud_Tree extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Mock the connected account's library: Personal, and a Heroes
-	 * collection holding a page and the section it places. A route the mock
-	 * does not know is answered the way the service's REST server answers
-	 * one it does not have.
+	 * Mock the connected account's library: Personal, and a Heroes collection holding a
+	 * page and the section it places.
 	 */
 	private function mock_library() {
 		add_filter(

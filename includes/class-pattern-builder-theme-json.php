@@ -16,15 +16,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * The active theme's `theme.json`, or the site's user Global Styles.
- *
- * Two destinations, one shape: a theme.json-shaped array that is loaded,
- * changed and written back. `Pattern_Builder_Cloud_Tokens` merges presets into
- * it and `Pattern_Builder_Theme_Styles` merges styles, and neither of them
- * should have to know that one destination is a file on disk and the other a
- * post — or repeat the four ways loading can fail.
  */
 class Pattern_Builder_Theme_Json {
-
 	/**
 	 * Read the config for a destination.
 	 *
@@ -43,8 +36,6 @@ class Pattern_Builder_Theme_Json {
 			if ( ! is_array( $config ) ) {
 				$config = array();
 			}
-
-			// Global Styles is stored as theme.json with two markers on it.
 			$config['version']                     = isset( $config['version'] ) ? $config['version'] : 3;
 			$config['isGlobalStylesUserThemeJSON'] = true;
 
@@ -71,7 +62,7 @@ class Pattern_Builder_Theme_Json {
 	 * Write a config back to its destination.
 	 *
 	 * @param string $destination "theme" or "user".
-	 * @param array  $config      theme.json-shaped config.
+	 * @param array  $config theme.json-shaped config.
 	 * @return true|WP_Error
 	 */
 	public static function save( $destination, $config ) {
@@ -98,8 +89,7 @@ class Pattern_Builder_Theme_Json {
 				return new WP_Error( 'pb_cloud_theme_json_write', __( 'theme.json could not be written.', 'pattern-builder' ), array( 'status' => 500 ) );
 			}
 		}
-
-		// Whatever just changed, the merged data every reader sees is stale.
+		// Whatever just changed, the merged data every reader sees is now stale.
 		wp_clean_theme_json_cache();
 
 		return true;
@@ -109,7 +99,7 @@ class Pattern_Builder_Theme_Json {
 	 * Load a config, hand it to a merger, and write the result back.
 	 *
 	 * @param string   $destination "theme" or "user".
-	 * @param callable $merge       Takes the config, returns it changed.
+	 * @param callable $merge Takes the config, returns it changed.
 	 * @return true|WP_Error
 	 */
 	public static function edit( $destination, $merge ) {

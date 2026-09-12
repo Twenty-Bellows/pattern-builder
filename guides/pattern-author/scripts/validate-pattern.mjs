@@ -1,40 +1,6 @@
 #!/usr/bin/env node
 /**
  * Validate block markup with the editor's own validator.
- *
- * WordPress decides a block is valid by re-running its `save()` against the
- * stored attributes and diffing the result against the markup on disk. `save()`
- * is JavaScript, so no amount of PHP, and no look at the rendered front end,
- * can answer the question — the front end happily prints invalid markup, and
- * the failure only appears when an editor opens it. This runs the real thing
- * (`@wordpress/blocks` with the core block library registered) in Node, so a
- * pattern can be checked before it is written anywhere.
- *
- * Two questions get asked, because core answers two:
- *
- *   parse()         Will an editor open this without complaining? Tolerant by
- *                   design — it tries each block's *deprecated* save versions
- *                   (core/paragraph has six) and silently migrates when one
- *                   matches.
- *   validateBlock() Is this what the block writes *today*? Strict.
- *
- * The gap between them is where a pattern quietly rots. Markup that matches a
- * deprecation opens without a murmur, but the file on disk still lacks what
- * the current block would write — most often a block-supports class — and the
- * front end renders the file, not the editor's idea of it. So
- * `{"backgroundColor":"primary"}` with no `has-primary-background-color`
- * passes parse(), renders with no background, and reads as a design mistake
- * rather than a bug. Hence both, reported separately.
- *
- * Usage:
- *   node validate-pattern.mjs <file.php|file.html> [more files...]
- *   cat markup | node validate-pattern.mjs -
- *
- * Exit code is 0 only when every block is valid and registered.
- *
- * Requires `@wordpress/blocks`, `@wordpress/block-library` and `jsdom` to be
- * resolvable — from the project's own node_modules, or installed on the fly:
- *   npm i --no-save @wordpress/blocks @wordpress/block-library jsdom
  */
 
 import fs from 'node:fs';
@@ -46,12 +12,6 @@ import {
 	loadWordPressBlocks,
 	loadWordPressBlocksFromUrls,
 } from './wp-core.mjs';
-
-/*
- * The WordPress packages' ESM builds import JSON without an import attribute,
- * which Node's strict ESM loader rejects outright. Their CommonJS builds are
- * equivalent and load cleanly, so everything goes through require().
- */
 const require = createRequire( import.meta.url );
 
 /**
@@ -61,9 +21,6 @@ const require = createRequire( import.meta.url );
  */
 function installDom() {
 	const { JSDOM, VirtualConsole } = require( 'jsdom' );
-
-	// jsdom complains about CSS it cannot parse in the block library's inline
-	// styles. Irrelevant to validation, and it drowns the report.
 	const dom = new JSDOM( '<!doctype html><html><body></body></html>', {
 		url: 'http://localhost',
 		pretendToBeVisual: true,
@@ -73,8 +30,6 @@ function installDom() {
 	globalThis.window = dom.window;
 	globalThis.document = dom.window.document;
 	globalThis.self = dom.window;
-
-	// Node exposes a getter-only `navigator`; plain assignment throws.
 	Object.defineProperty( globalThis, 'navigator', {
 		value: dom.window.navigator,
 		configurable: true,
@@ -168,34 +123,22 @@ function installDom() {
 /**
  * Reduce a pattern's PHP to the block markup underneath it.
  *
- * Theme patterns are PHP: a docblock header and sometimes inline
- * `<?php echo esc_url( … ); ?>` inside an attribute. Substituting a plausible
- * literal for each inline expression leaves markup that parses the way it
- * would at runtime.
  * @param {string} source
  */
 function stripPhp( source ) {
-	return (
-		source
-			// A byte order mark, as an escape rather than the character itself.
-			.replace( /^\uFEFF/, '' )
-			// The header docblock and any opening PHP section.
-			.replace( /^\s*<\?php[\s\S]*?\?>\s*/, '' )
-			// Inline expressions inside attributes become a stand-in URL/string.
-			.replace(
-				/<\?php\s*echo\s+esc_url\([\s\S]*?\)\s*;?\s*\?>/g,
-				'https://example.com/'
-			)
-			.replace( /<\?php[\s\S]*?\?>/g, 'placeholder' )
-	);
+	return source
+		.replace( /^\uFEFF/, '' )
+		.replace( /^\s*<\?php[\s\S]*?\?>\s*/, '' )
+		.replace(
+			/<\?php\s*echo\s+esc_url\([\s\S]*?\)\s*;?\s*\?>/g,
+			'https://example.com/'
+		)
+		.replace( /<\?php[\s\S]*?\?>/g, 'placeholder' );
 }
 
 /**
  * Run a function with the console muted.
  *
- * `parse()` logs the whole expected-vs-actual diff for every invalid block.
- * That detail is the useful part, but it is available per block through
- * `validationIssues`, and letting it stream to stdout buries the report.
  * @param {Function} fn
  */
 function quietly( fn ) {
@@ -221,6 +164,7 @@ function quietly( fn ) {
 
 /**
  * Every block in the tree, inner blocks included.
+ *
  * @param {Array} blocks
  * @param {Array} acc
  */
@@ -237,15 +181,6 @@ function flatten( blocks, acc = [] ) {
 /**
  * Did the value turn up somewhere else in the attributes?
  *
- * Core moves things as well as dropping them. Block library 10.5 turned text
- * alignment from a paragraph's `align` and a heading's `textAlign` into a
- * typography support, and its migration relocates the value to
- * `style.typography.textAlign` rather than discarding it. The setting is
- * intact, so that is not a loss and must not be reported as one.
- *
- * Only values distinctive enough not to collide are followed: a bare `2` or
- * `true` would match something unrelated and turn this into noise.
- *
  * @param {*}      value      The authored value.
  * @param {Object} attributes Attributes after parsing.
  * @return {boolean} Whether the value is still in there somewhere.
@@ -260,17 +195,6 @@ function survivedElsewhere( value, attributes ) {
 
 /**
  * Attributes the author wrote that did not survive parsing.
- *
- * When markup matches a deprecated save, core does not just accept it — it
- * runs that version's `migrate()`, which reads the *markup* as authoritative
- * and can drop an attribute the author wrote. A heading with
- * `{"level":2,"fontSize":"xx-large"}` whose tag carries no `has-…-font-size`
- * class comes back with no `fontSize` at all: the size is gone, the block is
- * entirely self-consistent afterwards, and nothing anywhere reports it.
- *
- * So this compares what is written in the block delimiters against what came
- * out of the full parser. Where a migration reshaped the tree the two stop
- * corresponding, and it stops rather than guess — silence beats a false alarm.
  *
  * @param {Array} authored Blocks from the raw serialization parser.
  * @param {Array} parsed   Blocks from the full parser.
@@ -290,21 +214,12 @@ function attributeLosses( authored, parsed, out = [] ) {
 
 		const dropped = Object.keys( wrote[ i ].attrs || {} ).filter(
 			( key ) => {
-				/*
-				 * `content` on core/pattern is the synced-pattern runtime's, supplied
-				 * by Pattern Builder rather than core, and the loaders declare it the
-				 * way the runtime does so it survives parsing here. Should a loader
-				 * ever not (a `core/pattern` registered before the filter), its loss
-				 * is a fact about this environment rather than about the file, and
-				 * not this file's to report.
-				 */
 				if ( got[ i ].name === 'core/pattern' && key === 'content' ) {
 					return false;
 				}
 				if ( got[ i ].attributes?.[ key ] !== undefined ) {
 					return false;
 				}
-				// Relocated by a migration rather than thrown away.
 				return ! survivedElsewhere(
 					wrote[ i ].attrs[ key ],
 					got[ i ].attributes
@@ -328,8 +243,6 @@ function attributeLosses( authored, parsed, out = [] ) {
 /**
  * Which classes a mismatch is about, when it is about classes.
  *
- * Nearly every strict failure is a block-supports class that never made it
- * into the markup, so naming the class beats printing core's tokenizer diff.
  * @param {string} expected
  * @param {string} actual
  */
@@ -387,38 +300,20 @@ function readInput( file ) {
 /**
  * Where the block code comes from.
  *
- * A WordPress install is preferred over anything on npm, and not only to
- * spare somebody a few hundred megabytes of install. Whether markup is what a
- * block writes *today* is a question only a specific block library can
- * answer — block library 10.5 moved text alignment into a typography support
- * and so disagrees with 9.22 about the same file — so the honest thing to
- * check against is the WordPress the pattern is destined for, not whatever
- * npm last resolved.
- *
  * @return {Object} parse, validateBlock, getSaveContent, parseRaw, describe.
  */
 async function loadCore() {
-	/*
-	 * A list of script URLs from `pattern-builder/get-editor-scripts`. This is
-	 * the route for an agent that reached the site over HTTP and has no copy
-	 * of WordPress on disk: the scripts are served to anyone, but the order
-	 * they load in has to come from the site, because core's manifest is a
-	 * PHP file and a request for it executes rather than serves.
-	 */
 	const listed = flagValue( '--scripts' );
 	if ( listed ) {
 		const raw = fs.readFileSync( listed, 'utf8' );
 		let urls;
 		let version = '';
 		try {
-			// The ability's response, saved verbatim, is the easiest thing to
-			// hand back to us.
 			const json = JSON.parse( raw );
 			const body = json.scripts ? json : json.output || json.data || {};
 			urls = body.scripts;
 			version = body.wordpress || '';
 		} catch {
-			// Or a plain list, one URL per line.
 			urls = raw
 				.split( '\n' )
 				.map( ( line ) => line.trim() )
@@ -477,8 +372,6 @@ async function loadCore() {
 			process.exit( 2 );
 		}
 	}
-
-	// Nothing to point at, so fall back to whatever the project has.
 	let blocks;
 	try {
 		installDom();
@@ -499,9 +392,6 @@ async function loadCore() {
 		);
 		process.exit( 2 );
 	}
-
-	// The `content` attribute Pattern Builder adds to core/pattern, declared
-	// before the core blocks register so a reference keeps its slot values.
 	require( '@wordpress/hooks' ).addFilter(
 		'blocks.registerBlockType',
 		'pattern-builder/pattern-content-attribute',
@@ -510,18 +400,9 @@ async function loadCore() {
 
 	const { registerCoreBlocks } = require( '@wordpress/block-library' );
 	quietly( () => registerCoreBlocks() );
-
-	/*
-	 * Block-supports classes are not written by a block's own save(); filters
-	 * in the editor package add them, and without those registered the strict
-	 * check silently loses most of its value. The block library pulls the
-	 * package in already, but say so out loud and check rather than trust.
-	 */
 	try {
 		quietly( () => require( '@wordpress/block-editor' ) );
-	} catch {
-		// The check below reports the consequence.
-	}
+	} catch {}
 	if (
 		! require( '@wordpress/hooks' ).hasFilter(
 			'blocks.getSaveContent.extraProps'
@@ -567,9 +448,6 @@ function flagValue( name ) {
 
 async function main() {
 	const argv = process.argv.slice( 2 );
-	// These flags take a value, and the value is not a file. Guard the index,
-	// because with a flag absent `indexOf` is -1 and `at + 1` would be 0,
-	// swallowing the first file.
 	const valueAt = [ '--wp', '--scripts' ]
 		.map( ( flag ) => argv.indexOf( flag ) )
 		.filter( ( at ) => at !== -1 )
@@ -629,13 +507,7 @@ async function main() {
 			}
 			if ( block.name === null ) {
 				continue;
-			} // Freeform whitespace between blocks.
-
-			/*
-			 * A migration can invent inner blocks (a deprecated list grows
-			 * list-item children). Nothing of theirs is on disk, so there is
-			 * nothing here to hold them to.
-			 */
+			}
 			if ( block.originalContent === undefined ) {
 				continue;
 			}
@@ -651,22 +523,9 @@ async function main() {
 				problems++;
 				continue;
 			}
-
-			/*
-			 * A bound block takes its content from the binding source at
-			 * render, not from the file, so holding the file to a save
-			 * computed from the file's own attributes says nothing. Core
-			 * reserves markup for the bound value too, which a bare Node
-			 * context has no way to fill.
-			 */
 			if ( block.attributes?.metadata?.bindings ) {
 				continue;
 			}
-
-			/*
-			 * parse() accepted it, which only means some version of this block
-			 * once saved markup like this. Ask whether the current one would.
-			 */
 			const [ current, issues ] = quietly( () => validateBlock( block ) );
 			if ( current ) {
 				continue;

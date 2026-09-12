@@ -17,37 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * The checks a write runs before it lands markup, and their limits.
- *
- * Whether a block is *valid* — whether re-running its `save()` reproduces the
- * markup — is JavaScript's to answer, and nothing here pretends otherwise: an
- * agent still validates before it calls `create-pattern`, with the tool the
- * site hands it. What PHP can settle is a different set of failures, every
- * one of them silent at render and every one of them cheap to catch here:
- *
- *  1. **Attribute JSON that does not parse.** `WP_Block_Parser` reads it as
- *     *no* attributes and carries on, so a heading that lost a brace stores
- *     as a heading with nothing set — and a Pattern Overrides slot that lost
- *     one is quietly no longer a slot.
- *  2. **Markup contradicting its own attributes**: a heading whose tag
- *     disagrees with its `level`, a list whose element disagrees with
- *     `ordered`. Valid nowhere, and reported by every editor that opens it.
- *  3. **A block this site has not registered.** It parses to `core/missing`
- *     and renders as a grey box; `list-block-types` says what is here.
- *  4. **A `core/pattern` reference that resolves to nothing** — an unresolved
- *     reference renders as nothing at all, with no error anywhere — or that
- *     names the pattern being written, which core drops as a loop.
- *  5. **A slot that cannot be filled**: a `content` key naming no slot in the
- *     referenced pattern (a misspelt key is simply ignored), a Pattern
- *     Overrides binding with no `metadata.name` (the binding source returns
- *     nothing for it), or a binding on a block core cannot bind.
- *
- * The same shape `Pattern_Validator::check_block_markup()` has on
- * patternbuilderwp.com, which runs the first two on every upload. Refusing
- * here means the failure is named while the agent is still holding the
- * markup, rather than discovered on a page a person thinks is finished.
  */
 class Pattern_Builder_Markup_Checks {
-
 	/**
 	 * The binding source Pattern Overrides slots use.
 	 */
@@ -56,9 +27,9 @@ class Pattern_Builder_Markup_Checks {
 	/**
 	 * Check markup, refusing it with every problem named.
 	 *
-	 * @param string $markup    Block markup.
-	 * @param string $self_name The name this markup is being stored under, so
-	 *                          a reference to itself can be refused.
+	 * @param string $markup Block markup.
+	 * @param string $self_name The name this markup is being stored under, so a reference
+	 * to itself can be refused.
 	 * @return true|WP_Error `pb_markup_refused`, with every problem under `problems`.
 	 */
 	public static function check( $markup, $self_name = '' ) {
@@ -91,7 +62,7 @@ class Pattern_Builder_Markup_Checks {
 	/**
 	 * Every problem in some markup, in the order found.
 	 *
-	 * @param string $markup    Block markup.
+	 * @param string $markup Block markup.
 	 * @param string $self_name The name this markup is stored under.
 	 * @return string[]
 	 */
@@ -110,10 +81,6 @@ class Pattern_Builder_Markup_Checks {
 
 	/**
 	 * Block comments whose attribute object is not JSON.
-	 *
-	 * Matches whatever sits between the block name and the delimiter rather
-	 * than a balanced-looking object, because the usual damage is a missing
-	 * brace and no `{...}` pattern would match one.
 	 *
 	 * @param string $markup Block markup.
 	 * @return string[]
@@ -144,7 +111,7 @@ class Pattern_Builder_Markup_Checks {
 	/**
 	 * Walk a parsed tree for everything but the JSON.
 	 *
-	 * @param array  $blocks    Parsed blocks.
+	 * @param array  $blocks Parsed blocks.
 	 * @param string $self_name The name this markup is stored under.
 	 * @return string[]
 	 */
@@ -154,8 +121,6 @@ class Pattern_Builder_Markup_Checks {
 
 		foreach ( $blocks as $block ) {
 			$name = isset( $block['blockName'] ) ? (string) $block['blockName'] : '';
-
-			// Freeform whitespace between blocks.
 			if ( '' === $name ) {
 				continue;
 			}
@@ -189,9 +154,9 @@ class Pattern_Builder_Markup_Checks {
 	/**
 	 * Markup that says one thing while the attributes say another.
 	 *
-	 * @param string $name  Block name.
+	 * @param string $name Block name.
 	 * @param array  $attrs Attributes.
-	 * @param string $html  The block's own HTML.
+	 * @param string $html The block's own HTML.
 	 * @return string[]
 	 */
 	private static function contradictions( $name, $attrs, $html ) {
@@ -225,11 +190,7 @@ class Pattern_Builder_Markup_Checks {
 	/**
 	 * A Pattern Overrides slot declared in a way nothing can fill.
 	 *
-	 * The binding source reads `metadata.name` and returns nothing without it,
-	 * and a block core cannot bind never has its value replaced — in both
-	 * cases the placeholder ships as though it were the page's copy.
-	 *
-	 * @param string $name  Block name.
+	 * @param string $name Block name.
 	 * @param array  $attrs Attributes.
 	 * @return string[]
 	 */
@@ -275,7 +236,7 @@ class Pattern_Builder_Markup_Checks {
 	/**
 	 * A `core/pattern` reference, and the slots it fills.
 	 *
-	 * @param array  $attrs     The reference's attributes.
+	 * @param array  $attrs The reference's attributes.
 	 * @param string $self_name The name this markup is stored under.
 	 * @return string[]
 	 */
@@ -344,12 +305,6 @@ class Pattern_Builder_Markup_Checks {
 	/**
 	 * The markup a reference resolves to, from wherever it is.
 	 *
-	 * The registry is what `core/pattern` renders from, but a theme pattern
-	 * written moments ago is only registered on the next request — WordPress
-	 * reads the theme's files on `init` — so the files are asked as well.
-	 * That is also what lets a page be stored in the same session as the
-	 * sections it references.
-	 *
 	 * @param string $slug Pattern name.
 	 * @return string|null
 	 */
@@ -404,8 +359,6 @@ class Pattern_Builder_Markup_Checks {
 		if ( function_exists( 'get_block_bindings_supported_attributes' ) ) {
 			return (array) get_block_bindings_supported_attributes( $name );
 		}
-
-		// WordPress 6.8 and earlier keep the list private to WP_Block.
 		$supported = array(
 			'core/paragraph' => array( 'content' ),
 			'core/heading'   => array( 'content' ),

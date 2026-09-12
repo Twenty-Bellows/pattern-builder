@@ -21,13 +21,10 @@ import { PatternAssociationsPanel } from './PatternAssociationsPanel';
 import { PatternActionsPanel } from './PatternActionsPanel';
 
 /**
- * The browse screen's details sidebar for the selected pattern — the same
- * panels the editor shows for a pattern document (Source, Synced Status,
- * and for theme patterns Metadata and Associations), staged on the entity
- * and persisted by the Save button; Edit opens the pattern's editor.
- *
- * Mount with `key={pattern.id}` — the metadata panels keep local input
- * state seeded from the record.
+ * The browse screen's details sidebar for the selected pattern — the same panels the editor
+ * shows for a pattern document (Source, Synced Status, and for theme patterns Metadata and
+ * Associations), staged on the entity and persisted by the Save button; Edit opens the
+ * pattern's editor.
  *
  * @param {Object}   props         Component props.
  * @param {Object}   props.pattern The selected pattern, or null for the empty state.

@@ -18,37 +18,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Writing and reading the theme's `styles/*.json` partials.
- *
- * A design usually wants more than one kind of button, and the three ways to
- * get one are not equal. Setting the attributes on each button fossilises the
- * design into the markup. `styles.elements.button` is one rule for every
- * button on the site, so it cannot describe a second kind at all. A **block
- * style variation** is the third: a named look, applied by putting
- * `is-style-{slug}` in the markup, scoped to exactly the blocks that carry the
- * class.
- *
- * That scoping is also what makes it the only styling a pattern can honestly
- * bring with it — the selector needs a class the pattern's own markup carries,
- * so installing one changes nothing the pattern did not put there. It is also
- * why this is the one writer that accepts a `css` property: a variation
- * without one cannot express a pseudo-element, a descendant rule or a hover
- * state, which is most of what a variation is for, and the class the rules
- * hang off is one the pattern brought. What may be in that string is
- * `Safe_Css`'s business, and only at the partial's top-level `styles.css` —
- * a `css` deeper in the tree is refused, so the audit surface stays one
- * string per variation.
- *
- * Registration is a **file**, not a theme.json key. `styles.blocks.variations`
- * in theme.json only *styles* a variation something else registered — core
- * builds its valid list from the block style registry and `sanitize()` drops
- * any variation node that is not in it. What registers one without PHP is a
- * partial in the theme's `styles/` directory carrying a `blockTypes` key,
- * which `WP_Theme_JSON_Resolver::get_style_variations( 'block' )` reads and
- * `wp_register_block_style_variations_from_theme_json_partials()` registers.
- * One file both registers and styles, which is why this writes a file.
  */
 class Pattern_Builder_Block_Style_Variations {
-
 	/**
 	 * The theme subdirectory core reads partials from.
 	 */
@@ -56,12 +27,6 @@ class Pattern_Builder_Block_Style_Variations {
 
 	/**
 	 * Write a variation into the active theme.
-	 *
-	 * Required: `slug` (the name the is-style- class is built from),
-	 * `blockTypes` (the blocks it applies to) and `styles` (a theme.json
-	 * `styles` subtree, which may carry a top-level `css` string in the subset
-	 * `Safe_Css` accepts). Optional: `title`, the label shown in the editor,
-	 * and `description`.
 	 *
 	 * @param array $args The variation to write.
 	 * @return array|WP_Error slug, title, class, blockTypes, path, written and skipped.
@@ -92,13 +57,6 @@ class Pattern_Builder_Block_Style_Variations {
 		if ( is_wp_error( $css ) ) {
 			return $css;
 		}
-
-		/*
-		 * A partial names blocks, and a variation for a block this site has
-		 * not registered would register a look for markup that parses to
-		 * core/missing. Refused by name rather than written as a file that
-		 * styles nothing.
-		 */
 		$unknown = array();
 		foreach ( $block_types as $name ) {
 			if ( null === \WP_Block_Type_Registry::get_instance()->get_registered( $name ) ) {
@@ -116,16 +74,6 @@ class Pattern_Builder_Block_Style_Variations {
 				array( 'status' => 400 )
 			);
 		}
-
-		/*
-		 * Checked exactly as core will read the file. `get_style_variations()`
-		 * runs a partial through the whole-theme schema before it injects the
-		 * styles under the variation's node, so what a partial can carry is
-		 * what a root `styles` tree can carry: the style properties, `elements`
-		 * and inner `blocks` — and not a block state. A button variation's
-		 * `:hover` written here is dropped on read, silently; the note below
-		 * says where it goes instead.
-		 */
 		$clean   = Pattern_Builder_Theme_Styles::sanitize( $styles );
 		$skipped = Pattern_Builder_Theme_Styles::missing_paths( $styles, $clean );
 		$states  = self::states_in( $styles );
@@ -142,16 +90,6 @@ class Pattern_Builder_Block_Style_Variations {
 		}
 
 		$path = self::path_for( $slug );
-
-		/*
-		 * A partial whose name is already taken registers nothing:
-		 * `wp_register_block_style_variations_from_theme_json_partials()`
-		 * checks the registry first and skips a name that is there. So a
-		 * collision with somebody else's registration has to be refused —
-		 * writing the file would look like success and change nothing. Our
-		 * own partial is a different matter: that is the file this ability
-		 * wrote, and rewriting it is how a design gets revised.
-		 */
 		if ( ! file_exists( $path ) ) {
 			$taken = self::registered_for( $slug, $block_types );
 			if ( $taken ) {
@@ -222,10 +160,6 @@ class Pattern_Builder_Block_Style_Variations {
 	/**
 	 * The block-state keys at the top of a styles tree.
 	 *
-	 * A pseudo-selector such as `:hover`, or a custom state such as
-	 * `-current`, which core accepts under a variation's node in theme.json
-	 * and never in a partial.
-	 *
 	 * @param array $styles A variation's `styles` subtree.
 	 * @return string[]
 	 */
@@ -243,22 +177,9 @@ class Pattern_Builder_Block_Style_Variations {
 	/**
 	 * Install a variation that arrived with a pattern.
 	 *
-	 * Never overwrites, which is the opposite of what `add()` does and right
-	 * for the same reason a downloaded pattern's tokens never overwrite: a
-	 * pattern arriving from somewhere else must not repaint what is already
-	 * here. A name that is taken is left alone and reported, so installing the
-	 * same collection twice is idempotent.
-	 *
-	 * This is also where the CSS check matters most. It ran on the authoring
-	 * site when the string was written and again on the service when the
-	 * package arrived, and neither of those is this machine — the one about to
-	 * write rules a browser will execute. So it runs a third time here, and a
-	 * string that fails takes its own variation out of the install rather than
-	 * the whole download: the pattern is still worth having with one look
-	 * missing, and the caller is told which and why.
-	 *
 	 * @param array $variation A variation from a package.
-	 * @return string|WP_Error 'written', 'skipped', or `pb_variation_css_refused` for a variation to leave out.
+	 * @return string|WP_Error 'written', 'skipped', or `pb_variation_css_refused` for a
+	 * variation to leave out.
 	 */
 	public static function install( $variation ) {
 		$slug = isset( $variation['slug'] ) ? sanitize_title( (string) $variation['slug'] ) : '';
@@ -291,11 +212,6 @@ class Pattern_Builder_Block_Style_Variations {
 	/**
 	 * The variation slugs a pattern's markup applies.
 	 *
-	 * Reads the class rather than any attribute, because that is the only
-	 * place a variation appears: `is-style-{slug}` in the block comment's
-	 * `className` and in the saved HTML, and nothing else in the file says
-	 * which look was chosen.
-	 *
 	 * @param string $content Block markup.
 	 * @return string[] Slugs, deduplicated.
 	 */
@@ -310,11 +226,6 @@ class Pattern_Builder_Block_Style_Variations {
 	/**
 	 * The definitions a pattern's markup needs carrying with it.
 	 *
-	 * Only the ones this site defines. A variation declared in a block's own
-	 * `block.json` — `is-style-outline` and the rest — ships with WordPress
-	 * and resolves at the far end without help, so carrying it would be
-	 * redundant at best and would collide with core's at worst.
-	 *
 	 * @param string $content Block markup.
 	 * @return array|WP_Error Package-shaped variation list.
 	 */
@@ -326,14 +237,6 @@ class Pattern_Builder_Block_Style_Variations {
 			if ( null === $definition || empty( $definition['styles'] ) ) {
 				continue;
 			}
-
-			/*
-			 * The `css` travels inside `styles`, where core reads it and where
-			 * the service validates it — but a partial written by hand is not
-			 * held to anything, so it is checked again on the way out. Better
-			 * to name the variation here than to have the upload refused at
-			 * the far end with nothing local to point at.
-			 */
 			$css = self::check_css( $definition['styles'] );
 			if ( is_wp_error( $css ) ) {
 				return new WP_Error(
@@ -361,22 +264,6 @@ class Pattern_Builder_Block_Style_Variations {
 
 	/**
 	 * Whether a variation's styles carry CSS this site will write.
-	 *
-	 * The one `css` a variation may hold sits at the top of its own styles
-	 * tree, which is where core looks for it and where every partial in this
-	 * design system puts it. One deeper — on an element, on an inner block —
-	 * is refused rather than checked, so what has to be audited is one string
-	 * per variation rather than a tree of them, and so that a reader of a
-	 * partial can see the whole of what it will emit in one place.
-	 *
-	 * There is deliberately **no `edit_css` capability check** here, which is
-	 * how core gates the same property. Two reasons. A gate would say that
-	 * unvalidated CSS is acceptable from a privileged caller, and it is not —
-	 * most of this string's journey is over the wire, and the destination
-	 * site's installer runs as whoever pressed the button. And `edit_css` is
-	 * a super-admin-only capability on multisite, so gating on it would stop
-	 * an ordinary network site's administrator writing a variation they can
-	 * already write by editing the file. The grammar is the boundary.
 	 *
 	 * @param array $styles A variation's `styles` subtree.
 	 * @return true|WP_Error
@@ -424,11 +311,6 @@ class Pattern_Builder_Block_Style_Variations {
 	/**
 	 * A variation's definition, by slug.
 	 *
-	 * Reads the same partials core registers from, so what comes back is what
-	 * is actually in effect — including the parent theme's, which a child
-	 * inherits. Used when collecting what a pattern depends on: the markup
-	 * carries the class and the definition lives here.
-	 *
 	 * @param string $slug Variation slug.
 	 * @return array|null The partial, or null.
 	 */
@@ -463,10 +345,6 @@ class Pattern_Builder_Block_Style_Variations {
 	/**
 	 * The slug a partial registers under.
 	 *
-	 * Core falls back to a kebab-cased title when a partial names no slug, so
-	 * reading one has to fall back the same way or the name would not match
-	 * the class in the markup.
-	 *
 	 * @param array $variation A partial.
 	 * @return string
 	 */
@@ -481,7 +359,7 @@ class Pattern_Builder_Block_Style_Variations {
 	/**
 	 * Which of these blocks already have a variation under this name.
 	 *
-	 * @param string $slug        Variation slug.
+	 * @param string $slug Variation slug.
 	 * @param array  $block_types Block names.
 	 * @return string[] The block names that are taken.
 	 */

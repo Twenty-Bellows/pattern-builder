@@ -1,10 +1,8 @@
 <?php
 /**
- * The cloud abilities: every one refuses when the WordPress user has no
- * connection, the reads relay what the service lists, the writes install
- * and upload through the same paths the browser uses, and none of them
- * changes a visibility or deletes a collection. The service is mocked at
- * the HTTP layer.
+ * The cloud abilities: every one refuses when the WordPress user has no connection, the
+ * reads relay what the service lists, the writes install and upload through the same paths
+ * the browser uses, and none of them changes a visibility or deletes a collection.
  *
  * @package PatternBuilder
  */
@@ -14,7 +12,6 @@ use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Abilities;
 use TwentyBellows\PatternBuilder\Pattern_File_Store;
 
 class Test_Cloud_Abilities extends WP_UnitTestCase {
-
 	/**
 	 * @var Pattern_Builder_Cloud_Abilities
 	 */
@@ -145,8 +142,6 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 			$this->assertSame( Pattern_Builder_Cloud_Abilities::NOT_CONNECTED, $result->get_error_code(), $method );
 			$this->assertStringContainsString( 'Connect Pattern Builder to your patternbuilderwp.com account on this site first.', $result->get_error_message() );
 		}
-
-		// Nothing reached the service, and nothing landed here.
 		$this->assertSame( array(), $this->seen );
 		$this->assertSame( 0, count( get_posts( array( 'post_type' => 'wp_block', 'post_status' => 'any' ) ) ) );
 	}
@@ -245,8 +240,6 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 
 		$terms = wp_get_object_terms( $result['results'][0]['id'], 'wp_pattern_category', array( 'fields' => 'slugs' ) );
 		$this->assertContains( 'pbwp-2-starter-sections', $terms );
-
-		// Run again: the one that landed is skipped, the other tried again.
 		$again = $this->abilities->execute_install_collection( array( 'owner' => 2, 'slug' => 'starter-sections' ) );
 		$this->assertSame( 1, $again['skipped'] );
 		$this->assertSame( 0, $again['installed'] );
@@ -310,10 +303,6 @@ class Test_Cloud_Abilities extends WP_UnitTestCase {
 		$this->assertSame( 'user', $result['local']['type'] );
 		$this->assertSame( 'Fresh', get_post( $result['local']['id'] )->post_title );
 		$this->assertStringContainsString( 'name="collection"' . "\r\n\r\npersonal", end( $this->seen )['body'] );
-
-		// A second upload updates the cloud copy in place. Naming a
-		// collection does nothing: a pattern's collection is part of its
-		// permanent name, decided when it was first uploaded (D38).
 		$again = $this->abilities->execute_upload_pattern( array( 'id' => (string) $result['local']['id'], 'collection' => '31' ) );
 		$this->assertTrue( $again['updated'] );
 		$this->assertSame( '/library/patterns/42', end( $this->seen )['path'] );

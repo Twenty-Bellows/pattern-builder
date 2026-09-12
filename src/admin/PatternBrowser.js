@@ -31,8 +31,7 @@ const ALL = 'all';
 const UNCATEGORIZED = 'uncategorized';
 
 /**
- * The four collections a pattern can come from. User and Theme are local;
- * Uploaded and Community are served by the cloud browser.
+ * The four collections a pattern can come from.
  */
 const THEME = 'theme';
 const USER = 'user';
@@ -82,8 +81,8 @@ function CollectionTabs( { active, onSelect } ) {
 }
 
 /**
- * The category rail: filters within the active tab — pattern categories
- * for the local tabs, the account's cloud collections for Uploaded.
+ * The category rail: filters within the active tab — pattern categories for the local tabs,
+ * the account's cloud collections for Uploaded.
  *
  * @param {Object}   props            Component props.
  * @param {Array}    props.categories The category descriptors.
@@ -120,9 +119,9 @@ function CategoryRail( { categories, active, onSelect } ) {
 }
 
 /**
- * The browse screen: a header with the four collection tabs, a category
- * rail scoped to the active tab (none on Community, whose landing is its
- * collections), a grid, and a details sidebar that is always present.
+ * The browse screen: a header with the four collection tabs, a category rail scoped to the
+ * active tab (none on Community, whose landing is its collections), a grid, and a details
+ * sidebar that is always present.
  *
  * @param {Object}   props                Component props.
  * @param {Function} props.onEdit         Called with the pattern to open its editor.
@@ -143,8 +142,6 @@ export function PatternBrowser( {
 	const [ cloudCollections, setCloudCollections ] = useState( [] );
 	const [ selectedId, setSelectedId ] = useState( null );
 	const [ isCreateOpen, setIsCreateOpen ] = useState( false );
-
-	// Asked once per site, the first time anyone opens this screen.
 	const [ askTelemetry, setAskTelemetry ] = useState(
 		shouldAskForTelemetry()
 	);
@@ -162,20 +159,10 @@ export function PatternBrowser( {
 	}, [] );
 
 	useEffect( refresh, [ refresh ] );
-
-	// Labels for registered pattern categories; raw slugs otherwise.
 	const registeredCategories = useSelect(
 		( select ) => select( coreStore ).getBlockPatternCategories(),
 		[]
 	);
-
-	/*
-	 * Every tile is the site's own render of its pattern, so nothing here
-	 * re-creates what the editor provides for rendering — styles, block style
-	 * variations, bindings, the patterns a reference resolves to. The key in
-	 * each URL follows the pattern and everything it places, so an edit, a
-	 * section's edit or a design change is a new URL and the rest stay cached.
-	 */
 	const tiles = useMemo(
 		() => tileUrls( patterns, tileBase, designVersion ),
 		[ patterns, tileBase, designVersion ]
@@ -197,8 +184,6 @@ export function PatternBrowser( {
 		setSelectedId( null );
 		setCloudCollections( [] );
 	};
-
-	// Patterns in the active local collection, before the category filter.
 	const collectionPatterns = useMemo(
 		() =>
 			( patterns || [] ).filter( ( pattern ) =>
@@ -211,8 +196,6 @@ export function PatternBrowser( {
 
 	const categories = useMemo( () => {
 		if ( isCloud ) {
-			// The Uploaded tab's rail is the account's collections, Personal
-			// first with its meter, as the cloud browser reports them.
 			return [
 				{
 					slug: ALL,
@@ -325,8 +308,6 @@ export function PatternBrowser( {
 	}
 
 	return (
-		// The details sidebar's panels are the editor's own, and read the
-		// block editor's settings as they do there.
 		<BlockEditorProvider settings={ editorSettings }>
 			<div className="pattern-builder-browser">
 				<header className="pattern-builder-browser__header">
@@ -365,7 +346,7 @@ export function PatternBrowser( {
 				</header>
 
 				<div className="pattern-builder-browser__body">
-					{ /* The Community tab's landing is its collections, so it has no rail. */ }
+					{  }
 					{ collection !== COMMUNITY && (
 						<aside className="pattern-builder-browser__sidebar">
 							<CategoryRail

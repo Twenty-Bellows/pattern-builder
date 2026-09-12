@@ -1,11 +1,5 @@
 /**
  * Writes a pattern's content into that pattern's blocks.
- *
- * The counterpart of `Pattern_Resolver::apply_content()` on the server, and it
- * follows the same rules: a block takes part when `metadata.name` matches a key
- * in the content, an attribute is filled when a `core/pattern-overrides`
- * binding asks for it, and every one of those bindings is removed afterwards so
- * what's left is ordinary editable content.
  */
 
 import { getBlockType } from '@wordpress/blocks';

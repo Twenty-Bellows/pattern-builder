@@ -36,15 +36,8 @@ require_once __DIR__ . '/class-pattern-builder-abilities.php';
 
 /**
  * Main class for managing the Pattern Builder plugin.
- *
- * Always registers the full stack — the pattern runtime (vendored from the
- * companion Synced Patterns for Themes plugin, kept logic-identical) and the
- * editing layer on top. When both plugins are installed, the companion
- * detects Pattern Builder at `plugins_loaded` and stays entirely unloaded;
- * this plugin never has to coordinate.
  */
 class Pattern_Builder {
-
 	/**
 	 * Singleton instance.
 	 *
@@ -58,8 +51,6 @@ class Pattern_Builder {
 	private function __construct() {
 		( new Pattern_Block() )->register();
 		( new Editor_Support( PATTERN_BUILDER_FILE ) )->register();
-
-		// A theme switch changes which pattern files the synced lookup reads.
 		add_action( 'switch_theme', array( Synced_Patterns::class, 'flush' ) );
 
 		new Pattern_Builder_Entity();

@@ -1,11 +1,5 @@
 /**
  * The browse app's side of opt-in usage telemetry.
- *
- * The PHP side (`Pattern_Builder_Telemetry`) owns the decision and does
- * the sending; this only knows whether the site said yes, asks the
- * question once, and reports what it sees. Nothing leaves the browser
- * when the answer is no — `track()` is a no-op, not a request that the
- * server discards.
  */
 
 import apiFetch from '@wordpress/api-fetch';
@@ -14,7 +8,6 @@ const BASE = '/pattern-builder/v1/telemetry';
 
 /**
  * The state the PHP side printed, kept current as the answer changes.
- * `consent` is '' (never asked), 'allowed' or 'declined'.
  */
 let state = { consent: '', enabled: false };
 
@@ -74,7 +67,7 @@ export function setTelemetryConsent( allow ) {
 }
 
 /**
- * Report an event. Fire and forget, and nothing at all unless allowed.
+ * Report an event.
  *
  * @param {string} event      Event name (the service keeps the list).
  * @param {Object} properties Scalar properties (the service keeps that list too).

@@ -1,20 +1,14 @@
 /**
- * The browse grid's tiles are drawn by the site itself: each is a front-end
- * render of the pattern (Pattern_Builder_Preview::serve_tile()), framed and
- * scaled like a cloud preview. The browser may keep one for as long as it
- * likes, because its URL carries a key that changes whenever anything the
- * render depends on does.
+ * The browse grid's tiles are drawn by the site itself: each is a front-end render of the
+ * pattern (Pattern_Builder_Preview::serve_tile()), framed and scaled like a cloud preview.
  */
 
 import { parse } from '@wordpress/block-serialization-default-parser';
 import { addQueryArgs } from '@wordpress/url';
 
 /**
- * The patterns a piece of markup places: `core/pattern` references by name,
- * and `core/block` references to user patterns by post id.
- *
- * The raw parser, as `patternTree.js` uses: only names and attributes are
- * needed, and it gives both without any block type being registered.
+ * The patterns a piece of markup places: `core/pattern` references by name, and
+ * `core/block` references to user patterns by post id.
  *
  * @param {string} content Block markup.
  * @return {Array<{kind: string, id: string}>} What it places.
@@ -41,10 +35,7 @@ function dependenciesOf( content ) {
 }
 
 /**
- * Two polynomial string hashes over prime moduli — about 62 bits between
- * them — as base 36. Not a security boundary: a collision would only show a
- * stale tile. Plain arithmetic, which keeps every step inside a double's
- * exact range.
+ * Two polynomial string hashes over prime moduli — about 62 bits between them — as base 36.
  *
  * @param {string} text The text.
  * @return {string} The hash.
@@ -63,15 +54,9 @@ function hash( text ) {
 /**
  * A tile's cache key: a hash of everything its render depends on.
  *
- * That is the pattern's markup, the markup of every pattern it places at any
- * depth — a page's tile has to follow its sections — and the design system,
- * which the page hands over as one `designVersion`. A title or description
- * is not in it: those are drawn outside the tile.
- *
  * @param {Object}   pattern       The pattern, with its `content`.
- * @param {Function} resolve       Called with `{ kind, id }` for each pattern
- *                                 placed; returns its markup, or undefined
- *                                 when it is not on this site.
+ * @param {Function} resolve       Called with `{ kind, id }` for each pattern placed;
+ *                                 returns its markup, or undefined when it is not on this site.
  * @param {string}   designVersion What every tile depends on.
  * @return {string} The key.
  */

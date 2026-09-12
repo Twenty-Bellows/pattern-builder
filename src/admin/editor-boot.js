@@ -1,8 +1,8 @@
 /**
- * Boots the WordPress editor — core's `@wordpress/edit-post` package, the
- * same editor that powers post.php — bound to the pattern's entity, so
- * every pattern (file-backed `pb_pattern` or `wp_block` post) is edited in
- * one place with the full core editing experience.
+ * Boots the WordPress editor — core's `@wordpress/edit-post` package, the same editor that
+ * powers post.php — bound to the pattern's entity, so every pattern (file-backed
+ * `pb_pattern` or `wp_block` post) is edited in one place with the full core editing
+ * experience.
  */
 
 import domReady from '@wordpress/dom-ready';
@@ -20,9 +20,7 @@ import {
 
 /**
  * The editor assumes it lives at post.php and rewrites the address bar to
- * `post.php?post={id}` as it settles (its BrowserURL component). Theme
- * patterns have string ids post.php can't load, and this page's own URL is
- * the shareable one — so those rewrites are dropped.
+ * `post.php?post={id}` as it settles (its BrowserURL component).
  */
 function keepPageUrl() {
 	const original = window.history.replaceState.bind( window.history );
@@ -37,10 +35,7 @@ function keepPageUrl() {
 }
 
 /**
- * The fullscreen-mode close button. The editor's default links to the post
- * type's list table, which a rowless type doesn't have — this one returns
- * to wherever the user came from (the Site Editor, the Pattern Builder
- * browse screen, …; the URL is validated server-side).
+ * The fullscreen-mode close button.
  *
  * @param {Object} props     Component props.
  * @param {string} props.url The URL to go back to.
@@ -84,12 +79,6 @@ export function bootPatternEditor( settings ) {
 			settings.editorSettings || {},
 			null
 		);
-
-		/*
-		 * The Summary panel is about a post's publication — status, date,
-		 * slug, author — none of which a pattern has. Removing it leaves the
-		 * document tab showing the pattern's own panels.
-		 */
 		dispatch( editorStore ).removeEditorPanel( 'post-status' );
 	} );
 }

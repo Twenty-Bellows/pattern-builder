@@ -18,12 +18,10 @@ import { planInstall, summarizeInstall, unionTokens } from './collections';
 const BASE = '/pattern-builder/v1/cloud';
 
 /**
- * Save a whole collection to this site: one destination choice, one
- * design-tokens step for the union of what every pattern needs, then the
- * patterns one after another with "3 of 12" progress — the ones already
- * installed from this collection skipped, the failures listed at the end
- * with the rest installed. A premium collection on a free account gets the
- * Pro prompt before any of it.
+ * Save a whole collection to this site: one destination choice, one design-tokens step for
+ * the union of what every pattern needs, then the patterns one after another with "3 of 12"
+ * progress — the ones already installed from this collection skipped, the failures listed
+ * at the end with the rest installed.
  *
  * @param {Object}   props             Component props.
  * @param {Object}   props.collection  The collection summary.
@@ -58,8 +56,6 @@ export function SaveCollectionFlow( {
 			cancelled.current = true;
 		};
 	}, [] );
-
-	// Which tokens the site lacks across the whole collection: one check.
 	const chooseDestination = ( where ) => {
 		setDestination( where );
 		const tokens = unionTokens( plan.toInstall );
@@ -83,8 +79,6 @@ export function SaveCollectionFlow( {
 			} )
 			.catch( () => setStep( 'progress' ) );
 	};
-
-	// The downloads, one after another, never stopping on a failure.
 	useEffect( () => {
 		if ( step !== 'progress' ) {
 			return;
@@ -142,7 +136,6 @@ export function SaveCollectionFlow( {
 				} );
 		};
 		next();
-		// The run starts once, when the step turns to progress.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ step ] );
 

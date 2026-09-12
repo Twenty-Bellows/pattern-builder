@@ -2,25 +2,6 @@
 /**
  * Self-hosted webfonts, installed by name.
  *
- * `add-design-tokens` can register a `fontFamily` preset, but a preset is a
- * stack of names: it selects between fonts the visitor's device already has.
- * A typeface the site does not own needs files, and files are the one thing
- * an agent cannot author — so this asks WordPress's own font collection for
- * them by name. Core registers Google Fonts as a collection whose stated job
- * is that the files are "copied to and served from your site", which is both
- * the only licence-safe default available and the right privacy answer, since
- * nothing is fetched from Google at render time.
- *
- * What actually makes a font render is worth stating, because it is not the
- * Font Library: `wp_print_font_faces()` builds its `@font-face` rules from
- * `WP_Font_Face_Resolver::get_fonts_from_theme_json()`, so the thing that
- * counts is a `fontFamily` preset carrying `fontFace` descriptors in the
- * merged theme.json. The `wp_font_family` and `wp_font_face` posts are a
- * registry for the Manage Fonts screen. A complete install therefore writes
- * the preset in both destinations, and additionally creates the library posts
- * for the `user` one so the font can be seen and removed where a person would
- * look for it.
- *
  * @package PatternBuilder
  */
 
@@ -30,33 +11,18 @@ namespace TwentyBellows\PatternBuilder;
  * Installs a font family from a registered font collection.
  */
 class Pattern_Builder_Fonts {
-
 	/**
 	 * The collection installed from.
-	 *
-	 * Core registers this one, pinned to the release, and it is the only
-	 * source whose licensing is safe by construction — every family in
-	 * Google Fonts is open licence. An arbitrary URL is a licensing decision
-	 * that is not this plugin's to make on somebody's behalf, so
-	 * `install_from_url()` exists separately and says whose call it is.
 	 */
 	const COLLECTION = 'google-fonts';
 
 	/**
 	 * A trimmed list of what the collection offers, cached.
-	 *
-	 * The collection JSON is a megabyte or so — every family, every variant,
-	 * and a preview string for each — which is worth fetching to install
-	 * from, and not worth fetching to answer "is Fraunces available?". The
-	 * index keeps the name, the slug and the categories, and nothing else.
 	 */
 	const INDEX_TRANSIENT = 'pattern_builder_font_index';
 
 	/**
 	 * Font file types a family may install, in order of preference.
-	 *
-	 * WOFF2 comes first because every browser this plugin's WordPress floor
-	 * supports reads it, and it is roughly half the size of WOFF.
 	 */
 	const FILE_TYPES = array( 'woff2', 'woff', 'ttf', 'otf' );
 
@@ -148,9 +114,9 @@ class Pattern_Builder_Fonts {
 	/**
 	 * Families whose name matches, with what each offers.
 	 *
-	 * @param string $search   Substring of the family name.
+	 * @param string $search Substring of the family name.
 	 * @param string $category Optional category slug, e.g. 'serif'.
-	 * @param int    $limit    How many to return.
+	 * @param int    $limit How many to return.
 	 * @return array|\WP_Error
 	 */
 	public static function search( $search = '', $category = '', $limit = 20 ) {
@@ -210,8 +176,6 @@ class Pattern_Builder_Fonts {
 			$entry_slug = isset( $settings['slug'] ) ? strtolower( (string) $settings['slug'] ) : sanitize_title( $settings['name'] );
 
 			if ( strtolower( (string) $settings['name'] ) === $wanted || $entry_slug === $slug ) {
-				// The collection files categories on the entry rather than on
-				// the settings, and describe() reports them.
 				if ( isset( $entry['categories'] ) ) {
 					$settings['categories'] = array_values( (array) $entry['categories'] );
 				}
@@ -232,14 +196,8 @@ class Pattern_Builder_Fonts {
 	}
 
 	/**
-	 * One family described in full: what it is called, and what it actually
-	 * offers to install.
-	 *
-	 * An agent choosing a typeface can otherwise only find out which weights
-	 * exist by asking for one and reading the refusal, and cannot find out at
-	 * all whether the family has a variable face — which decides whether an
-	 * axis like optical size is available or whether the design has to live
-	 * with fixed instances.
+	 * One family described in full: what it is called, and what it actually offers to
+	 * install.
 	 *
 	 * @param string $name Family name or slug.
 	 * @return array|\WP_Error
@@ -259,8 +217,6 @@ class Pattern_Builder_Fonts {
 		foreach ( $available as $face ) {
 			$weight = isset( $face['fontWeight'] ) ? trim( (string) $face['fontWeight'] ) : '400';
 			$style  = isset( $face['fontStyle'] ) ? strtolower( (string) $face['fontStyle'] ) : 'normal';
-
-			// A variable face states its range as "100 900" rather than one number.
 			if ( preg_match( '/^\d+\s+\d+$/', $weight ) ) {
 				$variable = true;
 			}
@@ -282,15 +238,6 @@ class Pattern_Builder_Fonts {
 			'weights'    => $weights,
 			'styles'     => $styles,
 			'variable'   => $variable,
-
-			/*
-			 * Google serves most families as one static file per weight, cut at
-			 * the family's default optical size. A design built on a variable
-			 * axis — optical sizing especially, which retunes a face as it grows
-			 * — cannot be reproduced from those, and the difference shows up as
-			 * text that sets wider or narrower than the original rather than as
-			 * anything an agent would recognise as a missing feature.
-			 */
 			'note'       => $variable
 				? __( 'This family has a variable face, so its axes are available.', 'pattern-builder' )
 				: __( 'Only fixed instances are available for this family, one file per weight. A design that relies on a variable axis such as optical sizing cannot be reproduced from them.', 'pattern-builder' ),
@@ -300,9 +247,9 @@ class Pattern_Builder_Fonts {
 	/**
 	 * Install a family and register it so a pattern can reference its slug.
 	 *
-	 * @param string $name        Family name, as the collection lists it.
-	 * @param array  $weights     Weights wanted, e.g. array( '400', '700' ).
-	 * @param array  $styles      Styles wanted: 'normal', 'italic'.
+	 * @param string $name Family name, as the collection lists it.
+	 * @param array  $weights Weights wanted, e.g. array( '400', '700' ).
+	 * @param array  $styles Styles wanted: 'normal', 'italic'.
 	 * @param string $destination 'theme' or 'user'.
 	 * @return array|\WP_Error
 	 */
@@ -343,7 +290,6 @@ class Pattern_Builder_Fonts {
 			'variable'    => ! is_wp_error( $offered ) && $offered['variable'],
 			'faces'       => $installed['faces'],
 			'preset'      => $installed['preset'],
-			// The whole point of installing it: what a pattern writes to use it.
 			'reference'   => array(
 				'attribute' => '"fontFamily":"' . $slug . '"',
 				'class'     => 'has-' . $slug . '-font-family',
@@ -353,12 +299,12 @@ class Pattern_Builder_Fonts {
 	}
 
 	/**
-	 * Pick the collection's font faces matching the weights and styles asked
-	 * for, tolerating a variable font that covers a weight as a range.
+	 * Pick the collection's font faces matching the weights and styles asked for,
+	 * tolerating a variable font that covers a weight as a range.
 	 *
-	 * @param array $family  Family settings from the collection.
+	 * @param array $family Family settings from the collection.
 	 * @param array $weights Weights wanted.
-	 * @param array $styles  Styles wanted.
+	 * @param array $styles Styles wanted.
 	 * @return array|\WP_Error
 	 */
 	private static function faces_for( $family, $weights, $styles ) {
@@ -391,9 +337,6 @@ class Pattern_Builder_Fonts {
 				if ( '' === $src ) {
 					continue;
 				}
-
-				// A variable font answers several weights with one file; keep
-				// it once rather than downloading it per weight asked for.
 				$key = $src . '|' . $style;
 
 				if ( isset( $chosen[ $key ] ) ) {
@@ -428,9 +371,9 @@ class Pattern_Builder_Fonts {
 	/**
 	 * The face in a list that serves a given weight and style.
 	 *
-	 * @param array  $faces  Font face descriptors.
+	 * @param array  $faces Font face descriptors.
 	 * @param string $weight Weight wanted.
-	 * @param string $style  Style wanted.
+	 * @param string $style Style wanted.
 	 * @return array|null
 	 */
 	private static function match_face( $faces, $weight, $style ) {
@@ -444,8 +387,6 @@ class Pattern_Builder_Fonts {
 			}
 
 			$face_weight = isset( $face['fontWeight'] ) ? trim( (string) $face['fontWeight'] ) : '400';
-
-			// A variable font states its range as "100 900".
 			if ( preg_match( '/^(\d+)\s+(\d+)$/', $face_weight, $range ) ) {
 				if ( $weight >= (int) $range[1] && $weight <= (int) $range[2] ) {
 					return $face;
@@ -487,14 +428,10 @@ class Pattern_Builder_Fonts {
 	/**
 	 * Put the files in the theme and the preset in its theme.json.
 	 *
-	 * `file:./` is the placeholder `WP_Font_Face_Resolver` rewrites into a
-	 * theme URI, which is what lets the font travel with the theme rather
-	 * than depending on this site's uploads directory.
-	 *
-	 * @param string $slug   Family slug.
-	 * @param string $name   Family name.
-	 * @param string $stack  The font-family CSS value.
-	 * @param array  $faces  Faces to install.
+	 * @param string $slug Family slug.
+	 * @param string $name Family name.
+	 * @param string $stack The font-family CSS value.
+	 * @param array  $faces Faces to install.
 	 * @return array|\WP_Error
 	 */
 	private static function install_into_theme( $slug, $name, $stack, $faces ) {
@@ -555,19 +492,11 @@ class Pattern_Builder_Fonts {
 	}
 
 	/**
-	 * Put the files in the uploads font directory, the preset in Global
-	 * Styles, and register the family in the Font Library.
+	 * Put the files in the uploads font directory, the preset in Global Styles, and
+	 * register the family in the Font Library.
 	 *
-	 * The library posts are what the Manage Fonts screen lists, so without
-	 * them the font renders but cannot be seen or removed by a person. Core's
-	 * own REST controllers create them, which is why they are driven here
-	 * rather than reimplemented — the duplicate checks and the post shape
-	 * stay core's. Only the file placement is ours, because core's controller
-	 * uses `wp_handle_upload()` and would reject a file this site downloaded
-	 * rather than received from a browser.
-	 *
-	 * @param string $slug  Family slug.
-	 * @param string $name  Family name.
+	 * @param string $slug Family slug.
+	 * @param string $name Family name.
 	 * @param string $stack The font-family CSS value.
 	 * @param array  $faces Faces to install.
 	 * @return array|\WP_Error
@@ -626,13 +555,9 @@ class Pattern_Builder_Fonts {
 	/**
 	 * Write the `fontFamily` preset that makes the font render.
 	 *
-	 * Goes through `Pattern_Builder_Cloud_Tokens::apply()` so that the two
-	 * destinations, the never-overwrite rule and the value grammar stay one
-	 * implementation shared with `add-design-tokens` and the cloud download.
-	 *
-	 * @param string $slug        Family slug.
-	 * @param string $name        Family name.
-	 * @param string $stack       The font-family CSS value.
+	 * @param string $slug Family slug.
+	 * @param string $name Family name.
+	 * @param string $stack The font-family CSS value.
 	 * @param array  $descriptors `fontFace` entries.
 	 * @param string $destination 'theme' or 'user'.
 	 * @return array|\WP_Error
@@ -655,9 +580,9 @@ class Pattern_Builder_Fonts {
 	/**
 	 * Create the Font Library's own record of the family.
 	 *
-	 * @param string $slug    Family slug.
-	 * @param string $name    Family name.
-	 * @param string $stack   The font-family CSS value.
+	 * @param string $slug Family slug.
+	 * @param string $name Family name.
+	 * @param string $stack The font-family CSS value.
 	 * @param array  $uploads Sideloaded files, each with url and relative path.
 	 * @return array|\WP_Error
 	 */
@@ -703,8 +628,6 @@ class Pattern_Builder_Fonts {
 						'fontFamily' => $name,
 						'fontWeight' => $upload['weight'],
 						'fontStyle'  => $upload['style'],
-						// Already a URL on this site, so core stores it as
-						// given and does not try to move a file.
 						'src'        => $upload['url'],
 					)
 				)
@@ -713,8 +636,6 @@ class Pattern_Builder_Fonts {
 			$response = rest_do_request( $request );
 
 			if ( $response->is_error() ) {
-				// A duplicate face is the expected case on a re-install and
-				// is not a failure: the file and the preset are both in place.
 				continue;
 			}
 
@@ -722,8 +643,6 @@ class Pattern_Builder_Fonts {
 			$face_id = isset( $data['id'] ) ? (int) $data['id'] : 0;
 
 			if ( $face_id && isset( $upload['relative'] ) ) {
-				// The meta core uses to know the file is the site's own, and
-				// so should be deleted with the face.
 				add_post_meta( $face_id, '_wp_font_face_file', $upload['relative'] );
 				$faces[] = $face_id;
 			}
@@ -758,14 +677,8 @@ class Pattern_Builder_Fonts {
 	/**
 	 * Move a font file into the uploads font directory.
 	 *
-	 * The two filters are the ones core's own controller installs: one
-	 * redirects the upload into `wp-content/uploads/fonts`, the other allows
-	 * font mime types for the duration. `wp_handle_sideload()` rather than
-	 * `wp_handle_upload()` because the file was downloaded, not posted, and
-	 * core only skips `is_uploaded_file()` for a sideload.
-	 *
 	 * @param string $filename Filename to store under.
-	 * @param string $bytes    File contents.
+	 * @param string $bytes File contents.
 	 * @return array|\WP_Error
 	 */
 	private static function sideload_font( $filename, $bytes ) {
@@ -786,8 +699,7 @@ class Pattern_Builder_Fonts {
 
 		add_filter( 'upload_mimes', array( '\WP_Font_Utils', 'get_allowed_font_mime_types' ) );
 		add_filter( 'upload_dir', '_wp_filter_font_directory' );
-
-		// Taken by reference, so it has to be a variable.
+		// wp_handle_sideload() takes this by reference, so it has to be a variable.
 		$file = array(
 			'name'     => $filename,
 			'tmp_name' => $temp,
@@ -879,9 +791,7 @@ class Pattern_Builder_Fonts {
 		if ( ! in_array( $extension, self::FILE_TYPES, true ) ) {
 			$extension = 'woff2';
 		}
-
-		// A variable font's weight is a range; the space would be escaped in
-		// every URL that named the file.
+		// A variable font's weight is a range; the space would be escaped in every URL naming the file.
 		$weight = str_replace( ' ', '-', (string) $face['weight'] );
 
 		return sanitize_file_name( $slug . '-' . $weight . '-' . $face['style'] . '.' . $extension );

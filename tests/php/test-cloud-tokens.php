@@ -1,7 +1,7 @@
 <?php
 /**
- * Design tokens: reference scanning, resolution against global settings,
- * missing-token detection, and the Global Styles / theme.json writers.
+ * Design tokens: reference scanning, resolution against global settings, missing-token
+ * detection, and the Global Styles / theme.json writers.
  *
  * @package PatternBuilder
  */
@@ -10,7 +10,6 @@ use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud;
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Tokens;
 
 class Test_Cloud_Tokens extends WP_UnitTestCase {
-
 	public function set_up() {
 		parent::set_up();
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
@@ -108,10 +107,8 @@ class Test_Cloud_Tokens extends WP_UnitTestCase {
 	}
 
 	/**
-	 * core/button renders `has-custom-font-size` beside its preset class
-	 * whenever a font size is set at all. That word is core's marker for "an
-	 * explicit value, not a preset", so reading it as a slug reports a token
-	 * this site does not define and never could.
+	 * core/button renders `has-custom-font-size` beside its preset class whenever a font
+	 * size is set at all.
 	 */
 	public function test_referenced_ignores_core_custom_marker_classes() {
 		$markup = '<!-- wp:buttons -->
@@ -155,7 +152,7 @@ class Test_Cloud_Tokens extends WP_UnitTestCase {
 				'slug'  => 'brand',
 				'name'  => 'Brand',
 				'value' => '#123456',
-			), // Theme-defined here — not missing, local value wins.
+			),
 			array(
 				'type'  => 'color',
 				'slug'  => 'imported-accent',
@@ -180,12 +177,8 @@ class Test_Cloud_Tokens extends WP_UnitTestCase {
 
 		$written = Pattern_Builder_Cloud_Tokens::apply( array( $token ), 'user' );
 		$this->assertSame( array( 'color' => array( 'imported-accent' ) ), $written );
-
-		// Now resolvable — and a second apply writes nothing.
 		$this->assertSame( array(), Pattern_Builder_Cloud_Tokens::missing( array( $token ) ) );
 		$this->assertSame( array(), Pattern_Builder_Cloud_Tokens::apply( array( $token ), 'user' ) );
-
-		// The value round-trips through the global styles pipeline.
 		$collected = Pattern_Builder_Cloud_Tokens::collect( '<!-- wp:paragraph {"textColor":"imported-accent"} --><p>x</p><!-- /wp:paragraph -->' );
 		$this->assertSame( '#aa5500', $collected[0]['value'] );
 	}
@@ -249,9 +242,9 @@ class Test_Cloud_Tokens extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The download endpoint asks no second question: whatever destination the
-	 * user picked for the pattern is where its missing tokens go, and only
-	 * the missing ones are written.
+	 * The download endpoint asks no second question: whatever destination the user picked
+	 * for the pattern is where its missing tokens go, and only the missing ones are
+	 * written.
 	 */
 	public function test_download_adds_missing_tokens_where_the_pattern_goes() {
 		update_user_meta( get_current_user_id(), Pattern_Builder_Cloud::META_TOKEN, 'pbwp_test-token' );
@@ -281,8 +274,6 @@ class Test_Cloud_Tokens extends WP_UnitTestCase {
 		$response = rest_do_request( $request );
 
 		$this->assertSame( 200, $response->get_status() );
-
-		// Only the token the site lacks; "brand" keeps the theme's value.
 		$this->assertSame(
 			array( 'color' => array( 'imported-accent' ) ),
 			$response->get_data()['tokensWritten']
@@ -393,12 +384,6 @@ class Test_Cloud_Tokens extends WP_UnitTestCase {
 
 	/**
 	 * A composed pattern's tokens include the ones its references need.
-	 *
-	 * A page pattern is mostly `core/pattern` references, so almost none of the
-	 * presets it depends on are in its own markup. Collecting only the top level
-	 * under-reports it, and renders it against another theme carrying a fraction
-	 * of what it needs — which is how a blank preview came back missing two of
-	 * the three colours the page actually uses.
 	 */
 	public function test_collect_tree_follows_pattern_references() {
 		register_block_pattern(

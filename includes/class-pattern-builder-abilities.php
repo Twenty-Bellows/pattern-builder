@@ -3,40 +3,10 @@
 namespace TwentyBellows\PatternBuilder;
 
 /**
- * Abilities: what an agent can ask this site about its patterns, and what it
- * can ask this site to store.
- *
- * The Abilities API (WordPress core) is a registry of machine-readable
- * capabilities — JSON Schema in, JSON Schema out, a permission callback, and
- * annotations saying whether a thing reads or writes. Core exposes the
- * registry over REST at `wp-abilities/v1`, so anything that can authenticate
- * to this site can discover these and call them; a bridge that turns the
- * registry into MCP tools gets them for free, and so does every other plugin
- * that registers abilities. That is the reason to register here rather than
- * to build a bespoke agent interface of our own.
- *
- * What is deliberately absent is generation. Nothing here takes a prompt.
- * An `execute_callback` that turned a description into a pattern would need a
- * model behind it, which would put this plugin back in the business of
- * running inference on somebody's behalf. The judgement of what a good
- * pattern is belongs to whatever agent is calling, and the knowledge it needs
- * travels as prose. These abilities are the two things an agent cannot supply
- * for itself: what is true about *this* site, and somewhere to put the result.
- *
- * Note what is also absent: validation. Whether block markup is valid is
- * decided by re-running the block's `save()`, which is JavaScript — no PHP
- * here can answer it (`WP_Block_Type` has no `save`; `serialize_block()`
- * only replays what it parsed). The most useful thing to offer is the one
- * thing the server cannot do, so the agent has to run that check itself
- * before calling `create-pattern`.
- *
- * Registration is conditional. The API arrived in WordPress well after this
- * plugin's 6.8 floor, and none of the plugin's own functionality depends on
- * it, so on an older site the whole file is inert and the REST controller
- * remains the way in.
+ * Abilities: what an agent can ask this site about its patterns, and what it can ask this
+ * site to store.
  */
 class Pattern_Builder_Abilities {
-
 	const CATEGORY = 'pattern-builder';
 
 	/**
@@ -99,8 +69,8 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
-	 * Writing a theme pattern writes a file into the theme, which is the same
-	 * authority the REST controller asks for.
+	 * Writing a theme pattern writes a file into the theme, which is the same authority the
+	 * REST controller asks for.
 	 *
 	 * @return bool
 	 */
@@ -109,16 +79,12 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
-	 * The annotations shared by every read: no state changes, same answer
-	 * twice. Core enforces these — a readonly ability is refused over
-	 * anything but GET — so they are behaviour, not documentation.
+	 * The annotations shared by every read: no state changes, same answer twice.
 	 *
 	 * @return array
 	 */
 	private function read_annotations() {
 		return array(
-			// Abilities are not exposed over the REST API unless they say so,
-			// and an agent that cannot reach these cannot use them.
 			'show_in_rest' => true,
 			'annotations'  => array(
 				'readonly'    => true,
@@ -130,11 +96,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * The design system as this site actually resolves it.
-	 *
-	 * An agent writing a pattern needs the palette, the spacing scale and the
-	 * type scale, and getting them itself means reading theme.json, merging
-	 * the parent theme's, and applying whatever a style variation changed.
-	 * WordPress already does all of that; this hands over the answer.
 	 */
 	private function register_design_system() {
 		wp_register_ability(
@@ -218,13 +179,6 @@ class Pattern_Builder_Abilities {
 			'spacing'      => $this->preset( $settings, array( 'spacing', 'spacingSizes' ) ),
 			'fontSizes'    => $this->preset( $settings, array( 'typography', 'fontSizes' ) ),
 			'fontFamilies' => $this->preset( $settings, array( 'typography', 'fontFamilies' ) ),
-
-			/*
-			 * The root padding flag lives beside `layout` in settings rather
-			 * than inside it, but it decides the same question — how wide a
-			 * band ends up — so it is reported together with the widths and set
-			 * by the same ability.
-			 */
 			'layout'       => array_merge(
 				isset( $settings['layout'] ) && is_array( $settings['layout'] ) ? $settings['layout'] : array(),
 				array( 'useRootPaddingAwareAlignments' => ! empty( $settings['useRootPaddingAwareAlignments'] ) )
@@ -237,20 +191,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * The block style variations available here, and which of them travel.
-	 *
-	 * Two registries answer half the question each. A style declared in a
-	 * block's own `block.json` lands on `WP_Block_Type::$styles` and ships
-	 * with the block, so `is-style-outline` resolves on every WordPress there
-	 * is. Everything else — a theme's `styles/*.json` partial, a
-	 * `register_block_style()` call — lives only in
-	 * `WP_Block_Styles_Registry`, and exists only here.
-	 *
-	 * The distinction is the whole point of reporting them. A variation is
-	 * applied by putting a class in the markup, and the class travels with a
-	 * pattern while the definition does not, so a pattern reaching for a
-	 * variation this site invented arrives somewhere else with the class
-	 * intact and nothing styling it — the same silent nothing an undefined
-	 * preset renders as.
 	 *
 	 * @return array Block name => list of variations.
 	 */
@@ -283,14 +223,6 @@ class Pattern_Builder_Abilities {
 				);
 			}
 		}
-
-		/*
-		 * The definition, where this theme holds it as a partial. A name and a
-		 * label say a look exists; only the styles say what it does, and an
-		 * agent deciding between reusing `is-style-card` and adding a second
-		 * card needs the second thing. A variation registered from PHP has no
-		 * definition anywhere theme.json can read, so it carries none.
-		 */
 		$partials = Pattern_Builder_Block_Style_Variations::all();
 
 		$answer = array();
@@ -318,12 +250,8 @@ class Pattern_Builder_Abilities {
 	/**
 	 * Read a preset list out of merged settings.
 	 *
-	 * Presets are keyed by origin (default/theme/custom) and a later origin
-	 * overrides an earlier one by slug — which is what the editor shows, so
-	 * it is what an agent should be told.
-	 *
 	 * @param array $settings Merged settings.
-	 * @param array $path     Path to the preset group.
+	 * @param array $path Path to the preset group.
 	 * @return array
 	 */
 	private function preset( $settings, $path ) {
@@ -338,9 +266,6 @@ class Pattern_Builder_Abilities {
 		if ( ! is_array( $node ) ) {
 			return array();
 		}
-
-		// A flat list is already resolved; otherwise flatten the origins in
-		// precedence order so the last definition of a slug wins.
 		if ( isset( $node[0] ) ) {
 			return array_values( $node );
 		}
@@ -362,10 +287,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * The block types this site actually has.
-	 *
-	 * Markup for a block that is not registered here parses to
-	 * `core/missing`, so an agent guessing from general knowledge of
-	 * WordPress will eventually write a pattern this site cannot render.
 	 */
 	private function register_block_types() {
 		wp_register_ability(
@@ -417,15 +338,8 @@ class Pattern_Builder_Abilities {
 	 * @return array
 	 */
 	public function execute_block_types( $input = array() ) {
-		$namespace = isset( $input['namespace'] ) ? (string) $input['namespace'] : '';
-		$wanted    = isset( $input['blocks'] ) ? array_map( 'strval', (array) $input['blocks'] ) : array();
-
-		/*
-		 * Supports is the larger half of a block's definition — about two and a
-		 * half times the size of its attributes across the core library — and a
-		 * browse of everything registered rarely needs it. Naming blocks is how
-		 * you ask for detail, so that is what turns it on.
-		 */
+		$namespace     = isset( $input['namespace'] ) ? (string) $input['namespace'] : '';
+		$wanted        = isset( $input['blocks'] ) ? array_map( 'strval', (array) $input['blocks'] ) : array();
 		$with_supports = isset( $input['supports'] ) ? (bool) $input['supports'] : ! empty( $wanted );
 
 		$registry = \WP_Block_Type_Registry::get_instance();
@@ -456,14 +370,7 @@ class Pattern_Builder_Abilities {
 			$blocks[] = $entry;
 		}
 
-		$answer = array( 'blocks' => $blocks );
-
-		/*
-		 * A name that matches nothing would otherwise come back as a shorter
-		 * list, which reads as an answer. It is the question this ability exists
-		 * to settle — markup naming a block this site lacks parses to
-		 * core/missing — so say so.
-		 */
+		$answer  = array( 'blocks' => $blocks );
 		$unknown = array_values(
 			array_filter(
 				$wanted,
@@ -555,12 +462,6 @@ class Pattern_Builder_Abilities {
 	/**
 	 * The pattern categories this site has registered.
 	 *
-	 * A theme pattern's `Categories:` header and a user pattern's terms are
-	 * only names; what the inserter shows are the categories registered with
-	 * `register_block_pattern_category()`, and a pattern whose category is
-	 * not among them is filed under Uncategorized. The guides tell an agent to
-	 * use the site's own categories, which means being able to see them.
-	 *
 	 * @return array Each with name and label.
 	 */
 	private function registered_categories() {
@@ -601,11 +502,7 @@ class Pattern_Builder_Abilities {
 	/**
 	 * Say when a stored pattern's categories will not show in the inserter.
 	 *
-	 * The write succeeds either way — a category is a header, and headers are
-	 * the author's — but a pattern filed under Uncategorized is one nobody
-	 * finds, so the answer says which slugs need registering.
-	 *
-	 * @param array $answer  The write's answer.
+	 * @param array $answer The write's answer.
 	 * @param array $pattern The stored pattern's summary.
 	 * @return array
 	 */
@@ -681,13 +578,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * What a stored pattern renders as on the front end.
-	 *
-	 * Takes an id rather than markup on purpose. A read-only ability is
-	 * refused over anything but GET, and a pattern's markup does not belong
-	 * in a query string; marking this writable to allow a POST body would
-	 * make the annotation a lie. An agent that wants to see un-saved markup
-	 * should validate it first — which it has to do anyway, and which this
-	 * site cannot do for it — then store it and render that.
 	 */
 	private function register_render_pattern() {
 		wp_register_ability(
@@ -741,16 +631,6 @@ class Pattern_Builder_Abilities {
 		if ( is_wp_error( $pattern ) ) {
 			return $pattern;
 		}
-
-		/*
-		 * Which of the tokens this pattern references the site actually
-		 * defines. This is the check that decides whether the pattern survives
-		 * being uploaded: `Cloud_Tokens::collect()` looks every referenced slug
-		 * up in *this* design system and skips the ones it cannot find, so a
-		 * pattern naming a preset the authoring site lacks ships no value for
-		 * it and arrives somewhere else referencing nothing. The failure is
-		 * silent at both ends and it is made here, not there.
-		 */
 		$referenced = Pattern_Builder_Cloud_Tokens::referenced( $pattern->content );
 		$defined    = Pattern_Builder_Cloud_Tokens::collect_tree( $pattern->content );
 		$has        = array();
@@ -781,22 +661,6 @@ class Pattern_Builder_Abilities {
 			$tokens['note'] = __( 'This pattern references presets this site does not define. They render as no styling at all here, and an upload carries no value for them, so they will render as nothing wherever the pattern is installed too. Add them with add-design-tokens, or reference presets that exist.', 'pattern-builder' );
 		}
 
-		/*
-		 * The HTML settles which classes are on which elements and nothing
-		 * else: what a band actually looks like is decided by stylesheets this
-		 * answer does not carry. So hand over the two URLs that do — one
-		 * showing the pattern by itself, one showing it where a page would put
-		 * it, which is the only way to see the theme's own layout act on it.
-		 */
-
-		/*
-		 * The two worlds a portable pattern has to survive, one call away.
-		 * The preview route wears a theme for one request without activating
-		 * it, carrying the pattern's own presets in where that theme has none
-		 * — the rule a download follows — so blank-theme shows the pattern's
-		 * intent and nothing else, and opinionated-theme shows whether it
-		 * adapts to a design system that is not the one it was written on.
-		 */
 		$themes = array();
 		foreach ( array_keys( Pattern_Builder_Preview::bundled_themes() ) as $slug ) {
 			$themes[ $slug ] = Pattern_Builder_Preview::url_for( $pattern->id, 'page', $slug );
@@ -816,18 +680,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * Hand an agent the knowledge, not just the mechanism.
-	 *
-	 * The other abilities say what is true about this site and take finished
-	 * markup; none of them says how to write a good pattern. That knowledge is
-	 * prose, and prose is the most portable thing there is — so rather than
-	 * shipping it only as a Claude skill, this serves the same documents over
-	 * the same interface everything else uses. Whatever is calling can put
-	 * them wherever its own harness expects: a SKILL.md, a rules file, a
-	 * system prompt, an AGENTS.md.
-	 *
-	 * It answers with an index by default. The full set runs to tens of
-	 * thousands of words, and an ability that dumped all of it into a caller's
-	 * context uninvited would be a poor guest.
 	 */
 	private function register_authoring_guide() {
 		wp_register_ability(
@@ -877,11 +729,6 @@ class Pattern_Builder_Abilities {
 	/**
 	 * Where the guides live.
 	 *
-	 * Under the plugin rather than beside the Claude skill, because the skill
-	 * directory is development tooling and does not ship. The skill is a
-	 * symlink to this directory, so there is one copy of every document and
-	 * both ways of consuming it read the same file.
-	 *
 	 * @return string
 	 */
 	private function guide_dir() {
@@ -895,7 +742,6 @@ class Pattern_Builder_Abilities {
 	 */
 	private function guide_files() {
 		return array(
-			// Authoring a pattern: what the plugin ships for everyday work.
 			'authoring'            => 'pattern-author/SKILL.md',
 			'pattern-kinds'        => 'pattern-author/references/pattern-kinds.md',
 			'block-vocabulary'     => 'pattern-author/references/block-vocabulary.md',
@@ -906,14 +752,6 @@ class Pattern_Builder_Abilities {
 			'assets'               => 'pattern-author/references/assets.md',
 			'keeping-current'      => 'pattern-author/references/keeping-current.md',
 			'abilities'            => 'pattern-author/references/abilities.md',
-
-			/*
-			 * Reproducing a design that already exists. A different job with a
-			 * different posture — the values come from somewhere else and the
-			 * question is how faithfully they can be read — so it is its own
-			 * skill rather than a branch of the one above, which it builds on
-			 * rather than repeats.
-			 */
 			'reproduction'         => 'design-reproduction/SKILL.md',
 			'reading-a-source'     => 'design-reproduction/references/reading-a-source.md',
 			'verifying'            => 'design-reproduction/references/verifying.md',
@@ -922,16 +760,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * Every guide this site offers, loaded and filtered.
-	 *
-	 * The documents this plugin ships are general — they describe WordPress,
-	 * not your project. What an agent most needs on top of them is the house
-	 * rule: which blocks this build has settled on, the copy voice, the reason
-	 * a particular section is composed the way it is. A theme knows those and
-	 * the plugin cannot, so the set is filtered before it is served.
-	 *
-	 * The filter deals in text rather than file paths on purpose: a guide
-	 * added this way needs no filesystem access, and no caller can steer a
-	 * read outside the plugin.
 	 *
 	 * @return array name => array( title, content ).
 	 */
@@ -946,9 +774,6 @@ class Pattern_Builder_Abilities {
 			$guides[ $name ] = array(
 				'title'   => $this->guide_title( $text, $name ),
 				'content' => $text,
-				// Which skill this document belongs to, from where it lives.
-				// A guide a theme supplies belongs to neither and says so by
-				// carrying no skill at all.
 				'skill'   => (string) strstr( $relative, '/', true ),
 			);
 		}
@@ -956,26 +781,10 @@ class Pattern_Builder_Abilities {
 		/**
 		 * Filters the authoring guides an agent is given.
 		 *
-		 * Amend a shipped guide by appending to its `content`, or add one of
-		 * your own under a new key. Both reach every agent that asks this
-		 * site how to write a pattern, which makes this the place to put a
-		 * project's own conventions.
-		 *
-		 *     add_filter( 'pattern_builder_authoring_guides', function ( $guides ) {
-		 *         $guides['house-rules'] = array(
-		 *             'title'   => 'House rules for this theme',
-		 *             'content' => "# House rules\n\nSections are full-width…",
-		 *         );
-		 *         return $guides;
-		 *     } );
-		 *
-		 * @param array $guides Guides, keyed by name, each with `title` and
-		 *                      `content` (Markdown).
+		 * @param array $guides Guides, keyed by name, each with `title` and `content`
+		 * (Markdown).
 		 */
 		$guides = apply_filters( 'pattern_builder_authoring_guides', $guides );
-
-		// A filter that returns something unusable should not take the
-		// ability down with it.
 		if ( ! is_array( $guides ) ) {
 			return array();
 		}
@@ -1026,17 +835,7 @@ class Pattern_Builder_Abilities {
 				'guides'   => $index,
 				'format'   => 'markdown',
 				'name'     => 'index',
-				// Say what this is for, since an index alone does not.
 				'content'  => __( 'Agent-facing instructions for writing WordPress block patterns. Request one by name with input[guide], or "all" for everything. Install the Markdown wherever your harness reads instructions from.', 'pattern-builder' ),
-
-				/*
-				 * Two of these documents are whole skills and the rest are
-				 * their references, which a flat list of fourteen titles
-				 * gives no sign of. Which one an agent opens with is decided
-				 * by the job rather than by the subject, so the index says
-				 * what each job is instead of leaving it to be inferred from
-				 * the names.
-				 */
 				'start'    => array(
 					array(
 						'guide' => 'authoring',
@@ -1049,13 +848,6 @@ class Pattern_Builder_Abilities {
 						'when'  => __( 'The design already exists somewhere else and the job is to copy it — a live site, a Figma file, a screenshot, a PDF, a mockup. Read it alongside the one above, not instead of it.', 'pattern-builder' ),
 					),
 				),
-
-				/*
-				 * An agent that goes straight to create-pattern never reads a
-				 * guide, and the one step it cannot afford to skip is the one
-				 * this site cannot do for it. So the index carries it, where
-				 * anyone asking what to read will see it first.
-				 */
 				'validate' => array(
 					'why'      => __( 'Validate markup before storing it. A block is valid only if re-running its save() reproduces the markup, and save() is JavaScript — no server can run it, so nothing here checks this for you. Invalid markup renders correctly on the front end and fails the moment an editor opens the pattern.', 'pattern-builder' ),
 					'before'   => array( 'pattern-builder/create-pattern', 'pattern-builder/update-pattern', 'pattern-builder/upload-pattern' ),
@@ -1099,18 +891,11 @@ class Pattern_Builder_Abilities {
 	/**
 	 * Read one guide, with its YAML front matter stripped.
 	 *
-	 * The main guide doubles as a Claude skill, so it carries front matter
-	 * that means nothing to anybody else. The prose underneath is the part
-	 * worth handing over.
-	 *
 	 * @param string $relative Path under the guide directory.
 	 * @return string|null Null when the file is absent or unreadable.
 	 */
 	private function read_guide( $relative ) {
 		$path = $this->guide_dir() . $relative;
-
-		// Nothing here takes a path from a caller, but keep the read inside
-		// the plugin regardless.
 		$real = realpath( $path );
 		$root = realpath( $this->guide_dir() );
 		if ( ! $real || ! $root || 0 !== strpos( $real, $root ) || ! is_readable( $real ) ) {
@@ -1128,7 +913,7 @@ class Pattern_Builder_Abilities {
 	/**
 	 * A guide's title, from its first heading.
 	 *
-	 * @param string $text     Guide text.
+	 * @param string $text Guide text.
 	 * @param string $fallback Name to use when there is no heading.
 	 * @return string
 	 */
@@ -1141,12 +926,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * Hand over the validator itself.
-	 *
-	 * The guides tell an agent to validate before it stores anything, and for
-	 * an agent with a shell on this machine that is a path on disk. An agent
-	 * that reached these abilities over HTTP has no such path and no copy of
-	 * the script, which made the instruction unfollowable for exactly the
-	 * callers the Abilities API exists to serve. So the scripts travel too.
 	 */
 	private function register_validator() {
 		wp_register_ability(
@@ -1210,12 +989,6 @@ class Pattern_Builder_Abilities {
 		return array(
 			'files' => $files,
 			'entry' => 'validate-pattern.mjs',
-
-			/*
-			 * Not translated, deliberately. This is a command line recipe rather
-			 * than interface copy, and the guides it belongs beside are served as
-			 * they were written too.
-			 */
 			'usage' => implode(
 				"\n",
 				array(
@@ -1240,11 +1013,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * Where this site's own editor scripts are, in the order they load.
-	 *
-	 * WordPress ships every byte the validator needs and serves it over HTTP
-	 * already. What it does not serve is the dependency graph: the manifest
-	 * core generates is a PHP file, so a request for it executes and returns
-	 * nothing. Only the site can answer that, which is why this exists.
 	 */
 	private function register_editor_scripts() {
 		wp_register_ability(
@@ -1285,12 +1053,6 @@ class Pattern_Builder_Abilities {
 	 */
 	public function execute_editor_scripts() {
 		global $wp_version;
-
-		/*
-		 * A fresh registry rather than the global one: `all_deps()` fills
-		 * `to_do`, and leaving that behind on the singleton would change what
-		 * a later part of this request decides to print.
-		 */
 		$scripts = new \WP_Scripts();
 		$scripts->all_deps( array( 'wp-blocks', 'wp-block-editor', 'wp-block-library' ) );
 
@@ -1302,13 +1064,9 @@ class Pattern_Builder_Abilities {
 
 			$item = $scripts->registered[ $handle ];
 			$src  = $item->src;
-
-			// Core registers its own scripts with a site-relative src.
 			if ( ! preg_match( '|^(https?:)?//|', $src ) ) {
 				$src = site_url( $src );
 			}
-
-			// The version keeps a caching client honest across upgrades.
 			$ver = isset( $item->ver ) ? $item->ver : $wp_version;
 			if ( $ver ) {
 				$src = add_query_arg( 'ver', $ver, $src );
@@ -1327,9 +1085,6 @@ class Pattern_Builder_Abilities {
 	/**
 	 * Where the validator and its loader live.
 	 *
-	 * Under `pattern-author` rather than under the guide root, which now
-	 * covers more than one skill: the validator is that skill's tool.
-	 *
 	 * @return string
 	 */
 	private function script_dir() {
@@ -1345,9 +1100,6 @@ class Pattern_Builder_Abilities {
 	private function read_script( $name ) {
 		$root = realpath( rtrim( $this->script_dir(), '/' ) );
 		$path = realpath( $this->script_dir() . $name );
-
-		// Nothing here takes a name from a caller, but keep the read inside
-		// the plugin regardless.
 		if ( ! $root || ! $path || 0 !== strpos( $path, $root ) || ! is_readable( $path ) ) {
 			return null;
 		}
@@ -1359,8 +1111,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * Store a new pattern.
-	 *
-	 * The markup arrives finished. Nothing here composes it.
 	 */
 	private function register_create_pattern() {
 		wp_register_ability(
@@ -1381,6 +1131,8 @@ class Pattern_Builder_Abilities {
 				'meta'                => array(
 					'show_in_rest' => true,
 					'annotations'  => array(
+						// These annotations select the HTTP method: readonly is GET,
+						// destructive and idempotent together are DELETE, anything else POST.
 						'readonly'    => false,
 						'destructive' => false,
 						'idempotent'  => false,
@@ -1413,17 +1165,7 @@ class Pattern_Builder_Abilities {
 					'show_in_rest' => true,
 					'annotations'  => array(
 						'readonly'    => false,
-
-						/*
-						 * Not destructive, even though it overwrites. Core reads
-						 * these to pick the HTTP method a call must arrive on —
-						 * readonly is GET, destructive plus idempotent is DELETE,
-						 * everything else is POST — so `destructive` here means
-						 * delete-like, not "changes data". Marking an update
-						 * destructive would make it callable only over DELETE.
-						 */
 						'destructive' => false,
-						// The same call twice leaves the same pattern.
 						'idempotent'  => true,
 					),
 				),
@@ -1532,13 +1274,7 @@ class Pattern_Builder_Abilities {
 	 */
 	public function execute_create_pattern( $input ) {
 		$source = isset( $input['source'] ) ? (string) $input['source'] : 'theme';
-
-		/*
-		 * The name the markup will be stored under, so a reference to itself
-		 * is refused as the loop core would drop it as. A user pattern has no
-		 * name a core/pattern could reach, so nothing to compare there.
-		 */
-		$self = '';
+		$self   = '';
 		if ( 'theme' === $source ) {
 			$self = Pattern_File_Store::namespaced_name(
 				isset( $input['name'] ) && '' !== $input['name'] ? (string) $input['name'] : sanitize_title( (string) $input['title'] )
@@ -1645,22 +1381,8 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
-	 * Adding a token is how a pattern's design ends up in the design system
-	 * rather than hard-coded into its markup.
-	 *
-	 * An agent turning a screenshot into a pattern has colors, sizes and a
-	 * type stack in hand and two places to put them: inline in the markup,
-	 * where they opt the pattern out of the site's palette, its dark mode and
-	 * every future restyle; or in the design system, where they become presets
-	 * every block can reference by slug. The second is right and until now
-	 * there was no way to do it over the wire — `theme.json` is a file with no
-	 * REST route, and Global Styles took raw JSON with nothing validating it.
-	 *
-	 * The writing itself is `Pattern_Builder_Cloud_Tokens::apply()`, which a
-	 * cloud download has always used: it writes only the slugs this site does
-	 * not already define, so a definition here always wins over an incoming
-	 * one, and it puts every value through the per-type grammar before it
-	 * lands anywhere near a stylesheet.
+	 * Adding a token is how a pattern's design ends up in the design system rather than
+	 * hard-coded into its markup.
 	 */
 	private function register_add_design_tokens() {
 		wp_register_ability(
@@ -1742,15 +1464,6 @@ class Pattern_Builder_Abilities {
 	/**
 	 * Write the tokens this site does not already define.
 	 *
-	 * The cloud download path hands `apply()` a package the service built and
-	 * validated, so it can take `type`, `slug` and `name` on trust. An agent's
-	 * input has been through nothing, so it is normalized first: an unknown
-	 * type is refused rather than dropped (an agent that wrote "typography"
-	 * for "fontSize" would otherwise get an empty result and go on to
-	 * reference a preset that was never created), and a slug is put through
-	 * `sanitize_title()` because core derives the CSS custom property from it
-	 * — `My Colour!` would land in the file and resolve to nothing.
-	 *
 	 * @param array $input Ability input.
 	 * @return array|\WP_Error
 	 */
@@ -1797,21 +1510,12 @@ class Pattern_Builder_Abilities {
 			$normalized[] = array(
 				'type'  => $type,
 				'slug'  => $slug,
-				// merge_settings() writes the name unconditionally, and a
-				// preset with no label reads as an empty swatch in the editor.
 				'name'  => isset( $token['name'] ) && '' !== trim( (string) $token['name'] )
 					? sanitize_text_field( (string) $token['name'] )
 					: ucwords( str_replace( '-', ' ', $slug ) ),
 				'value' => isset( $token['value'] ) ? (string) $token['value'] : '',
 			);
 		}
-
-		/*
-		 * Reported rather than silently dropped. An agent that proposed a
-		 * token which turns out to exist needs to know the site already had
-		 * an answer, so it references that slug instead of inventing a
-		 * near-duplicate beside it.
-		 */
 		$missing_keys = array();
 		foreach ( Pattern_Builder_Cloud_Tokens::missing( $normalized ) as $token ) {
 			$missing_keys[] = $token['type'] . '|' . $token['slug'];
@@ -1840,16 +1544,7 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
-	 * How to send bytes, in a shape an agent can act on without being told
-	 * twice.
-	 *
-	 * Returned by `find-media` and `add-asset` alike, because the one thing
-	 * an ability cannot do is take a file: abilities are JSON in and JSON out,
-	 * so a JPEG would have to be base64 inside that JSON — which means the
-	 * agent reading the bytes into its own context and paying for them there.
-	 * Naming the route in the *output* of the abilities that deal in media is
-	 * what stops it being rediscovered on every task: an agent looking for an
-	 * image is told, in the same answer, how to add one.
+	 * How to send bytes, in a shape an agent can act on without being told twice.
 	 *
 	 * @return array
 	 */
@@ -1884,14 +1579,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * Set the styles a pattern inherits.
-	 *
-	 * `add-design-tokens` gives a pattern a vocabulary to reference; this
-	 * decides what a block looks like when it references nothing. They are
-	 * separate abilities because they are opposite in every way that matters:
-	 * a preset is additive and inert, so a collision is skipped, while a style
-	 * is singular and immediate, so writing one replaces what was there and
-	 * repaints every page at once. Folding the second into the first would
-	 * have meant an ability documented as never overwriting that always does.
 	 */
 	private function register_set_global_styles() {
 		wp_register_ability(
@@ -1950,12 +1637,6 @@ class Pattern_Builder_Abilities {
 	/**
 	 * Set the widths a constrained layout measures against.
 	 *
-	 * A size is checked with the same grammar a spacing preset goes through,
-	 * because it lands in the same place: core writes it straight into a
-	 * `max-width` declaration. Core would quietly substitute `initial` for a
-	 * value it thinks unsafe, which reads as a layout that simply did not take,
-	 * so a bad value is refused here where the caller can see why.
-	 *
 	 * @param array $input Ability input.
 	 * @return array|\WP_Error
 	 */
@@ -2000,14 +1681,6 @@ class Pattern_Builder_Abilities {
 				array( 'status' => 400 )
 			);
 		}
-
-		/*
-		 * What was written, captured on the way past. Reading it back through
-		 * wp_get_global_settings() would report the values from before this
-		 * call: `WP_Theme_JSON_Resolver` keys parsed theme.json files by path
-		 * and `clean_cached_data()` does not clear that cache, so within one
-		 * request the file it already read is the file it keeps.
-		 */
 		$applied = array();
 
 		$result = Pattern_Builder_Theme_Json::edit(
@@ -2060,8 +1733,7 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
-	 * Register the ability that sets the widths a constrained layout measures
-	 * against.
+	 * Register the ability that sets the widths a constrained layout measures against.
 	 */
 	private function register_set_layout() {
 		wp_register_ability(
@@ -2125,12 +1797,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * Add a named look a pattern applies with a class.
-	 *
-	 * The third way to style a button, and the only one that both describes a
-	 * second kind and stays scoped to the markup that asks for it. Attributes
-	 * fossilise the design into the pattern; `styles.elements.button` is one
-	 * rule for every button on the site and cannot describe a second kind at
-	 * all.
 	 */
 	private function register_add_block_style_variation() {
 		wp_register_ability(
@@ -2234,12 +1900,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * What this site already has to illustrate a pattern with.
-	 *
-	 * Two places, because a pattern can reference either and only one of them
-	 * has a core route: the media library, and the files already sitting in
-	 * the theme's own `assets/images` — which is where every image a theme
-	 * pattern points at lives, since saving a theme pattern localises its
-	 * images into the theme.
 	 */
 	private function register_find_media() {
 		wp_register_ability(
@@ -2321,12 +1981,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * Add an image a pattern needs, in the two forms that fit in JSON.
-	 *
-	 * An SVG is text, so an agent can author one outright and it arrives
-	 * here whole. A URL is a fetch the site performs, which covers everything
-	 * already published somewhere. Bytes are the third case and cannot come
-	 * this way at all, so the description and the answer both name the route
-	 * that takes them.
 	 */
 	private function register_add_asset() {
 		wp_register_ability(
@@ -2384,9 +2038,6 @@ class Pattern_Builder_Abilities {
 					'annotations'  => array(
 						'readonly'    => false,
 						'destructive' => false,
-						// A second call with the same file stores a second
-						// copy rather than replacing the first, so this is
-						// not idempotent and must not be marked so.
 						'idempotent'  => false,
 					),
 				),
@@ -2441,8 +2092,6 @@ class Pattern_Builder_Abilities {
 				array( 'status' => 400 )
 			);
 		}
-
-		// Give it the extension it is, whatever the caller called it.
 		if ( 'svg' !== strtolower( (string) pathinfo( $filename, PATHINFO_EXTENSION ) ) ) {
 			$filename .= '.svg';
 		}
@@ -2455,12 +2104,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * Draw a placeholder rather than shipping a pattern with no image.
-	 *
-	 * A pattern under construction needs something in its image slots, and
-	 * the alternatives are both bad: a remote placeholder service means the
-	 * pattern renders a request to somebody else's server on every view, and
-	 * an empty image block reads as broken. This draws an SVG locally, which
-	 * costs no bytes over the wire and scales to whatever the layout asks.
 	 */
 	private function register_add_placeholder_image() {
 		wp_register_ability(
@@ -2542,9 +2185,6 @@ class Pattern_Builder_Abilities {
 		if ( 'svg' !== strtolower( (string) pathinfo( $filename, PATHINFO_EXTENSION ) ) ) {
 			$filename .= '.svg';
 		}
-
-		// Theme only: WordPress does not accept SVG in the media library, and
-		// a placeholder belongs with the pattern that uses it in any case.
 		return Pattern_Builder_Assets::store( $filename, $svg, 'theme' );
 	}
 
@@ -2604,12 +2244,6 @@ class Pattern_Builder_Abilities {
 	 * @return array|\WP_Error
 	 */
 	public function execute_list_fonts( $input = array() ) {
-		/*
-		 * Naming a family is what turns on the detail, the same way naming
-		 * blocks turns on their supports in list-block-types: a browse stays a
-		 * catalogue, and the answer grows only where somebody has narrowed to
-		 * the one family they are about to install.
-		 */
 		if ( isset( $input['family'] ) && '' !== $input['family'] ) {
 			$family = Pattern_Builder_Fonts::describe( (string) $input['family'] );
 
@@ -2635,12 +2269,6 @@ class Pattern_Builder_Abilities {
 
 	/**
 	 * Install a typeface and register it as a preset.
-	 *
-	 * Both halves matter and only one is obvious. The files make the font
-	 * available; the `fontFamily` preset is what actually renders it, since
-	 * `wp_print_font_faces()` builds its `@font-face` rules from the merged
-	 * theme.json rather than from the font library's own posts. A font
-	 * installed without the preset is a font nothing can use.
 	 */
 	private function register_add_font() {
 		wp_register_ability(
@@ -2704,9 +2332,6 @@ class Pattern_Builder_Abilities {
 					'annotations'  => array(
 						'readonly'    => false,
 						'destructive' => false,
-						// Installing the same family twice leaves the same
-						// files and the same preset: the preset is never
-						// overwritten and a duplicate library face is skipped.
 						'idempotent'  => true,
 					),
 				),
@@ -2742,18 +2367,8 @@ class Pattern_Builder_Abilities {
 	/**
 	 * The part of a user pattern that is not a post field.
 	 *
-	 * A `wp_block` carries its description as the excerpt, its categories as
-	 * `wp_pattern_category` terms, its keywords as a meta and its sync status
-	 * as another — where *absence* means synced, so an agent that asked for
-	 * an unsynced design pattern and was given a synced one would never have
-	 * been told. This writes the same fields
-	 * `Pattern_File_Store::convert_theme_pattern_to_user()` does, from the
-	 * same input the theme path takes, so the two sources answer `synced`,
-	 * `categories` and `keywords` alike. On an update, a field the input does
-	 * not mention keeps what the post already had.
-	 *
-	 * @param int                   $post_id  The wp_block post.
-	 * @param array                 $input    Ability input.
+	 * @param int                   $post_id The wp_block post.
+	 * @param array                 $input Ability input.
 	 * @param Abstract_Pattern|null $existing The pattern being replaced, on an update.
 	 */
 	private function write_user_pattern_meta( $post_id, $input, $existing = null ) {
@@ -2762,8 +2377,6 @@ class Pattern_Builder_Abilities {
 		} elseif ( $existing ) {
 			$synced = (bool) $existing->synced;
 		} else {
-			// The same default the theme path takes: a pattern is unsynced
-			// unless it is asked for as synced.
 			$synced = false;
 		}
 
@@ -2790,7 +2403,7 @@ class Pattern_Builder_Abilities {
 	/**
 	 * Build constructor args, falling back to an existing pattern's values.
 	 *
-	 * @param array                 $input    Ability input.
+	 * @param array                 $input Ability input.
 	 * @param Abstract_Pattern|null $existing Pattern being replaced, if any.
 	 * @return array
 	 */
@@ -2815,15 +2428,6 @@ class Pattern_Builder_Abilities {
 		if ( isset( $input['name'] ) && '' !== $input['name'] ) {
 			$args['name'] = (string) $input['name'];
 		}
-
-		/*
-		 * The placement headers, which are what make a pattern a starting
-		 * point rather than a section: WordPress reads them from the file, so
-		 * a pattern created without them is an ordinary theme pattern however
-		 * it was meant. Each one falls back to what the file already carries,
-		 * because an update that simply does not mention a header should not
-		 * be the thing that removes it.
-		 */
 		foreach ( array( 'blockTypes', 'postTypes', 'templateTypes' ) as $list ) {
 			if ( isset( $input[ $list ] ) ) {
 				$args[ $list ] = array_values( array_filter( array_map( 'sanitize_text_field', (array) $input[ $list ] ) ) );
@@ -2843,9 +2447,6 @@ class Pattern_Builder_Abilities {
 		} else {
 			$args['viewportWidth'] = $fallback( 'viewportWidth', null );
 		}
-
-		// Installs and uploads write these, never an edit, so an update
-		// carries them over rather than dropping them.
 		$args['origin'] = (string) $fallback( 'origin', '' );
 		$args['cloud']  = (string) $fallback( 'cloud', '' );
 
@@ -2872,13 +2473,6 @@ class Pattern_Builder_Abilities {
 
 		$store   = new Pattern_File_Store();
 		$pattern = $store->find_theme_pattern( $id );
-
-		/*
-		 * A theme pattern is stored under `{theme}/{slug}`, but an agent that
-		 * created one by its bare slug will ask for it the same way. Answering
-		 * the namespaced form costs nothing and saves a lookup that fails for a
-		 * reason nothing on the wire explains.
-		 */
 		if ( ! $pattern ) {
 			$namespaced = Pattern_File_Store::namespaced_name( $id );
 			if ( $namespaced !== $id ) {
@@ -2914,9 +2508,6 @@ class Pattern_Builder_Abilities {
 			'keywords'      => is_array( $pattern->keywords ) ? $pattern->keywords : array(),
 			'source'        => $pattern->source,
 			'synced'        => (bool) $pattern->synced,
-			// The placement headers are what make a pattern a page starter, a
-			// block starter or a template rather than a section — the *kind*
-			// an agent reading the site's existing patterns is trying to see.
 			'blockTypes'    => is_array( $pattern->blockTypes ) ? array_values( $pattern->blockTypes ) : array(), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 			'postTypes'     => is_array( $pattern->postTypes ) ? array_values( $pattern->postTypes ) : array(), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 			'templateTypes' => is_array( $pattern->templateTypes ) ? array_values( $pattern->templateTypes ) : array(), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
@@ -2925,12 +2516,10 @@ class Pattern_Builder_Abilities {
 		);
 
 		if ( ! empty( $pattern->origin ) ) {
-			// Attribution: the cloud pattern this one was first copied from.
 			$summary['origin'] = (string) $pattern->origin;
 		}
 
 		if ( ! empty( $pattern->cloud ) ) {
-			// Where this pattern's own copy lives on the cloud.
 			$summary['cloud'] = (string) $pattern->cloud;
 		}
 

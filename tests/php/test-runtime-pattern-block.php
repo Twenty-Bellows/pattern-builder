@@ -11,7 +11,6 @@
  * @covers \TwentyBellows\PatternBuilder\Pattern_Block
  */
 class Test_Pattern_Block extends Pattern_Test_Case {
-
 	/**
 	 * The block type carries the attribute and the context it provides.
 	 */

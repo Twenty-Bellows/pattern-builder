@@ -3,26 +3,8 @@ namespace TwentyBellows\PatternBuilder;
 
 /**
  * One-time upgrade from Pattern Builder 1.x to 2.0.
- *
- * Version 1 mirrored every theme pattern into a `tbell_pattern_block` post and
- * wrote `<!-- wp:block {"ref":N} /-->` references pointing at those posts.
- * Version 2 has no mirror posts, so those references would render nothing.
- *
- * The migration runs in strict order — the mirror rows are the only map from
- * ref ID back to pattern slug, so they must still exist while references are
- * rewritten:
- *
- * 1. Rewrite `wp:block` refs that point at mirror posts to
- *    `<!-- wp:pattern {"slug":"…"} /-->` — in theme pattern files and in post
- *    content.
- * 2. Delete the mirror posts (pure derived cache; the pattern files hold the
- *    content).
- * 3. Remove the custom capabilities v1 granted on activation.
- *
- * The routine is idempotent: with no mirror rows left it does nothing.
  */
 class Pattern_Builder_Migration {
-
 	/**
 	 * Option storing the plugin version the database was last migrated to.
 	 */
@@ -61,8 +43,6 @@ class Pattern_Builder_Migration {
 
 		if ( version_compare( $stored, '2.0.0', '>=' ) ) {
 			if ( version_compare( $stored, PATTERN_BUILDER_VERSION, '<' ) ) {
-				// 2.1 builds from before each pattern carried its own `Cloud:`
-				// reference kept a site-wide map of them; nothing reads it now.
 				delete_option( 'pattern_builder_cloud_links' );
 				update_option( self::VERSION_OPTION, PATTERN_BUILDER_VERSION );
 			}
@@ -70,7 +50,6 @@ class Pattern_Builder_Migration {
 		}
 
 		if ( ! current_user_can( 'edit_theme_options' ) ) {
-			// Wait for a user who could have used v1's editing tools.
 			return;
 		}
 
@@ -94,17 +73,15 @@ class Pattern_Builder_Migration {
 			'deleted_mirrors' => 0,
 			'time'            => time(),
 		);
-
-		// The mirror rows are the ID → slug map; read them before anything else.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$mirrors = $wpdb->get_results(
 			"SELECT ID, post_name FROM {$wpdb->posts} WHERE post_type = 'tbell_pattern_block'"
 		);
 
+		// The mirror rows are the ID -> slug map; read them before anything deletes them.
 		$ref_map = array();
 
 		foreach ( $mirrors as $mirror ) {
-			// v1 encoded '/' as '-x-x-' to fit post_name.
 			$ref_map[ (int) $mirror->ID ] = str_replace( '-x-x-', '/', $mirror->post_name );
 		}
 
@@ -127,9 +104,6 @@ class Pattern_Builder_Migration {
 
 	/**
 	 * Rewrites mirror-post refs inside theme pattern files.
-	 *
-	 * Operates on the raw file bytes — pattern files contain PHP, so they are
-	 * never run through the block parser here.
 	 *
 	 * @param array $ref_map Mirror post ID => pattern slug.
 	 * @return string[] Paths of the files that changed.
@@ -239,9 +213,6 @@ class Pattern_Builder_Migration {
 	/**
 	 * Rewrites every `wp:block` comment whose ref is a mirror post.
 	 *
-	 * Attributes other than `ref` — a `content` overrides object, alignment,
-	 * class names — are preserved on the resulting `wp:pattern` block.
-	 *
 	 * @param string $content Block markup (may contain PHP; treated as text).
 	 * @param array  $ref_map Mirror post ID => pattern slug.
 	 * @return string The rewritten markup.
@@ -263,8 +234,6 @@ class Pattern_Builder_Migration {
 				}
 
 				unset( $attributes['ref'] );
-
-				// `slug` leads so the serialized block reads naturally.
 				$attributes = array_merge( array( 'slug' => $ref_map[ $ref ] ), $attributes );
 
 				return '<!-- wp:pattern ' . serialize_block_attributes( $attributes ) . ' /-->';
@@ -318,9 +287,7 @@ class Pattern_Builder_Migration {
 			return;
 		}
 
-		$changed = $report['deleted_mirrors'] || $report['rewritten_files'] || $report['rewritten_posts'];
-
-		// Only ever show the notice once.
+		$changed                = $report['deleted_mirrors'] || $report['rewritten_files'] || $report['rewritten_posts'];
 		$report['acknowledged'] = true;
 		update_option( self::REPORT_OPTION, $report, false );
 

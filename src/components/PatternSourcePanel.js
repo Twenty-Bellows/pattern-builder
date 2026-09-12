@@ -21,19 +21,6 @@ import {
 /**
  * Shows where a pattern is stored and converts it to the other storage.
  *
- * A theme pattern lives in a PHP file in the theme; converting it moves the
- * content into a wp_block post (exporting theme image assets to the media
- * library) and deletes the file. A user pattern lives in the database;
- * converting it writes a pattern file (importing its images into the theme)
- * and deletes the post. Conversion changes the pattern's identity, so it acts
- * on the last saved version and then opens the converted pattern.
- *
- * Where a pattern lives also covers the cloud: connected users get the
- * upload/update control for their patternbuilderwp.com library here, and a
- * pattern copied from somebody else's collection says so — an origin is
- * only ever set across an account boundary (D38), so a line here always
- * names another person's work and never needs a "by you" case.
- *
  * @param {Object} root0             Component props.
  * @param {Object} root0.patternPost The pattern's entity record.
  * @param {string} root0.postType    The pattern's post type.
@@ -60,9 +47,6 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 	if ( ! patternPost ) {
 		return null;
 	}
-
-	// The panel is rendered from both an entity record (content is
-	// { raw, ... }) and an edited one (content is already the raw string).
 	const content =
 		typeof patternPost.content === 'string'
 			? patternPost.content

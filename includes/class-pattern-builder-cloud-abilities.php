@@ -5,30 +5,10 @@ namespace TwentyBellows\PatternBuilder;
 use WP_Error;
 
 /**
- * Abilities for the cloud: what an agent can ask patternbuilderwp.com
- * through this site, and what it can put there.
- *
- * Agents reach the cloud through a connected site and nothing else (D33).
- * An agent authenticates to WordPress with an application password, which
- * makes it that WordPress user; these abilities run as that user and use
- * the connection that user made. Two people have vouched — the site admin
- * who issued the password, the account holder who connected — and the
- * agent never holds a cloud credential. Without a connection every one of
- * them refuses with `pattern_builder_not_connected`.
- *
- * Seven abilities: four reads (list collections, one collection, search
- * patterns, and the collections and patterns those return carry what an
- * agent needs to choose) and three writes (install a collection, install a
- * pattern, upload a pattern, create a collection). Nothing here makes a
- * collection public, changes a visibility, or deletes a collection: an
- * agent never publishes, so `create-collection` is always private and on a
- * free account the service refuses it with the upgrade message.
- *
- * Registration is conditional on core having the Abilities API, as the
- * local abilities' is.
+ * Abilities for the cloud: what an agent can ask patternbuilderwp.com through this site,
+ * and what it can put there.
  */
 class Pattern_Builder_Cloud_Abilities {
-
 	const NOT_CONNECTED = 'pattern_builder_not_connected';
 
 	/**
@@ -73,8 +53,8 @@ class Pattern_Builder_Cloud_Abilities {
 	}
 
 	/**
-	 * Reading the cloud through this site is the same authority as
-	 * browsing it on the Pattern Builder screen.
+	 * Reading the cloud through this site is the same authority as browsing it on the
+	 * Pattern Builder screen.
 	 *
 	 * @return bool
 	 */
@@ -83,8 +63,8 @@ class Pattern_Builder_Cloud_Abilities {
 	}
 
 	/**
-	 * Installing writes into the theme or the database, and uploading
-	 * sends this site's work away: the same authority the proxy asks for.
+	 * Installing writes into the theme or the database, and uploading sends this site's
+	 * work away: the same authority the proxy asks for.
 	 *
 	 * @return bool
 	 */
@@ -93,8 +73,7 @@ class Pattern_Builder_Cloud_Abilities {
 	}
 
 	/**
-	 * The refusal every ability shares when the WordPress user has no
-	 * connection.
+	 * The refusal every ability shares when the WordPress user has no connection.
 	 *
 	 * @return true|WP_Error
 	 */
@@ -126,9 +105,7 @@ class Pattern_Builder_Cloud_Abilities {
 	}
 
 	/**
-	 * Meta for a write: POST, reachable over REST. Never destructive —
-	 * that word means delete-like here and would make the ability callable
-	 * only over DELETE — and nothing here deletes anything.
+	 * Meta for a write: POST, reachable over REST.
 	 *
 	 * @param bool $idempotent Whether the same call twice leaves the same state.
 	 * @return array
@@ -630,8 +607,6 @@ class Pattern_Builder_Cloud_Abilities {
 				$type = 'theme';
 			}
 		} elseif ( ! empty( $input['title'] ) && ! empty( $input['content'] ) ) {
-			// Finished markup with nowhere to live yet: it becomes a user
-			// pattern here, so the upload has something to link to.
 			$post_id = wp_insert_post(
 				array(
 					'post_type'    => 'wp_block',
@@ -661,8 +636,6 @@ class Pattern_Builder_Cloud_Abilities {
 		return array(
 			'pattern' => $result['pattern'],
 			'updated' => (bool) $result['updated'],
-			// Everything that went up, the pattern itself last. One name
-			// for a pattern that references nothing; several for a page.
 			'members' => isset( $result['members'] ) ? $result['members'] : array(),
 			'local'   => array(
 				'type' => $type,
@@ -688,9 +661,6 @@ class Pattern_Builder_Cloud_Abilities {
 							'type'      => 'string',
 							'minLength' => 1,
 						),
-						// Permanent, and the middle segment of every pattern
-						// name in the collection. Lower-case letters, numbers
-						// and single hyphens, starting with a letter.
 						'slug'        => array(
 							'type'      => 'string',
 							'pattern'   => '^[a-z][a-z0-9]*(-[a-z0-9]+)*$',

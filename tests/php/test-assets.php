@@ -2,17 +2,12 @@
 /**
  * Getting a file onto the site, and finding what is already here.
  *
- * The route is the interesting half: it exists because an ability cannot
- * carry bytes, so these check the two shapes it accepts and the fact that
- * every media-facing ability tells a caller it is there.
- *
  * @package PatternBuilder
  */
 
 use TwentyBellows\PatternBuilder\Pattern_Builder_Assets;
 
 class Test_Assets extends WP_UnitTestCase {
-
 	/**
 	 * The writable theme directory these tests treat as the active theme.
 	 *
@@ -35,9 +30,6 @@ class Test_Assets extends WP_UnitTestCase {
 		add_filter( 'template_directory', array( $this, 'theme_dir' ) );
 		add_filter( 'stylesheet', array( $this, 'theme_slug' ) );
 		add_filter( 'template', array( $this, 'theme_slug' ) );
-
-		// The route is registered on rest_api_init, which the REST test
-		// helpers fire; instantiating the component hooks it up.
 		new Pattern_Builder_Assets();
 		do_action( 'rest_api_init' );
 	}
@@ -74,8 +66,8 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A placeholder is drawn at the size asked for, and labels itself with
-	 * its own dimensions when nothing else is given.
+	 * A placeholder is drawn at the size asked for, and labels itself with its own
+	 * dimensions when nothing else is given.
 	 */
 	public function test_placeholder_is_drawn_at_the_size_asked_for() {
 		$svg = Pattern_Builder_Assets::placeholder_svg(
@@ -135,7 +127,6 @@ class Test_Assets extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'onload', $svg );
 		$this->assertStringNotContainsString( 'javascript:', $svg );
 		$this->assertStringNotContainsString( 'elsewhere.example', $svg );
-		// The drawing itself survives.
 		$this->assertStringContainsString( '<rect width="10" height="10"/>', $svg );
 	}
 
@@ -164,9 +155,9 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * An SVG stored in the theme is written to assets/images, and the
-	 * reference handed back is the PHP template tag a pattern file needs —
-	 * not a URL, which would break when the theme moved.
+	 * An SVG stored in the theme is written to assets/images, and the reference handed back
+	 * is the PHP template tag a pattern file needs — not a URL, which would break when the
+	 * theme moved.
 	 */
 	public function test_storing_an_svg_in_the_theme_returns_a_template_tag() {
 		$stored = Pattern_Builder_Assets::store(
@@ -186,8 +177,8 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Two files of the same name coexist: a pattern may bring its own
-	 * hero.svg to a theme that already has one.
+	 * Two files of the same name coexist: a pattern may bring its own hero.svg to a theme
+	 * that already has one.
 	 */
 	public function test_a_name_collision_is_numbered_not_overwritten() {
 		$svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="4" height="4"/></svg>';
@@ -202,8 +193,8 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * SVG is refused for the media library rather than quietly enabling a
-	 * site-wide upload type to satisfy one pattern.
+	 * SVG is refused for the media library rather than quietly enabling a site-wide upload
+	 * type to satisfy one pattern.
 	 */
 	public function test_svg_is_refused_for_the_media_library() {
 		$result = Pattern_Builder_Assets::store(
@@ -227,8 +218,8 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A file whose contents are not the image its name claims is refused —
-	 * the name arrived over the wire, the bytes are what count.
+	 * A file whose contents are not the image its name claims is refused — the name arrived
+	 * over the wire, the bytes are what count.
 	 */
 	public function test_contents_are_checked_against_the_name() {
 		$result = Pattern_Builder_Assets::store( 'hero.png', 'this is not a png', 'theme' );
@@ -238,9 +229,7 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * An oversized image is shrunk on the way in. Nothing else resizes a
-	 * file written straight into a theme, so without this a pattern ships
-	 * whatever came off the camera.
+	 * An oversized image is shrunk on the way in.
 	 */
 	public function test_an_oversized_image_is_constrained() {
 		$image = imagecreatetruecolor( 3200, 400 );
@@ -258,12 +247,6 @@ class Test_Assets extends WP_UnitTestCase {
 
 	/**
 	 * A resized image is left readable by the web server.
-	 *
-	 * The image editor chmods its output from the temporary directory's own
-	 * mode, so a resize in a 0777 temp directory produces a world-writable
-	 * file; moving that into the theme carried the mode across and suEXEC
-	 * hosts answer 403 for it. Nothing about the stored image's dimensions
-	 * or content shows the problem, so the mode is what has to be asserted.
 	 */
 	public function test_a_resized_image_is_stored_with_a_servable_mode() {
 		$image = imagecreatetruecolor( 3200, 400 );
@@ -326,10 +309,6 @@ class Test_Assets extends WP_UnitTestCase {
 
 	/**
 	 * The add-asset ability records alt text, as the upload route does.
-	 *
-	 * Both surfaces advertise an `alt`, and the ability used to accept it and
-	 * drop it — which reads as success while leaving the attachment with no
-	 * alt text at all, so find-media could not match on it either.
 	 */
 	public function test_alt_text_is_recorded_on_a_media_attachment() {
 		$image = imagecreatetruecolor( 400, 300 );
@@ -428,8 +407,8 @@ class Test_Assets extends WP_UnitTestCase {
 	 * Make a media library attachment to search for.
 	 *
 	 * @param string $filename Filename to record.
-	 * @param string $title    Attachment title.
-	 * @param string $alt      Alternative text.
+	 * @param string $title Attachment title.
+	 * @param string $alt Alternative text.
 	 * @return int
 	 */
 	private function make_attachment( $filename, $title, $alt = '' ) {
@@ -451,9 +430,7 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A search finds an attachment by its filename. Core does not do this by
-	 * default, and for media the filename is the likeliest thing to match:
-	 * looking for "hero" should turn up hero.webp whatever its title says.
+	 * A search finds an attachment by its filename.
 	 */
 	public function test_media_is_found_by_filename() {
 		$id = $this->make_attachment( 'hero-wide.webp', 'Untitled' );
@@ -469,9 +446,8 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A search finds an attachment by its alt text, which is where a site
-	 * records what an image actually shows — and which `s` never reaches,
-	 * because it lives in postmeta.
+	 * A search finds an attachment by its alt text, which is where a site records what an
+	 * image actually shows — and which `s` never reaches, because it lives in postmeta.
 	 */
 	public function test_media_is_found_by_alt_text() {
 		$id = $this->make_attachment( 'dsc00417.webp', 'DSC00417', 'A potter trimming a bowl' );
@@ -488,8 +464,8 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * An attachment matching on both counts is reported once: the two passes
-	 * merge by id rather than appending.
+	 * An attachment matching on both counts is reported once: the two passes merge by id
+	 * rather than appending.
 	 */
 	public function test_media_matching_twice_is_listed_once() {
 		$id = $this->make_attachment( 'kiln.webp', 'The kiln', 'The kiln at dusk' );
@@ -505,8 +481,8 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A media library result's reference is its URL, which is what a pattern
-	 * points at — and what the theme localiser rewrites on save.
+	 * A media library result's reference is its URL, which is what a pattern points at —
+	 * and what the theme localiser rewrites on save.
 	 */
 	public function test_a_media_result_references_its_url() {
 		$id = $this->make_attachment( 'bowl.webp', 'Bowl' );
@@ -517,9 +493,8 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The route takes a raw body with the filename in Content-Disposition,
-	 * which is the shape core's own media endpoint accepts and therefore the
-	 * one an agent already knows.
+	 * The route takes a raw body with the filename in Content-Disposition, which is the
+	 * shape core's own media endpoint accepts and therefore the one an agent already knows.
 	 */
 	public function test_the_route_accepts_a_raw_body() {
 		$request = new WP_REST_Request( 'POST', '/pattern-builder/v1/assets' );
@@ -538,8 +513,8 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A body with no filename anywhere is refused with the fix in the
-	 * message, rather than being stored under a made-up name.
+	 * A body with no filename anywhere is refused with the fix in the message, rather than
+	 * being stored under a made-up name.
 	 */
 	public function test_the_route_needs_a_filename() {
 		$request = new WP_REST_Request( 'POST', '/pattern-builder/v1/assets' );
@@ -565,8 +540,8 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The route is not open: writing into the theme is the same authority the
-	 * pattern routes ask for.
+	 * The route is not open: writing into the theme is the same authority the pattern
+	 * routes ask for.
 	 */
 	public function test_the_route_requires_the_capability() {
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'subscriber' ) ) );
@@ -582,8 +557,8 @@ class Test_Assets extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The filename may also be a query argument, for a client that finds
-	 * setting the header awkward.
+	 * The filename may also be a query argument, for a client that finds setting the header
+	 * awkward.
 	 */
 	public function test_the_route_accepts_a_filename_parameter() {
 		$request = new WP_REST_Request( 'POST', '/pattern-builder/v1/assets' );
