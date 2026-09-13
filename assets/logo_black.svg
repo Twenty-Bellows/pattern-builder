@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 1000 1000" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:square;">
+    <g transform="matrix(1.2,0,0,1.2,500,500)">
+        <g transform="matrix(1,0,0,1,-416.667,-416.667)">
+            <clipPath id="_clip1">
+                <rect x="0" y="0" width="833.333" height="833.333"/>
+            </clipPath>
+            <g clip-path="url(#_clip1)">
+                <g transform="matrix(4.16667,0,0,4.16667,0,0)">
+                    <path id="motif" d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    <g id="motif1" serif:id="motif" transform="matrix(0.951057,0.309017,-0.309017,0.951057,35.796,-26.0074)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif2" serif:id="motif" transform="matrix(0.809017,0.587785,-0.587785,0.809017,77.8768,-39.6802)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif3" serif:id="motif" transform="matrix(0.587785,0.809017,-0.809017,0.587785,122.123,-39.6802)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif4" serif:id="motif" transform="matrix(0.309017,0.951057,-0.951057,0.309017,164.204,-26.0074)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif5" serif:id="motif" transform="matrix(-3.82857e-16,1,-1,-3.82857e-16,200,4.26326e-14)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif6" serif:id="motif" transform="matrix(-0.309017,0.951057,-0.951057,-0.309017,226.007,35.796)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif7" serif:id="motif" transform="matrix(-0.587785,0.809017,-0.809017,-0.587785,239.68,77.8768)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif8" serif:id="motif" transform="matrix(-0.809017,0.587785,-0.587785,-0.809017,239.68,122.123)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif9" serif:id="motif" transform="matrix(-0.951057,0.309017,-0.309017,-0.951057,226.007,164.204)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif10" serif:id="motif" transform="matrix(-1,-7.65714e-16,7.65714e-16,-1,200,200)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif11" serif:id="motif" transform="matrix(-0.951057,-0.309017,0.309017,-0.951057,164.204,226.007)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif12" serif:id="motif" transform="matrix(-0.809017,-0.587785,0.587785,-0.809017,122.123,239.68)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif13" serif:id="motif" transform="matrix(-0.587785,-0.809017,0.809017,-0.587785,77.8768,239.68)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif14" serif:id="motif" transform="matrix(-0.309017,-0.951057,0.951057,-0.309017,35.796,226.007)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif15" serif:id="motif" transform="matrix(7.04481e-16,-1,1,7.04481e-16,-7.10543e-14,200)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif16" serif:id="motif" transform="matrix(0.309017,-0.951057,0.951057,0.309017,-26.0074,164.204)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif17" serif:id="motif" transform="matrix(0.587785,-0.809017,0.809017,0.587785,-39.6802,122.123)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif18" serif:id="motif" transform="matrix(0.809017,-0.587785,0.587785,0.809017,-39.6802,77.8768)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                    <g id="motif19" serif:id="motif" transform="matrix(0.951057,-0.309017,0.309017,0.951057,-26.0074,35.796)">
+                        <path d="M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:6px;"/>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+    <g transform="matrix(0.132235,0,0,0.132235,503.586,502.944)">
+        <g transform="matrix(1,0,0,1,-1200,-770.417)">
+            <g transform="matrix(4.16667,0,0,4.16667,0,0)">
+                <path d="M158.8,48.1L20.9,48.2C20.9,94.9 58.4,132.8 104.9,133.7C105.388,133.709 158.8,133.8 158.8,133.8L158.8,48.1Z" style="fill-rule:nonzero;"/>
+                <path d="M538.7,34.5C538.7,34.4 179.8,34.4 179.8,34.4L180,199.2C180.8,253.9 131.6,273.9 109,280.2C102.5,282 97.9,288.5 97.9,295.9L97.9,324.1L462.8,324.1L462.8,295.8C462.8,288.5 458.3,282.1 451.8,280.3C426.7,273.3 368.3,249.4 383,179.1C401.6,90.2 544,98.5 544,98.5L544,34.4L540.1,34.4C539.9,34.6 539.6,34.8 539.4,34.8C539.1,34.8 538.9,34.6 538.8,34.5L538.7,34.5Z" style="fill-rule:nonzero;"/>
+            </g>
+        </g>
+    </g>
+</svg>
