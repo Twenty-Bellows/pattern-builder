@@ -108,7 +108,7 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 						isBusy={ isConverting }
 						disabled={ isConverting }
 						onClick={ convert }
-						hoverTip={ __(
+						hovertip={ __(
 							'Converting moves the pattern into the database (exporting its images to the media library) and deletes the theme file.',
 							'pattern-builder'
 						) }
@@ -129,7 +129,7 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 						isBusy={ isConverting }
 						disabled={ isConverting }
 						onClick={ convert }
-						hoverTip={ __(
+						hovertip={ __(
 							'Converting writes the pattern into a file in the active theme (importing its images as theme assets) and deletes the database copy. The last saved version is converted.',
 							'pattern-builder'
 						) }
