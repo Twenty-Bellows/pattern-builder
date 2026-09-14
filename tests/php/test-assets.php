@@ -171,7 +171,7 @@ class Test_Assets extends WP_UnitTestCase {
 		$this->assertSame( 'mark.svg', $stored['filename'] );
 		$this->assertFileExists( $this->theme_dir . '/assets/images/mark.svg' );
 		$this->assertSame(
-			"<?php echo get_stylesheet_directory_uri() . '/assets/images/mark.svg'; ?>",
+			"<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/images/mark.svg' ); ?>",
 			$stored['reference']
 		);
 	}

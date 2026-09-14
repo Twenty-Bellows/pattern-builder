@@ -614,7 +614,7 @@ class Pattern_Builder_Assets {
 	 * @return string
 	 */
 	public static function theme_reference( $relative ) {
-		return '<?php echo get_stylesheet_directory_uri() . \'' . $relative . '\'; ?>';
+		return '<?php echo esc_url( get_stylesheet_directory_uri() . \'' . $relative . '\' ); ?>';
 	}
 
 	/**

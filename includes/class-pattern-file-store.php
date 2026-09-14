@@ -454,7 +454,7 @@ class Pattern_File_Store {
 		}
 
 		$formatted_content = $this->format_block_markup( $pattern->content );
-		$file_content      = $this->build_pattern_file_metadata( $pattern ) . $formatted_content;
+		$file_content      = $this->build_pattern_file_metadata( $pattern ) . $formatted_content . "\n";
 
 		$allowed_dirs = array(
 			get_stylesheet_directory() . '/patterns',
@@ -729,7 +729,7 @@ class Pattern_File_Store {
 			function ( $matches ) use ( $download_and_save_image ) {
 				$new_url = $download_and_save_image( $matches[2] );
 				if ( $new_url ) {
-					return $matches[1] . '="<?php echo get_stylesheet_directory_uri() . \'' . $new_url . '\'; ?>"';
+					return $matches[1] . '="' . Pattern_Builder_Assets::theme_reference( $new_url ) . '"';
 				}
 				return $matches[0];
 			},
@@ -740,7 +740,7 @@ class Pattern_File_Store {
 			function ( $matches ) use ( $download_and_save_image ) {
 				$new_url = $download_and_save_image( $matches[1] );
 				if ( $new_url ) {
-					return '"url":"<?php echo get_stylesheet_directory_uri() . \'' . $new_url . '\'; ?>"';
+					return '"url":"' . Pattern_Builder_Assets::theme_reference( $new_url ) . '"';
 				}
 				return $matches[0];
 			},
@@ -773,6 +773,9 @@ class Pattern_File_Store {
 			'/<!--(.*?)-->/s',
 			function ( $matches ) {
 				$content = trim( $matches[1] );
+
+				$content = preg_replace( '/\R\s*/', '', $content );
+
 				return "\n<!-- {$content} -->\n";
 			},
 			$block_markup
@@ -791,32 +794,85 @@ class Pattern_File_Store {
 	 * @return string Indented block markup.
 	 */
 	private function indent_block_markup( $block_markup ) {
-		$lines        = explode( "\n", $block_markup );
-		$lines        = array_map( 'trim', $lines );
-		$indent_str   = '  ';
+		$lines = array_map( 'trim', explode( "\n", $block_markup ) );
+		$lines = array_values( array_filter( $lines, 'strlen' ) );
+
 		$indent_level = 0;
 		$output       = array();
+		$total        = count( $lines );
 
-		foreach ( $lines as $line ) {
-			$is_closing_comment = preg_match( '/^<!--\s*\/[\w:-]+\s*-->$/', $line );
-			$is_closing_tag     = preg_match( '/^<\/[\w:-]+>$/', $line );
+		foreach ( $lines as $index => $line ) {
+			$previous = $index > 0 ? $lines[ $index - 1 ] : '';
+			$next     = $index + 1 < $total ? $lines[ $index + 1 ] : '';
 
-			if ( $is_closing_comment || $is_closing_tag ) {
+			$is_closing_comment = (bool) preg_match( '/^<!--\s*\/[\w:-]+\s*-->$/', $line );
+			$is_closing_tag     = (bool) preg_match( '/^<\/[\w:-]+>$/', $line );
+
+			if ( $is_closing_tag || ( $is_closing_comment && ! $this->is_own_markup( $previous ) ) ) {
 				$indent_level = max( $indent_level - 1, 0 );
 			}
 
-			$output[]                = str_repeat( $indent_str, $indent_level ) . $line;
-			$is_opening_comment      = preg_match( '/^<!--\s*[\w:-]+\b.*-->$/', $line ) &&
-				! preg_match( '/\/\s*-->$/', $line );
-			$is_opening_tag          = preg_match( '/^<([\w:-]+)(\s[^>]*)?>$/', $line );
-			$is_self_closing_tag     = preg_match( '/^<[^>]+\/>$/', $line );
-			$is_self_closing_comment = preg_match( '/^<!--.*\/\s*-->$/', $line );
+			$indent   = str_repeat( "\t", $indent_level );
+			$output[] = $indent . $this->expand_pattern_content( $line, $indent );
 
-			if ( ( $is_opening_comment || $is_opening_tag ) && ! $is_self_closing_tag && ! $is_self_closing_comment ) {
+			$is_opening_comment = preg_match( '/^<!--\s*[\w:-]+\b.*-->$/', $line ) &&
+				! preg_match( '/\/\s*-->$/', $line );
+			$is_opening_tag     = (bool) preg_match( '/^<([\w:-]+)(\s[^>]*)?>$/', $line );
+
+			if ( $is_opening_tag || ( $is_opening_comment && ! $this->is_own_markup( $next ) ) ) {
 				++$indent_level;
 			}
 		}
 
 		return implode( "\n", $output );
+	}
+
+	/**
+	 * Whether a line is a block's own HTML rather than a delimiter.
+	 *
+	 * @param string $line One trimmed line of block markup.
+	 * @return bool
+	 */
+	private function is_own_markup( $line ) {
+		return '' !== $line && 0 === strpos( $line, '<' ) && 0 !== strpos( $line, '<!--' );
+	}
+
+	/**
+	 * Writes a pattern reference's `content` out one slot to a line.
+	 *
+	 * @param string $line   One trimmed line of block markup.
+	 * @param string $indent The line's own indentation, for the lines it breaks onto.
+	 * @return string
+	 */
+	private function expand_pattern_content( $line, $indent ) {
+		if ( ! preg_match( '/^<!--\s+wp:pattern\s+(\{.*\})\s+(\/)?-->$/', $line, $matches ) ) {
+			return $line;
+		}
+
+		$attributes = json_decode( $matches[1] );
+
+		if ( ! $attributes instanceof \stdClass || ! isset( $attributes->content ) || ! $attributes->content instanceof \stdClass ) {
+			return $line;
+		}
+
+		$flags   = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+		$slots   = get_object_vars( $attributes->content );
+		$encoded = array();
+
+		foreach ( get_object_vars( $attributes ) as $key => $value ) {
+			if ( 'content' !== $key || empty( $slots ) ) {
+				$encoded[] = wp_json_encode( $key, $flags ) . ':' . wp_json_encode( $value, $flags );
+				continue;
+			}
+
+			$entries = array();
+			foreach ( $slots as $slot => $slot_value ) {
+				$entries[] = $indent . "\t" . wp_json_encode( $slot, $flags ) . ':' . wp_json_encode( $slot_value, $flags );
+			}
+
+			$encoded[] = wp_json_encode( $key, $flags ) . ":{\n" . implode( ",\n", $entries ) . "\n" . $indent . '}';
+		}
+
+		return '<!-- wp:pattern {' . implode( ',', $encoded ) . '}' . ( $matches[2] ? ' /' : ' ' ) . '-->';
 	}
 }
