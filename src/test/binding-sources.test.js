@@ -195,9 +195,9 @@ describe( 'fields declared through the PHP filter', () => {
 
 	it( 'gives a source with no field list something to offer', () => {
 		const sources = collect(
-			{ 'acf/field': { label: 'ACF Field' } },
+			{ 'acme/field': { label: 'Acme Field' } },
 			{
-				'acf/field': [
+				'acme/field': [
 					{
 						label: 'Hero link',
 						args: { key: 'hero_link' },
@@ -252,8 +252,8 @@ describe( 'fields declared through the PHP filter', () => {
 
 	it( 'drops a declared field with no args to bind to', () => {
 		const sources = collect(
-			{ 'acf/field': { label: 'ACF Field' } },
-			{ 'acf/field': [ { label: 'Broken' } ] }
+			{ 'acme/field': { label: 'Acme Field' } },
+			{ 'acme/field': [ { label: 'Broken' } ] }
 		);
 
 		expect( sources[ 0 ].fields ).toEqual( [] );

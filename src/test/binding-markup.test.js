@@ -119,13 +119,13 @@ describe( 'markup the panel writes', () => {
 			( rows ) => ( {
 				...rows,
 				text: { source: OVERRIDES_SOURCE },
-				url: { source: 'acf/field', args: { key: 'hero_link' } },
+				url: { source: 'acme/field', args: { key: 'hero_link' } },
 			} ),
 			1
 		);
 
 		expect( after ).toContain(
-			'"bindings":{"url":{"source":"acf/field","args":{"key":"hero_link"}},"text":{"source":"core/pattern-overrides"}}'
+			'"bindings":{"url":{"source":"acme/field","args":{"key":"hero_link"}},"text":{"source":"core/pattern-overrides"}}'
 		);
 		expect( after ).not.toContain( '__default' );
 	} );
@@ -207,7 +207,7 @@ describe( 'what the panel shows for that markup', () => {
 			NESTED,
 			( rows ) => ( {
 				...rows,
-				url: { source: 'acf/field', args: { key: 'hero_link' } },
+				url: { source: 'acme/field', args: { key: 'hero_link' } },
 			} ),
 			1
 		);

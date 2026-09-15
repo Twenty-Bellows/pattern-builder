@@ -35,7 +35,7 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 **Developer-Friendly**
 * **Export to Theme** - Convert user patterns to theme files with proper formatting
 * **Asset Management** - Automatically handles pattern images and media
-* **Block Bindings** - Advanced pattern configuration with block bindings support
+* **Block Bindings** - Bind a pattern's blocks to post meta, ACF fields or any registered binding source, or leave them for whoever places the pattern to fill in
 
 = Use Cases =
 
