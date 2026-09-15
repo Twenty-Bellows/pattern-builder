@@ -99,7 +99,7 @@ export const PatternBuilderPanel = ( { patternPost, postType } ) => {
 					'pattern-builder'
 				) }
 			>
-				<BlockBindingsPanel patternPost={ patternPost } />
+				<BlockBindingsPanel />
 			</PluginDocumentSettingPanel>
 
 			<PluginDocumentSettingPanel

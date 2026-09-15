@@ -6,34 +6,6 @@ import { store as coreStore } from '@wordpress/core-data';
 import { USER_INPUT_ONLY } from './use-binding-sources';
 
 /**
- * The help text below the lens.
- *
- * @param {string}  value      The post type being listed, or `USER_INPUT_ONLY`.
- * @param {boolean} isDeclared Whether the pattern declares that post type.
- * @return {string} The help text.
- */
-function helpText( value, isDeclared ) {
-	if ( ! value ) {
-		return __(
-			'Blocks can only take their value from the pattern file or from whoever places the pattern. Choose a post type to bind them to its fields as well.',
-			'pattern-builder'
-		);
-	}
-
-	if ( isDeclared ) {
-		return __(
-			'This pattern is associated with this post type. Bindings resolve against whichever post it lands in; this only chooses which fields are offered below.',
-			'pattern-builder'
-		);
-	}
-
-	return __(
-		'Bindings resolve against whichever post the pattern lands in. This only chooses which fields are offered below — it is not saved to the pattern.',
-		'pattern-builder'
-	);
-}
-
-/**
  * Which post type's fields the attribute rows should offer.
  *
  * A pattern binds against a post it has not met, so there is no record to read
@@ -45,18 +17,12 @@ function helpText( value, isDeclared ) {
  * types have nothing — `wp_template`, `wp_navigation` and the rest register no
  * meta — and offering them promises fields that are not there.
  *
- * @param {Object}    props                  Component props.
- * @param {string}    props.value            The post type being listed, or `USER_INPUT_ONLY`.
- * @param {Function}  props.onChange         Called with the new post type.
- * @param {string[]}  props.patternPostTypes The pattern's declared post types.
- * @param {?string[]} props.bindable         Post types with fields, or `undefined` while loading.
+ * @param {Object}    props          Component props.
+ * @param {string}    props.value    The post type being listed, or `USER_INPUT_ONLY`.
+ * @param {Function}  props.onChange Called with the new post type.
+ * @param {?string[]} props.bindable Post types with fields, or `undefined` while loading.
  */
-export const PostTypeLens = ( {
-	value,
-	onChange,
-	patternPostTypes,
-	bindable,
-} ) => {
+export const PostTypeLens = ( { value, onChange, bindable } ) => {
 	/*
 	 * `getPostTypes` returns only `show_in_rest` types; `bindable` narrows those
 	 * to the ones with fields. Filtering further by `viewable` would drop a
@@ -85,15 +51,16 @@ export const PostTypeLens = ( {
 		...postTypes,
 	];
 
-	const isDeclared = ( patternPostTypes || [] ).includes( value );
-
 	return (
 		<SelectControl
 			label={ __( 'Fields from', 'pattern-builder' ) }
 			value={ value }
 			options={ options }
 			onChange={ onChange }
-			help={ helpText( value, isDeclared ) }
+			help={ __(
+				'Choose a Post Type this pattern will be used in to create bindings to its data.',
+				'pattern-builder'
+			) }
 			__next40pxDefaultSize
 			__nextHasNoMarginBottom
 		/>

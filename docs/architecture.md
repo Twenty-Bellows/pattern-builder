@@ -66,7 +66,7 @@ post type in *Fields from* supplies the one piece of context the sources need;
 `core/post-meta` builds its list from `postType` alone. The lens is not saved
 to the pattern: the binding still resolves against whichever post the pattern
 is placed in. It starts at *User input only*, where no source is offered and a
-block gets the two choices a pattern can make by itself.
+block gets only the choice a pattern can make by itself.
 
 **The lens lists only post types worth naming.** Most of a site's post types are
 machinery a pattern is never placed in — templates, navigation, font faces, the
@@ -90,12 +90,14 @@ its fields only from JavaScript is invisible to the decision, so a post type
 nothing else offers will not be listed; answering the filter is how such a
 source puts one there.
 
-**The per-block control follows the lens.** With no post type a block gets a
-radio — static, or overridable. Choose a post type and that gives way to one
-row per bindable attribute, each offering *Not connected*, *Overridable*, or a
-field. A block whose bindings are too detailed for the radio — a source
-binding, or overrides on only some attributes — keeps its rows whatever the
-lens says, so nothing already bound is hidden.
+**The per-block control follows the lens.** With no post type a block gets an
+*Overridable* toggle, off being the value the pattern file saved; it is
+disabled until the block is named, since an override is stored against the
+name. Choose a post type and the toggle gives way to one row per bindable
+attribute, each offering *Not connected*, *Overridable*, or a field. A block
+whose bindings are too detailed for the toggle — a source binding, or overrides
+on only some attributes — keeps its rows whatever the lens says, so nothing
+already bound is hidden.
 
 **A source is offered only where it has fields to offer.** Every choice in a
 row is a field some source published for the chosen post type; a source that

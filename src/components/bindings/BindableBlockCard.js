@@ -4,7 +4,7 @@ import { getBlockType } from '@wordpress/blocks';
 import {
 	Card,
 	CardBody,
-	RadioControl,
+	ToggleControl,
 	TextControl,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalText as Text,
@@ -29,11 +29,11 @@ import { AttributeBindingRow } from './AttributeBindingRow';
 /**
  * One bindable block, and where each of its values comes from.
  *
- * With no post type chosen the block gets the two choices a pattern can make
- * on its own. Choosing one turns on a row per bindable attribute, which can
- * additionally reach that post type's fields. A block whose bindings are too
- * detailed for the radio keeps its rows either way, so nothing already bound
- * is hidden.
+ * With no post type chosen a block has only the one choice a pattern can make
+ * on its own, so it gets a toggle. Choosing a post type turns on a row per
+ * bindable attribute, which can additionally reach that post type's fields. A
+ * block whose bindings are too detailed for the toggle keeps its rows either
+ * way, so nothing already bound is hidden.
  *
  * @param {Object}   props           Component props.
  * @param {Object}   props.block     The block from the editor store.
@@ -138,37 +138,28 @@ export const BindableBlockCard = ( {
 							) ) }
 						</div>
 					) : (
-						<RadioControl
-							label={ __( 'Value from', 'pattern-builder' ) }
-							selected={ getBindingMode( bindings, supported ) }
-							onChange={ changeMode }
-							options={ [
-								{
-									label: __( 'Static', 'pattern-builder' ),
-									value: MODE.STATIC,
-									description: __(
-										'The value saved in the pattern file.',
-										'pattern-builder'
-									),
-								},
-								{
-									label: __(
-										'Overridable',
-										'pattern-builder'
-									),
-									value: MODE.OVERRIDES,
-									description: name
-										? __(
-												'Whoever places the pattern can change it.',
-												'pattern-builder'
-										  )
-										: __(
-												'Name the block first — overrides are stored against the name.',
-												'pattern-builder'
-										  ),
-									disabled: ! name,
-								},
-							] }
+						<ToggleControl
+							label={ __( 'Overridable', 'pattern-builder' ) }
+							help={
+								name
+									? __(
+											'Whoever places the pattern can change this value. Off, it stays as the pattern file saved it.',
+											'pattern-builder'
+									  )
+									: __(
+											'Name the block first — overrides are stored against the name.',
+											'pattern-builder'
+									  )
+							}
+							checked={
+								getBindingMode( bindings, supported ) ===
+								MODE.OVERRIDES
+							}
+							disabled={ ! name }
+							onChange={ ( on ) =>
+								changeMode( on ? MODE.OVERRIDES : MODE.STATIC )
+							}
+							__nextHasNoMarginBottom
 						/>
 					) }
 				</VStack>

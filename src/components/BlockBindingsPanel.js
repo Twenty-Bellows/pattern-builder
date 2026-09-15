@@ -20,14 +20,9 @@ import './bindings/bindings.scss';
 
 /**
  * Where every bindable block in the pattern gets its value.
- *
- * @param {Object}  props             Component props.
- * @param {?Object} props.patternPost The pattern's entity record, read only for
- *                                    the post types it declares.
  */
-export const BlockBindingsPanel = ( { patternPost } ) => {
+export const BlockBindingsPanel = () => {
 	const bindableBlocks = useBindableBlocks();
-	const patternPostTypes = patternPost?.postTypes || [];
 	const [ lens, setLens ] = useState( USER_INPUT_ONLY );
 	const bindable = useBindablePostTypes();
 	const sources = useBindingSources( lens );
@@ -51,7 +46,6 @@ export const BlockBindingsPanel = ( { patternPost } ) => {
 			<PostTypeLens
 				value={ lens }
 				onChange={ setLens }
-				patternPostTypes={ patternPostTypes }
 				bindable={ bindable }
 			/>
 
