@@ -52,6 +52,53 @@ never reach; the document tab's post card is hidden by a rule anchored on
 `.editor-post-card-panel__title`. Name and description are edited in the
 Pattern Metadata panel.
 
+## Pattern bindings
+
+A block's value can come from three places: the pattern file, whoever places
+the pattern, or the post the pattern lands in. The Pattern Bindings panel
+(`BlockBindingsPanel`) is where that is decided, and it writes nothing but
+core's own `metadata.bindings`.
+
+**The post type lens comes first.** A pattern binds against a post it has not
+met, so there is no record to read a field list from — which is why core's own
+bindings panel is empty inside a pattern and says nothing about why. Naming a
+post type in *Fields from* supplies the one piece of context the sources need;
+`core/post-meta` builds its list from `postType` alone. The lens is not saved
+to the pattern: the binding still resolves against whichever post the pattern
+is placed in. It starts at *User input only*, where no source is offered and a
+block gets the two choices a pattern can make by itself.
+
+**The per-block control follows the lens.** With no post type a block gets a
+radio — static, or overridable. Choose a post type and that gives way to one
+row per bindable attribute, each offering *Not connected*, *Overridable*, or a
+field. A block whose bindings are too detailed for the radio — a source
+binding, or overrides on only some attributes — keeps its rows whatever the
+lens says, so nothing already bound is hidden.
+
+**Most sources cannot be enumerated.** A source has to publish `getFieldsList`
+to the editor, and through `@wordpress/blocks` 15.6 the store keeps that
+function for `core/post-meta` and discards it for every other source unless the
+Gutenberg plugin is running. Nothing registered in PHP can publish one at all.
+Those sources are offered under *Enter a key*, writing whatever is typed into
+`args`, rather than being hidden the way core hides them.
+
+**Which attributes are bindable is core's decision**, read from the editor
+setting `__experimentalBlockBindingsSupportedAttributes` and falling back to
+the 6.8 table in `src/utils/bindings.js`, which mirrors
+`Pattern_Resolver::get_supported_attributes()`. A theme filtering
+`block_bindings_supported_attributes` widens the panel with it.
+
+**Writes stay in core's shape.** `__default` means every supported attribute is
+a pattern override; the panel expands it for display and collapses back to it
+whenever every attribute ends up overridable, so a pattern file does not change
+shape just because it was opened. Bindings on attributes the panel does not
+manage are carried through untouched.
+
+Editing any of this needs `canUpdateBlockBindings`, which core derives from
+`edit_block_binding` and denies outright for an editor context carrying no
+post. `Pattern_Builder_Admin::allow_block_bindings_editing()` grants it back on
+this screen to users who can already edit the pattern.
+
 ## The browse page
 
 Appearance → Pattern Builder is a Site-Editor-style library: a header with four
@@ -228,7 +275,8 @@ Three webpack bundles:
 
 Supporting modules: `src/admin/` (App, PatternBrowser, editor-boot),
 `src/cloud/` (see [`cloud.md`](cloud.md)), `src/components/`, `src/objects/`,
-`src/utils/` (`tileKey`, `patternTree`, `blockValidity`, `telemetry`), and
+`src/utils/` (`tileKey`, `patternTree`, `blockValidity`, `telemetry`,
+`bindings`), and
 `src/runtime/` (vendored; keep identical to the companion's `src/`).
 
 State comes from the core data stores (`core`, `core/editor`,
