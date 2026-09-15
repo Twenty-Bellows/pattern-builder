@@ -11,6 +11,11 @@ class Pattern_Builder_Admin {
 	private const PAGE_SLUG = 'pattern-builder';
 
 	/**
+	 * The name this screen gives its block editor context.
+	 */
+	private const EDITOR_CONTEXT = 'pattern-builder/editor';
+
+	/**
 	 * The admin page's hook suffix, once registered.
 	 *
 	 * @var string|false
@@ -23,6 +28,30 @@ class Pattern_Builder_Admin {
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'create_admin_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_filter( 'block_editor_settings_all', array( $this, 'allow_block_bindings_editing' ), 10, 2 );
+	}
+
+	/**
+	 * Lets this screen's editor edit block bindings.
+	 *
+	 * Core maps `edit_block_binding` to `do_not_allow` for an editor context
+	 * carrying no post, which is every pattern this screen edits, leaving the
+	 * bindings controls read-only. Reaching the screen already requires
+	 * `edit_theme_options`, which is what `pb_pattern` maps its edit
+	 * capabilities to.
+	 *
+	 * @param array                   $settings The block editor settings.
+	 * @param WP_Block_Editor_Context $context  The current editor context.
+	 * @return array The filtered settings.
+	 */
+	public function allow_block_bindings_editing( $settings, $context ) {
+		if ( ! isset( $context->name ) || self::EDITOR_CONTEXT !== $context->name ) {
+			return $settings;
+		}
+
+		$settings['canUpdateBlockBindings'] = current_user_can( 'edit_theme_options' );
+
+		return $settings;
 	}
 
 	/**
@@ -96,7 +125,7 @@ class Pattern_Builder_Admin {
 			'after'
 		);
 
-		$editor_context = new WP_Block_Editor_Context( array( 'name' => 'pattern-builder/editor' ) );
+		$editor_context = new WP_Block_Editor_Context( array( 'name' => self::EDITOR_CONTEXT ) );
 
 		wp_add_inline_script(
 			'wp-blocks',
