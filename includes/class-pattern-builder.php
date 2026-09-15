@@ -15,6 +15,7 @@ require_once __DIR__ . '/class-editor-support.php';
 require_once __DIR__ . '/class-pattern-builder-rest-patterns-controller.php';
 require_once __DIR__ . '/class-pattern-builder-entity.php';
 require_once __DIR__ . '/class-pattern-builder-api.php';
+require_once __DIR__ . '/class-pattern-builder-acf.php';
 require_once __DIR__ . '/class-pattern-builder-admin.php';
 require_once __DIR__ . '/class-pattern-builder-editor.php';
 require_once __DIR__ . '/class-pattern-builder-migration.php';
@@ -55,6 +56,7 @@ class Pattern_Builder {
 
 		new Pattern_Builder_Entity();
 		new Pattern_Builder_API();
+		new Pattern_Builder_ACF();
 		new Pattern_Builder_Admin();
 		new Pattern_Builder_Editor();
 		new Pattern_Builder_Migration();

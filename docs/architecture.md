@@ -123,6 +123,17 @@ nothing to bind to, so `Pattern_Builder_API::get_binding_fields()` drops it.
 while its own field list appears only when a Post Date block is selected.
 `core/term-data` is deliberately not given the same treatment: it resolves from
 a `termId` and `taxonomy` that a pattern placed in a post does not carry.
+`Pattern_Builder_ACF` answers it for `acf/field`. ACF registers that source
+with a value callback and nothing else, and ships no field list in JavaScript
+either, so without this the source appears in the panel with nothing under it.
+Only enumeration is supplied: resolving stays ACF's own callback, so the two
+gates it applies before returning a value are applied before offering one — a
+field type that supports bindings, and a field whose *Allow Access to Value in
+Editor UI* setting is on. ACF defaults that setting off for any field created
+since its 6.3.6, so a field added today is offered nowhere until somebody turns
+it on, and offering it regardless would be offering a choice that renders
+nothing.
+
 `core/post-meta` needs no help — it enumerates the registered meta itself, and
 it is the one source whose field list and render-time gate are the same, so a
 key missing from the list is a key that would render nothing.
