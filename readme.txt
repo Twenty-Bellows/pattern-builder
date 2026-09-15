@@ -106,11 +106,20 @@ Yes! Pattern Builder works with any WordPress theme that supports the block edit
 
 Yes, Pattern Builder provides a unified interface to manage both theme patterns (PHP files in your theme's patterns directory) and user-created patterns stored in the database.
 
+= Does it work with Advanced Custom Fields? =
+
+Yes, and with no code to write. Choose a post type in the Pattern Bindings panel and the ACF fields attached to it are offered alongside that post type's own custom fields. One ACF setting has to be on first: open the field, and under Presentation switch on "Allow Access to Value in Editor UI". ACF leaves that off for any field created since its 6.3.6, and a field without it renders nothing wherever it is bound, so Pattern Builder does not offer one until it is on.
+
+= Can I bind a block to my own data? =
+
+Yes. Anything registered as post meta with show_in_rest is offered automatically. For data of your own, register a block binding source: WordPress resolves the value from your PHP callback, and registering the same source in the editor with a getFieldsList puts your fields in the panel.
+
 == Screenshots ==
 
 == Changelog ==
 
 = 2.1.0 =
+* Pattern Bindings: bind a block's value to any registered source, not pattern overrides alone — a post type's custom fields, Advanced Custom Fields, or a source a plugin registers — picked per attribute from the fields that post type really offers
 * Cloud collections: sign in to a free patternbuilderwp.com account from Appearance → Pattern Builder and keep your patterns in a private Personal collection, on every site you connect; Pro adds private collections of your own
 * The Directory tab browses curated collections; save one pattern or a whole collection to this site, with the design tokens it needs, and the Uploaded tab manages your own collections
 * A page pattern travels with the patterns it references, uploading and installing them alongside it, and a copy records the pattern it came from
