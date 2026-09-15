@@ -238,6 +238,151 @@ class Test_Binding_Fields extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Asks which post types have anything to bind to.
+	 *
+	 * @return array The slugs.
+	 */
+	private function request_post_types(): array {
+		$response = rest_get_server()->dispatch(
+			new WP_REST_Request( 'GET', '/pattern-builder/v1/binding-fields' )
+		);
+
+		$this->assertSame( 200, $response->get_status() );
+
+		return (array) $response->get_data();
+	}
+
+	/**
+	 * The post types a pattern actually lands in are offered.
+	 */
+	public function test_lists_the_viewable_post_types() {
+		$listed = $this->request_post_types();
+
+		$this->assertContains( 'post', $listed );
+		$this->assertContains( 'page', $listed );
+	}
+
+	/**
+	 * The machinery a pattern is never placed in is not.
+	 *
+	 * Every one of these was in the list before it was narrowed. `wp_block` is
+	 * the interesting one: core registers a sync flag against it, so a rule
+	 * resting on registered meta alone would keep it.
+	 */
+	public function test_omits_the_internal_post_types() {
+		$listed = $this->request_post_types();
+
+		$internal = array(
+			'wp_template',
+			'wp_template_part',
+			'wp_navigation',
+			'wp_global_styles',
+			'wp_font_family',
+			'wp_font_face',
+			'nav_menu_item',
+			'wp_block',
+			'pb_pattern',
+		);
+
+		foreach ( $internal as $post_type ) {
+			$this->assertNotContains( $post_type, $listed );
+		}
+	}
+
+	/**
+	 * A plugin's own post type is offered for the meta it registers.
+	 *
+	 * Not being publicly viewable is no reason to hide it: the meta is there
+	 * and `core/post-meta` will list it.
+	 */
+	public function test_lists_a_private_post_type_with_registered_meta() {
+		register_post_type( 'book', array( 'show_in_rest' => true, 'public' => false ) );
+		register_post_meta( 'book', 'isbn', array( 'show_in_rest' => true, 'type' => 'string' ) );
+
+		$this->assertContains( 'book', $this->request_post_types() );
+	}
+
+	/**
+	 * A post type with nothing registered against it is not.
+	 */
+	public function test_omits_a_post_type_with_nothing_to_bind_to() {
+		register_post_type( 'crate', array( 'show_in_rest' => true, 'public' => false ) );
+
+		$this->assertNotContains( 'crate', $this->request_post_types() );
+	}
+
+	/**
+	 * Meta core hides from its own field list does not qualify a post type.
+	 */
+	public function test_ignores_meta_the_editor_would_not_offer() {
+		register_post_type( 'ledger', array( 'show_in_rest' => true, 'public' => false ) );
+		register_post_meta( 'ledger', '_secret', array( 'show_in_rest' => true, 'type' => 'string' ) );
+		register_post_meta( 'ledger', 'internal', array( 'show_in_rest' => false, 'type' => 'string' ) );
+
+		$this->assertNotContains( 'ledger', $this->request_post_types() );
+	}
+
+	/**
+	 * The filter alone is enough to put a post type in the list.
+	 *
+	 * This is the path a plugin that registers its source in PHP takes.
+	 */
+	public function test_a_declared_field_lists_its_post_type() {
+		register_post_type( 'product', array( 'show_in_rest' => true, 'public' => false ) );
+		register_post_type( 'pallet', array( 'show_in_rest' => true, 'public' => false ) );
+		$this->register_php_source( 'test/acf-like' );
+
+		add_filter(
+			'pattern_builder_binding_fields',
+			function ( $fields, $source_name, $post_type ) {
+				return 'test/acf-like' === $source_name && 'product' === $post_type
+					? array( array( 'label' => 'SKU', 'args' => array( 'key' => 'sku' ) ) )
+					: $fields;
+			},
+			10,
+			3
+		);
+
+		$listed = $this->request_post_types();
+
+		$this->assertContains( 'product', $listed );
+		$this->assertNotContains( 'pallet', $listed, 'the filter leaked past the post type it named' );
+	}
+
+	/**
+	 * A declaration reaches even a post type the other rules would skip.
+	 */
+	public function test_a_declared_field_overrides_the_internal_rule() {
+		$this->register_php_source( 'test/for-templates' );
+
+		add_filter(
+			'pattern_builder_binding_fields',
+			function ( $fields, $source_name, $post_type ) {
+				return 'test/for-templates' === $source_name && 'wp_template' === $post_type
+					? array( array( 'label' => 'Slot', 'args' => array( 'key' => 'slot' ) ) )
+					: $fields;
+			},
+			10,
+			3
+		);
+
+		$this->assertContains( 'wp_template', $this->request_post_types() );
+	}
+
+	/**
+	 * Post data's three fields are not a reason to offer a post type.
+	 *
+	 * They are offered for every post type, so they cannot tell one from
+	 * another — but they are still listed once a post type is chosen.
+	 */
+	public function test_universal_fields_do_not_list_a_post_type() {
+		register_post_type( 'shelf', array( 'show_in_rest' => true, 'public' => false ) );
+
+		$this->assertNotContains( 'shelf', $this->request_post_types() );
+		$this->assertNotEmpty( $this->request( 'shelf' )['core/post-data'] );
+	}
+
+	/**
 	 * Somebody who cannot edit posts cannot read the list.
 	 */
 	public function test_denies_a_user_who_cannot_edit_posts() {

@@ -41,26 +41,41 @@ function helpText( value, isDeclared ) {
  * Nothing here is written to the pattern — the binding still resolves against
  * whichever post the pattern is placed in.
  *
- * @param {Object}   props                  Component props.
- * @param {string}   props.value            The post type being listed, or `USER_INPUT_ONLY`.
- * @param {Function} props.onChange         Called with the new post type.
- * @param {string[]} props.patternPostTypes The pattern's declared post types.
+ * Only post types with something to bind to are listed. Most of a site's post
+ * types have nothing — `wp_template`, `wp_navigation` and the rest register no
+ * meta — and offering them promises fields that are not there.
+ *
+ * @param {Object}    props                  Component props.
+ * @param {string}    props.value            The post type being listed, or `USER_INPUT_ONLY`.
+ * @param {Function}  props.onChange         Called with the new post type.
+ * @param {string[]}  props.patternPostTypes The pattern's declared post types.
+ * @param {?string[]} props.bindable         Post types with fields, or `undefined` while loading.
  */
-export const PostTypeLens = ( { value, onChange, patternPostTypes } ) => {
+export const PostTypeLens = ( {
+	value,
+	onChange,
+	patternPostTypes,
+	bindable,
+} ) => {
 	/*
-	 * `getPostTypes` returns only `show_in_rest` types, which is already the
-	 * gate that matters for bindings. Filtering further by `viewable` would
-	 * drop a custom post type that is not publicly queryable but does register
-	 * meta worth binding to.
+	 * `getPostTypes` returns only `show_in_rest` types; `bindable` narrows those
+	 * to the ones with fields. Filtering further by `viewable` would drop a
+	 * custom post type that is not publicly queryable but does register meta
+	 * worth binding to.
 	 */
-	const postTypes = useSelect( ( select ) => {
-		const types = select( coreStore ).getPostTypes( { per_page: -1 } );
+	const postTypes = useSelect(
+		( select ) => {
+			const types = select( coreStore ).getPostTypes( { per_page: -1 } );
 
-		return ( types || [] ).map( ( type ) => ( {
-			label: type.labels?.singular_name || type.name || type.slug,
-			value: type.slug,
-		} ) );
-	}, [] );
+			return ( types || [] )
+				.filter( ( type ) => ( bindable || [] ).includes( type.slug ) )
+				.map( ( type ) => ( {
+					label: type.labels?.singular_name || type.name || type.slug,
+					value: type.slug,
+				} ) );
+		},
+		[ bindable ]
+	);
 
 	const options = [
 		{

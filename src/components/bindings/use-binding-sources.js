@@ -104,6 +104,41 @@ function useDeclaredFields( postType ) {
 }
 
 /**
+ * The post types that have anything to bind to.
+ *
+ * Asked of the server rather than worked out here: deciding it in the editor
+ * would mean enumerating every post type's meta, and `core/post-meta` resolves
+ * that with a request apiece.
+ *
+ * @return {string[]|undefined} Post type slugs, or `undefined` until loaded.
+ */
+export function useBindablePostTypes() {
+	const [ postTypes, setPostTypes ] = useState( undefined );
+
+	useEffect( () => {
+		let ignore = false;
+
+		apiFetch( { path: '/pattern-builder/v1/binding-fields' } )
+			.then( ( types ) => {
+				if ( ! ignore ) {
+					setPostTypes( Array.isArray( types ) ? types : [] );
+				}
+			} )
+			.catch( () => {
+				if ( ! ignore ) {
+					setPostTypes( [] );
+				}
+			} );
+
+		return () => {
+			ignore = true;
+		};
+	}, [] );
+
+	return postTypes;
+}
+
+/**
  * Every registered binding source, with the fields it offers for a post type.
  *
  * @param {string} postType The post type whose fields to list.

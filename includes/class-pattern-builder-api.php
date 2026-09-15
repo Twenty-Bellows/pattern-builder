@@ -54,7 +54,7 @@ class Pattern_Builder_API {
 				'args'                => array(
 					'post_type' => array(
 						'type'              => 'string',
-						'required'          => true,
+						'required'          => false,
 						'sanitize_callback' => 'sanitize_key',
 					),
 				),
@@ -88,12 +88,22 @@ class Pattern_Builder_API {
 	 * registration can carry `getFieldsList`. This endpoint gives those sources
 	 * a way in, through the `pattern_builder_binding_fields` filter.
 	 *
+	 * With no `post_type`, answers the prior question instead: which post types
+	 * have anything to bind to at all. That is asked for every post type at
+	 * once, so it is answered here rather than in the editor, where enumerating
+	 * a post type's meta costs a request apiece.
+	 *
 	 * @param \WP_REST_Request $request The request.
-	 * @return WP_REST_Response Fields keyed by source name.
+	 * @return WP_REST_Response Fields keyed by source name, or post type slugs.
 	 */
 	public function get_binding_fields( $request ) {
 		$post_type = $request->get_param( 'post_type' );
-		$declared  = array();
+
+		if ( ! $post_type ) {
+			return new WP_REST_Response( $this->get_bindable_post_types() );
+		}
+
+		$declared = array();
 
 		foreach ( get_all_registered_block_bindings_sources() as $source ) {
 			/**
@@ -117,6 +127,120 @@ class Pattern_Builder_API {
 		}
 
 		return new WP_REST_Response( $declared );
+	}
+
+	/**
+	 * The post types worth naming as a source of fields.
+	 *
+	 * Most of a site's post types are machinery — templates, navigation, font
+	 * faces, patterns — and a pattern is never placed in one, so offering them
+	 * promises fields that do not apply. Three rules, in order:
+	 *
+	 * A viewable post type is listed. These are the ones a pattern lands in, so
+	 * the fields every post has apply to them even when they register no meta
+	 * of their own, which on a stock site `post` and `page` do not.
+	 *
+	 * Any other post type is listed if the filter declared a field for it. That
+	 * is a deliberate act, so it is honoured whatever the post type.
+	 *
+	 * Failing that, a post type a plugin registered is listed if it has meta
+	 * worth binding to. The same courtesy is not extended to core's own
+	 * internals, or `wp_block` would appear on the strength of the sync flag
+	 * core registers against it.
+	 *
+	 * Only what this side can see is counted. A source that publishes its
+	 * fields solely from JavaScript is invisible here, so answering the filter
+	 * is how it puts a post type on this list.
+	 *
+	 * @return string[] Post type slugs.
+	 */
+	private function get_bindable_post_types(): array {
+		$bindable = array();
+
+		foreach ( get_post_types( array( 'show_in_rest' => true ), 'objects' ) as $post_type ) {
+			$listed = is_post_type_viewable( $post_type )
+				|| $this->has_declared_fields( $post_type->name )
+				|| ( ! $post_type->_builtin && $this->has_bindable_meta( $post_type->name ) );
+
+			if ( $listed ) {
+				$bindable[] = $post_type->name;
+			}
+		}
+
+		return $bindable;
+	}
+
+	/**
+	 * Whether a post type registers meta that `core/post-meta` would list.
+	 *
+	 * Mirrors what the editor shows: the keys core exposes over REST, less the
+	 * protected and internal ones its own field list drops.
+	 *
+	 * @param string $post_type The post type.
+	 * @return bool Whether any key qualifies.
+	 */
+	private function has_bindable_meta( string $post_type ): bool {
+		$keys = array_merge(
+			get_registered_meta_keys( 'post' ),
+			get_registered_meta_keys( 'post', $post_type )
+		);
+
+		foreach ( $keys as $key => $args ) {
+			if ( empty( $args['show_in_rest'] ) || 'footnotes' === $key || str_starts_with( $key, '_' ) ) {
+				continue;
+			}
+
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Whether the filter declares a field particular to a post type.
+	 *
+	 * A field offered whatever post type is named says nothing about any of
+	 * them, and `add_post_data_fields()` below offers three such: every post
+	 * has a date and a permalink. Those are worth showing once a post type is
+	 * chosen, but they are not a reason to choose one, so what this plugin
+	 * contributes is discounted here.
+	 *
+	 * @param string $post_type The post type.
+	 * @return bool Whether any source declared one.
+	 */
+	private function has_declared_fields( string $post_type ): bool {
+		foreach ( get_all_registered_block_bindings_sources() as $source ) {
+			/** This filter is documented in includes/class-pattern-builder-api.php */
+			$fields = apply_filters( 'pattern_builder_binding_fields', array(), $source->name, $post_type );
+
+			$universal = $this->field_signatures( $this->add_post_data_fields( array(), $source->name ) );
+
+			if ( array_diff( $this->field_signatures( $fields ), $universal ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Comparable strings for a set of declared fields, dropping malformed ones.
+	 *
+	 * @param mixed $fields The filtered value.
+	 * @return string[] One signature per usable field.
+	 */
+	private function field_signatures( $fields ): array {
+		$signatures = array();
+
+		foreach ( (array) $fields as $field ) {
+			$normalized = $this->normalize_binding_field( $field );
+
+			if ( $normalized ) {
+				$signatures[] = (string) wp_json_encode( $normalized );
+			}
+		}
+
+		return $signatures;
 	}
 
 	/**

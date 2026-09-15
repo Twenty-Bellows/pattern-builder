@@ -13,6 +13,7 @@ import { PostTypeLens } from './bindings/PostTypeLens';
 import { useBindableBlocks } from './bindings/use-bindable-blocks';
 import {
 	USER_INPUT_ONLY,
+	useBindablePostTypes,
 	useBindingSources,
 } from './bindings/use-binding-sources';
 import './bindings/bindings.scss';
@@ -28,6 +29,7 @@ export const BlockBindingsPanel = ( { patternPost } ) => {
 	const bindableBlocks = useBindableBlocks();
 	const patternPostTypes = patternPost?.postTypes || [];
 	const [ lens, setLens ] = useState( USER_INPUT_ONLY );
+	const bindable = useBindablePostTypes();
 	const sources = useBindingSources( lens );
 
 	if ( bindableBlocks.length === 0 ) {
@@ -42,6 +44,7 @@ export const BlockBindingsPanel = ( { patternPost } ) => {
 	}
 
 	const hasFields = sources.some( ( source ) => source.fields.length > 0 );
+	const nothingBindable = bindable?.length === 0;
 
 	return (
 		<VStack spacing={ 4 } className="pattern-builder-bindings">
@@ -49,7 +52,17 @@ export const BlockBindingsPanel = ( { patternPost } ) => {
 				value={ lens }
 				onChange={ setLens }
 				patternPostTypes={ patternPostTypes }
+				bindable={ bindable }
 			/>
+
+			{ nothingBindable && (
+				<Notice status="info" isDismissible={ false }>
+					{ __(
+						'No post type on this site has fields to bind to. A post type qualifies by registering meta with show_in_rest, or through the pattern_builder_binding_fields filter.',
+						'pattern-builder'
+					) }
+				</Notice>
+			) }
 
 			{ !! lens && ! hasFields && (
 				<Notice status="info" isDismissible={ false }>

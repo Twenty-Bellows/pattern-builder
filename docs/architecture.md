@@ -68,6 +68,28 @@ to the pattern: the binding still resolves against whichever post the pattern
 is placed in. It starts at *User input only*, where no source is offered and a
 block gets the two choices a pattern can make by itself.
 
+**The lens lists only post types worth naming.** Most of a site's post types are
+machinery a pattern is never placed in — templates, navigation, font faces, the
+plugin's own `pb_pattern` — and offering them promises fields that do not apply.
+`Pattern_Builder_API::get_bindable_post_types()` decides, in three steps: a
+viewable post type is listed, because those are the ones a pattern lands in and
+the fields every post has apply to them even when they register no meta, which
+on a stock site `post` and `page` do not; any other post type is listed if the
+filter declared a field for it, a deliberate act honoured whatever the post
+type; failing that, a post type a plugin registered is listed if it has meta
+worth binding to. That last courtesy stops short of core's own internals, or
+`wp_block` would appear on the strength of the sync flag core registers against
+it.
+
+The question is asked of the server because it has to be asked about every post
+type at once, and `core/post-meta` enumerates one with a request apiece — so
+deciding it in the editor would cost a round trip per post type to populate a
+dropdown. The same route answers it: `post_type` is optional, and omitting it
+returns the slugs rather than the fields. The cost is that a source publishing
+its fields only from JavaScript is invisible to the decision, so a post type
+nothing else offers will not be listed; answering the filter is how such a
+source puts one there.
+
 **The per-block control follows the lens.** With no post type a block gets a
 radio — static, or overridable. Choose a post type and that gives way to one
 row per bindable attribute, each offering *Not connected*, *Overridable*, or a
