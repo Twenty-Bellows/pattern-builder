@@ -138,9 +138,10 @@ describe( 'against the WordPress registry', () => {
 
 	beforeAll( () => {
 		/*
-		 * Through @wordpress/blocks 15.6 the store keeps `getFieldsList` only
-		 * for this name unless the Gutenberg plugin is running, so registering
-		 * it under its real name is what exercises the path the lens uses.
+		 * WordPress 6.8 kept `getFieldsList` only for this name unless the
+		 * Gutenberg plugin was running, a restriction @wordpress/blocks 15.7
+		 * lifted. Registering under the real name exercises the path the lens
+		 * uses on every version.
 		 */
 		registerBlockBindingsSource( {
 			name: POST_META_SOURCE,

@@ -79,12 +79,13 @@ lens says, so nothing already bound is hidden.
 happens in PHP, from whatever is in `args`, and never depends on the editor
 having enumerated anything — so every registered source is offered, and every
 one of them ends with *Enter a value…* whether or not it published fields. That
-matters because most cannot publish: through `@wordpress/blocks` 15.6 the store
-keeps `getFieldsList` for `core/post-meta` and discards it for every other
-source unless the Gutenberg plugin is running, nothing registered in PHP can
-publish one at all, and `core/post-data` and `core/term-data` publish nothing
-unless a Post Date block is selected while still resolving `date`, `modified`
-and `link` for any block.
+matters because many cannot publish: nothing registered in PHP can publish a
+field list at all, `core/post-data` and `core/term-data` publish nothing unless
+a Post Date block is selected while still resolving their fields for any block,
+and on WordPress 6.8 the store kept `getFieldsList` for `core/post-meta` and
+discarded it for every other source unless the Gutenberg plugin was running —
+a restriction `@wordpress/blocks` 15.7 lifted, so a source registering
+`getFieldsList` in JavaScript does publish its fields on a current WordPress.
 
 The argument name is editable rather than fixed, because it is not uniform:
 most sources read `key`, while those two core sources read `field`.
