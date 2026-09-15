@@ -103,9 +103,16 @@ while its own field list appears only when a Post Date block is selected.
 a `termId` and `taxonomy` that a pattern placed in a post does not carry.
 `core/post-meta` needs no help — it enumerates the registered meta itself, and
 it is the one source whose field list and render-time gate are the same, so a
-key missing from the list is a key that would render nothing. No core source
-exposes a post's title or content; core's answer there is the Post Title and
-Post Content blocks, not a binding.
+key missing from the list is a key that would render nothing.
+
+No core source exposes a post's title or content, and declaring one would not
+change that. Declaring and resolving are separate powers: the filter decides
+what the panel offers, while the source's own `get_value_callback` decides what
+a rendered block gets, and `core/post-data` answers the three fields above and
+null for everything else — a block bound to a title would render its fallback
+forever. Reaching a title through a binding means registering a source whose
+callback returns it, which is now a PHP-only job: the same filter gives that
+source its field list.
 
 **Which attributes are bindable is core's decision**, read from the editor
 setting `__experimentalBlockBindingsSupportedAttributes` and falling back to

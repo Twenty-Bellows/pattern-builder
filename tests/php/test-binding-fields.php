@@ -91,6 +91,65 @@ class Test_Binding_Fields extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Post data's declared list stops where its callback stops.
+	 *
+	 * Declaring a field only puts it in the panel; resolving it is core's
+	 * own callback, which answers `date`, `modified` and `link` and returns
+	 * null for anything else. A block bound to a field it does not answer
+	 * renders its fallback content, so declaring a title or a content field
+	 * would offer a binding that never shows anything.
+	 */
+	public function test_declares_only_what_post_data_resolves() {
+		$post_id = self::factory()->post->create(
+			array(
+				'post_title'  => 'The Real Title',
+				'post_status' => 'publish',
+			)
+		);
+
+		foreach ( array( 'title', 'content' ) as $field ) {
+			$this->assertStringContainsString(
+				'FALLBACK',
+				$this->render_bound_paragraph( array( 'field' => $field ), $post_id ),
+				"core/post-data resolved '$field'; it can now be declared."
+			);
+		}
+
+		$this->assertStringNotContainsString(
+			'FALLBACK',
+			$this->render_bound_paragraph( array( 'field' => 'link' ), $post_id )
+		);
+	}
+
+	/**
+	 * Renders a paragraph whose content is bound to core/post-data.
+	 *
+	 * Rendered rather than resolved directly, because the binding machinery
+	 * is what supplies the source's context.
+	 *
+	 * @param array $args    The binding arguments.
+	 * @param int   $post_id The post to render against.
+	 * @return string The rendered block.
+	 */
+	private function render_bound_paragraph( array $args, int $post_id ): string {
+		$binding = wp_json_encode(
+			array(
+				'source' => 'core/post-data',
+				'args'   => $args,
+			)
+		);
+
+		$blocks = parse_blocks(
+			'<!-- wp:paragraph {"metadata":{"bindings":{"content":' . $binding . '}}} -->' .
+			'<p>FALLBACK</p><!-- /wp:paragraph -->'
+		);
+
+		$block = new WP_Block( $blocks[0], array( 'postId' => $post_id ) );
+
+		return $block->render();
+	}
+
+	/**
 	 * Term data stays out: a pattern in a post has no term context.
 	 */
 	public function test_leaves_term_data_alone() {
