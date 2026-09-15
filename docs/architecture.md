@@ -75,23 +75,37 @@ field. A block whose bindings are too detailed for the radio — a source
 binding, or overrides on only some attributes — keeps its rows whatever the
 lens says, so nothing already bound is hidden.
 
-**Publishing a field list is a convenience, not a requirement.** Resolution
-happens in PHP, from whatever is in `args`, and never depends on the editor
-having enumerated anything — so every registered source is offered, and every
-one of them ends with *Enter a value…* whether or not it published fields. That
-matters because many cannot publish: nothing registered in PHP can publish a
-field list at all, `core/post-data` and `core/term-data` publish nothing unless
-a Post Date block is selected while still resolving their fields for any block,
-and on WordPress 6.8 the store kept `getFieldsList` for `core/post-meta` and
-discarded it for every other source unless the Gutenberg plugin was running —
-a restriction `@wordpress/blocks` 15.7 lifted, so a source registering
-`getFieldsList` in JavaScript does publish its fields on a current WordPress.
+**A source is offered only where it has fields to offer.** Every choice in a
+row is a field some source published for the chosen post type; a source that
+published none for it is left out rather than shown empty, and there is no
+typed escape hatch. The `args` a binding is written with come from the field
+descriptor, which is what lets sources disagree about the argument name — most
+read `key`, while `core/post-data` and `core/term-data` read `field`.
 
-The argument name is editable rather than fixed, because it is not uniform:
-most sources read `key`, while those two core sources read `field`.
-`core/post-meta` is the one source whose field list and render-time gate are
-the same — it refuses any key not registered with `show_in_rest` — so its entry
-says so rather than letting someone type one that silently renders nothing.
+Fields reach the panel two ways. A source registered in JavaScript publishes
+them itself through `getFieldsList`; on WordPress 6.8 the store kept that
+callback for `core/post-meta` and discarded it for every other source unless
+the Gutenberg plugin was running, a restriction `@wordpress/blocks` 15.7
+lifted. A source registered in PHP cannot publish one at all — core's registry
+rejects any property beyond `label`, `get_value_callback` and `uses_context`,
+and fails the whole registration rather than ignoring the extra — so the
+`pattern_builder_binding_fields` filter is how a PHP source declares its
+fields, and how a site adds a field to a source it does not own. The panel
+fetches them per post type, once one is chosen rather than for every type up
+front, and merges them with whatever the source published itself. A source
+whose declaration is malformed contributes nothing: a field with no `args` has
+nothing to bind to, so `Pattern_Builder_API::get_binding_fields()` drops it.
+
+`Pattern_Builder_API::add_post_data_fields()` answers that filter for
+`core/post-data`, whose `date`, `modified` and `link` resolve against any block
+while its own field list appears only when a Post Date block is selected.
+`core/term-data` is deliberately not given the same treatment: it resolves from
+a `termId` and `taxonomy` that a pattern placed in a post does not carry.
+`core/post-meta` needs no help — it enumerates the registered meta itself, and
+it is the one source whose field list and render-time gate are the same, so a
+key missing from the list is a key that would render nothing. No core source
+exposes a post's title or content; core's answer there is the Post Title and
+Post Content blocks, not a binding.
 
 **Which attributes are bindable is core's decision**, read from the editor
 setting `__experimentalBlockBindingsSupportedAttributes` and falling back to

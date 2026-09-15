@@ -15,11 +15,11 @@ import { select } from '@wordpress/data';
 
 import { OVERRIDES_SOURCE } from '../utils/bindings';
 import {
-	DEFAULT_ARG,
-	POST_META_SOURCE,
 	USER_INPUT_ONLY,
 	collectBindingSources,
 } from '../components/bindings/use-binding-sources';
+
+const POST_META_SOURCE = 'core/post-meta';
 
 const byName = ( sources, name ) =>
 	sources.find( ( source ) => source.name === name );
@@ -34,8 +34,8 @@ describe( 'collectBindingSources', () => {
 				: { subtitle: { label: 'Subtitle', type: 'string' } },
 	};
 
-	const collect = ( sources, postType = 'post' ) =>
-		collectBindingSources( sources, select, postType );
+	const collect = ( sources, postType = 'post', declared ) =>
+		collectBindingSources( sources, select, postType, declared );
 
 	it( 'offers nothing at all when no post type is chosen', () => {
 		expect( collect( { 'test/keyed': keyed }, USER_INPUT_ONLY ) ).toEqual(
@@ -189,8 +189,73 @@ describe( 'against the WordPress registry', () => {
 	} );
 } );
 
-describe( 'DEFAULT_ARG', () => {
-	it( 'is the argument name core documents for a server-side source', () => {
-		expect( DEFAULT_ARG ).toBe( 'key' );
+describe( 'fields declared through the PHP filter', () => {
+	const collect = ( sources, declared ) =>
+		collectBindingSources( sources, select, 'post', declared );
+
+	it( 'gives a source with no field list something to offer', () => {
+		const sources = collect(
+			{ 'acf/field': { label: 'ACF Field' } },
+			{
+				'acf/field': [
+					{
+						label: 'Hero link',
+						args: { key: 'hero_link' },
+						type: 'string',
+					},
+				],
+			}
+		);
+
+		expect( sources[ 0 ].fields ).toEqual( [
+			{ label: 'Hero link', type: 'string', args: { key: 'hero_link' } },
+		] );
+	} );
+
+	it( 'adds to the fields a source published itself', () => {
+		const sources = collect(
+			{
+				'test/partial': {
+					label: 'Partial',
+					getFieldsList: () => [
+						{
+							label: 'Published',
+							args: { key: 'a' },
+							type: 'string',
+						},
+					],
+				},
+			},
+			{
+				'test/partial': [
+					{ label: 'Declared', args: { key: 'b' }, type: 'string' },
+				],
+			}
+		);
+
+		expect( sources[ 0 ].fields.map( ( field ) => field.label ) ).toEqual( [
+			'Published',
+			'Declared',
+		] );
+	} );
+
+	it( 'ignores a declaration for a source that is not registered', () => {
+		const sources = collect(
+			{ 'test/only': { label: 'Only' } },
+			{ 'test/absent': [ { label: 'X', args: { key: 'x' } } ] }
+		);
+
+		expect( sources.map( ( source ) => source.name ) ).toEqual( [
+			'test/only',
+		] );
+	} );
+
+	it( 'drops a declared field with no args to bind to', () => {
+		const sources = collect(
+			{ 'acf/field': { label: 'ACF Field' } },
+			{ 'acf/field': [ { label: 'Broken' } ] }
+		);
+
+		expect( sources[ 0 ].fields ).toEqual( [] );
 	} );
 } );

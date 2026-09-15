@@ -1,30 +1,11 @@
 import { __, sprintf } from '@wordpress/i18n';
-import {
-	Button,
-	Dropdown,
-	MenuGroup,
-	MenuItem,
-	TextControl,
-} from '@wordpress/components';
+import { Button, Dropdown, MenuGroup, MenuItem } from '@wordpress/components';
 
 import {
 	OVERRIDES_SOURCE,
 	isOverride,
 	isSameBinding,
 } from '../../utils/bindings';
-import { DEFAULT_ARG, POST_META_SOURCE } from './use-binding-sources';
-
-/**
- * The single argument a typed binding carries.
- *
- * @param {?Object} binding The attribute's binding.
- * @return {{name: string, value: string}} The argument name and its value.
- */
-function typedArg( binding ) {
-	const name = Object.keys( binding?.args || {} )[ 0 ] || DEFAULT_ARG;
-
-	return { name, value: binding?.args?.[ name ] ?? '' };
-}
 
 /**
  * The published field a binding points at, if any.
@@ -41,6 +22,10 @@ function matchField( binding, source ) {
 
 /**
  * What the row says the attribute is connected to.
+ *
+ * A binding the panel cannot match to a field — written by hand, or pointing at
+ * a source the current post type does not reach — is named rather than hidden,
+ * so it can be seen and changed.
  *
  * @param {?Object} binding The attribute's binding.
  * @param {Array}   sources The registered sources.
@@ -70,12 +55,12 @@ function describeBinding( binding, sources ) {
 		return { text: field.label, tone: 'connected' };
 	}
 
-	const { value } = typedArg( binding );
+	const value = Object.values( binding.args || {} )[ 0 ];
 	const label = source?.label || binding.source;
 
 	return {
 		text: value ? `${ label } · ${ value }` : label,
-		tone: source ? 'connected' : 'muted',
+		tone: 'muted',
 	};
 }
 
@@ -99,17 +84,6 @@ export const AttributeBindingRow = ( {
 	onChange,
 } ) => {
 	const { text, tone } = describeBinding( binding, sources );
-	const boundSource = sources.find(
-		( candidate ) => candidate.name === binding?.source
-	);
-	const isTyped =
-		!! binding &&
-		! isOverride( binding ) &&
-		! matchField( binding, boundSource );
-	const arg = typedArg( binding );
-
-	const setArg = ( name, value ) =>
-		onChange( { source: binding.source, args: { [ name ]: value } } );
 
 	return (
 		<div className="pattern-builder-bindings__row">
@@ -188,8 +162,10 @@ export const AttributeBindingRow = ( {
 								const compatible = source.fields.filter(
 									( field ) => field.type === type
 								);
-								const typedHere =
-									isTyped && binding.source === source.name;
+
+								if ( compatible.length === 0 ) {
+									return null;
+								}
 
 								return (
 									<MenuGroup
@@ -221,41 +197,6 @@ export const AttributeBindingRow = ( {
 												</MenuItem>
 											);
 										} ) }
-										<MenuItem
-											role="menuitemradio"
-											isSelected={ typedHere }
-											info={
-												source.name === POST_META_SOURCE
-													? __(
-															'Only meta registered with show_in_rest resolves',
-															'pattern-builder'
-													  )
-													: source.name
-											}
-											onClick={ () =>
-												pick( {
-													source: source.name,
-													args: {
-														[ typedHere
-															? arg.name
-															: DEFAULT_ARG ]:
-															typedHere
-																? arg.value
-																: '',
-													},
-												} )
-											}
-										>
-											{ compatible.length === 0
-												? __(
-														'Enter a value…',
-														'pattern-builder'
-												  )
-												: __(
-														'Enter another value…',
-														'pattern-builder'
-												  ) }
-										</MenuItem>
 									</MenuGroup>
 								);
 							} ) }
@@ -263,38 +204,6 @@ export const AttributeBindingRow = ( {
 					);
 				} }
 			/>
-
-			{ isTyped && (
-				<div className="pattern-builder-bindings__key">
-					<TextControl
-						label={ __( 'Argument', 'pattern-builder' ) }
-						value={ arg.name }
-						onChange={ ( name ) =>
-							setArg( name || DEFAULT_ARG, arg.value )
-						}
-						spellCheck={ false }
-						__next40pxDefaultSize
-						__nextHasNoMarginBottom
-					/>
-					<TextControl
-						label={ __( 'Value', 'pattern-builder' ) }
-						value={ arg.value }
-						onChange={ ( value ) => setArg( arg.name, value ) }
-						placeholder={ __( 'field_name', 'pattern-builder' ) }
-						help={ sprintf(
-							/* translators: %s: binding source name, such as "acf/field". */
-							__(
-								'Passed to %s as its arguments when the block renders. Most sources read "key"; Post Data and Term Data read "field".',
-								'pattern-builder'
-							),
-							binding.source
-						) }
-						spellCheck={ false }
-						__next40pxDefaultSize
-						__nextHasNoMarginBottom
-					/>
-				</div>
-			) }
 		</div>
 	);
 };

@@ -56,7 +56,7 @@ export const BlockBindingsPanel = ( { patternPost } ) => {
 					{ sprintf(
 						/* translators: %s: a post type slug, such as "post". */
 						__(
-							'No source published a field list for %s. Publishing one is an editor convenience; a binding still resolves from whatever you type, so every source can be reached by entering the argument it reads.',
+							'No registered source publishes bindable fields for %s. A source declares them in JavaScript, or through the pattern_builder_binding_fields filter when it is registered in PHP.',
 							'pattern-builder'
 						),
 						lens
