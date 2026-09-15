@@ -114,6 +114,19 @@ forever. Reaching a title through a binding means registering a source whose
 callback returns it, which is now a PHP-only job: the same filter gives that
 source its field list.
 
+**None of this is needed to render a binding.** The panel writes core's
+`metadata.bindings` and the plugin registers no binding source of its own, so a
+pattern's bindings resolve wherever the pattern is rendered — including on a
+site running only synced-patterns-for-themes, or neither plugin.
+`Pattern_Resolver::fill_slots()` removes only the `core/pattern-overrides`
+bindings it answered and leaves every other one in the markup for core, and
+`Pattern_Block` attaches the pattern's blocks as inner blocks so they inherit
+the post context a binding needs. Both are vendored, so both plugins behave
+identically; core's own `render_block_core_pattern()` reaches the same place by
+calling `do_blocks()`. The `pattern_builder_binding_fields` filter is an
+authoring convenience with no render-time role — it names fields for the panel
+and never resolves one.
+
 **Which attributes are bindable is core's decision**, read from the editor
 setting `__experimentalBlockBindingsSupportedAttributes` and falling back to
 the 6.8 table in `src/utils/bindings.js`, which mirrors
