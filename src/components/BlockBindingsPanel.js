@@ -1,168 +1,114 @@
-import { store as blockEditorStore, BlockIcon } from '@wordpress/block-editor';
-import { useSelect, useDispatch } from '@wordpress/data';
-import { getBlockType } from '@wordpress/blocks';
+import { __ } from '@wordpress/i18n';
 import {
-	Card,
-	CardBody,
-	ToggleControl,
-	TextControl,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalText as Text,
+	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
+	__experimentalVStack as VStack,
 } from '@wordpress/components';
 import { useState } from '@wordpress/element';
 
-// NOTE: this was retrieved from the packages/patterns/src/constants.js file in Gutenberg.
-// They are correct.  This should not be hardcoded.  Nor should it be inacessible...
+import { MODE, getBindingMode } from '../utils/bindings';
+import { BindableBlockCard } from './bindings/BindableBlockCard';
+import { PostTypeLens } from './bindings/PostTypeLens';
+import { useBindableBlocks } from './bindings/use-bindable-blocks';
+import { useBindingSources } from './bindings/use-binding-sources';
+import './bindings/bindings.scss';
 
-// TODO: This should not be hardcoded. Maybe there should be a config and/or an UI.
-export const PARTIAL_SYNCING_SUPPORTED_BLOCKS = {
-	'core/paragraph': [ 'content' ],
-	'core/heading': [ 'content' ],
-	'core/button': [ 'text', 'url', 'linkTarget', 'rel' ],
-	'core/image': [ 'id', 'url', 'title', 'alt' ],
-};
+/**
+ * Where every bindable block in the pattern gets its values.
+ *
+ * Each block answers one question — from the pattern file, from whoever places
+ * the pattern, or from the post it lands in — and only the third one opens
+ * into per-attribute detail. The post type lens appears alongside it, because
+ * that is the first moment a field list can exist at all.
+ *
+ * @param {Object}  props             Component props.
+ * @param {?Object} props.patternPost The pattern's entity record, if the
+ *                                    editor has one. Only its `postTypes` are
+ *                                    read, to start the lens somewhere useful.
+ */
+export const BlockBindingsPanel = ( { patternPost } ) => {
+	const bindableBlocks = useBindableBlocks();
 
-const BindableBlockControls = ( { block } ) => {
-	const { updateBlockAttributes } = useDispatch( 'core/block-editor' );
+	// Which blocks the author has opened the per-attribute view on. A block
+	// whose bindings already need that view is in it whatever this says.
+	const [ expanded, setExpanded ] = useState( {} );
 
-	const blockType = getBlockType( block.name );
+	const patternPostTypes = patternPost?.postTypes || [];
+	const [ lens, setLens ] = useState( patternPostTypes[ 0 ] || 'post' );
 
-	const [ blockName, setBlockName ] = useState(
-		block.attributes?.metadata?.name || ''
-	);
+	const { listed, opaque } = useBindingSources( lens );
 
-	const [ blockBindable, setBlockBindable ] = useState(
-		block.attributes?.metadata?.bindings?.__default?.source ===
-			'core/pattern-overrides' || false
-	);
+	const cards = bindableBlocks.map( ( { block, supported } ) => {
+		const derived = getBindingMode(
+			block.attributes?.metadata?.bindings,
+			supported
+		);
 
-	const [ blockCanBeBound, setBlockCanBeBound ] = useState(
-		blockName !== ''
-	);
+		return {
+			block,
+			supported,
+			mode:
+				derived === MODE.DYNAMIC || expanded[ block.clientId ]
+					? MODE.DYNAMIC
+					: derived,
+		};
+	} );
 
-	const updateBlockName = ( newName ) => {
-		setBlockName( newName );
-
-		const canBeBound = newName !== '';
-
-		setBlockCanBeBound( canBeBound );
-
-		if ( blockBindable && ! canBeBound ) {
-			setBlockBindable( false );
-		}
-
-		updateBlockAttributes( block.clientId, {
-			metadata: {
-				...block.attributes.metadata,
-				name: newName,
-			},
-		} );
-	};
-
-	const updateBlockBindable = ( newValue ) => {
-		setBlockBindable( newValue );
-		updateBlockAttributes( block.clientId, {
-			metadata: {
-				...block.attributes.metadata,
-				bindings: newValue
-					? {
-							__default: { source: 'core/pattern-overrides' },
-					  }
-					: null,
-			},
-		} );
-	};
-
-	return (
-		<Card style={ { marginBottom: '1rem' } }>
-			<CardBody
-				style={ {
-					gap: '0.5rem',
-					display: 'flex',
-					flexDirection: 'column',
-				} }
-			>
-				<div
-					style={ {
-						display: 'flex',
-						alignItems: 'center',
-						justifyContent: 'left',
-					} }
-				>
-					<BlockIcon icon={ blockType.icon } />
-					<Text>{ blockType.title }</Text>
-				</div>
-
-				<TextControl
-					placeholder="Name this block to enable binding..."
-					label="Block Name"
-					value={ blockName || '' }
-					onChange={ updateBlockName }
-					__next40pxDefaultSize
-					__nextHasNoMarginBottom
-				/>
-				<ToggleControl
-					disabled={ ! blockCanBeBound }
-					label="Bindable"
-					checked={ blockBindable }
-					onChange={ updateBlockBindable }
-					__nextHasNoMarginBottom
-				/>
-			</CardBody>
-		</Card>
-	);
-};
-
-export const BlockBindingsPanel = () => {
-	function getBindableBlocks( blocks ) {
-		return blocks.reduce( ( acc, block ) => {
-			// Check if the block is bindable
-			if ( PARTIAL_SYNCING_SUPPORTED_BLOCKS[ block.name ] ) {
-				acc.push( block );
-			}
-
-			// Recursively check inner blocks
-			if ( block.innerBlocks && block.innerBlocks.length > 0 ) {
-				acc.push( ...getBindableBlocks( block.innerBlocks ) );
-			}
-
-			return acc;
-		}, [] );
+	if ( cards.length === 0 ) {
+		return (
+			<Text variant="muted">
+				{ __(
+					'None of the blocks in this pattern can take their values from anywhere else.',
+					'pattern-builder'
+				) }
+			</Text>
+		);
 	}
 
-	const bindableBlocks = useSelect( ( select ) => {
-		const rootBlocks = select( blockEditorStore ).getBlocks();
-
-		// Dig through the blocks to find anything in the tree that is bindable.
-		return getBindableBlocks( rootBlocks );
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [] );
+	const showLens = cards.some( ( card ) => card.mode === MODE.DYNAMIC );
 
 	return (
-		<>
-			{ bindableBlocks.length > 0 ? (
-				<div className="block-bindings-list">
-					<p style={ { marginTop: 0 } }>
-						The following blocks can allow user changes throughout
-						instances of this pattern. This is only available to
-						&ldquo;synced&rdquo; patterns.
-					</p>
-					<p>
-						Name the block to allow binding. This is the name a user
-						will see when they use the pattern.
-					</p>
+		<VStack spacing={ 4 } className="pattern-builder-bindings">
+			<Text>
+				{ __(
+					'Decide where each block gets its value: from the pattern file, from whoever places the pattern, or from the post it lands in.',
+					'pattern-builder'
+				) }
+			</Text>
 
-					{ bindableBlocks.map( ( block ) => (
-						<BindableBlockControls
-							key={ block.clientId }
-							block={ block }
-						/>
-					) ) }
-				</div>
-			) : (
-				<p>No bindable blocks found.</p>
+			{ showLens && (
+				<PostTypeLens
+					value={ lens }
+					onChange={ setLens }
+					patternPostTypes={ patternPostTypes }
+				/>
 			) }
-		</>
+
+			{ cards.map( ( { block, supported, mode } ) => (
+				<BindableBlockCard
+					key={ block.clientId }
+					block={ block }
+					supported={ supported }
+					mode={ mode }
+					listed={ listed }
+					opaque={ opaque }
+					onExpandedChange={ ( isExpanded ) =>
+						setExpanded( ( current ) => ( {
+							...current,
+							[ block.clientId ]: isExpanded,
+						} ) )
+					}
+				/>
+			) ) }
+
+			<Text variant="muted">
+				{ __(
+					'Overrides let someone change a value on one placement of a synced pattern. A binding to any other source reads its value when the page renders, synced or not.',
+					'pattern-builder'
+				) }
+			</Text>
+		</VStack>
 	);
 };
 

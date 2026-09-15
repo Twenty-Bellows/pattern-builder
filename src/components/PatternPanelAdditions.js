@@ -98,7 +98,7 @@ export const PatternBuilderPanel = ( { patternPost, postType } ) => {
 					'pattern-builder'
 				) }
 			>
-				<BlockBindingsPanel />
+				<BlockBindingsPanel patternPost={ patternPost } />
 			</PluginDocumentSettingPanel>
 		</>
 	);

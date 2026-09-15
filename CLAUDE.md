@@ -24,6 +24,8 @@ Version 2.0 removed the 1.x DB-mirror + REST-hijacking design entirely. Theme pa
 
 **Synced patterns via the `core/pattern` content runtime.** Synced theme patterns (`Synced: yes` file header) work exactly like Synced Patterns for Themes 2.0: `core/pattern` gets a `content` attribute + `pattern/overrides` context and a render callback that attaches the pattern's blocks as inner blocks (`Pattern_Block`); `Pattern_Resolver` composes editor-facing content; a synthesized `--synced-instance` companion entry puts a reference in the inserter. Inserted copies are plain `<!-- wp:pattern {"slug":…,"content":{…}} /-->` — no post ID anywhere.
 
+**Bindings to any registered source.** The Pattern Bindings panel offers each bindable block one choice — Static, Overridable, or Dynamic — where Overridable writes `__default` exactly as before and Dynamic opens the same choice per attribute, alongside every source `getBlockBindingsSources()` reports. The bindable-attribute table comes from core (`__experimentalBlockBindingsSupportedAttributes`, with a 6.8 fallback), never a local copy. Core's own bindings panel is empty inside a pattern for two reasons this works around: `canUpdateBlockBindings` maps to `do_not_allow` for a postless editor context (granted back in `Pattern_Builder_Admin` for users who can already edit the pattern), and `getFieldsList` needs a post type, which a pattern has none of — so a panel-level post type lens supplies one. Sources that cannot publish a field list (most of them: through `@wordpress/blocks` 15.6 core keeps `getFieldsList` only for `core/post-meta`) are offered with a typed key rather than hidden. Serialization stays core's: an all-overridable block always collapses back to `__default`.
+
 **Companion plugin coexistence.** The runtime classes (`Pattern_Block`, `Pattern_Resolver`, `Block_Markup`, `Inner_HTML_Processor`, `Synced_Patterns`, `Editor_Support`, and the `src/runtime/` JS) are vendored from [`synced-patterns-for-themes`](https://github.com/Twenty-Bellows/synced-patterns-for-themes) and must stay logic-identical to it. Pattern Builder always registers the full stack; when both plugins are installed, the companion sees `PATTERN_BUILDER_VERSION` at `plugins_loaded` and stays entirely unloaded — one check in one place, no coordination anywhere else. Deactivate Pattern Builder and the companion takes over again with identical rendering (both read the same `Synced: yes` header; keeping the vendored runtime in sync at release time is what makes the hand-off invisible). Pattern Builder also clears the companion's transient after file writes so it never wakes to a stale cache.
 
 **Migration from 1.x.** `Pattern_Builder_Migration` runs once on upgrade: it rewrites `wp:block` refs pointing at the old `tbell_pattern_block` mirror posts to `wp:pattern` slugs (in post content and theme files), then deletes the mirror posts and the old capabilities.
@@ -107,7 +109,9 @@ The plugin follows a component-based OOP architecture with clear separation of c
   - `PatternBrowserPanel` - Main pattern browsing interface
   - `PatternCreatePanel` - Pattern creation flow
   - `PatternPreview` - Pattern preview rendering
-  - `BlockBindingsPanel` - Block bindings configuration panel
+  - `BlockBindingsPanel` - Pattern Bindings panel; composes `bindings/BindableBlockCard`,
+    `bindings/AttributeBindingRow`, `bindings/PostTypeLens` and the `use-bindable-blocks` /
+    `use-binding-sources` hooks over the binding rules in `src/utils/bindings.js`
   - `PatternAssociationsPanel`, `PatternSyncedStatusPanel`, `PatternMetadataPanel`, `PatternPanelAdditions`, `PatternSourcePanel` - Editor sidebar panels (also reused by the browse page's details sidebar)
   - `PatternCard`, `PatternDetailsPanel` - The browse grid's square cards and details sidebar
   - `EditPatternToolbarButton` - "Edit Pattern" in the toolbar of synced theme pattern instances
