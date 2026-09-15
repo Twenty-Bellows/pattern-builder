@@ -28,7 +28,7 @@ export const BlockBindingsPanel = ( { patternPost } ) => {
 	const bindableBlocks = useBindableBlocks();
 	const patternPostTypes = patternPost?.postTypes || [];
 	const [ lens, setLens ] = useState( USER_INPUT_ONLY );
-	const { listed, opaque } = useBindingSources( lens );
+	const sources = useBindingSources( lens );
 
 	if ( bindableBlocks.length === 0 ) {
 		return (
@@ -41,7 +41,7 @@ export const BlockBindingsPanel = ( { patternPost } ) => {
 		);
 	}
 
-	const hasFields = listed.some( ( source ) => source.fields.length > 0 );
+	const hasFields = sources.some( ( source ) => source.fields.length > 0 );
 
 	return (
 		<VStack spacing={ 4 } className="pattern-builder-bindings">
@@ -51,25 +51,12 @@ export const BlockBindingsPanel = ( { patternPost } ) => {
 				patternPostTypes={ patternPostTypes }
 			/>
 
-			{ !! lens && ! hasFields && opaque.length === 0 && (
+			{ !! lens && ! hasFields && (
 				<Notice status="info" isDismissible={ false }>
 					{ sprintf(
 						/* translators: %s: a post type slug, such as "post". */
 						__(
-							'No registered binding source offers fields for %s. A source has to publish its fields to the editor to appear here, and most only expose them to the post editor.',
-							'pattern-builder'
-						),
-						lens
-					) }
-				</Notice>
-			) }
-
-			{ !! lens && ! hasFields && opaque.length > 0 && (
-				<Notice status="info" isDismissible={ false }>
-					{ sprintf(
-						/* translators: %s: a post type slug, such as "post". */
-						__(
-							'No source publishes a field list for %s, so its fields are reached by typing a key.',
+							'No source published a field list for %s. Publishing one is an editor convenience; a binding still resolves from whatever you type, so every source can be reached by entering the argument it reads.',
 							'pattern-builder'
 						),
 						lens
@@ -83,8 +70,7 @@ export const BlockBindingsPanel = ( { patternPost } ) => {
 					block={ block }
 					supported={ supported }
 					showRows={ !! lens }
-					listed={ listed }
-					opaque={ opaque }
+					sources={ sources }
 				/>
 			) ) }
 

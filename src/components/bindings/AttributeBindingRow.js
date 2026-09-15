@@ -12,17 +12,41 @@ import {
 	isOverride,
 	isSameBinding,
 } from '../../utils/bindings';
-import { OPAQUE_ARG } from './use-binding-sources';
+import { DEFAULT_ARG, POST_META_SOURCE } from './use-binding-sources';
+
+/**
+ * The single argument a typed binding carries.
+ *
+ * @param {?Object} binding The attribute's binding.
+ * @return {{name: string, value: string}} The argument name and its value.
+ */
+function typedArg( binding ) {
+	const name = Object.keys( binding?.args || {} )[ 0 ] || DEFAULT_ARG;
+
+	return { name, value: binding?.args?.[ name ] ?? '' };
+}
+
+/**
+ * The published field a binding points at, if any.
+ *
+ * @param {?Object} binding The attribute's binding.
+ * @param {?Object} source  The source it names.
+ * @return {?Object} The matching field.
+ */
+function matchField( binding, source ) {
+	return ( source?.fields || [] ).find( ( field ) =>
+		isSameBinding( { source: source.name, args: field.args }, binding )
+	);
+}
 
 /**
  * What the row says the attribute is connected to.
  *
  * @param {?Object} binding The attribute's binding.
- * @param {Array}   listed  Sources that published a field list.
- * @param {Array}   opaque  Sources that cannot describe themselves.
- * @return {{text: string, tone: string}} The label, and `muted`, `invalid` or `connected`.
+ * @param {Array}   sources The registered sources.
+ * @return {{text: string, tone: string}} The label, and `muted` or `connected`.
  */
-function describeBinding( binding, listed, opaque ) {
+function describeBinding( binding, sources ) {
 	if ( ! binding ) {
 		return {
 			text: __( 'Not connected', 'pattern-builder' ),
@@ -37,37 +61,21 @@ function describeBinding( binding, listed, opaque ) {
 		};
 	}
 
-	const source =
-		listed.find( ( candidate ) => candidate.name === binding.source ) ||
-		opaque.find( ( candidate ) => candidate.name === binding.source );
-
-	if ( ! source ) {
-		/*
-		 * Either the source is genuinely unregistered, or the panel is listing
-		 * a post type whose sources do not include it. Naming the source is
-		 * more use than calling it invalid.
-		 */
-		const key = binding.args?.[ OPAQUE_ARG ];
-
-		return {
-			text: key ? `${ binding.source } · ${ key }` : binding.source,
-			tone: 'muted',
-		};
-	}
-
-	const field = ( source.fields || [] ).find( ( candidate ) =>
-		isSameBinding( { source: source.name, args: candidate.args }, binding )
+	const source = sources.find(
+		( candidate ) => candidate.name === binding.source
 	);
+	const field = matchField( binding, source );
 
 	if ( field ) {
 		return { text: field.label, tone: 'connected' };
 	}
 
-	const key = binding.args?.[ OPAQUE_ARG ];
+	const { value } = typedArg( binding );
+	const label = source?.label || binding.source;
 
 	return {
-		text: key ? `${ source.label } · ${ key }` : source.label,
-		tone: 'connected',
+		text: value ? `${ label } · ${ value }` : label,
+		tone: source ? 'connected' : 'muted',
 	};
 }
 
@@ -78,8 +86,7 @@ function describeBinding( binding, listed, opaque ) {
  * @param {string}   props.attribute   The attribute name.
  * @param {string}   props.type        The type its bindings must match.
  * @param {?Object}  props.binding     The attribute's current binding.
- * @param {Array}    props.listed      Sources that published a field list.
- * @param {Array}    props.opaque      Sources that cannot describe themselves.
+ * @param {Array}    props.sources     The registered sources.
  * @param {boolean}  props.canOverride Whether the block is named.
  * @param {Function} props.onChange    Called with the new binding, or `undefined`.
  */
@@ -87,16 +94,22 @@ export const AttributeBindingRow = ( {
 	attribute,
 	type,
 	binding,
-	listed,
-	opaque,
+	sources,
 	canOverride,
 	onChange,
 } ) => {
-	const { text, tone } = describeBinding( binding, listed, opaque );
-	const isTypedKey =
+	const { text, tone } = describeBinding( binding, sources );
+	const boundSource = sources.find(
+		( candidate ) => candidate.name === binding?.source
+	);
+	const isTyped =
 		!! binding &&
 		! isOverride( binding ) &&
-		opaque.some( ( source ) => source.name === binding.source );
+		! matchField( binding, boundSource );
+	const arg = typedArg( binding );
+
+	const setArg = ( name, value ) =>
+		onChange( { source: binding.source, args: { [ name ]: value } } );
 
 	return (
 		<div className="pattern-builder-bindings__row">
@@ -171,33 +184,18 @@ export const AttributeBindingRow = ( {
 								</MenuItem>
 							</MenuGroup>
 
-							{ listed.map( ( source ) => {
+							{ sources.map( ( source ) => {
 								const compatible = source.fields.filter(
 									( field ) => field.type === type
 								);
+								const typedHere =
+									isTyped && binding.source === source.name;
 
 								return (
 									<MenuGroup
 										key={ source.name }
 										label={ source.label }
 									>
-										{ compatible.length === 0 && (
-											<p className="pattern-builder-bindings__empty">
-												{ source.fields.length === 0
-													? __(
-															'No fields registered.',
-															'pattern-builder'
-													  )
-													: sprintf(
-															/* translators: %s: an attribute type, such as "string". */
-															__(
-																'No %s fields.',
-																'pattern-builder'
-															),
-															type
-													  ) }
-											</p>
-										) }
 										{ compatible.map( ( field ) => {
 											const value = {
 												source: source.name,
@@ -223,63 +221,70 @@ export const AttributeBindingRow = ( {
 												</MenuItem>
 											);
 										} ) }
-									</MenuGroup>
-								);
-							} ) }
-
-							{ opaque.length > 0 && (
-								<MenuGroup
-									label={ __(
-										'Enter a key',
-										'pattern-builder'
-									) }
-								>
-									{ opaque.map( ( source ) => (
 										<MenuItem
-											key={ source.name }
 											role="menuitemradio"
-											isSelected={
-												binding?.source === source.name
+											isSelected={ typedHere }
+											info={
+												source.name === POST_META_SOURCE
+													? __(
+															'Only meta registered with show_in_rest resolves',
+															'pattern-builder'
+													  )
+													: source.name
 											}
-											info={ source.name }
 											onClick={ () =>
 												pick( {
 													source: source.name,
 													args: {
-														[ OPAQUE_ARG ]:
-															binding?.args?.[
-																OPAQUE_ARG
-															] || '',
+														[ typedHere
+															? arg.name
+															: DEFAULT_ARG ]:
+															typedHere
+																? arg.value
+																: '',
 													},
 												} )
 											}
 										>
-											{ source.label }
+											{ compatible.length === 0
+												? __(
+														'Enter a value…',
+														'pattern-builder'
+												  )
+												: __(
+														'Enter another value…',
+														'pattern-builder'
+												  ) }
 										</MenuItem>
-									) ) }
-								</MenuGroup>
-							) }
+									</MenuGroup>
+								);
+							} ) }
 						</>
 					);
 				} }
 			/>
 
-			{ isTypedKey && (
+			{ isTyped && (
 				<div className="pattern-builder-bindings__key">
 					<TextControl
-						label={ __( 'Key', 'pattern-builder' ) }
-						value={ binding.args?.[ OPAQUE_ARG ] || '' }
-						onChange={ ( value ) =>
-							onChange( {
-								source: binding.source,
-								args: { [ OPAQUE_ARG ]: value },
-							} )
+						label={ __( 'Argument', 'pattern-builder' ) }
+						value={ arg.name }
+						onChange={ ( name ) =>
+							setArg( name || DEFAULT_ARG, arg.value )
 						}
+						spellCheck={ false }
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+					/>
+					<TextControl
+						label={ __( 'Value', 'pattern-builder' ) }
+						value={ arg.value }
+						onChange={ ( value ) => setArg( arg.name, value ) }
 						placeholder={ __( 'field_name', 'pattern-builder' ) }
 						help={ sprintf(
 							/* translators: %s: binding source name, such as "acf/field". */
 							__(
-								'%s publishes no field list, so the key is typed. It reaches the source as its arguments when the block renders.',
+								'Passed to %s as its arguments when the block renders. Most sources read "key"; Post Data and Term Data read "field".',
 								'pattern-builder'
 							),
 							binding.source

@@ -39,15 +39,13 @@ import { AttributeBindingRow } from './AttributeBindingRow';
  * @param {Object}   props.block     The block from the editor store.
  * @param {string[]} props.supported The attributes it can bind.
  * @param {boolean}  props.showRows  Whether a post type is being listed.
- * @param {Array}    props.listed    Sources that published fields.
- * @param {Array}    props.opaque    Sources that cannot describe themselves.
+ * @param {Array}    props.sources   The registered binding sources.
  */
 export const BindableBlockCard = ( {
 	block,
 	supported,
 	showRows,
-	listed,
-	opaque,
+	sources,
 } ) => {
 	const { updateBlockAttributes } = useDispatch( blockEditorStore );
 
@@ -131,8 +129,7 @@ export const BindableBlockCard = ( {
 										attribute
 									) }
 									binding={ rows[ attribute ] }
-									listed={ listed }
-									opaque={ opaque }
+									sources={ sources }
 									canOverride={ !! name }
 									onChange={ ( binding ) =>
 										changeRow( attribute, binding )

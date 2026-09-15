@@ -75,12 +75,22 @@ field. A block whose bindings are too detailed for the radio — a source
 binding, or overrides on only some attributes — keeps its rows whatever the
 lens says, so nothing already bound is hidden.
 
-**Most sources cannot be enumerated.** A source has to publish `getFieldsList`
-to the editor, and through `@wordpress/blocks` 15.6 the store keeps that
-function for `core/post-meta` and discards it for every other source unless the
-Gutenberg plugin is running. Nothing registered in PHP can publish one at all.
-Those sources are offered under *Enter a key*, writing whatever is typed into
-`args`, rather than being hidden the way core hides them.
+**Publishing a field list is a convenience, not a requirement.** Resolution
+happens in PHP, from whatever is in `args`, and never depends on the editor
+having enumerated anything — so every registered source is offered, and every
+one of them ends with *Enter a value…* whether or not it published fields. That
+matters because most cannot publish: through `@wordpress/blocks` 15.6 the store
+keeps `getFieldsList` for `core/post-meta` and discards it for every other
+source unless the Gutenberg plugin is running, nothing registered in PHP can
+publish one at all, and `core/post-data` and `core/term-data` publish nothing
+unless a Post Date block is selected while still resolving `date`, `modified`
+and `link` for any block.
+
+The argument name is editable rather than fixed, because it is not uniform:
+most sources read `key`, while those two core sources read `field`.
+`core/post-meta` is the one source whose field list and render-time gate are
+the same — it refuses any key not registered with `show_in_rest` — so its entry
+says so rather than letting someone type one that silently renders nothing.
 
 **Which attributes are bindable is core's decision**, read from the editor
 setting `__experimentalBlockBindingsSupportedAttributes` and falling back to

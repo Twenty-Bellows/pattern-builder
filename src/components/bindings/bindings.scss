@@ -69,6 +69,9 @@
 	}
 
 	&__key {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
 		padding: 0 10px 10px;
 	}
 
