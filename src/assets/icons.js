@@ -1,15 +1,10 @@
 import { Icon } from '@wordpress/components';
 
-const RING_MOTIF =
-	'M100,50L100,40L106,40L106,30L94,30L94,20L106,20L106,10L94,10';
-const RING_ANGLES = [
-	0, 18, 36, 54, 72, 90, 108, 126, 144, 162, 180, 198, 216, 234, 252, 270,
-	288, 306, 324, 342,
-];
-
 /**
- * The Pattern Builder mark: the anvil inside a twenty-point meander ring,
- * ported from assets/logo_black.svg.
+ * The placeholder mark, ported from assets/logo_black.svg.
+ *
+ * Every stroke and fill is `currentColor`, so the mark takes the colour of
+ * whatever it sits in rather than carrying one of its own.
  *
  * @param {Object} props      Component props.
  * @param {number} props.size Pixel size of the square mark.
@@ -20,45 +15,225 @@ export const PatternBuilderLogo = ( { size = 24 } ) => (
 		height={ size }
 		viewBox="0 0 1000 1000"
 		xmlns="http://www.w3.org/2000/svg"
+		fillRule="evenodd"
+		clipRule="evenodd"
+		strokeLinejoin="bevel"
 		aria-hidden="true"
 		focusable="false"
 	>
-		<g transform="matrix(1.2,0,0,1.2,500,500)">
-			<g transform="matrix(1,0,0,1,-416.667,-416.667)">
-				<g transform="matrix(4.16667,0,0,4.16667,0,0)">
-					<g
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="6"
-						strokeLinecap="square"
-						strokeLinejoin="miter"
-					>
-						{ RING_ANGLES.map( ( angle ) => (
-							<path
-								key={ angle }
-								d={ RING_MOTIF }
-								transform={
-									angle
-										? `rotate(${ angle } 100 100)`
-										: undefined
-								}
-							/>
-						) ) }
-					</g>
-				</g>
-			</g>
-		</g>
-		<g transform="matrix(0.132235,0,0,0.132235,503.586,502.944)">
-			<g transform="matrix(1,0,0,1,-1200,-770.417)">
-				<g
-					transform="matrix(4.16667,0,0,4.16667,0,0)"
-					fill="currentColor"
-				>
-					<path d="M158.8,48.1L20.9,48.2C20.9,94.9 58.4,132.8 104.9,133.7C105.388,133.709 158.8,133.8 158.8,133.8L158.8,48.1Z" />
-					<path d="M538.7,34.5C538.7,34.4 179.8,34.4 179.8,34.4L180,199.2C180.8,253.9 131.6,273.9 109,280.2C102.5,282 97.9,288.5 97.9,295.9L97.9,324.1L462.8,324.1L462.8,295.8C462.8,288.5 458.3,282.1 451.8,280.3C426.7,273.3 368.3,249.4 383,179.1C401.6,90.2 544,98.5 544,98.5L544,34.4L540.1,34.4C539.9,34.6 539.6,34.8 539.4,34.8C539.1,34.8 538.9,34.6 538.8,34.5L538.7,34.5Z" />
-				</g>
-			</g>
-		</g>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M5266.3,9429L5266.3,4220.6"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M5266.3,4220.6L9823.7,4220.6"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M9823.7,4220.6L9823.7,7475.8"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M9823.7,7475.8L7870.5,7475.8"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M7870.5,7475.8L7870.5,6824.8"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M7870.5,6824.8L9172.6,6824.8"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M9172.6,6824.8L9172.6,4871.6"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M9172.6,4871.6L5917.4,4871.6"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M5917.4,4871.6L5917.4,9429"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M5917.4,9429L11777,9429"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M11777,9429L11777,4220.6"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M11777,4220.6L16334,4220.6"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M11126,3568.1L16985,3568.1"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M11126,8777.9L11126,3568.1"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M6568.4,8777.9L11126,8777.9"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M6568.4,5522.7L6568.4,8777.9"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M8521.6,5522.7L6568.4,5522.7"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M8521.6,6173.7L8521.6,5522.7"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M7219.5,6173.7L8521.6,6173.7"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M7219.5,8126.9L7219.5,6173.7"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M10475,8126.9L7219.5,8126.9"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M10475,3568.1L10475,8126.9"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M4613.8,3568.1L10475,3568.1"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M4613.8,8777.9L4613.8,3568.1"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M707.52,8777.9L4613.8,8777.9"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M20242,10731L707.52,10731"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M707.52,10080L20242,10080"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.16469,0,0,0.165398,-493.21,-373.965)"
+			d="M706,2726L14658,2726L14658,2261L706,2261L706,2726Z"
+			fill="currentColor"
+			stroke="currentColor"
+			strokeWidth="7.62"
+			strokeLinejoin="miter"
+		/>
+		<path
+			transform="matrix(0.16469,0,0,0.165398,-493.21,-373.965)"
+			d="M3962,7377L3962,3657L7217,3657L7217,5982L5822,5982L5822,5517L6752,5517L6752,4122L4427,4122L4427,7377L8612,7377L8612,3657L11867,3657L11867,5982L10472,5982L10472,5517L11402,5517L11402,4122L9077,4122L9077,7377L13262,7377L13262,3657L14658,3657L14658,3191L12797,3191L12797,6912L9542,6912L9542,4587L10937,4587L10937,5052L10007,5052L10007,6447L12332,6447L12332,3191L8147,3191L8147,6912L4892,6912L4892,4587L6287,4587L6287,5052L5357,5052L5357,6447L7682,6447L7682,3191L3496,3191L3496,6912L706,6912L706,7377L3962,7377Z"
+			fill="currentColor"
+			stroke="currentColor"
+			strokeWidth="7.62"
+			strokeLinejoin="miter"
+		/>
+		<path
+			transform="matrix(0.0716743,0,0,0.165398,-50.6021,-373.965)"
+			d="M14658,7842L706,7842L706,8307L14658,8307L14658,7842Z"
+			fill="currentColor"
+			stroke="currentColor"
+			strokeWidth="7.62"
+			strokeLinejoin="miter"
+		/>
 	</svg>
 );
 
