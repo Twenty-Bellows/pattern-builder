@@ -80,13 +80,6 @@ export const BlockBindingsPanel = () => {
 					sources={ sources }
 				/>
 			) ) }
-
-			<Text variant="muted">
-				{ __(
-					'Overrides let someone change a value on one placement of a synced pattern. A binding to any other source reads its value when the page renders.',
-					'pattern-builder'
-				) }
-			</Text>
 		</VStack>
 	);
 };
