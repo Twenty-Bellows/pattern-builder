@@ -8,6 +8,10 @@ import { PatternAssociationsPanel } from './PatternAssociationsPanel';
 import { PatternMetadataPanel } from './PatternMetadataPanel';
 import { BlockBindingsPanel } from './BlockBindingsPanel';
 import { PatternActionsPanel } from './PatternActionsPanel';
+import {
+	PatternPhpNotice,
+	usePatternCustomPhpSaveLock,
+} from './PatternPhpNotice';
 /**
  * The post types whose editor gets the pattern panels: user patterns (wp_block) and Pattern
  * Builder's file-backed theme patterns (pb_pattern).
@@ -32,6 +36,11 @@ export const PatternPanelAdditionsPlugin = () => {
 };
 
 export const PatternBuilderPanel = ( { patternPost, postType } ) => {
+	// Hooks run before the early return below, so the lock is read from the pattern
+	// rather than from whether one is loaded yet.
+	const hasCustomPhp = !! patternPost?.hasCustomPhp;
+	usePatternCustomPhpSaveLock( hasCustomPhp );
+
 	if ( ! patternPost ) {
 		return null;
 	}
@@ -48,6 +57,7 @@ export const PatternBuilderPanel = ( { patternPost, postType } ) => {
 					'pattern-builder'
 				) }
 			>
+				<PatternPhpNotice hasCustomPhp={ hasCustomPhp } />
 				<PatternMetadataPanel
 					patternPost={ patternPost }
 					postType={ postType }

@@ -2527,6 +2527,10 @@ class Pattern_Builder_Abilities {
 			$summary['additionalMetadata'] = (string) $pattern->additionalMetadata; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 		}
 
+		if ( ! empty( $pattern->hasCustomPhp ) ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			$summary['hasCustomPhp'] = true;
+		}
+
 		if ( ! empty( $pattern->origin ) ) {
 			$summary['origin'] = (string) $pattern->origin;
 		}

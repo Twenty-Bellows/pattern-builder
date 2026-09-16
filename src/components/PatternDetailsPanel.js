@@ -19,6 +19,7 @@ import { PatternSyncedStatusPanel } from './PatternSyncedStatusPanel';
 import { PatternMetadataPanel } from './PatternMetadataPanel';
 import { PatternAssociationsPanel } from './PatternAssociationsPanel';
 import { PatternActionsPanel } from './PatternActionsPanel';
+import { PatternPhpNotice } from './PatternPhpNotice';
 
 /**
  * The browse screen's details sidebar for the selected pattern — the same panels the editor
@@ -128,6 +129,7 @@ export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 			</div>
 
 			<div className="pattern-builder-details__panels">
+				<PatternPhpNotice hasCustomPhp={ !! record?.hasCustomPhp } />
 				{ ! isLoaded && (
 					<div className="pattern-builder-details__loading">
 						<Spinner />

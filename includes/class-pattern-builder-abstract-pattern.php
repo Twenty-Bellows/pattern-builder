@@ -155,6 +155,15 @@ class Abstract_Pattern {
 	public $additionalMetadata; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.PropertyNotSnakeCase
 
 	/**
+	 * Whether the pattern's file holds PHP this plugin can not write, which makes it a file
+	 * it can read and render but must not write over. Derived from the file, never from a
+	 * request, and always false for a user pattern.
+	 *
+	 * @var bool
+	 */
+	public $hasCustomPhp; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.PropertyNotSnakeCase
+
+	/**
 	 * Constructor.
 	 *
 	 * @param array $args Pattern arguments.
@@ -184,6 +193,7 @@ class Abstract_Pattern {
 		$this->origin             = $args['origin'] ?? '';
 		$this->cloud              = $args['cloud'] ?? '';
 		$this->additionalMetadata = (string) ( $args['additionalMetadata'] ?? '' ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName
+		$this->hasCustomPhp       = (bool) ( $args['hasCustomPhp'] ?? false ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 
 		$this->id = $args['id'] ?? ( 'theme' === $this->source ? $this->name : null );
 	}
@@ -242,6 +252,7 @@ class Abstract_Pattern {
 				'origin'             => trim( $pattern_data['origin'] ),
 				'cloud'              => trim( $pattern_data['cloud'] ),
 				'additionalMetadata' => self::additional_metadata_from_file( $pattern_file ),
+				'hasCustomPhp'       => self::file_has_custom_php( $pattern_file ),
 			)
 		);
 	}
@@ -262,6 +273,86 @@ class Abstract_Pattern {
 		}
 
 		return false;
+	}
+
+	/**
+	 * The calls this plugin writes into pattern markup itself.
+	 */
+	const LOCALIZED_STRING_FUNCTIONS = array( 'wp_kses_post', 'esc_attr__' );
+
+	/**
+	 * Whether a pattern file holds PHP beyond the localized strings this plugin writes.
+	 *
+	 * @param string $pattern_file Absolute path to the pattern file.
+	 * @return bool
+	 */
+	public static function file_has_custom_php( $pattern_file ) {
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading a theme's own pattern file.
+		$contents = file_get_contents( $pattern_file );
+
+		if ( false === $contents ) {
+			return false;
+		}
+
+		$markup_only = array( T_OPEN_TAG, T_CLOSE_TAG, T_DOC_COMMENT, T_INLINE_HTML, T_WHITESPACE );
+		$tokens      = token_get_all( $contents );
+		$count       = count( $tokens );
+
+		for ( $index = 0; $index < $count; $index++ ) {
+			$token = $tokens[ $index ];
+
+			if ( is_array( $token ) && in_array( $token[0], $markup_only, true ) ) {
+				continue;
+			}
+
+			$ends_at = self::localized_string_ends_at( $tokens, $index );
+
+			if ( null === $ends_at ) {
+				return true;
+			}
+
+			$index = $ends_at;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Matches one of this plugin's localized strings, starting at the given token.
+	 *
+	 * @param array $tokens The file's tokens, from `token_get_all()`.
+	 * @param int   $start  Index to match from.
+	 * @return int|null The index the call ends at, or null when it is not one.
+	 */
+	private static function localized_string_ends_at( array $tokens, $start ) {
+		$shape = array( T_ECHO, T_STRING, '(', T_CONSTANT_ENCAPSED_STRING, ',', T_CONSTANT_ENCAPSED_STRING, ')', ';' );
+		$index = $start;
+		$count = count( $tokens );
+
+		foreach ( $shape as $expected ) {
+			while ( $index < $count && is_array( $tokens[ $index ] ) && T_WHITESPACE === $tokens[ $index ][0] ) {
+				++$index;
+			}
+
+			if ( $index >= $count ) {
+				return null;
+			}
+
+			$token = $tokens[ $index ];
+			$type  = is_array( $token ) ? $token[0] : $token;
+
+			if ( $type !== $expected ) {
+				return null;
+			}
+
+			if ( T_STRING === $expected && ! in_array( $token[1], self::LOCALIZED_STRING_FUNCTIONS, true ) ) {
+				return null;
+			}
+
+			++$index;
+		}
+
+		return $index - 1;
 	}
 
 	/**
