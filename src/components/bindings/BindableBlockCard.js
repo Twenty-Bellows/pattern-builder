@@ -29,12 +29,6 @@ import { AttributeBindingRow } from './AttributeBindingRow';
 /**
  * One bindable block, and where each of its values comes from.
  *
- * With no post type chosen a block has only the one choice a pattern can make
- * on its own, so it gets a toggle. Choosing a post type turns on a row per
- * bindable attribute, which can additionally reach that post type's fields. A
- * block whose bindings are too detailed for the toggle keeps its rows either
- * way, so nothing already bound is hidden.
- *
  * @param {Object}   props           Component props.
  * @param {Object}   props.block     The block from the editor store.
  * @param {string[]} props.supported The attributes it can bind.
