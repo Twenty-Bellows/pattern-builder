@@ -52,6 +52,25 @@ never reach; the document tab's post card is hidden by a rule anchored on
 `.editor-post-card-panel__title`. Name and description are edited in the
 Pattern Metadata panel.
 
+A pattern is not a post, and one block has to be told so. The editor gives a
+document's blocks a `postId` and `postType` context unless its post type is one
+of core's `NON_CONTEXTUAL_POST_TYPES` — `wp_block`, `wp_navigation`,
+`wp_template_part`. A user pattern is on that list; `pb_pattern` cannot be,
+because the list is a constant inside core's editor bundle with no filter over
+it. So `core/post-content` in a theme pattern used to be handed the pattern's
+own id, find it already on the recursion stack, and render "Block cannot be
+rendered inside itself" in place of anything editable — while the same pattern
+saved as a user pattern behaved perfectly.
+
+`registerPatternPostContent()` takes the two values back out, on an
+`editor.BlockEdit` filter narrowed to that one block and that one post type,
+which puts it on the path core's own pattern editor uses: the placeholder
+describing what the block will show. The narrowing is not optional —
+`enqueue_block_editor_assets` fires on every editor screen, so a filter that
+did not check would break `core/post-content` in the page editor. `withoutPost()`
+removes only what is there, so this stops mattering by itself if core ever adds
+the post type to that list.
+
 ## Pattern bindings
 
 A block's value can come from three places: the pattern file, whoever places
@@ -347,11 +366,26 @@ a different capability, which a multisite site administrator does not have.
 styles: `standalone` on its own, `page` inside the resolved page template, and
 either one against a bundled lab theme through the route's `theme` parameter.
 
-The page context needs a post to exist, so a stand-in is primed into the object
+Every render needs a post to exist, so a stand-in is primed into the object
 cache for one request and never written. Two things make it work:
 `core/post-content` checks `$block->context['postId']` and refuses without it,
 then calls `get_the_content()` with no arguments, which reads the *global* post
-and the `$pages` globals `setup_postdata()` fills.
+and the `$pages` globals `setup_postdata()` fills. `supply_the_page()` satisfies
+the first and `pose_as_a_page()` the second.
+
+The page context poses as a page whose content *is* the pattern, so the
+template's `core/post-content` renders it; the pattern's own, if it has one,
+meets core's `$seen_ids` guard and renders nothing.
+
+`render_blocks()` is why the other contexts pose as well, and it is not a
+nicety. A tile is drawn on a front-end request to `tile_base()` —
+`home_url( '/' )` — and `serve_tile()` runs on `template_redirect`, by which
+point WordPress has queried the front page and set the global post. Core's
+`render_block()` seeds `postId` and `postType` context from that global, so a
+pattern carrying `core/post-content` passed the block's guard and then drew the
+site's home page inside itself, in every tile of every such pattern. Posing puts
+`stand_in_content()` there instead: filler that says it is filler, because a
+pattern is a layout and an empty column shows less of one than filler does.
 
 ### Lab themes (`themes/`)
 

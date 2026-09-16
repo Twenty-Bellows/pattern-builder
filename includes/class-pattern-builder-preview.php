@@ -242,7 +242,7 @@ class Pattern_Builder_Preview {
 		return array(
 			'status'  => 200,
 			'headers' => $headers,
-			'body'    => self::without_scripts( $this->document_around( do_blocks( $pattern->content ), $pattern, true ) ),
+			'body'    => self::without_scripts( $this->document_around( $this->render_blocks( $pattern->content ), $pattern, true ) ),
 		);
 	}
 
@@ -520,7 +520,40 @@ class Pattern_Builder_Preview {
 	 * @return string
 	 */
 	private function standalone_document( $pattern ) {
-		return $this->document_around( do_blocks( $pattern->content ), $pattern );
+		return $this->document_around( $this->render_blocks( $pattern->content ), $pattern );
+	}
+
+	/**
+	 * Render a pattern's blocks with a stand-in post behind them.
+	 *
+	 * @param string $content The pattern's block markup.
+	 * @return string Rendered HTML.
+	 */
+	private function render_blocks( $content ) {
+		$this->pose_as_a_page( self::stand_in_content() );
+
+		$html = do_blocks( $content );
+
+		$this->stop_posing();
+
+		return $html;
+	}
+
+	/**
+	 * What the blocks that render a post's own fields show in a preview.
+	 *
+	 * @return string Block markup.
+	 */
+	private static function stand_in_content() {
+		$lead = __( 'This is where the post’s content appears when the pattern is used.', 'pattern-builder' );
+		$rest = __( 'The preview fills it in so the layout can be seen. Nothing here comes from the site.', 'pattern-builder' );
+
+		return '<!-- wp:paragraph {"className":"pattern-builder-placeholder"} -->'
+			. '<p class="pattern-builder-placeholder">' . esc_html( $lead ) . '</p>'
+			. '<!-- /wp:paragraph -->'
+			. '<!-- wp:paragraph {"className":"pattern-builder-placeholder"} -->'
+			. '<p class="pattern-builder-placeholder">' . esc_html( $rest ) . '</p>'
+			. '<!-- /wp:paragraph -->';
 	}
 
 	/**
@@ -535,7 +568,7 @@ class Pattern_Builder_Preview {
 		if ( '' === $template ) {
 			return $this->document_around(
 				'<!-- pattern-builder: this theme has no block template for a page; rendered standalone -->'
-					. do_blocks( $pattern->content ),
+					. $this->render_blocks( $pattern->content ),
 				$pattern
 			);
 		}
@@ -573,14 +606,6 @@ class Pattern_Builder_Preview {
 
 	/**
 	 * Put a stand-in page in front of the blocks that ask for one.
-	 *
-	 * Two things are needed, and the second is not what the first suggests.
-	 * `core/post-content` checks `$block->context['postId']` and returns nothing
-	 * without it — but having passed that guard it calls `get_the_content()`
-	 * with *no arguments*, deliberately, so that a preview of the queried object
-	 * can apply. That reads the global post and the `$pages` globals
-	 * `setup_postdata()` fills in, not the context. So the context makes the
-	 * block agree to render and the globals decide what it renders.
 	 *
 	 * @param string $content The pattern's markup, as the page's content.
 	 */
@@ -682,6 +707,9 @@ class Pattern_Builder_Preview {
 	.pattern-builder-tile__content > * { margin-top: 0 !important; }
 </style>
 		<?php endif; ?>
+<style id="pattern-builder-placeholder">
+	.pattern-builder-placeholder { opacity: 0.55; font-style: italic; }
+</style>
 </head>
 <body class="pattern-builder-preview wp-embed-responsive">
 		<?php
