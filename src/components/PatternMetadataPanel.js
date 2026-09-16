@@ -51,6 +51,9 @@ export const PatternMetadataPanel = ( {
 	const [ viewportWidth, setViewportWidth ] = useState(
 		patternPost.viewportWidth || ''
 	);
+	const [ additionalMetadata, setAdditionalMetadata ] = useState(
+		patternPost.additionalMetadata || ''
+	);
 
 	const stageEdit = ( edit ) => {
 		dispatch( 'core' ).editEntityRecord(
@@ -175,6 +178,27 @@ export const PatternMetadataPanel = ( {
 					) }
 				</Text>
 			</VStack>
+			{ /* Only a theme pattern has a file, and so a header comment to keep. */ }
+			{ isThemePattern && (
+				<VStack spacing={ 0 }>
+					<TextareaControl
+						__nextHasNoMarginBottom
+						label={ __( 'Additional Metadata', 'pattern-builder' ) }
+						value={ additionalMetadata }
+						rows={ 4 }
+						onChange={ ( value ) => {
+							setAdditionalMetadata( value );
+							stageEdit( { additionalMetadata: value } );
+						} }
+					/>
+					<Text variant="muted">
+						{ __(
+							'Anything else the pattern file’s header comment carries, such as the theme’s @package tags. Kept as written.',
+							'pattern-builder'
+						) }
+					</Text>
+				</VStack>
+			) }
 		</VStack>
 	);
 };

@@ -88,6 +88,12 @@ markup.
 `styles.elements.link.color.text` on a site and it paints every page, so a
 pattern that repainted its destination on install would be vandalism.
 
+**Nor does `additionalMetadata`.** What a pattern file's header comment carries
+beyond its headers describes the theme it was written in — `@package` and its
+neighbours — and would be a false claim about the theme it lands in. The
+`pbp/1` payload is an explicit list of fields, so it never left in the first
+place.
+
 ## CSS in a variation: `Safe_Css`
 
 WordPress does not sanitize a theme.json `css` property — it gates it on

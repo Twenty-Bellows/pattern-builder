@@ -1181,64 +1181,68 @@ class Pattern_Builder_Abilities {
 	 */
 	private function write_schema( $creating ) {
 		$properties = array(
-			'title'         => array(
+			'title'              => array(
 				'type'        => 'string',
 				'description' => 'Human-readable pattern title.',
 				'minLength'   => 1,
 			),
-			'content'       => array(
+			'content'            => array(
 				'type'        => 'string',
 				'description' => 'The pattern\'s block markup, complete and already validated.',
 				'minLength'   => 1,
 			),
-			'source'        => array(
+			'source'             => array(
 				'type'        => 'string',
 				'enum'        => array( 'theme', 'user' ),
 				'description' => 'Where to store it: "theme" writes a PHP file into the active theme, "user" creates a reusable block. Defaults to theme.',
 			),
-			'name'          => array(
+			'name'               => array(
 				'type'        => 'string',
 				'description' => 'Namespaced slug for a theme pattern, e.g. "my-theme/hero". Derived from the title when omitted.',
 			),
-			'description'   => array(
+			'description'        => array(
 				'type'        => 'string',
 				'description' => 'Short description shown in the inserter.',
 			),
-			'categories'    => array(
+			'categories'         => array(
 				'type'        => 'array',
 				'description' => 'Pattern category slugs.',
 				'items'       => array( 'type' => 'string' ),
 			),
-			'keywords'      => array(
+			'keywords'           => array(
 				'type'  => 'array',
 				'items' => array( 'type' => 'string' ),
 			),
-			'synced'        => array(
+			'synced'             => array(
 				'type'        => 'boolean',
 				'description' => 'Whether the pattern is synced. Defaults to false for either source: a theme pattern gets no Synced header, a user pattern is marked unsynced. A synced pattern is the one a core/pattern reference keeps pointing at, so a design pattern whose slots pages fill should be synced.',
 			),
-			'blockTypes'    => array(
+			'blockTypes'         => array(
 				'type'        => 'array',
 				'items'       => array( 'type' => 'string' ),
 				'description' => 'Blocks this pattern is offered for. ["core/post-content"] makes it a starting layout for new content; a block\'s own name offers it when that block is inserted still empty.',
 			),
-			'postTypes'     => array(
+			'postTypes'          => array(
 				'type'        => 'array',
 				'items'       => array( 'type' => 'string' ),
 				'description' => 'Post types this pattern is offered for when new content is created, e.g. ["page"]. Takes effect alongside blockTypes ["core/post-content"].',
 			),
-			'templateTypes' => array(
+			'templateTypes'      => array(
 				'type'        => 'array',
 				'items'       => array( 'type' => 'string' ),
 				'description' => 'Template types this pattern is offered for, e.g. ["front-page"]. A whole-template pattern usually pairs this with inserter false.',
 			),
-			'inserter'      => array(
+			'inserter'           => array(
 				'type'        => 'boolean',
 				'description' => 'Whether the pattern appears in the block inserter. Defaults to true; a whole template is noise there, so template patterns set it false.',
 			),
-			'viewportWidth' => array(
+			'viewportWidth'      => array(
 				'type'        => 'integer',
 				'description' => 'Preview width in pixels.',
+			),
+			'additionalMetadata' => array(
+				'type'        => 'string',
+				'description' => 'Lines to keep in the pattern file\'s header comment that are not headers, such as the @package/@subpackage/@since block a theme carries. Theme patterns only; omit it and an existing pattern keeps what its file already has.',
 			),
 		);
 
@@ -2447,6 +2451,10 @@ class Pattern_Builder_Abilities {
 		} else {
 			$args['viewportWidth'] = $fallback( 'viewportWidth', null );
 		}
+		$args['additionalMetadata'] = isset( $input['additionalMetadata'] )
+			? (string) $input['additionalMetadata']
+			: (string) $fallback( 'additionalMetadata', '' );
+
 		$args['origin'] = (string) $fallback( 'origin', '' );
 		$args['cloud']  = (string) $fallback( 'cloud', '' );
 
@@ -2514,6 +2522,10 @@ class Pattern_Builder_Abilities {
 			'inserter'      => (bool) $pattern->inserter,
 			'viewportWidth' => $pattern->viewportWidth ? (int) $pattern->viewportWidth : null, // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 		);
+
+		if ( ! empty( $pattern->additionalMetadata ) ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			$summary['additionalMetadata'] = (string) $pattern->additionalMetadata; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		}
 
 		if ( ! empty( $pattern->origin ) ) {
 			$summary['origin'] = (string) $pattern->origin;
