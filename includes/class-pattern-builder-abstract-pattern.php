@@ -7,11 +7,6 @@ namespace TwentyBellows\PatternBuilder;
  * Value object representing a single block pattern.
  */
 class Abstract_Pattern {
-	/**
-	 * The headers a pattern file's comment block carries: the property each one sets,
-	 * keyed to the name `get_file_data()` looks for. Every other line of that comment is
-	 * kept verbatim in `$additionalMetadata`, so the two cannot drift apart.
-	 */
 	const FILE_HEADERS = array(
 		'title'         => 'Title',
 		'slug'          => 'Slug',
