@@ -2527,6 +2527,12 @@ class Pattern_Builder_Abilities {
 			$summary['additionalMetadata'] = (string) $pattern->additionalMetadata; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 		}
 
+		// Only worth saying when it is true, and when true it is the whole story: the
+		// pattern cannot be updated, because its file is a program rather than markup.
+		if ( ! empty( $pattern->hasCustomPhp ) ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			$summary['hasCustomPhp'] = true;
+		}
+
 		if ( ! empty( $pattern->origin ) ) {
 			$summary['origin'] = (string) $pattern->origin;
 		}

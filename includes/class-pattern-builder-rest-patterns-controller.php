@@ -437,6 +437,7 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 			'origin'             => (string) $pattern->origin,
 			'cloud'              => (string) $pattern->cloud,
 			'additionalMetadata' => (string) $pattern->additionalMetadata,
+			'hasCustomPhp'       => (bool) $pattern->hasCustomPhp,
 		);
 
 		if ( $is_theme && current_user_can( 'edit_theme_options' ) ) {
@@ -619,6 +620,11 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 				'additionalMetadata' => array(
 					'description' => __( 'Lines of the pattern file’s header comment that are not headers Pattern Builder reads, kept verbatim. Always empty for a user pattern, which has no file.', 'pattern-builder' ),
 					'type'        => 'string',
+				),
+				'hasCustomPhp'       => array(
+					'description' => __( 'Whether the pattern’s file holds PHP beyond the localized strings Pattern Builder writes itself. Such a file can be read and rendered but not written, because reading it runs it and keeps the output.', 'pattern-builder' ),
+					'type'        => 'boolean',
+					'readonly'    => true,
 				),
 				'fromWpBlock'        => array(
 					'description' => __( 'On creation, the ID of a wp_block post to convert into this theme pattern.', 'pattern-builder' ),

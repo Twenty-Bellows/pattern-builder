@@ -296,10 +296,50 @@ save. `tests/php/test-pattern-metadata.php` asserts that what lands on disk
 tokenizes to an opening tag, a doc comment, a closing tag and literal markup,
 and nothing else.
 
-This covers the header only. A pattern file whose *body* runs PHP is a separate
-problem — reading one executes it and keeps the output, so writing it back
-replaces the program with a snapshot of a single run — and nothing guards
-against that yet.
+## Pattern files that are programs
+
+A pattern file may be a program. Core reads one by running it and keeping the
+output — `WP_Block_Patterns_Registry` includes the `filePath` it registered when
+a pattern's content is first asked for — and `Abstract_Pattern::from_file()`
+does the same. That is how a theme writes a pattern that changes with the post
+it is placed in.
+
+It is also why such a file cannot be written back. What the read produced is a
+snapshot of one run, in whatever context that run had: one side of every branch,
+every `do_blocks()` call frozen as rendered HTML, every translated string frozen
+in one language, every generated URL resolved for this site. Rebuilding the file
+from that would put the snapshot where the program was.
+
+`Abstract_Pattern::file_has_custom_php()` decides, with the tokenizer rather
+than a search for an opening tag. A file that is an opening tag, a doc comment,
+a closing tag and literal markup is one this plugin wrote and can rewrite;
+anything else is not. An ordinary comment counts as well — it runs nothing, but
+it sits outside the header comment and would be dropped just the same, so the
+conservative answer is the safe one. The cost is about the same as the `include`
+that already happens for every pattern read.
+
+There is one exception, and it is the plugin's own. A localized write turns a
+pattern's text into `<?php echo wp_kses_post( 'text', 'domain' ); ?>` and writes
+it out again the same way, so a file carrying those is still one the plugin can
+rebuild. `localized_string_ends_at()` matches that shape exactly — `echo`, one
+of `LOCALIZED_STRING_FUNCTIONS`, two quoted literals — and a variable, a
+concatenation or any other function fails it. A hand-written `esc_html_e()` is
+therefore custom PHP, correctly: its string would survive the round trip but the
+call around it would not.
+
+`hasCustomPhp` carries the answer through the REST response and an agent's pattern
+summary, and `refuse_if_file_has_custom_php()` turns it into a 409 at both
+`update_theme_pattern()`, before anything has been imported or localized, and
+`update_theme_pattern_file()`, so no later caller can route around it. A pattern
+with no file yet is a creation and passes. In the editor the pattern still opens
+and still previews; `usePatternCustomPhpSaveLock()` takes the Save button away and
+`PatternPhpNotice` says why, in the sidebar and on the browse screen, because a
+save that fails at the server costs whatever was typed first.
+
+What this does not do is let anyone edit such a pattern. The file is the place
+to edit it, and a source editor inside the plugin would have to be gated on
+`edit_themes` rather than the `edit_theme_options` every other write here uses —
+a different capability, which a multisite site administrator does not have.
 
 ## Previews
 

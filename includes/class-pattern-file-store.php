@@ -194,6 +194,11 @@ class Pattern_File_Store {
 		if ( 'theme' === $pattern->source ) {
 			$pattern->id = $pattern->name;
 		}
+
+		$writable = $this->refuse_if_file_has_custom_php( $pattern );
+		if ( is_wp_error( $writable ) ) {
+			return $writable;
+		}
 		if ( ! isset( $options['import_images'] ) || true === $options['import_images'] ) {
 			$pattern = $this->import_pattern_image_assets( $pattern );
 		}
@@ -448,6 +453,11 @@ class Pattern_File_Store {
 	 * @return Abstract_Pattern|WP_Error
 	 */
 	public function update_theme_pattern_file( Abstract_Pattern $pattern ) {
+		$writable = $this->refuse_if_file_has_custom_php( $pattern );
+		if ( is_wp_error( $writable ) ) {
+			return $writable;
+		}
+
 		$path = $this->get_pattern_filepath( $pattern );
 		if ( is_wp_error( $path ) ) {
 			$path = $this->path_for_name( $pattern->name );
@@ -467,6 +477,31 @@ class Pattern_File_Store {
 		}
 
 		return $pattern;
+	}
+
+	/**
+	 * Refuses to write over a pattern file that holds PHP.
+	 *
+	 * Reading such a file runs it and keeps the output, so the pattern in hand is a
+	 * snapshot of one run in whatever context that run had — not the program on disk.
+	 * Writing it back would put the snapshot where the program was, losing every branch
+	 * the run did not take. A pattern with no file yet is a creation and passes.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern about to be written.
+	 * @return true|WP_Error
+	 */
+	private function refuse_if_file_has_custom_php( Abstract_Pattern $pattern ) {
+		$path = $this->get_pattern_filepath( $pattern );
+
+		if ( is_wp_error( $path ) || ! Abstract_Pattern::file_has_custom_php( $path ) ) {
+			return true;
+		}
+
+		return new WP_Error(
+			'pattern_file_has_custom_php',
+			__( 'This pattern’s file contains PHP, so Pattern Builder will not write it. Saving from here would replace that code with the output of a single run. Edit the file in the theme instead.', 'pattern-builder' ),
+			array( 'status' => 409 )
+		);
 	}
 
 	/**
