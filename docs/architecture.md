@@ -52,6 +52,133 @@ never reach; the document tab's post card is hidden by a rule anchored on
 `.editor-post-card-panel__title`. Name and description are edited in the
 Pattern Metadata panel.
 
+## Pattern bindings
+
+A block's value can come from three places: the pattern file, whoever places
+the pattern, or the post the pattern lands in. The Pattern Bindings panel
+(`BlockBindingsPanel`) is where that is decided, and it writes nothing but
+core's own `metadata.bindings`.
+
+**The post type lens comes first.** A pattern binds against a post it has not
+met, so there is no record to read a field list from — which is why core's own
+bindings panel is empty inside a pattern and says nothing about why. Naming a
+post type in *Fields from* supplies the one piece of context the sources need;
+`core/post-meta` builds its list from `postType` alone. The lens is not saved
+to the pattern: the binding still resolves against whichever post the pattern
+is placed in. It starts at *User input only*, where no source is offered and a
+block gets only the choice a pattern can make by itself.
+
+**The lens lists only post types worth naming.** Most of a site's post types are
+machinery a pattern is never placed in — templates, navigation, font faces, the
+plugin's own `pb_pattern` — and offering them promises fields that do not apply.
+`Pattern_Builder_API::get_bindable_post_types()` decides, in three steps: a
+viewable post type is listed, because those are the ones a pattern lands in and
+the fields every post has apply to them even when they register no meta, which
+on a stock site `post` and `page` do not; any other post type is listed if the
+filter declared a field for it, a deliberate act honoured whatever the post
+type; failing that, a post type a plugin registered is listed if it has meta
+worth binding to. That last courtesy stops short of core's own internals, or
+`wp_block` would appear on the strength of the sync flag core registers against
+it.
+
+The question is asked of the server because it has to be asked about every post
+type at once, and `core/post-meta` enumerates one with a request apiece — so
+deciding it in the editor would cost a round trip per post type to populate a
+dropdown. The same route answers it: `post_type` is optional, and omitting it
+returns the slugs rather than the fields. The cost is that a source publishing
+its fields only from JavaScript is invisible to the decision, so a post type
+nothing else offers will not be listed; answering the filter is how such a
+source puts one there.
+
+**The per-block control follows the lens.** With no post type a block gets an
+*Overridable* toggle, off being the value the pattern file saved; it is
+disabled until the block is named, since an override is stored against the
+name. Choose a post type and the toggle gives way to one row per bindable
+attribute, each offering *Not connected*, *Overridable*, or a field. A block
+whose bindings are too detailed for the toggle — a source binding, or overrides
+on only some attributes — keeps its rows whatever the lens says, so nothing
+already bound is hidden.
+
+**A source is offered only where it has fields to offer.** Every choice in a
+row is a field some source published for the chosen post type; a source that
+published none for it is left out rather than shown empty, and there is no
+typed escape hatch. The `args` a binding is written with come from the field
+descriptor, which is what lets sources disagree about the argument name — most
+read `key`, while `core/post-data` and `core/term-data` read `field`.
+
+Fields reach the panel two ways. A source registered in JavaScript publishes
+them itself through `getFieldsList`; on WordPress 6.8 the store kept that
+callback for `core/post-meta` and discarded it for every other source unless
+the Gutenberg plugin was running, a restriction `@wordpress/blocks` 15.7
+lifted. A source registered in PHP cannot publish one at all — core's registry
+rejects any property beyond `label`, `get_value_callback` and `uses_context`,
+and fails the whole registration rather than ignoring the extra — so the
+`pattern_builder_binding_fields` filter is how a PHP source declares its
+fields, and how a site adds a field to a source it does not own. The panel
+fetches them per post type, once one is chosen rather than for every type up
+front, and merges them with whatever the source published itself. A source
+whose declaration is malformed contributes nothing: a field with no `args` has
+nothing to bind to, so `Pattern_Builder_API::get_binding_fields()` drops it.
+
+`Pattern_Builder_API::add_post_data_fields()` answers that filter for
+`core/post-data`, whose `date`, `modified` and `link` resolve against any block
+while its own field list appears only when a Post Date block is selected.
+`core/term-data` is deliberately not given the same treatment: it resolves from
+a `termId` and `taxonomy` that a pattern placed in a post does not carry.
+`Pattern_Builder_ACF` answers it for `acf/field`. ACF registers that source
+with a value callback and nothing else, and ships no field list in JavaScript
+either, so without this the source appears in the panel with nothing under it.
+Only enumeration is supplied: resolving stays ACF's own callback, so the two
+gates it applies before returning a value are applied before offering one — a
+field type that supports bindings, and a field whose *Allow Access to Value in
+Editor UI* setting is on. ACF defaults that setting off for any field created
+since its 6.3.6, so a field added today is offered nowhere until somebody turns
+it on, and offering it regardless would be offering a choice that renders
+nothing.
+
+`core/post-meta` needs no help — it enumerates the registered meta itself, and
+it is the one source whose field list and render-time gate are the same, so a
+key missing from the list is a key that would render nothing.
+
+No core source exposes a post's title or content, and declaring one would not
+change that. Declaring and resolving are separate powers: the filter decides
+what the panel offers, while the source's own `get_value_callback` decides what
+a rendered block gets, and `core/post-data` answers the three fields above and
+null for everything else — a block bound to a title would render its fallback
+forever. Reaching a title through a binding means registering a source whose
+callback returns it, which is now a PHP-only job: the same filter gives that
+source its field list.
+
+**None of this is needed to render a binding.** The panel writes core's
+`metadata.bindings` and the plugin registers no binding source of its own, so a
+pattern's bindings resolve wherever the pattern is rendered — including on a
+site running only synced-patterns-for-themes, or neither plugin.
+`Pattern_Resolver::fill_slots()` removes only the `core/pattern-overrides`
+bindings it answered and leaves every other one in the markup for core, and
+`Pattern_Block` attaches the pattern's blocks as inner blocks so they inherit
+the post context a binding needs. Both are vendored, so both plugins behave
+identically; core's own `render_block_core_pattern()` reaches the same place by
+calling `do_blocks()`. The `pattern_builder_binding_fields` filter is an
+authoring convenience with no render-time role — it names fields for the panel
+and never resolves one.
+
+**Which attributes are bindable is core's decision**, read from the editor
+setting `__experimentalBlockBindingsSupportedAttributes` and falling back to
+the 6.8 table in `src/utils/bindings.js`, which mirrors
+`Pattern_Resolver::get_supported_attributes()`. A theme filtering
+`block_bindings_supported_attributes` widens the panel with it.
+
+**Writes stay in core's shape.** `__default` means every supported attribute is
+a pattern override; the panel expands it for display and collapses back to it
+whenever every attribute ends up overridable, so a pattern file does not change
+shape just because it was opened. Bindings on attributes the panel does not
+manage are carried through untouched.
+
+Editing any of this needs `canUpdateBlockBindings`, which core derives from
+`edit_block_binding` and denies outright for an editor context carrying no
+post. `Pattern_Builder_Admin::allow_block_bindings_editing()` grants it back on
+this screen to users who can already edit the pattern.
+
 ## The browse page
 
 Appearance → Pattern Builder is a Site-Editor-style library: a header with four
@@ -228,7 +355,8 @@ Three webpack bundles:
 
 Supporting modules: `src/admin/` (App, PatternBrowser, editor-boot),
 `src/cloud/` (see [`cloud.md`](cloud.md)), `src/components/`, `src/objects/`,
-`src/utils/` (`tileKey`, `patternTree`, `blockValidity`, `telemetry`), and
+`src/utils/` (`tileKey`, `patternTree`, `blockValidity`, `telemetry`,
+`bindings`), and
 `src/runtime/` (vendored; keep identical to the companion's `src/`).
 
 State comes from the core data stores (`core`, `core/editor`,

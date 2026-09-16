@@ -1,0 +1,77 @@
+/**
+ * The Pattern Bindings panel.
+ */
+
+.pattern-builder-bindings {
+
+	&__block {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	&__rows {
+		border: 1px solid #e0e0e0;
+		border-radius: 2px;
+	}
+
+	&__row + &__row {
+		border-top: 1px solid #e0e0e0;
+	}
+
+	&__dropdown {
+		display: block;
+	}
+
+	// The toggle carries two lines, so it cannot keep a button's fixed height
+	// or its centred single line of text.
+	&__toggle.components-button {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 2px;
+		width: 100%;
+		height: auto;
+		padding: 8px 10px;
+		text-align: left;
+		white-space: normal;
+	}
+
+	&__attribute {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		width: 100%;
+		font-size: 12px;
+	}
+
+	&__type {
+		margin-left: auto;
+		color: #757575;
+		font-family: Menlo, Consolas, monaco, monospace;
+		font-size: 10px;
+	}
+
+	&__value {
+		max-width: 100%;
+		overflow: hidden;
+		color: var(--wp-components-color-accent, #3858e9);
+		font-size: 12px;
+		text-overflow: ellipsis;
+
+		&.is-muted {
+			color: #757575;
+		}
+
+		&.is-invalid {
+			color: #cc1818;
+		}
+	}
+
+	&__empty {
+		margin: 0;
+		padding: 6px 12px 8px;
+		color: #757575;
+		font-size: 12px;
+	}
+}

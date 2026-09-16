@@ -36,6 +36,7 @@ const ALLOW = new Set( [
 	'WP_Theme_JSON_Resolver::get_style_variations()',
 	'WP_Theme_JSON::process_blocks_custom_css()', 'WP_Image_Editor::get_output_format()',
 	'registerBlockBindingsSource()', 'onNavigateToEntityRecord', 'MainDashboardButton',
+	'render_block_core_pattern()',
 	// The host environment and other repositories.
 	'sqlite-database-integration', 'db.copy', 'wp-tests-config.php', 'wp-content/db.php',
 	'DB_DIR', 'DB_FILE', 'includes/patterns/class-safe-css.php', 'docs/decisions.md',
