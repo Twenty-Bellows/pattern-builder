@@ -160,7 +160,7 @@ class Abstract_Pattern {
 	public $additionalMetadata; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.PropertyNotSnakeCase
 
 	/**
-	 * Whether the pattern's file holds PHP this plugin did not write, which makes it a file
+	 * Whether the pattern's file holds PHP this plugin can not write, which makes it a file
 	 * it can read and render but must not write over. Derived from the file, never from a
 	 * request, and always false for a user pattern.
 	 *
@@ -267,9 +267,6 @@ class Abstract_Pattern {
 	 * `from_file()` reads, and so belongs to a field of its own rather than to
 	 * `$additionalMetadata`.
 	 *
-	 * The tolerated prefix and the case-insensitivity mirror `get_file_data()` exactly, so
-	 * a line this answers false for is a line core will not read as a header either.
-	 *
 	 * @param string $line One line of the comment.
 	 * @return bool
 	 */
@@ -285,28 +282,11 @@ class Abstract_Pattern {
 
 	/**
 	 * The calls this plugin writes into pattern markup itself.
-	 *
-	 * `Pattern_Builder_Localization` turns a pattern's text into
-	 * `<?php echo wp_kses_post( 'text', 'domain' ); ?>` on a localized write, and writes it
-	 * out again the same way, so a file carrying these is still one the plugin can rebuild.
-	 * Nothing else is: a call this plugin did not write is one it cannot reproduce.
 	 */
 	const LOCALIZED_STRING_FUNCTIONS = array( 'wp_kses_post', 'esc_attr__' );
 
 	/**
 	 * Whether a pattern file holds PHP beyond the localized strings this plugin writes.
-	 *
-	 * A file this plugin produced is an opening tag, the header comment, a closing tag,
-	 * literal markup and those localized strings, and nothing else. Anything more is a file
-	 * it cannot rebuild: reading one runs it and keeps the output, so writing the pattern
-	 * back would replace the program with a snapshot of a single run, taken in whatever
-	 * context that run happened to have. A conditional loses the branch it did not take, a
-	 * `do_blocks()` call freezes as rendered HTML, a translated string freezes in one
-	 * language.
-	 *
-	 * The tokenizer answers this exactly, where searching for an opening tag would guess.
-	 * An ordinary comment counts too: it is inert, but it sits outside the header comment
-	 * and so would be dropped just the same.
 	 *
 	 * @param string $pattern_file Absolute path to the pattern file.
 	 * @return bool
@@ -345,10 +325,6 @@ class Abstract_Pattern {
 	/**
 	 * Matches one of this plugin's localized strings, starting at the given token.
 	 *
-	 * The shape is fixed by `Pattern_Builder_Localization::create_localized_string()`:
-	 * `echo`, one of two functions, and two quoted literals. A variable, a concatenation or
-	 * any other function is something else, and something else is not ours to rewrite.
-	 *
 	 * @param array $tokens The file's tokens, from `token_get_all()`.
 	 * @param int   $start  Index to match from.
 	 * @return int|null The index the call ends at, or null when it is not one.
@@ -386,11 +362,6 @@ class Abstract_Pattern {
 
 	/**
 	 * Reads the part of a pattern file's header comment that is not a recognised header.
-	 *
-	 * `get_file_data()` only extracts headers it is asked for by name, so the rest of that
-	 * comment is invisible to it, and rebuilding the file from the pattern would drop it.
-	 * Themes conventionally carry a `@package`/`@subpackage`/`@since` block there, and a
-	 * hand-written pattern often carries a note beside it.
 	 *
 	 * @param string $pattern_file Absolute path to the pattern file.
 	 * @return string The remaining lines with their leading `*` stripped, or '' if none.
