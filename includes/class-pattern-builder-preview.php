@@ -526,12 +526,6 @@ class Pattern_Builder_Preview {
 	/**
 	 * Render a pattern's blocks with a stand-in post behind them.
 	 *
-	 * A pattern is not a page, but the blocks in it may well be a page's: `core/post-title`
-	 * and `core/post-content` render whatever post the request has. A tile is drawn on a
-	 * front-end request to the site's home page, so without this the request's own post is
-	 * what they find — and a pattern carrying `core/post-content` draws the site's home page
-	 * inside itself, in every tile.
-	 *
 	 * @param string $content The pattern's block markup.
 	 * @return string Rendered HTML.
 	 */
@@ -547,10 +541,6 @@ class Pattern_Builder_Preview {
 
 	/**
 	 * What the blocks that render a post's own fields show in a preview.
-	 *
-	 * There is no real content to show, and an empty region says less about a layout than
-	 * filler does — a pattern's two columns are only legible when there is something in
-	 * them. So this is filler that says what it is.
 	 *
 	 * @return string Block markup.
 	 */
@@ -616,14 +606,6 @@ class Pattern_Builder_Preview {
 
 	/**
 	 * Put a stand-in page in front of the blocks that ask for one.
-	 *
-	 * Two things are needed, and the second is not what the first suggests.
-	 * `core/post-content` checks `$block->context['postId']` and returns nothing
-	 * without it — but having passed that guard it calls `get_the_content()`
-	 * with *no arguments*, deliberately, so that a preview of the queried object
-	 * can apply. That reads the global post and the `$pages` globals
-	 * `setup_postdata()` fills in, not the context. So the context makes the
-	 * block agree to render and the globals decide what it renders.
 	 *
 	 * @param string $content The pattern's markup, as the page's content.
 	 */
