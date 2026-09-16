@@ -242,7 +242,7 @@ class Pattern_Builder_Preview {
 		return array(
 			'status'  => 200,
 			'headers' => $headers,
-			'body'    => self::without_scripts( $this->document_around( do_blocks( $pattern->content ), $pattern, true ) ),
+			'body'    => self::without_scripts( $this->document_around( $this->render_blocks( $pattern->content ), $pattern, true ) ),
 		);
 	}
 
@@ -520,7 +520,50 @@ class Pattern_Builder_Preview {
 	 * @return string
 	 */
 	private function standalone_document( $pattern ) {
-		return $this->document_around( do_blocks( $pattern->content ), $pattern );
+		return $this->document_around( $this->render_blocks( $pattern->content ), $pattern );
+	}
+
+	/**
+	 * Render a pattern's blocks with a stand-in post behind them.
+	 *
+	 * A pattern is not a page, but the blocks in it may well be a page's: `core/post-title`
+	 * and `core/post-content` render whatever post the request has. A tile is drawn on a
+	 * front-end request to the site's home page, so without this the request's own post is
+	 * what they find — and a pattern carrying `core/post-content` draws the site's home page
+	 * inside itself, in every tile.
+	 *
+	 * @param string $content The pattern's block markup.
+	 * @return string Rendered HTML.
+	 */
+	private function render_blocks( $content ) {
+		$this->pose_as_a_page( self::stand_in_content() );
+
+		$html = do_blocks( $content );
+
+		$this->stop_posing();
+
+		return $html;
+	}
+
+	/**
+	 * What the blocks that render a post's own fields show in a preview.
+	 *
+	 * There is no real content to show, and an empty region says less about a layout than
+	 * filler does — a pattern's two columns are only legible when there is something in
+	 * them. So this is filler that says what it is.
+	 *
+	 * @return string Block markup.
+	 */
+	private static function stand_in_content() {
+		$lead = __( 'This is where the post’s content appears when the pattern is used.', 'pattern-builder' );
+		$rest = __( 'The preview fills it in so the layout can be seen. Nothing here comes from the site.', 'pattern-builder' );
+
+		return '<!-- wp:paragraph {"className":"pattern-builder-placeholder"} -->'
+			. '<p class="pattern-builder-placeholder">' . esc_html( $lead ) . '</p>'
+			. '<!-- /wp:paragraph -->'
+			. '<!-- wp:paragraph {"className":"pattern-builder-placeholder"} -->'
+			. '<p class="pattern-builder-placeholder">' . esc_html( $rest ) . '</p>'
+			. '<!-- /wp:paragraph -->';
 	}
 
 	/**
@@ -535,7 +578,7 @@ class Pattern_Builder_Preview {
 		if ( '' === $template ) {
 			return $this->document_around(
 				'<!-- pattern-builder: this theme has no block template for a page; rendered standalone -->'
-					. do_blocks( $pattern->content ),
+					. $this->render_blocks( $pattern->content ),
 				$pattern
 			);
 		}
@@ -682,6 +725,9 @@ class Pattern_Builder_Preview {
 	.pattern-builder-tile__content > * { margin-top: 0 !important; }
 </style>
 		<?php endif; ?>
+<style id="pattern-builder-placeholder">
+	.pattern-builder-placeholder { opacity: 0.55; font-style: italic; }
+</style>
 </head>
 <body class="pattern-builder-preview wp-embed-responsive">
 		<?php

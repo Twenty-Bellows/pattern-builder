@@ -69,6 +69,68 @@ class Test_Preview extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A tile is drawn on a front-end request to the site's home page, so by the time the
+	 * pattern renders, the global post is whatever that request queried.
+	 * `core/post-content` reads the global rather than its context — deliberately, so that
+	 * a preview of the queried object can apply — so a pattern carrying one used to draw
+	 * the site's home page inside itself, in every tile, in every such pattern.
+	 */
+	public function test_a_standalone_render_does_not_borrow_the_requests_post() {
+		$queried = self::factory()->post->create_and_get(
+			array(
+				'post_title'   => 'The Home Page',
+				'post_content' => '<!-- wp:paragraph --><p>The home page copy.</p><!-- /wp:paragraph -->',
+			)
+		);
+		$GLOBALS['post'] = $queried;
+		setup_postdata( $queried );
+
+		$html = $this->call( 'standalone_document', array( $this->a_pattern( '<!-- wp:post-content /-->' ) ) );
+
+		wp_reset_postdata();
+		unset( $GLOBALS['post'] );
+
+		$this->assertStringNotContainsString( 'The home page copy.', $html );
+	}
+
+	/**
+	 * And the region is not simply left blank: a pattern is a layout, and an empty column
+	 * shows less about it than filler does.
+	 */
+	public function test_a_standalone_render_stands_in_for_the_post() {
+		$html = $this->call( 'standalone_document', array( $this->a_pattern( '<!-- wp:post-content /-->' ) ) );
+
+		// The rendered text, not the class: the document always carries a style rule naming
+		// that class, so matching it alone would pass without post-content rendering at all.
+		$this->assertStringContainsString( 'wp-block-post-content', $html );
+		$this->assertStringContainsString( 'This is where the post’s content appears', $html );
+	}
+
+	/**
+	 * The control for the test above. A pattern that asks for no post of its own gets no
+	 * filler, however much of a post is standing behind it.
+	 */
+	public function test_a_pattern_that_wants_no_post_gets_no_filler() {
+		$html = $this->call( 'standalone_document', array( $this->a_pattern() ) );
+
+		$this->assertStringNotContainsString( 'This is where the post’s content appears', $html );
+		$this->assertStringContainsString( 'Body copy.', $html );
+	}
+
+	/**
+	 * Whatever the request was doing with the global post, it gets it back.
+	 */
+	public function test_a_standalone_render_puts_the_requests_post_back() {
+		$queried         = self::factory()->post->create_and_get( array( 'post_title' => 'The Home Page' ) );
+		$GLOBALS['post'] = $queried;
+
+		$this->call( 'standalone_document', array( $this->a_pattern( '<!-- wp:post-content /-->' ) ) );
+
+		$this->assertSame( $queried->ID, $GLOBALS['post']->ID );
+		unset( $GLOBALS['post'] );
+	}
+
+	/**
 	 * The stand-in is what makes the page context possible.
 	 */
 	public function test_the_stand_in_lets_post_content_render_the_pattern() {

@@ -279,11 +279,26 @@ than as an error.
 styles: `standalone` on its own, `page` inside the resolved page template, and
 either one against a bundled lab theme through the route's `theme` parameter.
 
-The page context needs a post to exist, so a stand-in is primed into the object
+Every render needs a post to exist, so a stand-in is primed into the object
 cache for one request and never written. Two things make it work:
 `core/post-content` checks `$block->context['postId']` and refuses without it,
 then calls `get_the_content()` with no arguments, which reads the *global* post
-and the `$pages` globals `setup_postdata()` fills.
+and the `$pages` globals `setup_postdata()` fills. `supply_the_page()` satisfies
+the first and `pose_as_a_page()` the second.
+
+The page context poses as a page whose content *is* the pattern, so the
+template's `core/post-content` renders it; the pattern's own, if it has one,
+meets core's `$seen_ids` guard and renders nothing.
+
+`render_blocks()` is why the other contexts pose as well, and it is not a
+nicety. A tile is drawn on a front-end request to `tile_base()` —
+`home_url( '/' )` — and `serve_tile()` runs on `template_redirect`, by which
+point WordPress has queried the front page and set the global post. Core's
+`render_block()` seeds `postId` and `postType` context from that global, so a
+pattern carrying `core/post-content` passed the block's guard and then drew the
+site's home page inside itself, in every tile of every such pattern. Posing puts
+`stand_in_content()` there instead: filler that says it is filler, because a
+pattern is a layout and an empty column shows less of one than filler does.
 
 ### Lab themes (`themes/`)
 
