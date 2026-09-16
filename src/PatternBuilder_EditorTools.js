@@ -10,8 +10,10 @@ import { EditorSidePanel } from './components/EditorSidePanel';
 import { PatternPanelAdditionsPlugin } from './components/PatternPanelAdditions';
 import { PatternSaveMonitor } from './utils/patternSaveMonitor';
 import { registerEditPatternToolbarButton } from './components/EditPatternToolbarButton';
+import { registerPatternPostContent } from './components/PatternPostContent';
 
 registerEditPatternToolbarButton();
+registerPatternPostContent();
 
 registerPlugin( 'pattern-builder-editor-side-panel', {
 	render: EditorSidePanel,
