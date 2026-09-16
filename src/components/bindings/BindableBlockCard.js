@@ -142,10 +142,7 @@ export const BindableBlockCard = ( {
 							label={ __( 'Overridable', 'pattern-builder' ) }
 							help={
 								name
-									? __(
-											'Whoever places the pattern can change this value. Off, it stays as the pattern file saved it.',
-											'pattern-builder'
-									  )
+									? undefined
 									: __(
 											'Name the block first — overrides are stored against the name.',
 											'pattern-builder'
