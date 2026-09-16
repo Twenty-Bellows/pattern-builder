@@ -7,11 +7,6 @@ namespace TwentyBellows\PatternBuilder;
  * Value object representing a single block pattern.
  */
 class Abstract_Pattern {
-	/**
-	 * The headers a pattern file's comment block carries: the property each one sets,
-	 * keyed to the name `get_file_data()` looks for. Every other line of that comment is
-	 * kept verbatim in `$additionalMetadata`, so the two cannot drift apart.
-	 */
 	const FILE_HEADERS = array(
 		'title'         => 'Title',
 		'slug'          => 'Slug',
@@ -256,9 +251,6 @@ class Abstract_Pattern {
 	 * `from_file()` reads, and so belongs to a field of its own rather than to
 	 * `$additionalMetadata`.
 	 *
-	 * The tolerated prefix and the case-insensitivity mirror `get_file_data()` exactly, so
-	 * a line this answers false for is a line core will not read as a header either.
-	 *
 	 * @param string $line One line of the comment.
 	 * @return bool
 	 */
@@ -274,11 +266,6 @@ class Abstract_Pattern {
 
 	/**
 	 * Reads the part of a pattern file's header comment that is not a recognised header.
-	 *
-	 * `get_file_data()` only extracts headers it is asked for by name, so the rest of that
-	 * comment is invisible to it, and rebuilding the file from the pattern would drop it.
-	 * Themes conventionally carry a `@package`/`@subpackage`/`@since` block there, and a
-	 * hand-written pattern often carries a note beside it.
 	 *
 	 * @param string $pattern_file Absolute path to the pattern file.
 	 * @return string The remaining lines with their leading `*` stripped, or '' if none.
