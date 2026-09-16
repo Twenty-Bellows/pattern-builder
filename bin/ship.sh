@@ -73,25 +73,31 @@ for cmd in svn rsync npm node git; do
 done
 dim "tooling ok: svn, rsync, npm, node, git"
 
-# Version must agree in all three places wp.org and WordPress read it from.
+# Version must agree everywhere it is read from: the three wp.org and WordPress read,
+# and PATTERN_BUILDER_VERSION, which the plugin itself reads. The constant was left out
+# of this check once and fell a version behind, which took the tile cache key and the
+# per-version upgrade step with it.
 pkg_version="$(node -p "require('./package.json').version")"
 hdr_version="$(sed -n -E 's/^[[:space:]]*\*[[:space:]]*Version:[[:space:]]*(.+[^[:space:]])[[:space:]]*$/\1/p' "${SLUG}.php" | head -n1)"
 txt_version="$(sed -n -E 's/^Stable tag:[[:space:]]*(.+[^[:space:]])[[:space:]]*$/\1/p' readme.txt | head -n1)"
+const_version="$(sed -n -E "s/^[[:space:]]*define\\([[:space:]]*'PATTERN_BUILDER_VERSION',[[:space:]]*'([^']+)'.*$/\\1/p" "${SLUG}.php" | head -n1)"
 
 [ -n "$pkg_version" ] || die 'Could not read version from package.json'
 [ -n "$hdr_version" ] || die "Could not read Version: from ${SLUG}.php"
 [ -n "$txt_version" ] || die 'Could not read Stable tag: from readme.txt'
+[ -n "$const_version" ] || die "Could not read PATTERN_BUILDER_VERSION from ${SLUG}.php"
 
-if [ "$pkg_version" != "$hdr_version" ] || [ "$pkg_version" != "$txt_version" ]; then
+if [ "$pkg_version" != "$hdr_version" ] || [ "$pkg_version" != "$txt_version" ] || [ "$pkg_version" != "$const_version" ]; then
 	printf '\n' >&2
-	printf '    package.json  version     %s\n' "$pkg_version" >&2
-	printf '    %s.php  Version:    %s\n' "$SLUG" "$hdr_version" >&2
-	printf '    readme.txt    Stable tag: %s\n' "$txt_version" >&2
-	die 'Version mismatch. Make all three agree before shipping.'
+	printf '    package.json  version                  %s\n' "$pkg_version" >&2
+	printf '    %s.php  Version:                 %s\n' "$SLUG" "$hdr_version" >&2
+	printf '    readme.txt    Stable tag:              %s\n' "$txt_version" >&2
+	printf '    %s.php  PATTERN_BUILDER_VERSION  %s\n' "$SLUG" "$const_version" >&2
+	die 'Version mismatch. Make all four agree before shipping.'
 fi
 
 readonly VERSION="$pkg_version"
-dim "version ${VERSION} (package.json, plugin header, readme.txt all agree)"
+dim "version ${VERSION} (package.json, plugin header, readme.txt, PATTERN_BUILDER_VERSION all agree)"
 
 # The release should correspond to a commit, so it can be reproduced later.
 if [ -n "$(git status --porcelain)" ]; then

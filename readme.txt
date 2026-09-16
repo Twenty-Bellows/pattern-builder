@@ -3,7 +3,7 @@ Contributors:      twentybellows, pbking
 Tags:              block-patterns, patterns, block-editor, gutenberg, design
 Requires at least: 6.8
 Tested up to:      7.1
-Stable tag:        2.1.0
+Stable tag:        2.1.1
 Requires PHP:      7.4
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -117,6 +117,12 @@ Yes. Anything registered as post meta with show_in_rest is offered automatically
 == Screenshots ==
 
 == Changelog ==
+
+= 2.1.1 =
+* Editing a theme pattern no longer discards the rest of its file header: the @package block a theme carries, or a note written beside it, is kept exactly as it was and can be edited in the Pattern Metadata panel
+* A pattern file that runs PHP is now recognised and never written over. Reading one runs it, so saving would have replaced the code with the output of a single run; the pattern still lists, opens and previews, and the editor says why it cannot be saved
+* Patterns built around the Content block now preview as themselves instead of drawing the site's home page inside the pattern, and open in the editor instead of reporting that the block cannot be rendered inside itself
+* The plugin's version constant is reported correctly again. It had fallen a release behind, which left the 2.1.0 upgrade step unrun and pattern previews serving what they had drawn before the update
 
 = 2.1.0 =
 * Pattern Bindings: bind a block's value to any registered source, not pattern overrides alone — a post type's custom fields, Advanced Custom Fields, or a source a plugin registers — picked per attribute from the fields that post type really offers
