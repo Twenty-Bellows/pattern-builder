@@ -73,8 +73,9 @@ after touching the porter, the cloud controller, or the service's store.
 stops before the commit; `npm run plugin-ship` ships it; `npm run
 plugin-ship:reset` restores the `svn/` working copy. The ship set is
 `.distignore`; wp.org assets live in `.wordpress-org/`. Preflight requires the
-version to agree in `pattern-builder.php`, `package.json` and readme.txt's
-`Stable tag`.
+version to agree in all four places it is read from: `package.json`, readme.txt's
+`Stable tag`, and both the `Version:` header and `PATTERN_BUILDER_VERSION` in
+`pattern-builder.php`.
 
 ## Invariants
 
@@ -172,6 +173,14 @@ correctly absent.
 
 ## Versioning
 
-The version is tracked in `pattern-builder.php`, `package.json` and
-`readme.txt`. `npm run version-bump` changes all three: the patch number by
-default, or the version given as its argument.
+The version is tracked in four places: `package.json`, readme.txt's `Stable
+tag`, and both the `Version:` header and `PATTERN_BUILDER_VERSION` in
+`pattern-builder.php`. `npm run version-bump` changes all four — the patch
+number by default, or the version given as its argument — and stops rather than
+writing a partial bump if any of them has moved out from under it.
+
+The constant is the one that bites. The header is what WordPress and wp.org
+read; the constant is what the plugin reads, and the tile cache key
+(`design_version()`) and the per-version upgrade step in
+`Pattern_Builder_Migration` are both keyed on it. It fell a release behind once,
+so neither took effect on update.
