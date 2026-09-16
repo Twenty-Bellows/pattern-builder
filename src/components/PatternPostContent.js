@@ -20,17 +20,6 @@ const PATTERN_POST_TYPE = 'pb_pattern';
 /**
  * `core/post-content` while a theme pattern is open.
  *
- * The editor gives a document's blocks a `postId` and `postType` context unless its post
- * type is one of core's `NON_CONTEXTUAL_POST_TYPES` — `wp_block`, `wp_navigation`,
- * `wp_template_part`. A user pattern is on that list, and a theme pattern cannot be: the
- * list is a constant inside core's editor bundle with no filter over it.
- *
- * So `core/post-content` in a theme pattern is handed the pattern's own id, finds that id
- * already on the recursion stack — the editor wraps the document in a `RecursionProvider`
- * keyed on it — and renders "Block cannot be rendered inside itself" in place of anything
- * editable. Taking the two values away puts the block on the path core's own pattern
- * editor uses, where it draws its placeholder instead.
- *
  * @param {Object}   root0           Component props.
  * @param {Function} root0.BlockEdit The wrapped edit.
  */
