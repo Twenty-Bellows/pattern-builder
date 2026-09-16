@@ -140,14 +140,6 @@ export const BindableBlockCard = ( {
 					) : (
 						<ToggleControl
 							label={ __( 'Overridable', 'pattern-builder' ) }
-							help={
-								name
-									? undefined
-									: __(
-											'Name the block first — overrides are stored against the name.',
-											'pattern-builder'
-									  )
-							}
 							checked={
 								getBindingMode( bindings, supported ) ===
 								MODE.OVERRIDES
