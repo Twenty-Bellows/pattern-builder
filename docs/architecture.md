@@ -273,6 +273,34 @@ rather than at each caller. WordPress registers a pattern under whatever its
 reference can reach — and an unresolved reference renders as nothing rather
 than as an error.
 
+## What a pattern file carries
+
+Writing a theme pattern rebuilds its file. `build_pattern_file_metadata()`
+composes the header out of the pattern's own fields, and
+`Abstract_Pattern::FILE_HEADERS` is the one list naming them, so the read and
+the write cannot drift apart. That is lossless for a file the plugin wrote, and
+lossy for every other one: `get_file_data()` can only extract headers it is
+asked for by name, so the `@package` block a theme conventionally carries is
+invisible to it and used to disappear on the first save.
+
+`additionalMetadata` holds the rest of that comment verbatim — every line
+`is_recognised_header()` says is not a header, stripped of its leading `*`, in
+the order it was written. Preserved rather than parsed, because a docblock tail
+is freeform: tags, a note to the next reader, a license paragraph. A user
+pattern has no file and so always has an empty one, and nothing carries it to
+the cloud, where a tag naming this theme would be wrong in anybody else's.
+
+The value is free text from the editor written into a PHP comment, so the
+writer breaks apart the one sequence that escapes one rather than refusing the
+save. `tests/php/test-pattern-metadata.php` asserts that what lands on disk
+tokenizes to an opening tag, a doc comment, a closing tag and literal markup,
+and nothing else.
+
+This covers the header only. A pattern file whose *body* runs PHP is a separate
+problem — reading one executes it and keeps the output, so writing it back
+replaces the program with a snapshot of a single run — and nothing guards
+against that yet.
+
 ## Previews
 
 `Pattern_Builder_Preview` renders a pattern as a whole page with the site's

@@ -354,6 +354,10 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 			$pattern->description = $request['description'];
 		}
 
+		if ( is_string( $request['additionalMetadata'] ) ) {
+			$pattern->additionalMetadata = $request['additionalMetadata'];
+		}
+
 		foreach ( array( 'categories', 'keywords', 'blockTypes', 'postTypes', 'templateTypes' ) as $list_field ) {
 			if ( is_array( $request[ $list_field ] ) ) {
 				$pattern->{$list_field} = array_values( array_filter( array_map( 'strval', $request[ $list_field ] ), 'strlen' ) );
@@ -407,31 +411,32 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 		$is_theme = 'theme' === $pattern->source;
 
 		$data = array(
-			'id'            => $is_theme ? $pattern->name : $pattern->id,
-			'name'          => $pattern->name,
-			'slug'          => $is_theme ? $pattern->name : basename( (string) $pattern->name ),
-			'type'          => $is_theme ? $this->post_type : 'wp_block',
-			'status'        => 'publish',
-			'title'         => array(
+			'id'                 => $is_theme ? $pattern->name : $pattern->id,
+			'name'               => $pattern->name,
+			'slug'               => $is_theme ? $pattern->name : basename( (string) $pattern->name ),
+			'type'               => $is_theme ? $this->post_type : 'wp_block',
+			'status'             => 'publish',
+			'title'              => array(
 				'raw'      => $pattern->title,
 				'rendered' => $pattern->title,
 			),
-			'content'       => array(
+			'content'            => array(
 				'raw'           => $pattern->content,
 				'block_version' => block_version( $pattern->content ),
 			),
-			'description'   => $pattern->description,
-			'categories'    => array_values( $pattern->categories ),
-			'keywords'      => array_values( $pattern->keywords ),
-			'blockTypes'    => array_values( $pattern->blockTypes ),
-			'postTypes'     => array_values( $pattern->postTypes ),
-			'templateTypes' => array_values( $pattern->templateTypes ),
-			'inserter'      => (bool) $pattern->inserter,
-			'synced'        => (bool) $pattern->synced,
-			'viewportWidth' => $pattern->viewportWidth,
-			'source'        => $pattern->source,
-			'origin'        => (string) $pattern->origin,
-			'cloud'         => (string) $pattern->cloud,
+			'description'        => $pattern->description,
+			'categories'         => array_values( $pattern->categories ),
+			'keywords'           => array_values( $pattern->keywords ),
+			'blockTypes'         => array_values( $pattern->blockTypes ),
+			'postTypes'          => array_values( $pattern->postTypes ),
+			'templateTypes'      => array_values( $pattern->templateTypes ),
+			'inserter'           => (bool) $pattern->inserter,
+			'synced'             => (bool) $pattern->synced,
+			'viewportWidth'      => $pattern->viewportWidth,
+			'source'             => $pattern->source,
+			'origin'             => (string) $pattern->origin,
+			'cloud'              => (string) $pattern->cloud,
+			'additionalMetadata' => (string) $pattern->additionalMetadata,
 		);
 
 		if ( $is_theme && current_user_can( 'edit_theme_options' ) ) {
@@ -509,31 +514,31 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 			'title'      => $this->post_type,
 			'type'       => 'object',
 			'properties' => array(
-				'id'            => array(
+				'id'                 => array(
 					'description' => __( 'Pattern identity: the namespaced name for theme patterns, the post ID for user patterns.', 'pattern-builder' ),
 					'type'        => array( 'string', 'integer' ),
 					'readonly'    => true,
 				),
-				'name'          => array(
+				'name'               => array(
 					'description' => __( 'Namespaced pattern name.', 'pattern-builder' ),
 					'type'        => 'string',
 				),
-				'slug'          => array(
+				'slug'               => array(
 					'description' => __( 'Pattern slug.', 'pattern-builder' ),
 					'type'        => 'string',
 					'readonly'    => true,
 				),
-				'type'          => array(
+				'type'               => array(
 					'description' => __( 'Entity type of the pattern.', 'pattern-builder' ),
 					'type'        => 'string',
 					'readonly'    => true,
 				),
-				'status'        => array(
+				'status'             => array(
 					'description' => __( 'Pattern status.', 'pattern-builder' ),
 					'type'        => 'string',
 					'readonly'    => true,
 				),
-				'title'         => array(
+				'title'              => array(
 					'description' => __( 'Pattern title.', 'pattern-builder' ),
 					'type'        => array( 'string', 'object' ),
 					'properties'  => array(
@@ -544,7 +549,7 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 						),
 					),
 				),
-				'content'       => array(
+				'content'            => array(
 					'description' => __( 'Pattern block markup.', 'pattern-builder' ),
 					'type'        => array( 'string', 'object' ),
 					'properties'  => array(
@@ -555,63 +560,67 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 						),
 					),
 				),
-				'description'   => array(
+				'description'        => array(
 					'description' => __( 'Pattern description.', 'pattern-builder' ),
 					'type'        => 'string',
 				),
-				'categories'    => array(
+				'categories'         => array(
 					'description' => __( 'Pattern category slugs.', 'pattern-builder' ),
 					'type'        => 'array',
 					'items'       => array( 'type' => 'string' ),
 				),
-				'keywords'      => array(
+				'keywords'           => array(
 					'description' => __( 'Pattern keywords.', 'pattern-builder' ),
 					'type'        => 'array',
 					'items'       => array( 'type' => 'string' ),
 				),
-				'blockTypes'    => array(
+				'blockTypes'         => array(
 					'description' => __( 'Block types this pattern is offered for.', 'pattern-builder' ),
 					'type'        => 'array',
 					'items'       => array( 'type' => 'string' ),
 				),
-				'postTypes'     => array(
+				'postTypes'          => array(
 					'description' => __( 'Post types this pattern is limited to.', 'pattern-builder' ),
 					'type'        => 'array',
 					'items'       => array( 'type' => 'string' ),
 				),
-				'templateTypes' => array(
+				'templateTypes'      => array(
 					'description' => __( 'Template types this pattern is offered for.', 'pattern-builder' ),
 					'type'        => 'array',
 					'items'       => array( 'type' => 'string' ),
 				),
-				'inserter'      => array(
+				'inserter'           => array(
 					'description' => __( 'Whether the pattern is offered by the block inserter.', 'pattern-builder' ),
 					'type'        => 'boolean',
 				),
-				'synced'        => array(
+				'synced'             => array(
 					'description' => __( 'Whether inserted copies of the pattern stay linked to it.', 'pattern-builder' ),
 					'type'        => 'boolean',
 				),
-				'viewportWidth' => array(
+				'viewportWidth'      => array(
 					'description' => __( 'Intended viewport width when previewing the pattern, in pixels.', 'pattern-builder' ),
 					'type'        => array( 'integer', 'null' ),
 				),
-				'source'        => array(
+				'source'             => array(
 					'description' => __( 'Where the pattern lives: a theme file or the database.', 'pattern-builder' ),
 					'type'        => 'string',
 					'enum'        => array( 'theme', 'user' ),
 				),
-				'origin'        => array(
+				'origin'             => array(
 					'description' => __( 'The cloud pattern this one was first copied from, or empty when it is original work here.', 'pattern-builder' ),
 					'type'        => 'string',
 					'readonly'    => true,
 				),
-				'cloud'         => array(
+				'cloud'              => array(
 					'description' => __( 'The name of this pattern’s copy on the cloud, or empty when it has none.', 'pattern-builder' ),
 					'type'        => 'string',
 					'readonly'    => true,
 				),
-				'fromWpBlock'   => array(
+				'additionalMetadata' => array(
+					'description' => __( 'Lines of the pattern file’s header comment that are not headers Pattern Builder reads, kept verbatim. Always empty for a user pattern, which has no file.', 'pattern-builder' ),
+					'type'        => 'string',
+				),
+				'fromWpBlock'        => array(
 					'description' => __( 'On creation, the ID of a wp_block post to convert into this theme pattern.', 'pattern-builder' ),
 					'type'        => 'integer',
 				),

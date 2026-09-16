@@ -26,6 +26,10 @@ export class AbstractPattern {
 	viewportWidth = null;
 	filePath = null;
 
+	// Whatever the pattern file's header comment carries besides the headers above.
+	// Always '' for a user pattern, which has no file.
+	additionalMetadata = '';
+
 	constructor( options ) {
 		this.id = options.id ?? null;
 
@@ -47,6 +51,7 @@ export class AbstractPattern {
 
 		this.viewportWidth = options.viewportWidth || null;
 		this.filePath = options.filePath || null;
+		this.additionalMetadata = options.additionalMetadata || '';
 	}
 
 	getBlocks() {

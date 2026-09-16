@@ -8,6 +8,27 @@ namespace TwentyBellows\PatternBuilder;
  */
 class Abstract_Pattern {
 	/**
+	 * The headers a pattern file's comment block carries: the property each one sets,
+	 * keyed to the name `get_file_data()` looks for. Every other line of that comment is
+	 * kept verbatim in `$additionalMetadata`, so the two cannot drift apart.
+	 */
+	const FILE_HEADERS = array(
+		'title'         => 'Title',
+		'slug'          => 'Slug',
+		'description'   => 'Description',
+		'viewportWidth' => 'Viewport Width',
+		'inserter'      => 'Inserter',
+		'categories'    => 'Categories',
+		'keywords'      => 'Keywords',
+		'blockTypes'    => 'Block Types',
+		'postTypes'     => 'Post Types',
+		'templateTypes' => 'Template Types',
+		'synced'        => 'Synced',
+		'origin'        => 'Origin',
+		'cloud'         => 'Cloud',
+	);
+
+	/**
 	 * Pattern identity.
 	 *
 	 * @var string|int|null
@@ -129,6 +150,16 @@ class Abstract_Pattern {
 	public $cloud;
 
 	/**
+	 * The lines of the pattern file's header comment that are not headers this class
+	 * reads — the `@package`/`@subpackage`/`@since` block a theme conventionally carries,
+	 * a paragraph explaining what the file is for — kept verbatim so that writing the
+	 * pattern back does not discard them. Always '' for a user pattern, which has no file.
+	 *
+	 * @var string
+	 */
+	public $additionalMetadata; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.PropertyNotSnakeCase
+
+	/**
 	 * Constructor.
 	 *
 	 * @param array $args Pattern arguments.
@@ -154,9 +185,10 @@ class Abstract_Pattern {
 
 		$this->viewportWidth = isset( $args['viewportWidth'] ) && '' !== $args['viewportWidth'] ? (int) $args['viewportWidth'] : null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 
-		$this->filePath = $args['filePath'] ?? null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName
-		$this->origin   = $args['origin'] ?? '';
-		$this->cloud    = $args['cloud'] ?? '';
+		$this->filePath           = $args['filePath'] ?? null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName
+		$this->origin             = $args['origin'] ?? '';
+		$this->cloud              = $args['cloud'] ?? '';
+		$this->additionalMetadata = (string) ( $args['additionalMetadata'] ?? '' ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 
 		$this->id = $args['id'] ?? ( 'theme' === $this->source ? $this->name : null );
 	}
@@ -194,45 +226,86 @@ class Abstract_Pattern {
 	 * @return self
 	 */
 	public static function from_file( $pattern_file ) {
-		$pattern_data = get_file_data(
-			$pattern_file,
-			array(
-				'title'         => 'Title',
-				'slug'          => 'Slug',
-				'description'   => 'Description',
-				'viewportWidth' => 'Viewport Width',
-				'inserter'      => 'Inserter',
-				'categories'    => 'Categories',
-				'keywords'      => 'Keywords',
-				'blockTypes'    => 'Block Types',
-				'postTypes'     => 'Post Types',
-				'templateTypes' => 'Template Types',
-				'synced'        => 'Synced',
-				'origin'        => 'Origin',
-				'cloud'         => 'Cloud',
-			)
-		);
+		$pattern_data = get_file_data( $pattern_file, self::FILE_HEADERS );
 
 		return new self(
 			array(
-				'name'          => $pattern_data['slug'],
-				'title'         => $pattern_data['title'],
-				'description'   => $pattern_data['description'],
-				'content'       => self::render_pattern( $pattern_file ),
-				'filePath'      => $pattern_file,
-				'categories'    => self::split_header_list( $pattern_data['categories'] ),
-				'keywords'      => self::split_header_list( $pattern_data['keywords'] ),
-				'blockTypes'    => self::split_header_list( $pattern_data['blockTypes'] ),
-				'postTypes'     => self::split_header_list( $pattern_data['postTypes'] ),
-				'templateTypes' => self::split_header_list( $pattern_data['templateTypes'] ),
-				'viewportWidth' => $pattern_data['viewportWidth'],
-				'source'        => 'theme',
-				'synced'        => in_array( strtolower( trim( $pattern_data['synced'] ) ), array( 'yes', 'true', '1', 'on' ), true ),
-				'inserter'      => 'no' !== strtolower( trim( $pattern_data['inserter'] ) ),
-				'origin'        => trim( $pattern_data['origin'] ),
-				'cloud'         => trim( $pattern_data['cloud'] ),
+				'name'               => $pattern_data['slug'],
+				'title'              => $pattern_data['title'],
+				'description'        => $pattern_data['description'],
+				'content'            => self::render_pattern( $pattern_file ),
+				'filePath'           => $pattern_file,
+				'categories'         => self::split_header_list( $pattern_data['categories'] ),
+				'keywords'           => self::split_header_list( $pattern_data['keywords'] ),
+				'blockTypes'         => self::split_header_list( $pattern_data['blockTypes'] ),
+				'postTypes'          => self::split_header_list( $pattern_data['postTypes'] ),
+				'templateTypes'      => self::split_header_list( $pattern_data['templateTypes'] ),
+				'viewportWidth'      => $pattern_data['viewportWidth'],
+				'source'             => 'theme',
+				'synced'             => in_array( strtolower( trim( $pattern_data['synced'] ) ), array( 'yes', 'true', '1', 'on' ), true ),
+				'inserter'           => 'no' !== strtolower( trim( $pattern_data['inserter'] ) ),
+				'origin'             => trim( $pattern_data['origin'] ),
+				'cloud'              => trim( $pattern_data['cloud'] ),
+				'additionalMetadata' => self::additional_metadata_from_file( $pattern_file ),
 			)
 		);
+	}
+
+	/**
+	 * Whether a line of a pattern file's header comment sets one of the headers
+	 * `from_file()` reads, and so belongs to a field of its own rather than to
+	 * `$additionalMetadata`.
+	 *
+	 * The tolerated prefix and the case-insensitivity mirror `get_file_data()` exactly, so
+	 * a line this answers false for is a line core will not read as a header either.
+	 *
+	 * @param string $line One line of the comment.
+	 * @return bool
+	 */
+	public static function is_recognised_header( $line ) {
+		foreach ( self::FILE_HEADERS as $header ) {
+			if ( preg_match( '/^(?:[ \t]*<\?(?:php)?)?[ \t\/*#@]*' . preg_quote( $header, '/' ) . ':/i', $line ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Reads the part of a pattern file's header comment that is not a recognised header.
+	 *
+	 * `get_file_data()` only extracts headers it is asked for by name, so the rest of that
+	 * comment is invisible to it, and rebuilding the file from the pattern would drop it.
+	 * Themes conventionally carry a `@package`/`@subpackage`/`@since` block there, and a
+	 * hand-written pattern often carries a note beside it.
+	 *
+	 * @param string $pattern_file Absolute path to the pattern file.
+	 * @return string The remaining lines with their leading `*` stripped, or '' if none.
+	 */
+	private static function additional_metadata_from_file( $pattern_file ) {
+		// The same window, and the same line-ending fix, that get_file_data() applies, so
+		// that the two always read the same header.
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading a theme's own pattern file.
+		$head = file_get_contents( $pattern_file, false, null, 0, 8 * KB_IN_BYTES );
+
+		if ( false === $head || ! preg_match( '/\/\*\*(.*?)\*\//s', str_replace( "\r", "\n", $head ), $comment ) ) {
+			return '';
+		}
+
+		$lines = array();
+
+		foreach ( explode( "\n", $comment[1] ) as $line ) {
+			$line = rtrim( preg_replace( '/^\s*\*\s?/', '', $line ) );
+
+			if ( ! self::is_recognised_header( $line ) ) {
+				$lines[] = $line;
+			}
+		}
+
+		// Blank lines within the block are the author's paragraph breaks and are kept; the
+		// ones the opening and closing lines leave behind are not.
+		return trim( implode( "\n", $lines ), "\n" );
 	}
 
 	/**

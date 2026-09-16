@@ -528,9 +528,49 @@ class Pattern_File_Store {
 		$metadata .= " * Title: $pattern->title\n";
 		$metadata .= " * Slug: $pattern->name\n";
 		$metadata .= " * Description: $pattern->description$categories$keywords$blockTypes$postTypes$templateTypes$viewportWidth$inserter$synced$origin$cloud\n";
+		$metadata .= $this->build_additional_metadata( $pattern->additionalMetadata ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 		$metadata .= " */\n";
 		$metadata .= "?>\n";
 		return $metadata;
+	}
+
+	/**
+	 * Renders a pattern's preserved header lines back into its file's comment block.
+	 *
+	 * This text reaches us from the editor, so it cannot be trusted to stay inside the
+	 * comment it is written into: `*` followed by `/` closes the comment, and everything
+	 * after it would be parsed as PHP. That sequence is the only way out of a block
+	 * comment, and it is broken apart rather than refused so that pasting a code sample
+	 * into the field still saves.
+	 *
+	 * @param string $text The preserved lines, newline-separated.
+	 * @return string The comment lines to append, or '' when there is nothing to write.
+	 */
+	private function build_additional_metadata( $text ) {
+		$kept = array();
+
+		foreach ( explode( "\n", str_replace( array( "\r\n", "\r" ), "\n", (string) $text ) ) as $line ) {
+			// A header typed in here would sit beside the real one and be ignored by
+			// get_file_data(), so it is dropped: this field holds what the others do not.
+			if ( ! Abstract_Pattern::is_recognised_header( $line ) ) {
+				$kept[] = rtrim( str_replace( '*/', '* /', $line ) );
+			}
+		}
+
+		$text = trim( implode( "\n", $kept ), "\n" );
+
+		if ( '' === $text ) {
+			return '';
+		}
+
+		$lines = array();
+
+		foreach ( explode( "\n", $text ) as $line ) {
+			$lines[] = '' === $line ? ' *' : ' * ' . $line;
+		}
+
+		// A blank line separates the headers from the rest, as theme pattern files write it.
+		return " *\n" . implode( "\n", $lines ) . "\n";
 	}
 
 	/**
