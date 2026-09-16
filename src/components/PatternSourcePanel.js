@@ -1,4 +1,4 @@
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import {
 	Button,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
@@ -13,16 +13,13 @@ import { store as blockEditorStore } from '@wordpress/block-editor';
 import { useState } from '@wordpress/element';
 
 import { navigateToPattern } from '../utils/patternNavigation';
+import {
+	usePatternCloudState,
+	PatternCloudControls,
+} from './PatternCloudPanel';
 
 /**
  * Shows where a pattern is stored and converts it to the other storage.
- *
- * A theme pattern lives in a PHP file in the theme; converting it moves the
- * content into a wp_block post (exporting theme image assets to the media
- * library) and deletes the file. A user pattern lives in the database;
- * converting it writes a pattern file (importing its images into the theme)
- * and deletes the post. Conversion changes the pattern's identity, so it acts
- * on the last saved version and then opens the converted pattern.
  *
  * @param {Object} root0             Component props.
  * @param {Object} root0.patternPost The pattern's entity record.
@@ -39,11 +36,21 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 		};
 	}, [] );
 
+	const isThemePattern = postType === 'pb_pattern';
+	const patternType = isThemePattern ? 'theme' : 'user';
+	const { state: cloudState, refresh: refreshCloud } = usePatternCloudState(
+		patternType,
+		patternPost?.id,
+		patternPost?.modified
+	);
+
 	if ( ! patternPost ) {
 		return null;
 	}
-
-	const isThemePattern = postType === 'pb_pattern';
+	const content =
+		typeof patternPost.content === 'string'
+			? patternPost.content
+			: patternPost.content?.raw || '';
 
 	const convert = async () => {
 		setIsConverting( true );
@@ -92,7 +99,7 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 				<>
 					<Text variant="muted">
 						{ __(
-							'This is a Theme Pattern. It is stored as a file in your theme, is tied to the current theme, and can be shipped with the theme to other environments.',
+							'This is a Theme Pattern, stored as a file in your current theme directory.',
 							'pattern-builder'
 						) }
 					</Text>
@@ -101,21 +108,19 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 						isBusy={ isConverting }
 						disabled={ isConverting }
 						onClick={ convert }
+						hovertip={ __(
+							'Converting moves the pattern into the database (exporting its images to the media library) and deletes the theme file.',
+							'pattern-builder'
+						) }
 					>
 						{ __( 'Convert to User Pattern', 'pattern-builder' ) }
 					</Button>
-					<Text variant="muted">
-						{ __(
-							'Converting moves the pattern into the database (exporting its theme images to the media library) and deletes the theme file. The last saved version is converted.',
-							'pattern-builder'
-						) }
-					</Text>
 				</>
 			) : (
 				<>
 					<Text variant="muted">
 						{ __(
-							'This is a User Pattern. It is stored in the database, works across themes, but only exists in this environment.',
+							'This is a User Pattern, stored in the database, and works across themes.',
 							'pattern-builder'
 						) }
 					</Text>
@@ -124,16 +129,36 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 						isBusy={ isConverting }
 						disabled={ isConverting }
 						onClick={ convert }
-					>
-						{ __( 'Convert to Theme Pattern', 'pattern-builder' ) }
-					</Button>
-					<Text variant="muted">
-						{ __(
+						hovertip={ __(
 							'Converting writes the pattern into a file in the active theme (importing its images as theme assets) and deletes the database copy. The last saved version is converted.',
 							'pattern-builder'
 						) }
-					</Text>
+					>
+						{ __( 'Convert to Theme Pattern', 'pattern-builder' ) }
+					</Button>
 				</>
+			) }
+
+			{ !! patternPost.origin && (
+				<Text variant="muted" size="12px">
+					{ sprintf(
+						/* translators: %s: the pattern this one was copied from, e.g. studio-a/heroes/hero. */
+						__( 'Originally from %s', 'pattern-builder' ),
+						patternPost.origin
+					) }
+				</Text>
+			) }
+
+			{ cloudState?.connected && (
+				<div className="pattern-builder-source__cloud">
+					<PatternCloudControls
+						state={ cloudState }
+						onRefresh={ refreshCloud }
+						patternType={ patternType }
+						patternId={ patternPost?.id }
+						content={ content }
+					/>
+				</div>
 			) }
 		</VStack>
 	);

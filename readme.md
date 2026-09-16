@@ -1,90 +1,49 @@
-# Pattern Builder for WordPress
+# Pattern Builder
 
-**Manage Block Patterns Like a Pro** - Create, edit, and organize WordPress block patterns directly in your admin area with a powerful, intuitive interface.
+A WordPress plugin for creating, editing and organising block patterns in the
+admin. Theme patterns (PHP files in `patterns/`) and user patterns (`wp_block`
+posts) are managed in one interface, edited in the WordPress editor, and
+optionally shared through [patternbuilderwp.com](https://patternbuilderwp.com).
 
-## Features
-
-### Pattern Management Made Easy
-- **Unified Interface** - Manage both theme patterns and user-created patterns in one place
-- **Visual Editor** - Create patterns using the familiar WordPress block editor
-- **Live Preview** - See your patterns in action before saving
-
-### Powerful Organization
-- **Categories** - Organize patterns by category for easy discovery
-- **Advanced Search** - Find patterns quickly with powerful filtering options
-- **Tags & Keywords** - Add metadata to make patterns discoverable
-- **Sync Status** - Manage synced and unsynced patterns effortlessly
-
-### Developer-Friendly
-- **Export to Theme** - Convert user patterns to theme files with proper formatting
-- **Asset Management** - Automatically handles pattern images and media
-- **Block Bindings** - Advanced pattern configuration with block bindings support
+Agents can drive the same operations through WordPress core's Abilities API.
 
 ## Requirements
 
-- WordPress 6.8 or higher
-- PHP 7.4 or higher
-- Modern browser with JavaScript enabled
+WordPress 6.8+ · PHP 7.4+
 
-## Development
+## Install
 
-### Quick Start
+Download a release and install it as a plugin, or from source:
 
 ```bash
-# Clone the repository
 git clone https://github.com/Twenty-Bellows/pattern-builder.git
 cd pattern-builder
-
-# Install dependencies
-npm install
-composer install
-
-# Build assets
+npm install && composer install
 npm run build
-
-# Start development environment with Docker
-npm run start
-
-# Watch for changes during development
-npm run watch
 ```
 
-## Use Cases
+`npm run start` boots a local WordPress with the plugin active (requires
+Docker). `npm run watch` rebuilds on change.
 
-### For Theme Developers
-- Create and manage theme patterns visually
-- Export patterns with proper formatting
-- Organize patterns by category
-- Test patterns before deployment
+## Documentation
 
-### For Site Builders
-- Build custom patterns without coding
-- Reuse patterns across multiple pages
-- Share patterns between sites
-- Maintain pattern library
+| | |
+|---|---|
+| [`docs/architecture.md`](docs/architecture.md) | How the plugin is built. |
+| [`docs/abilities.md`](docs/abilities.md) | The agent interface. |
+| [`docs/cloud.md`](docs/cloud.md) | The patternbuilderwp.com integration. |
+| [`docs/collections.md`](docs/collections.md) | Collections. |
+| [`docs/dependencies.md`](docs/dependencies.md) | Dependency trees and attribution. |
+| [`CLAUDE.md`](CLAUDE.md) | Commands, invariants and coding standards. |
 
-### For Agencies
-- Create pattern libraries for clients
-- Standardize design systems
-- Speed up development workflow
-- Maintain brand consistency
+## Related
 
-## Contributing
+- [Synced Patterns for Themes](https://github.com/Twenty-Bellows/synced-patterns-for-themes)
+  — the runtime half, for shipping a theme built with Pattern Builder.
+- [patternbuilderwp.com](https://github.com/Twenty-Bellows/patternbuilderwp.com)
+  — the service.
 
-### Coding Standards
-- Follow WordPress coding standards for PHP
-- Use ESLint configuration for JavaScript
-- Write tests for new features
-- Update documentation as needed
+## License
 
-## Credits
-
-Pattern Builder is developed and maintained by [Twenty Bellows](https://github.com/Twenty-Bellows).
-
-## Support
-
-- Email: support@twentybellows.com
-- Issues: [GitHub Issues](https://github.com/Twenty-Bellows/pattern-builder/issues)
-- Documentation: [Wiki](https://github.com/Twenty-Bellows/pattern-builder/wiki)
-
----
+GPL-2.0-or-later. Built by [Twenty Bellows](https://twentybellows.com).
+Issues: [GitHub](https://github.com/Twenty-Bellows/pattern-builder/issues).

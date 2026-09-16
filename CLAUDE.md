@@ -1,149 +1,177 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code and other AI coding agents when working with code in this repository.
+Guidance for Claude Code and other AI coding agents working in this repository.
 
-## Project Overview
+## What this is
 
-**Pattern Builder** is a WordPress plugin developed by [Twenty Bellows](https://twentybellows.com). It allows WordPress users to create, edit, organize, and manage block patterns directly in the admin interface — unifying theme patterns (PHP files) and user-created patterns (`wp_block` posts) in a single, intuitive UI with visual editing, live preview, metadata management, and conversion between the two.
+**Pattern Builder** is a WordPress plugin by [Twenty Bellows](https://twentybellows.com)
+for creating, editing and organising block patterns in the admin. It unifies
+theme patterns (PHP files) and user patterns (`wp_block` posts) in one UI, and
+connects to [patternbuilderwp.com](https://patternbuilderwp.com) for sharing
+them.
 
-- **Version:** 2.0.0
-- **Repository:** https://github.com/twenty-bellows/pattern-builder
-- **Issue Tracker:** GitHub Issues — https://github.com/twenty-bellows/pattern-builder/issues
-- **Plugin URI:** https://www.twentybellows.com/pattern-builder/
-- **License:** GPL-2.0-or-later
-- **WordPress Requires:** 6.8+
-- **PHP Requires:** 7.4+
+- **Requires:** WordPress 6.8+, PHP 7.4+ · **License:** GPL-2.0-or-later
+- **Issues:** https://github.com/twenty-bellows/pattern-builder/issues
 
-## Architecture (Key Design Decisions)
+## Where the detail lives
 
-Version 2.0 removed the 1.x DB-mirror + REST-hijacking design entirely. Theme pattern files are the single source of truth; nothing is mirrored into the database and no core REST route is intercepted.
+Read these before changing the areas they cover. They describe how the system
+works **now**; a change that makes one wrong is not finished until that document
+is right.
 
-**Theme patterns are file-backed REST entities.** A rowless post type `pb_pattern` (registered like core's `wp_template` — zero DB rows) hangs `Pattern_Builder_REST_Patterns_Controller` off core routing at `/pattern-builder/v1/patterns`. Theme patterns have string IDs (their namespaced name, e.g. `my-theme/hero`), templates-style. Reads come from the pattern files (child + parent theme); writes go back to the files (`Pattern_File_Store`). Because the type is `show_in_rest`, the block editor auto-creates a matching client-side entity from `/wp/v2/types`, which gives theme patterns entity-powered editing (undo, dirty tracking, save flow) for free.
+| Document | Covers |
+|---|---|
+| [`docs/architecture.md`](docs/architecture.md) | The shape of the plugin: the rowless `pb_pattern` entity, the file store, editing surfaces, the browse grid and its tiles, previews and lab themes, the vendored runtime, the webpack bundles, the 1.x migration. |
+| [`docs/abilities.md`](docs/abilities.md) | The agent interface: the 26 abilities, how annotations pick the HTTP method, the markup checks, the validator, the authoring guides, media and fonts. |
+| [`docs/cloud.md`](docs/cloud.md) | patternbuilderwp.com: connecting, the proxy, the `pbp/1` porter, what travels with a pattern, `Safe_Css`, accounts and telemetry. |
+| [`docs/collections.md`](docs/collections.md) | Collections as the plugin sees them. |
+| [`docs/dependencies.md`](docs/dependencies.md) | Dependency trees and attribution. |
 
-**Editing surfaces — always the WordPress editor, never a custom one.** The post editor opens any pattern in place via `onNavigateToEntityRecord` (both `wp_block` and `pb_pattern`). User patterns are otherwise edited by the Site Editor natively (its `/wp_block/:postId` route) — in place from within the Site Editor, deep-linked from everywhere else. Theme patterns cannot open in the Site Editor's canvas (core hard-codes the entity types its canvas binds and keeps route registration private), so from the Site Editor and the browse screen they open Appearance → Pattern Builder's edit mode (`&pattern={id}`), which boots core's own edit-post editor (`wp.editPost.initializeEditor`) against the `pb_pattern` entity — the genuine post-editor chrome, with a validated `back` URL whose Back button returns to the originating screen. The Appearance page's browse mode is a Site-Editor-style library: a category rail with counts, a grid of uniform 1:1 pattern cards, and a details sidebar for the selected pattern carrying the same panels the editor shows (staged on the entity, persisted by its Save button; Edit opens the pattern's editor).
+The service side lives in the
+[patternbuilderwp.com repository](https://github.com/Twenty-Bellows/patternbuilderwp.com),
+whose `docs/decisions.md` is the decision log both repositories reference.
 
-**Synced patterns via the `core/pattern` content runtime.** Synced theme patterns (`Synced: yes` file header) work exactly like Synced Patterns for Themes 2.0: `core/pattern` gets a `content` attribute + `pattern/overrides` context and a render callback that attaches the pattern's blocks as inner blocks (`Pattern_Block`); `Pattern_Resolver` composes editor-facing content; a synthesized `--synced-instance` companion entry puts a reference in the inserter. Inserted copies are plain `<!-- wp:pattern {"slug":…,"content":{…}} /-->` — no post ID anywhere.
+## Development
 
-**Companion plugin coexistence.** The runtime classes (`Pattern_Block`, `Pattern_Resolver`, `Block_Markup`, `Inner_HTML_Processor`, `Synced_Patterns`, `Editor_Support`, and the `src/runtime/` JS) are vendored from [`synced-patterns-for-themes`](https://github.com/Twenty-Bellows/synced-patterns-for-themes) and must stay logic-identical to it. Pattern Builder always registers the full stack; when both plugins are installed, the companion sees `PATTERN_BUILDER_VERSION` at `plugins_loaded` and stays entirely unloaded — one check in one place, no coordination anywhere else. Deactivate Pattern Builder and the companion takes over again with identical rendering (both read the same `Synced: yes` header; keeping the vendored runtime in sync at release time is what makes the hand-off invisible). Pattern Builder also clears the companion's transient after file writes so it never wakes to a stale cache.
+Node 18+, PHP 7.4+ with Composer, Docker for `wp-env` and the PHP tests.
 
-**Migration from 1.x.** `Pattern_Builder_Migration` runs once on upgrade: it rewrites `wp:block` refs pointing at the old `tbell_pattern_block` mirror posts to `wp:pattern` slugs (in post content and theme files), then deletes the mirror posts and the old capabilities.
+| Command | Does |
+|---|---|
+| `npm run build` / `npm run watch` | Production build / dev build with hot reload. |
+| `npm run format` / `npm run lint:js` / `npm run lint:css` | JavaScript and style formatting and linting. |
+| `composer format` / `composer lint` | PHP formatting and linting (PHPCS, WordPress Coding Standards). |
+| `npm run test:unit` | JavaScript unit tests (no Docker). |
+| `npm run test:php` | PHP tests in wp-env (**Docker**). |
+| `npm run start` / `npm run stop` / `npm run clean` | wp-env lifecycle. |
+| `npm run plugin-test` | Build, zip and open in WP Playground. |
+| `npm run version-bump` | Bump the patch version everywhere it is tracked; `npm run version-bump -- 2.2.0` sets one outright. |
 
-**Webpack entries:** `PatternBuilder_EditorTools.js` (management: sidebar, panels, save monitor — all block-editor screens), `PatternBuilder_Runtime.js` (the vendored content runtime — enqueued only when this plugin owns it), `PatternBuilder_Admin.js` (the browse grid, plus the edit-mode boot of core's edit-post editor).
+**No Docker?** The PHP suite runs host-native on SQLite: download WordPress and
+the `sqlite-database-integration` plugin, copy that plugin's `db.copy` to
+`wp-content/db.php` with its two placeholders filled, write a
+`wp-tests-config.php` whose `ABSPATH` points at that WordPress (any `DB_*`
+values; `DB_DIR`/`DB_FILE` name the database file), then:
 
----
+```
+WP_TESTS_DIR=$(pwd)/vendor/wp-phpunit/wp-phpunit \
+WP_PHPUNIT__TESTS_CONFIG=/path/to/wp-tests-config.php \
+vendor/bin/phpunit
+```
 
-## Development Environment
+Everything passes there except `test_convert_theme_image_pattern_exports_assets`,
+which needs a media pipeline the sandbox lacks.
 
-### Prerequisites
-- Node.js (v18+ recommended)
-- PHP 7.4+ with Composer
-- Docker (for `wp-env` local WordPress environment and PHP integration tests)
+**The cloud round trip** is manual, because it needs a second WordPress:
+`wp eval-file tests/e2e/cloud-roundtrip.php <token> [pattern-id] [tree-pattern]`
+against a live patternbuilderwp.com, then `… <token> install <owner>/<slug>` on
+a second site. Every automated test of this path mocks `pre_http_request`, so
+nothing else exercises the real multipart upload, the service's sanitization
+and asset rehosting, or the download that fetches those assets back. Run it
+after touching the porter, the cloud controller, or the service's store.
 
-### Environment Notes
-- Docker is available (host socket shared). All `wp-env` commands work.
-- `wp-env` binary is at `node_modules/.bin/wp-env` — run via npm scripts from this directory.
-- First `npm run start` will pull WordPress Docker images (~1-2 min).
+**Releasing to wp.org:** `npm run plugin-ship:dry-run` stages everything and
+stops before the commit; `npm run plugin-ship` ships it; `npm run
+plugin-ship:reset` restores the `svn/` working copy. The ship set is
+`.distignore`; wp.org assets live in `.wordpress-org/`. Preflight requires the
+version to agree in `pattern-builder.php`, `package.json` and readme.txt's
+`Stable tag`.
 
-### Known Pre-Existing Issues
-- Several PHP lint violations exist in the codebase (Yoda conditions, inline comment formatting). These are pre-existing and not regressions. Fix them if you touch the file; don't feel obligated to fix unrelated files.
+## Invariants
 
-## Development Commands
+The things that bite. Each is expanded in the document beside it.
 
-### Build Commands
-- `npm run build` - Production build with minification
-- `npm run watch` - Development build with hot reload
-- `npm run format` - Format JavaScript code
-- `npm run lint:js` - Lint JavaScript files
-- `npm run lint:css` - Lint CSS/SCSS files
-- `composer format` - Format PHP code using WordPress coding standards
-- `composer lint` - Lint PHP code
+- **Theme pattern files are the single source of truth.** Nothing is mirrored
+  into the database and no core REST route is intercepted.
+  ([architecture](docs/architecture.md))
+- **The vendored runtime must stay logic-identical** to
+  [synced-patterns-for-themes](https://github.com/Twenty-Bellows/synced-patterns-for-themes):
+  `Pattern_Block`, `Pattern_Resolver`, `Block_Markup`,
+  `Inner_HTML_Processor`, `Synced_Patterns`, `Editor_Support`, and
+  `src/runtime/`. ([architecture](docs/architecture.md))
+- **`Safe_Css` is vendored byte-for-byte** into the service but for its
+  namespace, and `tests/php/fixtures/safe-css-cases.json` is the same file in
+  both repositories. Change one, change both. ([cloud](docs/cloud.md))
+- **Every theme-pattern write goes through
+  `Pattern_File_Store::update_theme_pattern()`**, which is where a bare name is
+  namespaced. A pattern registered under a bare name is one no `core/pattern`
+  reference can reach, and an unresolved reference renders as nothing rather
+  than as an error. ([architecture](docs/architecture.md))
+- **Block validity is decided in the browser and nowhere else.** `save()` is
+  JavaScript; no server can re-run it. ([architecture](docs/architecture.md))
+- **Ability annotations select the HTTP method** — `readonly` is GET,
+  `destructive` + `idempotent` is DELETE, everything else POST — and
+  `meta.show_in_rest` must be true or the ability is unreachable.
+  ([abilities](docs/abilities.md))
+- **The browser never talks to the service.** All cloud traffic goes through
+  the nonce- and capability-gated proxy. ([cloud](docs/cloud.md))
+- **The plugin is fully functional disconnected.** ([cloud](docs/cloud.md))
 
-### Testing Commands
-- `npm run test:unit` - Run JavaScript unit tests (no Docker required)
-- `npm run test:unit:watch` - Run JavaScript tests in watch mode
-- `npm run test:php` - Run PHP unit tests in wp-env environment (**requires Docker**)
-- `npm run test:php:watch` - Run PHP tests in watch mode (**requires Docker**)
-- `composer test` - Run PHP tests directly via PHPUnit (requires WP test bootstrap)
+## Keeping the documentation true
 
-### Development Environment (Docker required)
-- `npm run start` - Start wp-env with xdebug enabled
-- `npm run stop` - Stop wp-env
-- `npm run clean` - Clean wp-env
-- `npm run plugin-test-env` - Start WP Playground for testing
-- `npm run plugin-test` - Full build, zip, and test workflow
+**A change is not finished until the documents describing it are right.** That
+is a step in the work, not a follow-up: correct them in place, in the same
+commit, and never annotate a stale passage with a note saying it is stale.
 
-### Releasing to WordPress.org (same workflow as synced-patterns-for-themes)
-- `npm run plugin-ship:dry-run` - Stage everything (SVN sync, assets, tag) and stop before the commit
-- `npm run plugin-ship` - Ship the release to the WordPress.org SVN (asks for confirmation; SVN prompts for wp.org credentials)
-- `npm run plugin-ship:reset` - Put the `svn/` working copy back the way wp.org has it
-- The ship set is defined by `.distignore`; wp.org assets (icon) live in `.wordpress-org/`
-- Preflight requires the version to agree in `pattern-builder.php` (header), `package.json`, and readme.txt's `Stable tag`
+Before you open a pull request:
 
-## Architecture Overview
+1. **Find what your change touched** in the table above, and read that
+   document. Ask whether any sentence in it is now wrong — a renamed class, a
+   moved file, a behaviour that changed, a count that shifted, a mechanism
+   replaced by another.
+2. **Update `readme.md`** if you changed what the plugin *is*, what it
+   requires, or how it is run. It is deliberately minimal; keep it that way and
+   put the detail in `docs/`.
+3. **Update this file** if you changed a command, an invariant, or a standard.
+   It is an index, not a manual — if a paragraph starts explaining a mechanism,
+   that paragraph belongs in `docs/`.
+4. **Run `npm run check:docs`.**
 
-### Plugin Structure
-The plugin follows a component-based OOP architecture with clear separation of concerns:
+```
+npm run check:docs          # every identifier the docs name must exist
+npm run check:docs -- --list
+```
 
-1. **Main Entry Point**: `pattern-builder.php` initializes the plugin
-2. **Core Class**: `Pattern_Builder` (singleton in `includes/class-pattern-builder.php`) bootstraps all plugin components
-3. **Component Classes** (`includes/`):
-   - `Pattern_Builder_Entity` - Rowless `pb_pattern` post type registration
-   - `Pattern_Builder_REST_Patterns_Controller` - String-ID REST controller for theme patterns
-   - `Pattern_File_Store` - Reads/writes pattern files; image import/export; conversions
-   - `Pattern_Builder_API` - The `/pattern-builder/v1/process-theme` endpoint
-   - `Pattern_Builder_Admin` - Appearance → Pattern Builder: browse grid + core-editor boot
-   - `Pattern_Builder_Editor` - Block editor asset integration
-   - `Pattern_Builder_Migration` - One-time 1.x → 2.0 upgrade
-   - `Pattern_Builder_Security` - File-path validation and safe filesystem helpers
-   - `Pattern_Builder_Localization` - i18n support
-   - Vendored runtime (kept identical to synced-patterns-for-themes): `Pattern_Block`, `Pattern_Resolver`, `Block_Markup`, `Inner_HTML_Processor`, `Synced_Patterns`, `Editor_Support`
+The check reads every backticked token in `CLAUDE.md`, `readme.md` and `docs/`
+and verifies it against the source: a path has to exist, a symbol has to appear
+somewhere in the tree. It catches the way these documents actually rot — a
+class that was renamed, a file that moved, a method that was never built.
 
-### Frontend Architecture
-- **Build System**: Webpack via `@wordpress/scripts` with three entry points:
-  - `src/PatternBuilder_EditorTools.js` - Editor tools (sidebar, document panels, save monitor)
-  - `src/PatternBuilder_Runtime.js` - The vendored core/pattern content runtime
-  - `src/PatternBuilder_Admin.js` - The Appearance → Pattern Builder page (browse grid + edit-post boot)
-- **React Components** in `src/components/`:
-  - `PatternBrowserPanel` - Main pattern browsing interface
-  - `PatternCreatePanel` - Pattern creation flow
-  - `PatternPreview` - Pattern preview rendering
-  - `BlockBindingsPanel` - Block bindings configuration panel
-  - `PatternAssociationsPanel`, `PatternSyncedStatusPanel`, `PatternMetadataPanel`, `PatternPanelAdditions`, `PatternSourcePanel` - Editor sidebar panels (also reused by the browse page's details sidebar)
-  - `PatternCard`, `PatternDetailsPanel` - The browse grid's square cards and details sidebar
-  - `EditPatternToolbarButton` - "Edit Pattern" in the toolbar of synced theme pattern instances
-  - `EditorSidePanel` - Editor sidebar container
-  - `PatternList` - Pattern list/grid view
-  - `PatternBuilderConfiguration` - Plugin settings UI
-- **Admin app** in `src/admin/`: `App`, `PatternBrowser`, `editor-boot`
-- **Vendored runtime** in `src/runtime/` (keep identical to synced-patterns-for-themes `src/`)
-- **State Management**: core data stores (`core`, `core/editor`, `core/block-editor`) — no custom store
+**It cannot check prose.** A sentence can be wrong with every identifier in it
+spelled correctly, so a green run means the names are real, not that the
+document is true. The reading in step 1 is the part that matters; the check is
+the backstop.
 
-### Pattern Handling
-- Supports both **theme patterns** (PHP files in `patterns/`, child and parent theme) and **user patterns** (core `wp_block` posts)
-- Abstract pattern class (`src/objects/AbstractPattern.js`) provides unified interface
-- Pattern syncing capabilities between theme files and database
+Two notes on using it. A name this repository only talks about — WordPress
+core, another repository, an illustrative path — belongs in `ALLOW` in
+`scripts/check-docs.mjs`, and a line carrying `check-docs:ignore` is skipped.
+And do not write a removed symbol in backticks in order to say it was removed;
+describe it in words, or the check has to be told to ignore a name that is
+correctly absent.
 
-### REST API
-Endpoints registered under `/wp-json/pattern-builder/v1/`. Authentication via WordPress nonce system.
+## Coding standards
 
-### Key Development Patterns
-- PHP classes follow WordPress coding standards with proper namespace (`TwentyBellows\PatternBuilder`)
-- JavaScript follows WordPress/Gutenberg patterns using `@wordpress` packages
-- Assets enqueued with proper dependency management using `.asset.php` files generated by Webpack
-- Security: nonce verification on all state-changing operations, capability checks, data sanitization
-
-## Coding Standards
-
-- **PHP**: WordPress Coding Standards (WPCS 3.x) via PHPCS. Config: `phpcs.xml.dist`
-- **JavaScript**: ESLint via `@wordpress/scripts` defaults
-- **CSS/SCSS**: Stylelint via `@wordpress/scripts` defaults
-- **Formatting**: Prettier (wp-prettier) for JS/CSS
+- **`docs/` is living.** Every document there describes how the system works
+  now, corrected in place rather than annotated.
+- **Comments carry what the code cannot.** A docblock is its summary plus
+  `@param`/`@return`; an inline comment earns its place by preventing a bug.
+  Reasoning and history belong in `docs/`.
+- **PHP:** WordPress Coding Standards (WPCS 3.x) via PHPCS, config
+  `phpcs.xml.dist`, namespace `TwentyBellows\PatternBuilder`.
+- **JavaScript:** ESLint via `@wordpress/scripts`, extended by
+  `eslint.config.cjs` for one thing only — `src/runtime/` is vendored, so two
+  rules that disagree with how that upstream is written are turned off *there*
+  and nowhere else.
+- **Jest:** `jest-unit.config.js` extends the `@wordpress/scripts` config to
+  compile `node_modules` and `.mjs`. Much of the WordPress dependency tree now
+  ships ESM only and Jest cannot `require()` an ES module before Node 24.9;
+  without this the suite fails to *load* rather than failing a test.
+- **CSS/SCSS:** Stylelint via `@wordpress/scripts`. **Formatting:** Prettier
+  (wp-prettier).
+- Some pre-existing PHPCS violations remain (Yoda conditions, inline comment
+  formatting). Fix them in files you touch; don't go looking.
 
 ## Versioning
 
-Version is tracked in:
-- `pattern-builder.php` (plugin header)
-- `package.json`
-- `readme.txt`
-
-Use `npm run version-bump` to bump all at once.
+The version is tracked in `pattern-builder.php`, `package.json` and
+`readme.txt`. `npm run version-bump` changes all three: the patch number by
+default, or the version given as its argument.

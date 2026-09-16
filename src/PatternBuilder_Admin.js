@@ -1,8 +1,5 @@
 /**
- * The Appearance → Pattern Builder screen. Two modes, decided by the URL's
- * `pattern` parameter: browse (the pattern grid), and edit — the WordPress
- * editor itself (core's edit-post package, the same editor post.php runs)
- * bound to the `pb_pattern` entity.
+ * The Appearance → Pattern Builder screen.
  */
 
 import domReady from '@wordpress/dom-ready';
@@ -11,16 +8,15 @@ import { registerCoreBlocks } from '@wordpress/block-library';
 
 import { PatternBuilderAdminApp } from './admin/App';
 import { bootPatternEditor } from './admin/editor-boot';
+import { setTelemetryState } from './utils/telemetry';
 import './admin/admin.scss';
 
 const settings = window.patternBuilderAdmin || {};
+setTelemetryState( settings.telemetry );
 
 /**
- * Pins the app's bottom edge to the viewport so the browser panes scroll
- * internally instead of the page. The container sits below whatever the
- * admin renders above it (admin bar, notices, update nags), so its height
- * is measured from its actual position — and re-measured when the window
- * resizes or the content above it changes (a dismissed notice).
+ * Pins the app's bottom edge to the viewport so the browser panes scroll internally instead
+ * of the page.
  *
  * @param {Element} el The app container.
  */
@@ -32,9 +28,6 @@ function lockToViewportBottom( el ) {
 
 	update();
 	window.addEventListener( 'resize', update );
-
-	// The admin body keeps a viewport-locked height, but #wpbody-content
-	// grows and shrinks with the notices above the app.
 	if ( window.ResizeObserver ) {
 		new window.ResizeObserver( update ).observe(
 			document.getElementById( 'wpbody-content' ) || document.body
@@ -53,10 +46,6 @@ if ( settings.pattern ) {
 		}
 
 		lockToViewportBottom( mountPoint );
-
-		// Core's editor screens do this during boot; the browse screen (which
-		// renders block previews) boots itself. The edit mode must NOT do
-		// this — initializeEditor registers core blocks on its own.
 		registerCoreBlocks();
 
 		createRoot( mountPoint ).render(

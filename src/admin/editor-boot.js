@@ -1,12 +1,13 @@
 /**
- * Boots the WordPress editor — core's `@wordpress/edit-post` package, the
- * same editor that powers post.php — bound to a `pb_pattern` entity, so a
- * theme pattern gets the full core editing experience (header, list view,
- * inspector, document panels, keyboard shortcuts) and its saves go straight
- * to the pattern file.
+ * Boots the WordPress editor — core's `@wordpress/edit-post` package, the same editor that
+ * powers post.php — bound to the pattern's entity, so every pattern (file-backed
+ * `pb_pattern` or `wp_block` post) is edited in one place with the full core editing
+ * experience.
  */
 
 import domReady from '@wordpress/dom-ready';
+import { dispatch } from '@wordpress/data';
+import { store as editorStore } from '@wordpress/editor';
 import { registerPlugin } from '@wordpress/plugins';
 import { Button } from '@wordpress/components';
 import { __, isRTL } from '@wordpress/i18n';
@@ -19,9 +20,7 @@ import {
 
 /**
  * The editor assumes it lives at post.php and rewrites the address bar to
- * `post.php?post={id}` as it settles (its BrowserURL component). Theme
- * patterns have string ids post.php can't load, and this page's own URL is
- * the shareable one — so those rewrites are dropped.
+ * `post.php?post={id}` as it settles (its BrowserURL component).
  */
 function keepPageUrl() {
 	const original = window.history.replaceState.bind( window.history );
@@ -36,10 +35,7 @@ function keepPageUrl() {
 }
 
 /**
- * The fullscreen-mode close button. The editor's default links to the post
- * type's list table, which a rowless type doesn't have — this one returns
- * to wherever the user came from (the Site Editor, the Pattern Builder
- * browse screen, …; the URL is validated server-side).
+ * The fullscreen-mode close button.
  *
  * @param {Object} props     Component props.
  * @param {string} props.url The URL to go back to.
@@ -73,13 +69,16 @@ export function bootPatternEditor( settings ) {
 		),
 	} );
 
+	const isUserPattern = settings.patternType === 'user';
+
 	domReady( () => {
 		initializeEditor(
 			'pattern-builder-admin',
-			'pb_pattern',
-			settings.pattern,
+			isUserPattern ? 'wp_block' : 'pb_pattern',
+			isUserPattern ? Number( settings.pattern ) : settings.pattern,
 			settings.editorSettings || {},
 			null
 		);
+		dispatch( editorStore ).removeEditorPanel( 'post-status' );
 	} );
 }

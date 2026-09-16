@@ -10,31 +10,18 @@ namespace TwentyBellows\PatternBuilder;
 use WP_Block_Patterns_Registry;
 
 /**
- * Replaces `core/pattern` blocks that carry content with the referenced
- * pattern's blocks, with the content written into them.
- *
- * The front end does not need this: there, `Pattern_Block` puts the content in
- * block context and core's `core/pattern-overrides` binding source resolves it
- * while rendering. The editor does, because it works with blocks rather than
- * rendered HTML — and because core flattens `core/pattern` blocks server side
- * (`resolve_pattern_blocks()`) before the editor ever sees them, which drops
- * the content attribute along the way.
- *
- * So for editor-facing markup the composition happens here first, and the
- * result is ordinary editable content: values written into the markup, and the
- * `core/pattern-overrides` bindings that asked for them removed. Whatever this
- * leaves behind is a plain pattern block that core resolves as it always has.
+ * Replaces `core/pattern` blocks that carry content with the referenced pattern's blocks,
+ * with the content written into them.
  */
 class Pattern_Resolver {
-
 	/**
 	 * The block bindings source that marks a pattern's content slots.
 	 */
 	const OVERRIDES_SOURCE = 'core/pattern-overrides';
 
 	/**
-	 * How many patterns have been expanded, for detecting whether a subtree
-	 * needed this resolver at all.
+	 * How many patterns have been expanded, for detecting whether a subtree needed this
+	 * resolver at all.
 	 *
 	 * @var int
 	 */
@@ -48,11 +35,15 @@ class Pattern_Resolver {
 	private static $expanding = array();
 
 	/**
-	 * Cheap test for markup that might contain a pattern block.
+	 * Whether plain pattern blocks — no content, none inside — are inlined too, the way
+	 * core's own resolver inlines them.
 	 *
-	 * Parsing every pattern and template would be wasteful on sites that do not
-	 * use the feature, and every one of them would have to be parsed to find
-	 * out.
+	 * @var bool
+	 */
+	private static $inline_plain = false;
+
+	/**
+	 * Cheap test for markup that might contain a pattern block.
 	 *
 	 * @param mixed $markup Block markup.
 	 * @return bool Whether the markup is worth parsing.
@@ -65,8 +56,8 @@ class Pattern_Resolver {
 	 * Composes every pattern with content in a piece of block markup.
 	 *
 	 * @param string $markup Block markup.
-	 * @return string Block markup with those patterns composed into it, or the
-	 *                markup untouched if there were none.
+	 * @return string Block markup with those patterns composed into it, or the markup
+	 * untouched if there were none.
 	 */
 	public static function resolve( string $markup ): string {
 		if ( ! self::contains_pattern_block( $markup ) ) {
@@ -77,6 +68,29 @@ class Pattern_Resolver {
 		$blocks     = self::resolve_blocks( parse_blocks( $markup ) );
 
 		return self::$expansions === $expansions ? $markup : serialize_blocks( $blocks );
+	}
+
+	/**
+	 * Composes a pattern the way the editor's pattern list needs it.
+	 *
+	 * @param string $markup Block markup.
+	 * @return string Block markup with every pattern block composed into it, except the
+	 * synced references, or the markup untouched if there were none.
+	 */
+	public static function compose( string $markup ): string {
+		if ( ! self::contains_pattern_block( $markup ) ) {
+			return $markup;
+		}
+
+		self::$inline_plain = true;
+
+		try {
+			$blocks = self::resolve_blocks( parse_blocks( $markup ) );
+		} finally {
+			self::$inline_plain = false;
+		}
+
+		return serialize_blocks( $blocks );
 	}
 
 	/**
@@ -104,29 +118,18 @@ class Pattern_Resolver {
 	/**
 	 * Resolves a single parsed block.
 	 *
-	 * A pattern block becomes the blocks it stands for, which is why this
-	 * returns a list rather than a block.
-	 *
 	 * @param array $block A parsed block.
 	 * @return array[] The blocks that replace it.
 	 */
 	private static function resolve_block( array $block ): array {
 		if ( 'core/pattern' === ( $block['blockName'] ?? null ) ) {
 			$expanded = self::expand_pattern_block( $block );
-
-			// Null means core's own resolver can take this one from here.
 			return null === $expanded ? array( $block ) : $expanded;
 		}
 
 		if ( empty( $block['innerBlocks'] ) || empty( $block['innerContent'] ) ) {
 			return array( $block );
 		}
-
-		/*
-		 * `serialize_block()` walks `innerContent` and consumes one inner block
-		 * for every null in it, so the two have to be rebuilt together: a
-		 * pattern standing in one null slot may resolve to any number of blocks.
-		 */
 		$inner_blocks  = array();
 		$inner_content = array();
 		$index         = 0;
@@ -159,14 +162,9 @@ class Pattern_Resolver {
 	/**
 	 * Replaces a pattern block with the pattern's blocks, content written in.
 	 *
-	 * A pattern block with no content of its own is still expanded when the
-	 * pattern it points at reaches one that has some — otherwise core would
-	 * flatten its way down to that pattern and drop the content. A pattern
-	 * block that leads nowhere near any content is left for core.
-	 *
 	 * @param array $block A parsed `core/pattern` block.
-	 * @return array[]|null The blocks that replace it, an empty array to drop
-	 *                      it, or null to leave it to core's resolver.
+	 * @return array[]|null The blocks that replace it, an empty array to drop it, or null
+	 * to leave it to core's resolver.
 	 */
 	private static function expand_pattern_block( array $block ): ?array {
 		$slug     = $block['attrs']['slug'] ?? null;
@@ -176,8 +174,9 @@ class Pattern_Resolver {
 		if ( ! is_string( $slug ) || ! $registry->is_registered( $slug ) ) {
 			return null;
 		}
-
-		// A pattern that contains itself is dropped, the way core drops it.
+		if ( Synced_Patterns::is_synced( $slug ) ) {
+			return array( $block );
+		}
 		if ( isset( self::$expanding[ $slug ] ) ) {
 			return array();
 		}
@@ -185,7 +184,7 @@ class Pattern_Resolver {
 		$pattern     = $registry->get_registered( $slug );
 		$has_content = is_array( $content ) && ! empty( $content );
 
-		if ( ! $has_content && ! self::contains_pattern_block( $pattern['content'] ?? null ) ) {
+		if ( ! self::$inline_plain && ! $has_content && ! self::contains_pattern_block( $pattern['content'] ?? null ) ) {
 			return null;
 		}
 
@@ -200,9 +199,7 @@ class Pattern_Resolver {
 		self::$expanding[ $slug ] = true;
 		$blocks                   = self::resolve_blocks( $blocks );
 		unset( self::$expanding[ $slug ] );
-
-		// Nothing inside needed this resolver, so core should expand it instead.
-		if ( ! $has_content && self::$expansions === $expansions ) {
+		if ( ! self::$inline_plain && ! $has_content && self::$expansions === $expansions ) {
 			return null;
 		}
 
@@ -212,11 +209,7 @@ class Pattern_Resolver {
 	/**
 	 * Marks a single-block pattern as an instance of that pattern.
 	 *
-	 * Mirrors what core's `resolve_pattern_blocks()` does when it inlines a
-	 * pattern, so a pattern expanded here still reads as a pattern instance in
-	 * the editor.
-	 *
-	 * @param array[] $blocks  The pattern's blocks.
+	 * @param array[] $blocks The pattern's blocks.
 	 * @param array   $pattern The registered pattern.
 	 * @return array[] The blocks.
 	 */
@@ -227,14 +220,7 @@ class Pattern_Resolver {
 
 		$metadata                = $blocks[0]['attrs']['metadata'] ?? array();
 		$metadata['patternName'] = $pattern['name'];
-
-		/*
-		 * A block's own name wins over the pattern's title, which is the one place
-		 * this departs from core's resolver. A block that names a content slot has
-		 * just had that slot filled, and renaming it would throw away what it was
-		 * for. Core's editor makes the same choice when it expands a pattern.
-		 */
-		$values = array(
+		$values                  = array(
 			'name'        => $metadata['name'] ?? $pattern['title'] ?? null,
 			'description' => $pattern['description'] ?? $metadata['description'] ?? null,
 			'categories'  => $pattern['categories'] ?? $metadata['categories'] ?? null,
@@ -258,12 +244,7 @@ class Pattern_Resolver {
 	/**
 	 * Writes a pattern's content into that pattern's blocks.
 	 *
-	 * Every `core/pattern-overrides` binding in the tree is removed afterwards,
-	 * including the ones no value was supplied for. The composed blocks are no
-	 * longer inside a pattern, so a binding left behind would resolve to
-	 * nothing and would only make the block read-only in the editor.
-	 *
-	 * @param array[] $blocks  The pattern's parsed blocks.
+	 * @param array[] $blocks The pattern's parsed blocks.
 	 * @param array   $content Content, keyed by slot name and then attribute name.
 	 * @return array[] The blocks with the content written into them.
 	 */
@@ -293,7 +274,7 @@ class Pattern_Resolver {
 	/**
 	 * Writes values into one block's content slots and removes its bindings.
 	 *
-	 * @param array $block  A parsed block.
+	 * @param array $block A parsed block.
 	 * @param array $values Values for this block, keyed by attribute name.
 	 * @return array The updated block.
 	 */
@@ -352,8 +333,6 @@ class Pattern_Resolver {
 		if ( function_exists( 'get_block_bindings_supported_attributes' ) ) {
 			return get_block_bindings_supported_attributes( $block_name );
 		}
-
-		// WordPress 6.8 and earlier keep this list private to `WP_Block`.
 		$supported = array(
 			'core/paragraph' => array( 'content' ),
 			'core/heading'   => array( 'content' ),

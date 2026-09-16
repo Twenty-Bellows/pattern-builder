@@ -3,7 +3,6 @@
 namespace TwentyBellows\PatternBuilder;
 
 class Pattern_Builder_Editor {
-
 	/**
 	 * Constructor to initialize editor hooks.
 	 */

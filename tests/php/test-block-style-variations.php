@@ -1,0 +1,375 @@
+<?php
+/**
+ * Block style variations: the partial that registers one, and its refusals.
+ *
+ * @package PatternBuilder
+ */
+
+use TwentyBellows\PatternBuilder\Pattern_Builder_Block_Style_Variations;
+use TwentyBellows\PatternBuilder\Pattern_Builder_Theme_Styles;
+
+class Test_Block_Style_Variations extends WP_UnitTestCase {
+	public function set_up() {
+		parent::set_up();
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		wp_clean_theme_json_cache();
+	}
+
+	public function tear_down() {
+		foreach ( array( 'core/button' => array( 'button-secondary', 'button-hover', 'button-hover-css' ), 'core/group' => array( 'group-hover' ) ) as $block => $slugs ) {
+			foreach ( $slugs as $slug ) {
+				if ( WP_Block_Styles_Registry::get_instance()->is_registered( $block, $slug ) ) {
+					unregister_block_style( $block, $slug );
+				}
+			}
+		}
+
+		$dir = Pattern_Builder_Block_Style_Variations::directory();
+		if ( is_dir( $dir ) ) {
+			foreach ( glob( $dir . '/*.json' ) as $file ) {
+				unlink( $file );
+			}
+			rmdir( $dir );
+		}
+		wp_clean_theme_json_cache();
+		parent::tear_down();
+	}
+
+	/**
+	 * The shape of a variation this ability writes.
+	 *
+	 * @param array $overrides Fields to change.
+	 * @return array
+	 */
+	private function args( $overrides = array() ) {
+		return array_merge(
+			array(
+				'slug'       => 'button-secondary',
+				'title'      => 'Secondary',
+				'blockTypes' => array( 'core/button' ),
+				'styles'     => array(
+					'border' => array( 'radius' => '999px' ),
+					'color'  => array( 'background' => 'var:preset|color|accent' ),
+				),
+			),
+			$overrides
+		);
+	}
+
+	public function test_a_variation_is_written_as_a_theme_partial() {
+		$result = Pattern_Builder_Block_Style_Variations::add( $this->args() );
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( 'button-secondary', $result['slug'] );
+		$this->assertSame( 'is-style-button-secondary', $result['class'] );
+		$this->assertSame( 'styles/button-secondary.json', $result['path'] );
+
+		$partial = json_decode( (string) file_get_contents( Pattern_Builder_Block_Style_Variations::directory() . '/button-secondary.json' ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test assertion.
+		$this->assertSame( array( 'core/button' ), $partial['blockTypes'] );
+		$this->assertSame( 'Secondary', $partial['title'] );
+		$this->assertSame( '999px', $partial['styles']['border']['radius'] );
+	}
+
+	/**
+	 * The partial is only worth writing if WordPress registers it.
+	 */
+	public function test_wordpress_registers_the_variation_it_finds() {
+		Pattern_Builder_Block_Style_Variations::add( $this->args() );
+
+		$variations = WP_Theme_JSON_Resolver::get_style_variations( 'block' );
+		wp_register_block_style_variations_from_theme_json_partials( $variations );
+
+		$registered = WP_Block_Styles_Registry::get_instance()->get_registered( 'core/button', 'button-secondary' );
+
+		$this->assertNotNull( $registered );
+		$this->assertSame( 'Secondary', $registered['label'] );
+	}
+
+	public function test_the_definition_can_be_read_back_by_slug() {
+		Pattern_Builder_Block_Style_Variations::add( $this->args() );
+
+		$definition = Pattern_Builder_Block_Style_Variations::definition( 'button-secondary' );
+
+		$this->assertNotNull( $definition );
+		$this->assertSame( array( 'core/button' ), $definition['blockTypes'] );
+		$this->assertArrayHasKey( 'button-secondary', Pattern_Builder_Block_Style_Variations::all() );
+	}
+
+	/**
+	 * Revising a design means rewriting the variation, and this theme's own partial is the
+	 * file this ability wrote.
+	 */
+	public function test_our_own_partial_is_rewritten_rather_than_refused() {
+		Pattern_Builder_Block_Style_Variations::add( $this->args() );
+
+		$result = Pattern_Builder_Block_Style_Variations::add(
+			$this->args( array( 'styles' => array( 'border' => array( 'radius' => '2px' ) ) ) )
+		);
+
+		$this->assertNotWPError( $result );
+		$partial = json_decode( (string) file_get_contents( Pattern_Builder_Block_Style_Variations::directory() . '/button-secondary.json' ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test assertion.
+		$this->assertSame( '2px', $partial['styles']['border']['radius'] );
+	}
+
+	/**
+	 * `wp_register_block_style_variations_from_theme_json_partials()` checks the registry
+	 * and skips a name that is already there, so a partial written over somebody else's
+	 * registration is inert.
+	 */
+	public function test_a_name_another_registration_holds_is_refused() {
+		register_block_style( 'core/button', array( 'name' => 'button-secondary', 'label' => 'Someone else\'s' ) );
+
+		try {
+			$result = Pattern_Builder_Block_Style_Variations::add( $this->args() );
+
+			$this->assertWPError( $result );
+			$this->assertSame( 'pb_variation_name_taken', $result->get_error_code() );
+			$this->assertFalse( file_exists( Pattern_Builder_Block_Style_Variations::directory() . '/button-secondary.json' ) );
+		} finally {
+			unregister_block_style( 'core/button', 'button-secondary' );
+		}
+	}
+
+	/**
+	 * Core reads a partial through the whole-theme schema before it puts the styles under
+	 * the variation's node (`get_style_variations()`), so what a partial can carry is what
+	 * a root `styles` tree can: properties, `elements`, inner `blocks`.
+	 */
+	public function test_a_block_state_is_reported_with_where_it_goes_and_elements_survive() {
+		$result = Pattern_Builder_Block_Style_Variations::add(
+			$this->args(
+				array(
+					'slug'   => 'button-hover',
+					'styles' => array(
+						'color'    => array( 'background' => 'var:preset|color|accent' ),
+						':hover'   => array( 'color' => array( 'background' => 'var:preset|color|contrast' ) ),
+						'elements' => array( 'link' => array( 'color' => array( 'text' => 'var:preset|color|base' ) ) ),
+					),
+				)
+			)
+		);
+
+		$this->assertNotWPError( $result );
+		$this->assertContains( 'elements.link.color.text', $result['written'] );
+		$this->assertContains( ':hover', $result['skipped'] );
+		$this->assertArrayHasKey( 'note', $result );
+		$this->assertStringContainsString( 'set-global-styles', $result['note'] );
+		$this->assertStringContainsString( 'variations.button-hover', $result['note'] );
+
+		$partial = json_decode( (string) file_get_contents( Pattern_Builder_Block_Style_Variations::directory() . '/button-hover.json' ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test assertion.
+		$this->assertArrayNotHasKey( ':hover', $partial['styles'] );
+		$this->assertSame( 'var(--wp--preset--color--base)', $partial['styles']['elements']['link']['color']['text'] );
+	}
+
+	/**
+	 * The state does have a home: theme.json's block-level node for the variation, which
+	 * core merges over the partial.
+	 */
+	public function test_a_state_set_through_global_styles_reaches_the_rendered_css() {
+		$added = Pattern_Builder_Block_Style_Variations::add(
+			$this->args(
+				array(
+					'slug'   => 'button-hover-css',
+					'styles' => array( 'border' => array( 'radius' => '999px' ) ),
+				)
+			)
+		);
+		$this->assertNotWPError( $added );
+
+		$theme_json = get_stylesheet_directory() . '/theme.json';
+		$had_file   = file_exists( $theme_json );
+		if ( ! $had_file ) {
+			file_put_contents( $theme_json, wp_json_encode( array( 'version' => 3 ) ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		}
+		wp_clean_theme_json_cache();
+
+		try {
+			$set = Pattern_Builder_Theme_Styles::apply(
+				array(
+					'blocks' => array(
+						'core/button' => array(
+							'variations' => array(
+								'button-hover-css' => array(
+									':hover' => array( 'color' => array( 'background' => '#123456' ) ),
+								),
+							),
+						),
+					),
+				),
+				'theme'
+			);
+
+			$this->assertNotWPError( $set );
+			$this->assertSame( array(), $set['skipped'] );
+			$this->assertContains( 'blocks.core/button.variations.button-hover-css.:hover.color.background', $set['written'] );
+			$file_cache = new ReflectionProperty( WP_Theme_JSON_Resolver::class, 'theme_json_file_cache' );
+			$file_cache->setAccessible( true );
+			$file_cache->setValue( null, array() );
+			wp_clean_theme_json_cache();
+
+			do_blocks( "<!-- wp:buttons -->\n<div class=\"wp-block-buttons\"><!-- wp:button {\"className\":\"is-style-button-hover-css\"} -->\n<div class=\"wp-block-button is-style-button-hover-css\"><a class=\"wp-block-button__link wp-element-button\">Go</a></div>\n<!-- /wp:button --></div>\n<!-- /wp:buttons -->" );
+
+			$after = wp_styles()->get_data( 'block-style-variation-styles', 'after' );
+			$css   = is_array( $after ) ? implode( "\n", $after ) : (string) $after;
+
+			$this->assertStringContainsString( 'is-style-button-hover-css--', $css );
+			$this->assertStringContainsString( '999px', $css );
+			$this->assertStringContainsString( ':hover', $css );
+			$this->assertStringContainsString( '#123456', $css );
+		} finally {
+			if ( ! $had_file ) {
+				unlink( $theme_json ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			}
+			wp_styles()->remove( 'block-style-variation-styles' );
+		}
+	}
+
+	/**
+	 * A block this site has not registered cannot be checked against anything, and a
+	 * partial naming one would register a look for a block that parses to core/missing.
+	 */
+	public function test_a_variation_for_a_block_this_site_lacks_is_refused() {
+		$result = Pattern_Builder_Block_Style_Variations::add( $this->args( array( 'blockTypes' => array( 'acme/nothing' ) ) ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_variation_unknown_block', $result->get_error_code() );
+	}
+
+	/**
+	 * CSS that fits the subset is written into the partial as it was given, because a
+	 * variation without one cannot express a pseudo-element, a descendant rule or a hover
+	 * state — most of what a variation is for.
+	 */
+	public function test_css_in_the_safe_subset_is_written_into_the_partial() {
+		$css = 'position: relative; & > * { z-index: 1; } &::before { content: ""; inset: 0; }';
+
+		$result = Pattern_Builder_Block_Style_Variations::add(
+			$this->args( array( 'styles' => array( 'css' => $css, 'border' => array( 'radius' => '999px' ) ) ) )
+		);
+
+		$this->assertNotWPError( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$this->assertSame( array(), $result['skipped'] );
+
+		$partial = json_decode(
+			(string) file_get_contents( Pattern_Builder_Block_Style_Variations::directory() . '/button-secondary.json' ), // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test assertion.
+			true
+		);
+
+		$this->assertSame( $css, $partial['styles']['css'], 'The CSS is written through unchanged — nothing strips or repairs it.' );
+	}
+
+	/**
+	 * And CSS outside it is refused with the rule it broke, rather than written and left
+	 * for a browser to interpret.
+	 */
+	public function test_css_outside_the_safe_subset_is_refused() {
+		$result = Pattern_Builder_Block_Style_Variations::add(
+			$this->args( array( 'styles' => array( 'css' => '} body { display: none } .x {' ) ) )
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_variation_css_refused', $result->get_error_code() );
+	}
+
+	/**
+	 * One `css`, at the top of the variation's own styles tree.
+	 */
+	public function test_css_deeper_in_the_tree_is_refused() {
+		$result = Pattern_Builder_Block_Style_Variations::add(
+			$this->args(
+				array(
+					'styles' => array(
+						'elements' => array( 'link' => array( 'css' => 'color: red;' ) ),
+					),
+				)
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_variation_nested_css', $result->get_error_code() );
+		$this->assertStringContainsString( 'elements.link.css', $result->get_error_message() );
+	}
+
+	/**
+	 * Global styles are a different question and the answer there has not changed: a `css`
+	 * at the root or on an element is scoped to nothing a pattern brought with it, so `set-
+	 * global-styles` still refuses one.
+	 */
+	public function test_global_styles_still_refuse_raw_css_altogether() {
+		$result = Pattern_Builder_Theme_Styles::apply(
+			array( 'css' => 'position: relative;' ),
+			'theme'
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_styles_css_refused', $result->get_error_code() );
+	}
+
+	/**
+	 * The rules a variation's CSS describes have to reach the front end, or the feature
+	 * does nothing.
+	 */
+	public function test_a_variation_carrying_css_renders_its_rules_on_the_front_end() {
+		$written = Pattern_Builder_Block_Style_Variations::add(
+			$this->args(
+				array(
+					'slug'       => 'group-hover',
+					'blockTypes' => array( 'core/group' ),
+					'styles'     => array( 'css' => 'position: relative; &:hover { outline: 3px solid #123456; }' ),
+				)
+			)
+		);
+		$this->assertNotWPError( $written, is_wp_error( $written ) ? $written->get_error_message() : '' );
+
+		wp_clean_theme_json_cache();
+		\WP_Theme_JSON_Resolver::get_theme_data();
+		wp_register_block_style_variations_from_theme_json_partials(
+			\WP_Theme_JSON_Resolver::get_style_variations( 'block' )
+		);
+		wp_clean_theme_json_cache();
+
+		do_blocks(
+			'<!-- wp:group {"className":"is-style-group-hover"} -->'
+				. '<div class="wp-block-group is-style-group-hover"></div>'
+				. '<!-- /wp:group -->'
+		);
+
+		$after = wp_styles()->get_data( 'block-style-variation-styles', 'after' );
+		$css   = is_array( $after ) ? implode( "\n", $after ) : (string) $after;
+		$GLOBALS['wp_styles'] = null;
+
+		$this->assertStringContainsString( 'position: relative', $css );
+		$this->assertStringContainsString( ':hover', $css );
+		$this->assertStringContainsString( '#123456', $css );
+		$this->assertStringContainsString( ':root :where(', $css, 'Core scopes the rules to the variation rather than emitting them bare.' );
+	}
+
+	public function test_a_variation_needs_a_block_type() {
+		$result = Pattern_Builder_Block_Style_Variations::add( $this->args( array( 'blockTypes' => array() ) ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_variation_no_block_types', $result->get_error_code() );
+	}
+
+	public function test_a_variation_needs_styles() {
+		$result = Pattern_Builder_Block_Style_Variations::add( $this->args( array( 'styles' => array() ) ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_variation_no_styles', $result->get_error_code() );
+	}
+
+	public function test_a_slug_is_normalised_and_the_title_follows_it() {
+		$result = Pattern_Builder_Block_Style_Variations::add(
+			$this->args(
+				array(
+					'slug'  => 'Button Secondary!',
+					'title' => '',
+				)
+			)
+		);
+
+		$this->assertNotWPError( $result );
+		$this->assertSame( 'button-secondary', $result['slug'] );
+		$this->assertSame( 'Button Secondary', $result['title'] );
+	}
+}

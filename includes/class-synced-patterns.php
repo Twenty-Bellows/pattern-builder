@@ -9,19 +9,8 @@ namespace TwentyBellows\PatternBuilder;
 
 /**
  * Reads the `Synced` header from a theme's pattern files.
- *
- * A pattern marked `Synced: yes` is inserted as a reference to itself rather
- * than as a copy of its blocks, so editing the theme file keeps changing every
- * place it was used.
- *
- * `WP_Theme::get_block_patterns()` reads a fixed list of headers and `Synced`
- * is not one of them, so the files are read again here. Only the first 8 KB of
- * each is read, no PHP in them runs, the answer is cached per theme version,
- * and nothing asks for it outside the editor: the front end renders a pattern
- * reference the same way whether or not it was inserted as one.
  */
 class Synced_Patterns {
-
 	/**
 	 * Suffix for the companion entry that puts a reference in the inserter.
 	 */
@@ -64,11 +53,7 @@ class Synced_Patterns {
 		/**
 		 * Filters the patterns that are inserted as a reference to themselves.
 		 *
-		 * Patterns registered by a plugin have no file header to read, so this
-		 * is how they opt in.
-		 *
 		 * @since 2.0.0
-		 *
 		 * @param string[] $slugs Pattern slugs, including namespace.
 		 */
 		$slugs = (array) apply_filters( 'pattern_builder_synced_patterns', $slugs );
@@ -105,7 +90,6 @@ class Synced_Patterns {
 	 * @return string Block markup.
 	 */
 	public static function get_reference_markup( string $slug ): string {
-		// Core's serializer, so the markup matches what a round trip produces.
 		return '<!-- wp:pattern ' . serialize_block_attributes( array( 'slug' => $slug ) ) . ' /-->';
 	}
 
@@ -170,9 +154,6 @@ class Synced_Patterns {
 
 	/**
 	 * Reads a header value as a yes or a no.
-	 *
-	 * Accepts what a theme author is likely to write. Version 1 of this plugin
-	 * documented `Synced: true` but only ever tested for `yes`.
 	 *
 	 * @param string $value Raw header value.
 	 * @return bool Whether the header says yes.

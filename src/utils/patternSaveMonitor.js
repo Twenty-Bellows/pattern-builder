@@ -15,11 +15,6 @@ import {
 
 /**
  * Decorates pattern saves with this plugin's save options.
- *
- * Theme pattern writes all travel through `/pattern-builder/v1/` (entity
- * saves from any editor, and the bulk process-theme action). The middleware
- * appends the localize / import-images flags the server-side file writer
- * reads, based on the user's Configuration panel settings.
  */
 export const PatternSaveMonitor = () => {
 	const postType = useSelect(
@@ -27,8 +22,6 @@ export const PatternSaveMonitor = () => {
 		[]
 	);
 	const { lockPostAutosaving } = useDispatch( 'core/editor' ) || {};
-
-	// Theme patterns are rowless entities with no autosaves endpoint.
 	useEffect( () => {
 		if ( postType === 'pb_pattern' && lockPostAutosaving ) {
 			lockPostAutosaving( 'pattern-builder' );
@@ -49,7 +42,6 @@ export const PatternSaveMonitor = () => {
 				}
 
 				if ( ! getImportImagesSetting() ) {
-					// Only add parameter if disabled (since default is true).
 					params.push( 'patternBuilderImportImages=false' );
 				}
 
@@ -64,10 +56,6 @@ export const PatternSaveMonitor = () => {
 		};
 
 		apiFetch.use( middleware );
-
-		// apiFetch has no way to remove middleware; this effect runs once.
 	}, [] );
-
-	// This component doesn't render anything.
 	return null;
 };

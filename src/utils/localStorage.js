@@ -6,6 +6,7 @@ const STORAGE_KEY_PREFIX = 'pattern-builder-';
 
 /**
  * Gets a value from localStorage with the pattern-builder prefix
+ *
  * @param {string} key          - The key to retrieve
  * @param {*}      defaultValue - Default value if key doesn't exist
  * @return {*} The stored value or default
@@ -23,6 +24,7 @@ export const getLocalStorageValue = ( key, defaultValue = null ) => {
 
 /**
  * Sets a value in localStorage with the pattern-builder prefix
+ *
  * @param {string} key   - The key to store
  * @param {*}      value - The value to store
  */
@@ -40,6 +42,7 @@ export const setLocalStorageValue = ( key, value ) => {
 
 /**
  * Removes a value from localStorage with the pattern-builder prefix
+ *
  * @param {string} key - The key to remove
  */
 export const removeLocalStorageValue = ( key ) => {
@@ -53,6 +56,7 @@ export const removeLocalStorageValue = ( key ) => {
 
 /**
  * Gets the localize patterns setting from localStorage
+ *
  * @return {boolean} Whether pattern localization is enabled
  */
 export const getLocalizePatternsSetting = () => {
@@ -61,6 +65,7 @@ export const getLocalizePatternsSetting = () => {
 
 /**
  * Sets the localize patterns setting in localStorage
+ *
  * @param {boolean} value - Whether to enable pattern localization
  */
 export const setLocalizePatternsSetting = ( value ) => {
@@ -69,6 +74,7 @@ export const setLocalizePatternsSetting = ( value ) => {
 
 /**
  * Gets the import images setting from localStorage
+ *
  * @return {boolean} Whether image importing is enabled (defaults to true)
  */
 export const getImportImagesSetting = () => {
@@ -77,6 +83,7 @@ export const getImportImagesSetting = () => {
 
 /**
  * Sets the import images setting in localStorage
+ *
  * @param {boolean} value - Whether to enable image importing
  */
 export const setImportImagesSetting = ( value ) => {

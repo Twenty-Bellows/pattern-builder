@@ -12,32 +12,12 @@ import { dispatch, useSelect } from '@wordpress/data';
 import { store as blocksStore } from '@wordpress/blocks';
 import { store as coreStore } from '@wordpress/core-data';
 
-const ALL_TEMPLATE_TYPES = [
-	'index',
-	'home',
-	'front-page',
-	'singular',
-	'single',
-	'page',
-	'archive',
-	'author',
-	'category',
-	'taxonomy',
-	'date',
-	'tag',
-	'attachment',
-	'search',
-	'privacy-policy',
-	'404',
-];
+import { TEMPLATE_TYPES } from './patternKinds';
+
+const ALL_TEMPLATE_TYPES = TEMPLATE_TYPES.map( ( type ) => type.slug );
 
 /**
  * Edits a theme pattern's contextual associations.
- *
- * These are the pattern-file headers WordPress reads to offer a pattern in
- * specific contexts — block types, post types, template types — plus whether
- * the pattern appears in the inserter at all. All of them stage edits on the
- * pb_pattern entity and persist with the next save.
  *
  * @param {Object} root0             Component props.
  * @param {Object} root0.patternPost The pattern's entity record.

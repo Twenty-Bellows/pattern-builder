@@ -1,0 +1,98 @@
+# Pattern dependencies and attribution
+
+How the plugin carries a pattern's dependencies and its attribution. The service side — the closed-world rule, the `origin` field and the validation — is in the [patternbuilderwp.com repository's `docs/dependencies.md`](https://github.com/Twenty-Bellows/patternbuilderwp.com/blob/main/docs/dependencies.md); this is what the plugin builds on top of that contract.
+
+## 1. What the user sees
+
+A page pattern is `core/pattern` references to the sections it is built out of, so carrying one means carrying those.
+
+- **Upload takes the tree.** Uploading a page pattern uploads every pattern it references, and everything those reference, into the same collection. The panel says how many before it starts.
+- **Install takes the tree.** Installing a page pattern installs its sections first. Nothing is left rendering a placeholder.
+- **A pattern says where it came from.** A copy of somebody else's pattern carries an `Origin:` header naming the original, in the pattern file itself, and the details sidebar shows it. It survives editing, re-uploading, and any number of hops.
+- **There is no move.** Download it and upload it where you want it.
+
+## 2. The tree
+
+A pattern's dependencies are found by parsing its saved markup and collecting the `slug` of every `core/pattern` block, recursively through the patterns those name. `src/utils/patternTree.js`:
+
+- `referencesOf( content )` — the names a pattern's markup references, in document order.
+- `treeOf( name, resolve )` — the transitive closure, leaves first, with cycle detection. `resolve` is "give me this pattern by name", so the same function serves the local walk and any future remote one.
+
+Three things fall out of the walk, and all three are checked before anything is sent:
+
+| Finding | What happens |
+| --- | --- |
+| A referenced pattern is not installed | Refuse, naming what is missing. This is the common real error and the message has to be the useful one. |
+| A cycle | Refuse, naming the loop. |
+| A referenced pattern is a `wp_block` | Cannot happen — `core/pattern` resolves against the block-pattern registry and user patterns are not in it. The walk treats an unresolvable name as missing. |
+
+The existing block-validity gate (`src/utils/blockValidity.js`) runs over **every member of the tree**, not just the pattern being uploaded, and one invalid member stops the whole upload. It is the same check; it just runs more times.
+
+## 3. Upload
+
+The upload runs server-side, in the proxy, so the authoritative walk is `Pattern_Builder_Cloud_Porter::local_tree()` rather than the JavaScript one — and `/cloud/pattern-tree` serves the panel from that same code, so there is one answer rather than two.
+
+1. **Walk** the tree locally, leaves first, over the theme's own pattern files.
+2. **Resolve the target.** The root's `Cloud:` reference, when the connected account's library still has it, makes this an update in that pattern's collection; otherwise it goes into the collection asked for. `GET /library/collections` gives the collection's `namespace` and its count — only the service knows the account's handle and the collection's slug. A pattern that references nothing skips this entirely: there is nothing to rewrite, so an ordinary upload costs exactly what it always did.
+3. **Address each member by name** in that collection (`GET /library/patterns/by-name/{collection}/{slug}`): one that is there is updated, one that is not is created. A name that is already the cloud copy of a *different* pattern on this site refuses the whole upload (`pb_cloud_name_taken`) rather than overwrite it.
+4. **Pre-flight the cap.** Count the members that will be created and check them against the Personal cap **before uploading anything**, so a tree that will not fit is refused whole rather than half way. The service refuses one pattern at a time, which for a tree means stopping in the middle.
+5. **Rewrite** each member's references onto the target namespace, on the exported copy; the local file's content is untouched.
+6. **Upload** leaves first. Each request is validated by the service against what is already in the collection, so ordering is the whole of the transaction: no batching, no rollback.
+7. **Remember** each copy on the pattern: the root takes its copy's name as its `Cloud:` reference, and every other member does too unless it already carries a copy of the account's own elsewhere — a section shared by pages in two collections has a copy in each, and its reference names the first.
+
+A failure part-way leaves the successfully uploaded members in place — they are valid patterns on their own — and reports which member failed and why. The parent is not uploaded.
+
+The panel shows the tree before the upload: *"Uploads 5 patterns: Home Page, plus Bold Hero, Feature Grid, Testimonial, CTA Band."* Where an existing pattern in the collection will be updated as part of the tree, it says so, because updating a shared section changes every page in the collection that uses it.
+
+## 4. Install
+
+Installing needs no rewriting at all. The reference in the markup is `studio-a/heroes/hero`, the file written is `patterns/studio-a/heroes/hero.php` with that exact `Slug:` header, and it resolves. This is namespacing paying for itself.
+
+- `install_cloud_pattern()` resolves the tree from the collection listing (every dependency is in the same collection, guaranteed by the service) and installs **leaves first**. The directory's listing is addressed by the owner and slug the install was handed. The account's own library addresses a collection by id, so its listing is `GET /library/collections/{id}`, with the id found by matching the package's own namespace in `GET /library/collections` — a library install gets its tree whether or not the caller named the collection, and an agent never does.
+- A member already installed under that name is skipped, so installing two page patterns that share a hero installs the hero once. Installs are idempotent by name.
+- **Dependencies always install as theme patterns**, even when the parent is going to a user pattern, because a `wp_block` can never be a `core/pattern` target. The destination step says so in a line rather than silently doing something surprising.
+- A failed dependency aborts the parent and names what failed; already-written members stay.
+- `install_collection()` needs no ordering change — it installs everything anyway — but it does need the leaves-first order so a partial failure never leaves a page ahead of its sections.
+
+## 5. Attribution
+
+The `Origin:` file header, and `pattern_builder_origin` post meta for user patterns.
+
+| Moment | Rule |
+| --- | --- |
+| Install, package carries an `origin` | Write it, unchanged. |
+| Install, no `origin`, and the package's handle is not the connected account's | Write the package's own name. |
+| Install, no `origin`, and it is the account's own pattern | Write nothing. |
+| Upload | Send the header if there is one. |
+
+Core parses a fixed list of pattern-file headers and ignores the rest, so `Origin:` is inert to WordPress and travels with the theme — which is the point. It sits beside the `Cloud:` header and is not the same thing: `Cloud:` names this pattern's own copy on the cloud and changes whenever the pattern goes up somewhere new, while an **origin** names whose work it started as and is never rewritten. A pattern installed from somebody else's collection and then shared again from yours carries both.
+
+The Pattern Source panel — which both the browse sidebar and the editor render — shows one line: *"Originally from studio-a/heroes/hero"*. By construction an origin never names your own account, so there is no display-time check and a pattern you authored shows nothing.
+
+## 6. What goes away
+
+- `PUT /cloud/library/{id}`, the proxy route that moved a cloud pattern.
+- **Move to collection** in the Uploaded tab's details sidebar and in `PatternCloudPanel`.
+- The delete-collection dialog's *move its patterns to Personal* option: deleting a collection deletes its patterns, and the dialog says so.
+- The "move within the cap" line in the over-policy banner.
+
+## 7. Abilities
+
+- `upload-pattern` uploads the tree, and its description says so — an agent that uploads a page pattern is uploading five patterns and the count comes back in the result.
+- `install-cloud-pattern` and `install-collection` install trees; per-pattern results already carry each member.
+- No new ability. Nothing here needs an agent to do anything it could not already ask for.
+
+## 8. Code map
+
+- `src/utils/patternTree.js`: the walk, cycle detection, reference rewriting. Pure, and unit-tested on its own.
+- `includes/class-pattern-builder-cloud-porter.php`: `local_tree()`, `rewrite_references()`, `install_dependencies()`, the `Origin:` stamp on import.
+- `includes/class-pattern-file-store.php`: the `Origin:` header, read and written.
+- `includes/class-pattern-builder-cloud-controller.php`: `upload_pattern()` walks and uploads the tree, `pattern_tree` answers the panel, and the move route goes.
+- `src/components/PatternCloudPanel.js`, `src/cloud/UploadedTab.js`: the tree summary before upload, the removal of Move to…, the origin line.
+- `docs/`, `CLAUDE.md`, `readme.txt`, `guides/pattern-author/`: the documentation.
+
+## 9. Tests
+
+- **JS** (`tests/unit/pattern-tree.test.js`): references extracted from nested markup; the transitive walk in leaves-first order; a cycle detected and named; a missing name reported; references rewritten into a target namespace without touching anything else in the markup.
+- **PHP** (`tests/php/`, `pre_http_request` mocked as every cloud test does): `local_tree()` sends leaves first and `rewrite_references()` points them at the target collection; a missing dependency refuses before any request is made; the install order, from the directory and from the account's own library (with the collection named, and without it, as an agent asks); a second install of a shared dependency is skipped; the `Origin:` stamp in each of its three cases; the header round-trips through a file write and read.
+- **Manual**: `tests/e2e/cloud-roundtrip.php` extended to upload a page pattern with two sections and install it on a second site, checking the installed page renders its sections rather than placeholder copy.

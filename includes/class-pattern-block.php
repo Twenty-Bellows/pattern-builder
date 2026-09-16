@@ -2,10 +2,6 @@
 /**
  * Teaches the `core/pattern` block to accept content.
  *
- * Vendored from the Synced Patterns for Themes plugin, which stands down
- * entirely while Pattern Builder is active — this copy is always the one
- * that runs, and must stay logic-identical to the companion's.
- *
  * @package Pattern_Builder
  */
 
@@ -16,21 +12,10 @@ use WP_Block_Patterns_Registry;
 use WP_Embed;
 
 /**
- * Extends `core/pattern` so a `content` attribute fills the pattern's
- * override slots, exactly the way `core/block` already works.
- *
- * `core/block` declares:
- *
- *     "attributes":      { "ref": {…},  "content": { "type": "object" } }
- *     "providesContext": { "pattern/overrides": "content" }
- *
- * This adds the same two lines to `core/pattern`, then renders the pattern's
- * blocks as inner blocks so `WP_Block` hands that context down the tree. From
- * there core's own `core/pattern-overrides` binding source resolves the values;
- * this plugin never substitutes one itself.
+ * Extends `core/pattern` so a `content` attribute fills the pattern's override slots,
+ * exactly the way `core/block` already works.
  */
 class Pattern_Block {
-
 	/**
 	 * Name of the attribute that carries a pattern's content.
 	 */
@@ -51,10 +36,10 @@ class Pattern_Block {
 	}
 
 	/**
-	 * Adds the `content` attribute, the context it provides, and the render
-	 * callback that passes that context on to the pattern's blocks.
+	 * Adds the `content` attribute, the context it provides, and the render callback that
+	 * passes that context on to the pattern's blocks.
 	 *
-	 * @param array  $args       Arguments the block type is being registered with.
+	 * @param array  $args Arguments the block type is being registered with.
 	 * @param string $block_type Block type name, including namespace.
 	 * @return array Filtered arguments.
 	 */
@@ -83,15 +68,9 @@ class Pattern_Block {
 	/**
 	 * Renders a `core/pattern` block.
 	 *
-	 * Behaves like core's `render_block_core_pattern()` — same recursion guard,
-	 * same auto-embedding — but attaches the pattern's blocks as inner blocks
-	 * instead of calling `do_blocks()` on them. That is what core's
-	 * `render_block_core_block()` does, and it is what makes the block's
-	 * provided context reach the blocks inside the pattern.
-	 *
 	 * @param array    $attributes Block attributes.
-	 * @param string   $content    Block save content. Unused: `core/pattern` is a void block.
-	 * @param WP_Block $block      The block instance.
+	 * @param string   $content Block save content.
+	 * @param WP_Block $block The block instance.
 	 * @return string Rendered pattern.
 	 */
 	public function render( $attributes, $content, $block ): string {
@@ -109,10 +88,6 @@ class Pattern_Block {
 		}
 
 		if ( isset( $seen_slugs[ $slug ] ) ) {
-			/*
-			 * WP_DEBUG_DISPLAY must only be honored when WP_DEBUG. This precedent
-			 * is set in `wp_debug_mode()`.
-			 */
 			if ( ! WP_DEBUG || ! WP_DEBUG_DISPLAY ) {
 				return '';
 			}
@@ -136,8 +111,6 @@ class Pattern_Block {
 		$block->parsed_block['innerBlocks']  = $inner_blocks;
 		$block->parsed_block['innerContent'] = array_fill( 0, count( $inner_blocks ), null );
 		$block->refresh_context_dependents();
-
-		// `dynamic => false` renders the inner blocks without calling this callback again.
 		$rendered = $block->render( array( 'dynamic' => false ) );
 
 		unset( $seen_slugs[ $slug ] );

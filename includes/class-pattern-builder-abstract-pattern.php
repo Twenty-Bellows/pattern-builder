@@ -5,17 +5,10 @@ namespace TwentyBellows\PatternBuilder;
 
 /**
  * Value object representing a single block pattern.
- *
- * Property names intentionally use camelCase to mirror the JavaScript AbstractPattern class,
- * keeping PHP and JS representations symmetrical and reducing mapping friction.
  */
 class Abstract_Pattern {
-
 	/**
 	 * Pattern identity.
-	 *
-	 * Theme patterns are identified by their namespaced name (e.g.
-	 * "theme-slug/pattern-name"); user patterns by their wp_block post ID.
 	 *
 	 * @var string|int|null
 	 */
@@ -120,6 +113,22 @@ class Abstract_Pattern {
 	public $filePath; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.PropertyNotSnakeCase
 
 	/**
+	 * The cloud pattern this one was first copied from, or '' when it is original work
+	 * here.
+	 *
+	 * @var string
+	 */
+	public $origin;
+
+	/**
+	 * The name of this pattern's copy on the cloud — `{handle}/{collection}/{slug}` — or ''
+	 * when it has none.
+	 *
+	 * @var string
+	 */
+	public $cloud;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param array $args Pattern arguments.
@@ -146,6 +155,8 @@ class Abstract_Pattern {
 		$this->viewportWidth = isset( $args['viewportWidth'] ) && '' !== $args['viewportWidth'] ? (int) $args['viewportWidth'] : null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 
 		$this->filePath = $args['filePath'] ?? null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName
+		$this->origin   = $args['origin'] ?? '';
+		$this->cloud    = $args['cloud'] ?? '';
 
 		$this->id = $args['id'] ?? ( 'theme' === $this->source ? $this->name : null );
 	}
@@ -197,6 +208,8 @@ class Abstract_Pattern {
 				'postTypes'     => 'Post Types',
 				'templateTypes' => 'Template Types',
 				'synced'        => 'Synced',
+				'origin'        => 'Origin',
+				'cloud'         => 'Cloud',
 			)
 		);
 
@@ -216,6 +229,8 @@ class Abstract_Pattern {
 				'source'        => 'theme',
 				'synced'        => in_array( strtolower( trim( $pattern_data['synced'] ) ), array( 'yes', 'true', '1', 'on' ), true ),
 				'inserter'      => 'no' !== strtolower( trim( $pattern_data['inserter'] ) ),
+				'origin'        => trim( $pattern_data['origin'] ),
+				'cloud'         => trim( $pattern_data['cloud'] ),
 			)
 		);
 	}
@@ -248,6 +263,8 @@ class Abstract_Pattern {
 				'keywords'    => isset( $metadata['wp_pattern_keywords'][0] ) ? array_map( 'trim', explode( ',', $metadata['wp_pattern_keywords'][0] ) ) : array(),
 				'categories'  => $categories,
 				'inserter'    => true,
+				'origin'      => (string) ( $metadata[ Pattern_File_Store::META_ORIGIN ][0] ?? '' ),
+				'cloud'       => (string) ( $metadata[ Pattern_File_Store::META_CLOUD ][0] ?? '' ),
 			)
 		);
 	}

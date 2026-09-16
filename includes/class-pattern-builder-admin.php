@@ -6,18 +6,14 @@ use WP_Block_Editor_Context;
 
 /**
  * The Appearance → Pattern Builder screen.
- *
- * Two modes, decided by the URL's `pattern` parameter:
- *
- * - Browse (no parameter): the pattern grid — search, filter, create.
- * - Edit (`&pattern={id}`): the WordPress editor itself. The page boots
- *   core's `@wordpress/edit-post` editor (the one that powers post.php)
- *   bound to the `pb_pattern` entity, so theme pattern edits save straight
- *   to the pattern files with the full core editing experience.
  */
 class Pattern_Builder_Admin {
-
 	private const PAGE_SLUG = 'pattern-builder';
+
+	/**
+	 * The name this screen gives its block editor context.
+	 */
+	private const EDITOR_CONTEXT = 'pattern-builder/editor';
 
 	/**
 	 * The admin page's hook suffix, once registered.
@@ -32,6 +28,30 @@ class Pattern_Builder_Admin {
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'create_admin_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_filter( 'block_editor_settings_all', array( $this, 'allow_block_bindings_editing' ), 10, 2 );
+	}
+
+	/**
+	 * Lets this screen's editor edit block bindings.
+	 *
+	 * Core maps `edit_block_binding` to `do_not_allow` for an editor context
+	 * carrying no post, which is every pattern this screen edits, leaving the
+	 * bindings controls read-only. Reaching the screen already requires
+	 * `edit_theme_options`, which is what `pb_pattern` maps its edit
+	 * capabilities to.
+	 *
+	 * @param array                   $settings The block editor settings.
+	 * @param WP_Block_Editor_Context $context  The current editor context.
+	 * @return array The filtered settings.
+	 */
+	public function allow_block_bindings_editing( $settings, $context ) {
+		if ( ! isset( $context->name ) || self::EDITOR_CONTEXT !== $context->name ) {
+			return $settings;
+		}
+
+		$settings['canUpdateBlockBindings'] = current_user_can( 'edit_theme_options' );
+
+		return $settings;
 	}
 
 	/**
@@ -52,13 +72,23 @@ class Pattern_Builder_Admin {
 	}
 
 	/**
-	 * Marks the edit-mode screen as a block editor screen, as core's own
-	 * editor pages do — admin body classes and asset behavior key off it.
+	 * Marks the edit-mode screen as a block editor screen, as core's own editor pages do —
+	 * admin body classes and asset behavior key off it.
 	 */
 	public function setup_screen(): void {
 		if ( $this->get_requested_pattern() ) {
 			get_current_screen()->is_block_editor( true );
 		}
+	}
+
+	/**
+	 * The pattern id the page was asked to edit, if any.
+	 *
+	 * @return string The pattern id, or an empty string on the browse screen.
+	 */
+	private function get_requested_pattern_type(): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return isset( $_GET['type'] ) && 'user' === $_GET['type'] ? 'user' : 'theme';
 	}
 
 	/**
@@ -89,22 +119,38 @@ class Pattern_Builder_Admin {
 
 		$asset   = include $asset_path;
 		$pattern = $this->get_requested_pattern();
-
-		// The block editor's client-side registry needs the server's block
-		// definitions and categories, exactly as core's editor screens set up.
 		wp_add_inline_script(
 			'wp-blocks',
 			'wp.blocks.unstable__bootstrapServerSideBlockDefinitions(' . wp_json_encode( get_block_editor_server_block_settings() ) . ');',
 			'after'
 		);
 
-		$editor_context = new WP_Block_Editor_Context( array( 'name' => 'pattern-builder/editor' ) );
+		$editor_context = new WP_Block_Editor_Context( array( 'name' => self::EDITOR_CONTEXT ) );
 
 		wp_add_inline_script(
 			'wp-blocks',
 			sprintf( 'wp.blocks.setCategories( %s );', wp_json_encode( get_block_categories( $editor_context ) ) ),
 			'after'
 		);
+		$binding_sources = array();
+		foreach ( get_all_registered_block_bindings_sources() as $source ) {
+			$binding_sources[] = array(
+				'name'        => $source->name,
+				'label'       => $source->label,
+				'usesContext' => $source->uses_context,
+			);
+		}
+
+		if ( $binding_sources ) {
+			wp_add_inline_script(
+				'wp-blocks',
+				sprintf(
+					'for ( const source of %s ) { wp.blocks.registerBlockBindingsSource( source ); }',
+					wp_json_encode( $binding_sources, JSON_HEX_TAG | JSON_UNESCAPED_SLASHES )
+				),
+				'after'
+			);
+		}
 
 		wp_enqueue_script(
 			'pattern-builder-admin',
@@ -117,7 +163,6 @@ class Pattern_Builder_Admin {
 		wp_set_script_translations( 'pattern-builder-admin', 'pattern-builder' );
 
 		if ( $pattern ) {
-			// The full editor skin — the same stylesheet stack post.php loads.
 			wp_enqueue_style( 'wp-edit-post' );
 		}
 
@@ -143,14 +188,14 @@ class Pattern_Builder_Admin {
 			),
 			$editor_context
 		);
+		if ( $pattern ) {
+			$settings['styles'][] = array(
+				'css' => '.editor-visual-editor__post-title-wrapper { display: none; }',
+			);
+		}
 
 		$browse_url = admin_url( 'themes.php?page=' . self::PAGE_SLUG );
 
-		/*
-		 * Where the editor's back button returns to: the screen the user
-		 * came from (the Site Editor, the browse screen, …), validated the
-		 * way core validates redirect targets, falling back to browse.
-		 */
 		$back_url = isset( $_GET['back'] ) ? wp_validate_redirect( sanitize_url( wp_unslash( $_GET['back'] ) ), '' ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
 		wp_add_inline_script(
@@ -159,21 +204,20 @@ class Pattern_Builder_Admin {
 				'window.patternBuilderAdmin = %s;',
 				wp_json_encode(
 					array(
-						'editorSettings' => $settings,
-						'pattern'        => $pattern ? $pattern : null,
-						'adminUrl'       => $browse_url,
-						'backUrl'        => $back_url ? $back_url : $browse_url,
+						'editorSettings'   => $settings,
+						'pattern'          => $pattern ? $pattern : null,
+						'patternType'      => $this->get_requested_pattern_type(),
+						'adminUrl'         => $browse_url,
+						'backUrl'          => $back_url ? $back_url : $browse_url,
+						'telemetry'        => Pattern_Builder_Telemetry::client_state(),
+						'wordPressVersion' => Pattern_Builder_Cloud_Porter::wordpress_version(),
+						'tileBase'         => $pattern ? '' : Pattern_Builder_Preview::tile_base(),
+						'designVersion'    => $pattern ? '' : Pattern_Builder_Preview::design_version(),
 					)
 				)
 			),
 			'before'
 		);
-
-		/*
-		 * Let every block-editor integration load — this plugin's own editor
-		 * tools and pattern runtime included, along with any third-party
-		 * blocks' editor assets.
-		 */
 		do_action( 'enqueue_block_editor_assets' );
 	}
 
@@ -182,7 +226,6 @@ class Pattern_Builder_Admin {
 	 */
 	public function render_admin_menu_page(): void {
 		if ( $this->get_requested_pattern() ) {
-			// The div core's editor takes over — mirrors post.php's markup.
 			echo '<div class="block-editor">';
 			echo '<div id="pattern-builder-admin" class="block-editor__container hide-if-no-js"></div>';
 			echo '</div>';

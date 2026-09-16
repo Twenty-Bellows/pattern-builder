@@ -1,0 +1,445 @@
+<?php
+/**
+ * The preview document.
+ *
+ * @package PatternBuilder
+ */
+
+use TwentyBellows\PatternBuilder\Abstract_Pattern;
+use TwentyBellows\PatternBuilder\Pattern_Builder_Preview;
+
+/**
+ * Rendering a pattern as something a browser can open.
+ */
+class Test_Preview extends WP_UnitTestCase {
+	/**
+	 * @var Pattern_Builder_Preview
+	 */
+	private $preview;
+
+	public function set_up() {
+		parent::set_up();
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$this->preview = new Pattern_Builder_Preview();
+	}
+
+	/**
+	 * Reach a private builder, since the route wiring is core's business.
+	 *
+	 * @param string $method Method name.
+	 * @param array  $args Arguments.
+	 * @return mixed
+	 */
+	private function call( $method, $args = array() ) {
+		$m = new ReflectionMethod( $this->preview, $method );
+		$m->setAccessible( true );
+		return $m->invokeArgs( $this->preview, $args );
+	}
+
+	private function a_pattern( $content = '<!-- wp:paragraph --><p>Body copy.</p><!-- /wp:paragraph -->' ) {
+		return new Abstract_Pattern(
+			array(
+				'title'   => 'Preview Probe',
+				'name'    => 'preview-probe',
+				'content' => $content,
+			)
+		);
+	}
+
+	/**
+	 * The whole reason this exists: the document carries the site's stylesheets.
+	 */
+	public function test_the_document_carries_the_sites_styles() {
+		$html = $this->call( 'standalone_document', array( $this->a_pattern() ) );
+
+		$this->assertStringContainsString( '<!DOCTYPE html>', $html );
+		$this->assertStringContainsString( '<title>Preview Probe</title>', $html );
+		$this->assertStringContainsString( 'Body copy.', $html );
+		$this->assertStringContainsString( 'wp-block-library', $html );
+		$this->assertStringContainsString( 'global-styles', $html );
+	}
+
+	/**
+	 * Blocks are rendered, not handed over as comments.
+	 */
+	public function test_blocks_are_rendered() {
+		$html = $this->call( 'standalone_document', array( $this->a_pattern() ) );
+
+		$this->assertStringNotContainsString( '<!-- wp:paragraph -->', $html );
+	}
+
+	/**
+	 * The stand-in is what makes the page context possible.
+	 */
+	public function test_the_stand_in_lets_post_content_render_the_pattern() {
+		$this->call( 'pose_as_a_page', array( '<!-- wp:paragraph --><p>Inside the template.</p><!-- /wp:paragraph -->' ) );
+
+		$html = do_blocks( '<!-- wp:post-content /-->' );
+
+		$this->call( 'stop_posing' );
+
+		$this->assertStringContainsString( 'Inside the template.', $html );
+	}
+
+	/**
+	 * And it leaves nothing behind: no row, and no cached post either.
+	 */
+	public function test_the_stand_in_is_cleaned_up() {
+		$this->call( 'pose_as_a_page', array( '<!-- wp:paragraph --><p>Transient.</p><!-- /wp:paragraph -->' ) );
+		$this->call( 'stop_posing' );
+
+		$this->assertFalse( wp_cache_get( Pattern_Builder_Preview::STAND_IN_ID, 'posts' ) );
+		$this->assertNull( get_post( Pattern_Builder_Preview::STAND_IN_ID ) );
+		$this->assertArrayNotHasKey( 'pattern_builder_preview_post', $GLOBALS );
+	}
+
+	/**
+	 * A pattern that is not here is a 404, not an empty document.
+	 */
+	public function test_an_unknown_pattern_is_refused() {
+		$found = $this->call( 'find', array( 'no-such-theme/no-such-pattern' ) );
+
+		$this->assertWPError( $found );
+		$this->assertSame( 'pb_preview_not_found', $found->get_error_code() );
+	}
+
+	/**
+	 * Naming nothing is a different mistake and says so.
+	 */
+	public function test_naming_no_pattern_is_refused() {
+		$found = $this->call( 'find', array( '' ) );
+
+		$this->assertWPError( $found );
+		$this->assertSame( 'pb_preview_no_pattern', $found->get_error_code() );
+	}
+
+	/**
+	 * A user pattern previews by post ID.
+	 */
+	public function test_a_user_pattern_previews_by_id() {
+		$id = self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_block',
+				'post_title'   => 'Reusable',
+				'post_content' => '<!-- wp:paragraph --><p>From the database.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$found = $this->call( 'find', array( (string) $id ) );
+
+		$this->assertNotWPError( $found );
+		$this->assertStringContainsString( 'From the database.', $found->content );
+	}
+
+	/**
+	 * Rendering against another theme, without changing the site.
+	 */
+	public function test_wearing_blank_theme_leaves_the_site_alone() {
+		$before = get_stylesheet();
+
+		$this->call( 'wear_theme', array( 'blank-theme' ) );
+
+		$this->assertSame( 'blank-theme', get_stylesheet() );
+		$this->assertStringEndsWith( '/themes/blank-theme', get_stylesheet_directory() );
+
+		$this->call( 'take_theme_off' );
+
+		$this->assertSame( $before, get_stylesheet(), 'The active theme must be exactly as it was.' );
+	}
+
+	/**
+	 * And what it renders really has none of core's presets in it.
+	 */
+	public function test_a_blank_preview_carries_no_core_presets() {
+		$this->call( 'wear_theme', array( 'blank-theme' ) );
+
+		$css  = wp_get_global_stylesheet( array( 'variables' ) );
+		$html = $this->call( 'standalone_document', array( $this->a_pattern() ) );
+
+		$this->call( 'take_theme_off' );
+
+		foreach ( array( 'vivid-red', 'pale-pink', 'vivid-purple' ) as $slug ) {
+			$this->assertStringNotContainsString(
+				'--wp--preset--color--' . $slug,
+				$css,
+				'A blank preview emitted a core preset it is meant to have none of.'
+			);
+		}
+
+		$this->assertStringContainsString( 'Body copy.', $html, 'It still has to render the pattern.' );
+	}
+
+	/**
+	 * The opinionated theme brings its own, which is the other half of the pair.
+	 */
+	public function test_an_opinionated_preview_carries_that_themes_presets() {
+		$this->call( 'wear_theme', array( 'opinionated-theme' ) );
+		$css = wp_get_global_stylesheet( array( 'variables' ) );
+
+		$this->call( 'take_theme_off' );
+
+		$this->assertStringContainsString( '--wp--preset--color--base', $css );
+		$this->assertStringContainsString( '--wp--preset--color--contrast', $css );
+		$this->assertStringContainsString( '--wp--preset--font-size--xx-large', $css );
+	}
+
+	/**
+	 * A pattern carries its own presets into a theme that has none.
+	 */
+	public function test_a_pattern_carries_its_presets_into_a_blank_render() {
+		$pattern = $this->a_pattern(
+			'<!-- wp:paragraph {"backgroundColor":"carried-probe"} --><p class="has-carried-probe-background-color has-background">Body copy.</p><!-- /wp:paragraph -->'
+		);
+		$carried = array(
+			array(
+				'type'  => 'color',
+				'slug'  => 'carried-probe',
+				'name'  => 'Carried Probe',
+				'value' => '#123456',
+			),
+		);
+
+		$this->call( 'wear_theme', array( 'blank-theme' ) );
+		$this->call( 'carry_tokens', array( $carried ) );
+
+		$css = wp_get_global_stylesheet( array( 'variables' ) );
+
+		$this->call( 'take_theme_off' );
+
+		$this->assertStringContainsString( '--wp--preset--color--carried-probe: #123456', $css );
+	}
+
+	/**
+	 * What the destination already defines wins, exactly as a download does.
+	 */
+	public function test_a_carried_preset_never_overwrites_the_themes_own() {
+		$carried = array(
+			array(
+				'type'  => 'color',
+				'slug'  => 'base',
+				'name'  => 'Base',
+				'value' => '#ff0000',
+			),
+		);
+
+		$this->call( 'wear_theme', array( 'opinionated-theme' ) );
+		$this->call( 'carry_tokens', array( $carried ) );
+
+		$css = wp_get_global_stylesheet( array( 'variables' ) );
+
+		$this->call( 'take_theme_off' );
+
+		$this->assertStringNotContainsString( '--wp--preset--color--base: #ff0000', $css );
+		$this->assertStringContainsString( '--wp--preset--color--base: #fbf7f0', $css );
+	}
+
+	/**
+	 * And carrying stops when the theme comes off.
+	 */
+	public function test_carried_presets_do_not_outlive_the_render() {
+		$this->call( 'wear_theme', array( 'blank-theme' ) );
+		$this->call( 'carry_tokens', array( array( array( 'type' => 'color', 'slug' => 'leak-probe', 'name' => 'Leak', 'value' => '#abcdef' ) ) ) );
+		$this->call( 'take_theme_off' );
+
+		$this->assertFalse( has_filter( 'wp_theme_json_data_theme', array( $this->preview, 'add_carried_tokens' ) ) );
+		$this->assertStringNotContainsString( 'leak-probe', wp_get_global_stylesheet( array( 'variables' ) ) );
+	}
+
+	/**
+	 * A theme nobody has is a 404 that names what there is.
+	 */
+	public function test_an_unknown_theme_is_refused() {
+		$refused = $this->call( 'wear_theme', array( 'no-such-theme' ) );
+
+		$this->assertWPError( $refused );
+		$this->assertSame( 'pb_preview_no_theme', $refused->get_error_code() );
+		$this->assertStringContainsString( 'blank-theme', $refused->get_error_message() );
+	}
+
+	/**
+	 * Both bundled themes are found where the preview looks for them.
+	 */
+	public function test_the_bundled_themes_are_locatable() {
+		$themes = Pattern_Builder_Preview::bundled_themes();
+
+		$this->assertArrayHasKey( 'blank-theme', $themes );
+		$this->assertArrayHasKey( 'opinionated-theme', $themes );
+
+		foreach ( $themes as $slug => $dir ) {
+			$this->assertFileExists( $dir . '/theme.json', $slug . ' must carry a theme.json.' );
+			$this->assertFileExists( $dir . '/style.css', $slug . ' must carry a style.css.' );
+		}
+	}
+
+	/**
+	 * The URL is what render-pattern hands back, so its shape is part of the contract.
+	 */
+	public function test_the_url_names_the_pattern_and_context() {
+		$url = Pattern_Builder_Preview::url_for( 'my-theme/hero', 'page' );
+
+		$this->assertStringContainsString( 'pattern-builder', $url );
+		$this->assertStringContainsString( 'preview', $url );
+		$this->assertStringContainsString( 'pattern=my-theme%2Fhero', $url );
+		$this->assertStringContainsString( 'context=page', $url );
+	}
+
+	/**
+	 * The route is registered where the answer says it is.
+	 */
+	public function test_the_route_is_registered() {
+		do_action( 'rest_api_init' );
+
+		$routes = rest_get_server()->get_routes();
+
+		$this->assertArrayHasKey( '/pattern-builder/v1/preview', $routes );
+	}
+
+	/**
+	 * A user pattern to draw a tile of.
+	 *
+	 * @param string $content Its markup.
+	 * @return int Post ID.
+	 */
+	private function a_user_pattern( $content = '<!-- wp:paragraph --><p>Tile copy.</p><!-- /wp:paragraph -->' ) {
+		return self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_block',
+				'post_status'  => 'publish',
+				'post_title'   => 'Tile Probe',
+				'post_content' => $content,
+			)
+		);
+	}
+
+	/**
+	 * What the tiles exist for: a block style variation is styled in its tile, because the
+	 * site's own renderer drew it.
+	 */
+	public function test_a_tile_styles_the_block_style_variation_it_applies() {
+		register_block_style(
+			'core/group',
+			array(
+				'name'       => 'tile-probe',
+				'label'      => 'Tile probe',
+				'style_data' => array( 'color' => array( 'background' => '#123456' ) ),
+			)
+		);
+		WP_Theme_JSON_Resolver::clean_cached_data();
+
+		$post_id = $this->a_user_pattern( '<!-- wp:group {"className":"is-style-tile-probe"} --><div class="wp-block-group is-style-tile-probe"><!-- wp:paragraph --><p>Inside the band.</p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
+		$tile    = $this->preview->tile( (string) $post_id, true );
+
+		unregister_block_style( 'core/group', 'tile-probe' );
+		WP_Theme_JSON_Resolver::clean_cached_data();
+
+		$this->assertSame( 200, $tile['status'] );
+		$this->assertStringContainsString( 'Inside the band.', $tile['body'] );
+		$this->assertStringContainsString( 'is-style-tile-probe--', $tile['body'] );
+		$this->assertStringContainsString( '#123456', $tile['body'] );
+	}
+
+	/**
+	 * And the half of a variation the style properties cannot express.
+	 */
+	public function test_a_tile_styles_a_variation_that_carries_css() {
+		$was = get_stylesheet();
+		register_theme_directory( dirname( __DIR__, 2 ) . '/themes' );
+		delete_site_transient( 'theme_roots' );
+		if ( ! wp_get_theme( 'opinionated-theme' )->exists() ) {
+			$this->markTestSkipped( 'The bundled themes directory is not registered in this environment.' );
+		}
+		switch_theme( 'opinionated-theme' );
+		wp_clean_theme_json_cache();
+		$GLOBALS['wp_styles'] = null;
+
+		register_block_style(
+			'core/group',
+			array(
+				'name'       => 'tile-css-probe',
+				'label'      => 'Tile CSS probe',
+				'style_data' => array( 'css' => 'position: relative; &::before { content: ""; outline: 2px solid #abcdef; }' ),
+			)
+		);
+		WP_Theme_JSON_Resolver::clean_cached_data();
+
+		$post_id = $this->a_user_pattern( '<!-- wp:group {"className":"is-style-tile-css-probe"} --><div class="wp-block-group is-style-tile-css-probe"><!-- wp:paragraph --><p>Inside the band.</p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
+		$tile    = $this->preview->tile( (string) $post_id, true );
+
+		unregister_block_style( 'core/group', 'tile-css-probe' );
+		switch_theme( $was );
+		$GLOBALS['wp_styles'] = null;
+		WP_Theme_JSON_Resolver::clean_cached_data();
+		wp_clean_theme_json_cache();
+
+		$this->assertSame( 200, $tile['status'] );
+		$this->assertStringContainsString( 'Inside the band.', $tile['body'] );
+		$this->assertStringContainsString( '::before', $tile['body'] );
+		$this->assertStringContainsString( '#abcdef', $tile['body'] );
+	}
+
+	/**
+	 * A tile is a picture: no scripts, framed only here, centred by its own document, and
+	 * kept by the browser for as long as its key holds.
+	 */
+	public function test_a_tile_is_a_cacheable_picture_only_this_site_frames() {
+		add_action(
+			'wp_enqueue_scripts',
+			static function () {
+				wp_enqueue_script( 'tile-probe', 'https://example.test/probe.js', array(), '1', true );
+			}
+		);
+
+		$tile = $this->preview->tile( (string) $this->a_user_pattern(), true );
+
+		$this->assertSame( 200, $tile['status'] );
+		$this->assertStringContainsString( 'Tile copy.', $tile['body'] );
+		$this->assertStringNotContainsString( '<script', $tile['body'] );
+		$this->assertStringContainsString( 'pattern-builder-tile__content', $tile['body'] );
+		$this->assertStringContainsString( "frame-ancestors 'self'", $tile['headers']['Content-Security-Policy'] );
+		$this->assertSame( 'private, max-age=31536000, immutable', $tile['headers']['Cache-Control'] );
+	}
+
+	/**
+	 * Without a key there is nothing to tell a stale tile from a fresh one.
+	 */
+	public function test_a_tile_without_a_key_is_not_kept() {
+		$tile = $this->preview->tile( (string) $this->a_user_pattern(), false );
+
+		$this->assertSame( 200, $tile['status'] );
+		$this->assertSame( 'no-store', $tile['headers']['Cache-Control'] );
+	}
+
+	/**
+	 * With no nonce, the capability is the whole door.
+	 */
+	public function test_a_tile_answers_only_someone_who_may_edit() {
+		$post_id = $this->a_user_pattern();
+
+		wp_set_current_user( 0 );
+		$refused = $this->preview->tile( (string) $post_id, true );
+		$this->assertSame( 401, $refused['status'] );
+		$this->assertSame( '', $refused['body'] );
+		$this->assertSame( 'no-store', $refused['headers']['Cache-Control'] );
+
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'subscriber' ) ) );
+		$this->assertSame( 403, $this->preview->tile( (string) $post_id, true )['status'] );
+	}
+
+	public function test_an_unknown_tile_is_a_404() {
+		$this->assertSame( 404, $this->preview->tile( 'nobody/nothing', true )['status'] );
+	}
+
+	/**
+	 * The part of every tile's key that is not the pattern: it holds still, and moves when
+	 * something every tile depends on does.
+	 */
+	public function test_the_design_version_follows_what_every_tile_depends_on() {
+		$before = Pattern_Builder_Preview::design_version();
+
+		$this->assertSame( $before, Pattern_Builder_Preview::design_version() );
+
+		update_option( 'active_plugins', array( 'tile-probe/tile-probe.php' ) );
+
+		$this->assertNotSame( $before, Pattern_Builder_Preview::design_version() );
+	}
+}

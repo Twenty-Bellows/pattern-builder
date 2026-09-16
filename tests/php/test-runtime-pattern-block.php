@@ -11,7 +11,6 @@
  * @covers \TwentyBellows\PatternBuilder\Pattern_Block
  */
 class Test_Pattern_Block extends Pattern_Test_Case {
-
 	/**
 	 * The block type carries the attribute and the context it provides.
 	 */
@@ -50,6 +49,73 @@ class Test_Pattern_Block extends Pattern_Test_Case {
 
 		$this->assertStringContainsString( 'Hello world', $rendered );
 		$this->assertStringNotContainsString( 'Default headline', $rendered );
+	}
+
+	/**
+	 * A binding to another source resolves inside a rendered pattern.
+	 *
+	 * The runtime attaches the pattern's blocks as inner blocks, so they
+	 * inherit the pattern block's context — which is what lets core resolve a
+	 * binding that needs a post. Nothing here is this plugin's: the panel
+	 * writes core's `metadata.bindings` and core's own source reads it.
+	 */
+	public function test_a_source_binding_resolves_inside_a_pattern() {
+		$post_id = $this->set_up_global_post();
+		$slug    = $this->register_pattern( 'test/dated', $this->linked_paragraph() );
+
+		$rendered = do_blocks( $this->pattern_block( $slug ) );
+
+		$this->assertStringContainsString( get_permalink( $post_id ), $rendered );
+		$this->assertStringNotContainsString( 'Default link', $rendered );
+	}
+
+	/**
+	 * Filling the override slots leaves other sources' bindings alone.
+	 *
+	 * The resolver removes only the bindings it answered, so a binding to
+	 * another source survives into the markup core renders.
+	 */
+	public function test_filling_slots_leaves_other_bindings_to_core() {
+		$post_id = $this->set_up_global_post();
+		$slug    = $this->register_pattern(
+			'test/mixed',
+			$this->bound_heading() . "\n" . $this->linked_paragraph()
+		);
+
+		$rendered = do_blocks(
+			$this->pattern_block( $slug, array( 'headline' => array( 'content' => 'Hello world' ) ) )
+		);
+
+		$this->assertStringContainsString( 'Hello world', $rendered );
+		$this->assertStringContainsString( get_permalink( $post_id ), $rendered );
+		$this->assertStringNotContainsString( 'Default link', $rendered );
+	}
+
+	/**
+	 * A paragraph bound to core/post-data rather than to the pattern.
+	 *
+	 * @return string Block markup.
+	 */
+	private function linked_paragraph(): string {
+		return '<!-- wp:paragraph {"metadata":{"bindings":{"content":'
+			. '{"source":"core/post-data","args":{"field":"link"}}}}} -->' . "\n"
+			. '<p>Default link</p>' . "\n"
+			. '<!-- /wp:paragraph -->';
+	}
+
+	/**
+	 * Renders as though a post were being displayed, which is where the
+	 * context a binding needs comes from.
+	 *
+	 * @return int The post ID.
+	 */
+	private function set_up_global_post(): int {
+		$post_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+
+		$GLOBALS['post'] = get_post( $post_id );
+		setup_postdata( $GLOBALS['post'] );
+
+		return $post_id;
 	}
 
 	/**

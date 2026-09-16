@@ -46,8 +46,6 @@ describe( 'applyContent', () => {
 			],
 			{ somewhereElse: { content: 'Filled' } }
 		);
-
-		// Left in place the binding would resolve to nothing and lock the block.
 		expect( block.attributes.content ).toBe( 'Default' );
 		expect( block.attributes.metadata.bindings ).toBeUndefined();
 	} );

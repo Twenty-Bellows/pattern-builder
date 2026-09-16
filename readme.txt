@@ -2,8 +2,8 @@
 Contributors:      twentybellows, pbking
 Tags:              block-patterns, patterns, block-editor, gutenberg, design
 Requires at least: 6.8
-Tested up to:      6.9
-Stable tag:        2.0.0
+Tested up to:      7.1
+Stable tag:        2.1.0
 Requires PHP:      7.4
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -27,10 +27,15 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 * **Tags & Keywords** - Add metadata to make patterns discoverable
 * **Sync Status** - Manage synced and unsynced patterns effortlessly
 
+**Your Patterns, on Every Site**
+* **Collections** - Keep patterns on patternbuilderwp.com in collections: a private Personal for yourself, private collections of your own on Pro, and the curated collections Twenty Bellows and partner studios publish
+* **Install a whole collection** - Save any directory collection to a site in one action, as theme patterns or user patterns, images included
+* **Agents welcome** - An agent connected to your site can browse, install and upload through your account, and never holds a cloud credential
+
 **Developer-Friendly**
 * **Export to Theme** - Convert user patterns to theme files with proper formatting
 * **Asset Management** - Automatically handles pattern images and media
-* **Block Bindings** - Advanced pattern configuration with block bindings support
+* **Block Bindings** - Bind a pattern's blocks to post meta, ACF fields or any registered binding source, or leave them for whoever places the pattern to fill in
 
 = Use Cases =
 
@@ -43,7 +48,7 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 **For Site Builders**
 * Build custom patterns without coding
 * Reuse patterns across multiple pages
-* Share patterns between sites
+* Carry patterns between sites
 * Maintain pattern library
 
 **For Agencies**
@@ -77,6 +82,20 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 4. Start development environment: `npm run start`
 5. Watch for changes: `npm run watch`
 
+== External services ==
+
+Everything local works without an account and without sending anything anywhere. Three services are involved only when you choose to use them:
+
+**patternbuilderwp.com** — the cloud library and its directory of curated collections, and the account behind them. When you sign in or create an account from Appearance → Pattern Builder, your email and password are relayed once, server-side, to patternbuilderwp.com; only the returned access token is stored, on this site, for your WordPress user. Browsing the Uploaded and Directory tabs, managing your collections, uploading patterns and installing patterns or whole collections, starting a password reset, and confirming a purchase all talk to patternbuilderwp.com through this site. Pattern Builder is the only way to install anything from patternbuilderwp.com: the website shows collections and sends people here. Anonymous usage reporting, if you allow it, goes there too (see below). Terms: https://patternbuilderwp.com/terms/ — Privacy: https://patternbuilderwp.com/privacy/
+
+**Freemius** — the checkout for Pattern Builder Pro. Choosing Go Pro loads Freemius's checkout script (https://checkout.freemius.com/js/v1/) on the Pattern Builder screen and opens their checkout; nothing from Freemius loads anywhere else or before that click. Terms: https://freemius.com/terms/ — Privacy: https://freemius.com/privacy/
+
+**Google Fonts, through WordPress.org** — installing a font. Adding a font family (from the pattern authoring tools, or by an agent using the add-font ability) fetches the list of available families from WordPress.org (https://s.w.org/), which is the same list WordPress core's own Manage Fonts screen uses, and then downloads the font files you chose from Google's font server (https://fonts.gstatic.com/). The files are saved to your site and served from it, so your visitors' browsers never request anything from Google. No request is made until you install a font. Google Fonts terms: https://developers.google.com/fonts/terms — Privacy: https://policies.google.com/privacy
+
+= Usage reporting (opt-in) =
+
+The first time the pattern browser opens on a site, it asks once whether Pattern Builder may report anonymous usage, with Allow and No thanks buttons. Nothing is sent unless an administrator chooses Allow, and the choice can be changed on the same screen at any time. What is sent when allowed: which features are used (the browser opened, a pattern created, the community browsed, an upload or download) and the environment — WordPress, PHP and plugin versions, locale, active theme, multisite, and environment type — under a random install id. What is never sent: the site's address or name, pattern content, or anything about the site's visitors.
+
 == Frequently Asked Questions ==
 
 = Can I use this with any theme? =
@@ -87,9 +106,27 @@ Yes! Pattern Builder works with any WordPress theme that supports the block edit
 
 Yes, Pattern Builder provides a unified interface to manage both theme patterns (PHP files in your theme's patterns directory) and user-created patterns stored in the database.
 
+= Does it work with Advanced Custom Fields? =
+
+Yes, and with no code to write. Choose a post type in the Pattern Bindings panel and the ACF fields attached to it are offered alongside that post type's own custom fields. One ACF setting has to be on first: open the field, and under Presentation switch on "Allow Access to Value in Editor UI". ACF leaves that off for any field created since its 6.3.6, and a field without it renders nothing wherever it is bound, so Pattern Builder does not offer one until it is on.
+
+= Can I bind a block to my own data? =
+
+Yes. Anything registered as post meta with show_in_rest is offered automatically. For data of your own, register a block binding source: WordPress resolves the value from your PHP callback, and registering the same source in the editor with a getFieldsList puts your fields in the panel.
+
 == Screenshots ==
 
 == Changelog ==
+
+= 2.1.0 =
+* Pattern Bindings: bind a block's value to any registered source, not pattern overrides alone — a post type's custom fields, Advanced Custom Fields, or a source a plugin registers — picked per attribute from the fields that post type really offers
+* Cloud collections: sign in to a free patternbuilderwp.com account from Appearance → Pattern Builder and keep your patterns in a private Personal collection, on every site you connect; Pro adds private collections of your own
+* The Directory tab browses curated collections; save one pattern or a whole collection to this site, with the design tokens it needs, and the Uploaded tab manages your own collections
+* A page pattern travels with the patterns it references, uploading and installing them alongside it, and a copy records the pattern it came from
+* Images and fonts for patterns: find what the site has, add a file, draw a placeholder, or install a self-hosted font family, and get back the exact reference to use
+* Agents: seven cloud abilities, an ability that extends the theme's design tokens, create and update checks that refuse invalid markup by name, and authoring guides checked against WordPress 7.1
+* Accounts: stronger passwords, email confirmation, a password reset from the connect panel, and Go Pro through Freemius's checkout on the Pattern Builder screen
+* Opt-in anonymous usage reporting, asked once, never on by default
 
 = 2.0.0 =
 * Complete architectural overhaul: theme pattern files are now the single source of truth — no more database mirror posts, no more custom post type rows, and no more interception of the /wp/v2/blocks REST API

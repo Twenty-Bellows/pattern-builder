@@ -13,7 +13,6 @@ use TwentyBellows\PatternBuilder\Synced_Patterns;
  * @covers \TwentyBellows\PatternBuilder\Editor_Support
  */
 class Test_Editor_Support extends Pattern_Test_Case {
-
 	/**
 	 * Sets the test up.
 	 */
@@ -40,7 +39,7 @@ class Test_Editor_Support extends Pattern_Test_Case {
 	 * Finds one pattern in a REST response.
 	 *
 	 * @param array[] $patterns Patterns from the response.
-	 * @param string  $name     Pattern name.
+	 * @param string  $name Pattern name.
 	 * @return array|null The pattern.
 	 */
 	private function find_pattern( array $patterns, string $name ): ?array {
@@ -69,6 +68,80 @@ class Test_Editor_Support extends Pattern_Test_Case {
 		$this->assertStringContainsString( 'From the page pattern', $pattern['content'] );
 		$this->assertStringNotContainsString( 'Default headline', $pattern['content'] );
 		$this->assertStringNotContainsString( 'core/pattern-overrides', $pattern['content'] );
+	}
+
+	/**
+	 * A reference to a synced pattern survives the list, content and all.
+	 */
+	public function test_patterns_endpoint_keeps_synced_references() {
+		$hero = $this->register_pattern( 'test/hero', $this->bound_heading() );
+		$this->mark_synced( $hero );
+
+		$page = $this->register_pattern(
+			'test/page',
+			'<!-- wp:group {"layout":{"type":"constrained"}} --><div class="wp-block-group">'
+			. $this->pattern_block( $hero, array( 'headline' => array( 'content' => 'From the page pattern' ) ) )
+			. '</div><!-- /wp:group -->'
+		);
+
+		$pattern = $this->find_pattern( $this->request_patterns(), $page );
+
+		$this->assertNotNull( $pattern );
+
+		$blocks = parse_blocks( $pattern['content'] );
+		$this->assertSame( 'core/group', $blocks[0]['blockName'] );
+
+		$reference = $blocks[0]['innerBlocks'][0];
+		$this->assertSame( 'core/pattern', $reference['blockName'], 'The synced pattern should still be a reference.' );
+		$this->assertSame( $hero, $reference['attrs']['slug'] );
+		$this->assertSame(
+			array( 'headline' => array( 'content' => 'From the page pattern' ) ),
+			$reference['attrs']['content'],
+			'The reference should keep the content the page gave it.'
+		);
+		$this->assertStringNotContainsString( 'Default headline', $pattern['content'] );
+	}
+
+	/**
+	 * Plain references beside a synced one are still inlined, as core would.
+	 */
+	public function test_patterns_endpoint_inlines_plain_references_beside_synced_ones() {
+		$hero = $this->register_pattern( 'test/hero', $this->bound_heading() );
+		$this->mark_synced( $hero );
+
+		$plain = $this->register_pattern(
+			'test/plain',
+			'<!-- wp:paragraph --><p>Inlined by the plugin</p><!-- /wp:paragraph -->'
+		);
+		$page  = $this->register_pattern( 'test/page', $this->pattern_block( $plain ) . $this->pattern_block( $hero ) );
+
+		$pattern = $this->find_pattern( $this->request_patterns(), $page );
+
+		$this->assertNotNull( $pattern );
+
+		$names = array_column( parse_blocks( $pattern['content'] ), 'blockName' );
+		$this->assertContains( 'core/paragraph', $names, 'The plain pattern should be inlined.' );
+		$this->assertContains( 'core/pattern', $names, 'The synced pattern should stay a reference.' );
+		$this->assertSame( 1, substr_count( $pattern['content'], 'wp:pattern ' ) );
+	}
+
+	/**
+	 * A template keeps its synced references for the editor as well.
+	 */
+	public function test_template_keeps_synced_references_for_the_editor() {
+		$hero = $this->register_pattern( 'test/hero', $this->bound_heading() );
+		$this->mark_synced( $hero );
+
+		$template          = new WP_Block_Template();
+		$template->content = $this->pattern_block( $hero, array( 'headline' => array( 'content' => 'From the template' ) ) );
+
+		add_filter( 'pattern_builder_is_editor_request', '__return_true' );
+		$filtered = apply_filters( 'get_block_template', $template, 'test//index', 'wp_template' );
+		remove_filter( 'pattern_builder_is_editor_request', '__return_true' );
+
+		$this->assertStringContainsString( 'wp:pattern', $filtered->content );
+		$this->assertStringContainsString( 'From the template', $filtered->content );
+		$this->assertStringNotContainsString( 'Default headline', $filtered->content );
 	}
 
 	/**
@@ -104,8 +177,8 @@ class Test_Editor_Support extends Pattern_Test_Case {
 	}
 
 	/**
-	 * Template content is left alone outside the editor, where the pattern
-	 * block renders the content itself.
+	 * Template content is left alone outside the editor, where the pattern block renders
+	 * the content itself.
 	 */
 	public function test_template_content_is_untouched_on_the_front_end() {
 		$hero   = $this->register_pattern( 'test/hero', $this->bound_heading() );
@@ -139,31 +212,7 @@ class Test_Editor_Support extends Pattern_Test_Case {
 	}
 
 	/**
-	 * Marks a pattern as synced for the duration of a test.
-	 *
-	 * @param string $slug Pattern slug.
-	 * @return void
-	 */
-	private function mark_synced( string $slug ): void {
-		add_filter(
-			'pattern_builder_synced_patterns',
-			static function ( $slugs ) use ( $slug ) {
-				$slugs[] = $slug;
-
-				return $slugs;
-			}
-		);
-
-		Synced_Patterns::flush();
-	}
-
-	/**
 	 * A synced pattern is offered to the inserter as a reference to itself.
-	 *
-	 * This goes through a real request rather than calling the plugin's own
-	 * helpers: the first version of this feature worked when called directly
-	 * and did nothing at all over REST, because it was wired to `init`, where
-	 * `wp_is_serving_rest_request()` is still false.
 	 */
 	public function test_synced_pattern_is_offered_as_a_reference() {
 		$this->register_pattern( 'test/hero', $this->bound_heading(), array( 'title' => 'Hero' ) );
@@ -181,15 +230,8 @@ class Test_Editor_Support extends Pattern_Test_Case {
 		);
 		$this->assertSame( 'Hero', $companion['title'] );
 		$this->assertTrue( $companion['inserter'] );
-
-		// The pattern itself steps aside so the inserter offers it only once.
 		$this->assertNotNull( $design );
 		$this->assertFalse( $design['inserter'] );
-
-		/*
-		 * It still carries its blocks and their bindings, which is what the
-		 * editor renders the instance from.
-		 */
 		$this->assertStringContainsString( 'core/pattern-overrides', $design['content'] );
 		$this->assertStringContainsString( 'Default headline', $design['content'] );
 	}

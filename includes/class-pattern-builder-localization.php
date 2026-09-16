@@ -4,34 +4,18 @@ namespace TwentyBellows\PatternBuilder;
 
 /**
  * Pattern Builder Localization Class
- *
- * Handles localization of pattern content by wrapping translatable strings
- * with appropriate WordPress localization functions.
  */
 class Pattern_Builder_Localization {
-
 	/**
 	 * Localizes the pattern content.
-	 *
-	 * Parse the pattern content. Loop through the blocks recursively and replace any
-	 * text or html content with PHP to escape and localize the content.
-	 * The PHP would be in a format like <?php echo esc_html__( 'Your text here', 'text-domain' ); ?>
-	 * Some blocks have attributes that need to be localized as well, such as the alt text for images.
 	 *
 	 * @param Abstract_Pattern $pattern The pattern to localize.
 	 * @return Abstract_Pattern
 	 */
 	public static function localize_pattern_content( $pattern ) {
-		// Parse the pattern content into blocks.
-		$blocks = parse_blocks( $pattern->content );
-
-		// Process blocks recursively to localize content.
-		$blocks = self::localize_blocks( $blocks );
-
-		// Serialize blocks back to content.
+		$blocks           = parse_blocks( $pattern->content );
+		$blocks           = self::localize_blocks( $blocks );
 		$pattern->content = serialize_blocks( $blocks );
-
-		// Fix encoded PHP tags that get encoded during serialization.
 		$pattern->content = str_replace( '\u003c', '<', $pattern->content );
 		$pattern->content = str_replace( '\u003e', '>', $pattern->content );
 
@@ -46,12 +30,9 @@ class Pattern_Builder_Localization {
 	 */
 	private static function localize_blocks( $blocks ) {
 		foreach ( $blocks as &$block ) {
-			// Skip null blocks or blocks without a name.
 			if ( ! isset( $block['blockName'] ) || null === $block['blockName'] ) {
 				continue;
 			}
-
-			// Process block based on its type.
 			switch ( $block['blockName'] ) {
 				case 'core/paragraph':
 				case 'core/heading':
@@ -104,8 +85,6 @@ class Pattern_Builder_Localization {
 					break;
 
 			}
-
-			// Process inner blocks recursively.
 			if ( ! empty( $block['innerBlocks'] ) ) {
 				$block['innerBlocks'] = self::localize_blocks( $block['innerBlocks'] );
 			}
@@ -122,11 +101,9 @@ class Pattern_Builder_Localization {
 	 */
 	private static function localize_text_block( $block ) {
 		if ( ! empty( $block['innerHTML'] ) && ! empty( trim( wp_strip_all_tags( $block['innerHTML'] ) ) ) ) {
-			// Extract the text content from innerHTML.
 			$content = self::extract_text_content( $block['innerHTML'] );
 
 			if ( ! empty( $content ) ) {
-				// Replace the content with localized version.
 				$localized             = self::create_localized_string( $content );
 				$block['innerHTML']    = str_replace( $content, $localized, $block['innerHTML'] );
 				$block['innerContent'] = array( $block['innerHTML'] );
@@ -145,8 +122,6 @@ class Pattern_Builder_Localization {
 	private static function localize_pullquote_block( $block ) {
 		if ( ! empty( $block['innerHTML'] ) ) {
 			$html = $block['innerHTML'];
-
-			// Localize paragraph content(s) within the blockquote.
 			$html = preg_replace_callback(
 				'/<p[^>]*>([^<]+)<\/p>/',
 				function ( $matches ) {
@@ -159,8 +134,6 @@ class Pattern_Builder_Localization {
 				},
 				$html
 			);
-
-			// Localize citation content.
 			$html = preg_replace_callback(
 				'/<cite[^>]*>([^<]+)<\/cite>/',
 				function ( $matches ) {
@@ -189,7 +162,6 @@ class Pattern_Builder_Localization {
 	 */
 	private static function localize_button_block( $block ) {
 		if ( ! empty( $block['innerHTML'] ) ) {
-			// Extract button text from the anchor tag.
 			if ( preg_match( '/<a[^>]*>(.*?)<\/a>/s', $block['innerHTML'], $matches ) ) {
 				$button_text = wp_strip_all_tags( $matches[1] );
 				if ( ! empty( trim( $button_text ) ) ) {
@@ -210,10 +182,6 @@ class Pattern_Builder_Localization {
 	 * @return array Localized block.
 	 */
 	private static function localize_image_block( $block ) {
-		// Note: for attributes, we don't localize them directly in the attrs array,
-		// because they get HTML-encoded when serialized; instead, we handle them in innerHTML.
-
-		// Localize caption if present.
 		if ( ! empty( $block['innerHTML'] ) && strpos( $block['innerHTML'], '<figcaption' ) !== false ) {
 			if ( preg_match( '/<figcaption[^>]*>(.*?)<\/figcaption>/s', $block['innerHTML'], $matches ) ) {
 				$caption = wp_strip_all_tags( $matches[1] );
@@ -224,8 +192,6 @@ class Pattern_Builder_Localization {
 				}
 			}
 		}
-
-		// Localize alt text in the HTML if present.
 		if ( ! empty( $block['innerHTML'] ) && preg_match( '/alt="([^"]*)"/', $block['innerHTML'], $matches ) ) {
 			$alt_text = $matches[1];
 			if ( ! empty( trim( $alt_text ) ) ) {
@@ -245,7 +211,6 @@ class Pattern_Builder_Localization {
 	 * @return array Localized block.
 	 */
 	private static function localize_media_block( $block ) {
-		// Localize alt text for media blocks.
 		if ( ! empty( $block['attrs']['alt'] ) ) {
 			$block['attrs']['alt'] = self::create_localized_string( $block['attrs']['alt'], 'esc_attr__' );
 		}
@@ -261,7 +226,6 @@ class Pattern_Builder_Localization {
 	 */
 	private static function localize_table_block( $block ) {
 		if ( ! empty( $block['innerHTML'] ) ) {
-			// Extract and localize table cell contents.
 			$block['innerHTML']    = preg_replace_callback(
 				'/<t[dh]>([^<]+)<\/t[dh]>/',
 				function ( $matches ) {
@@ -285,10 +249,6 @@ class Pattern_Builder_Localization {
 	 * @return array Localized block.
 	 */
 	private static function localize_query_pagination_block( $block ) {
-		// For query pagination blocks, handle the label attribute.
-		// These blocks are self-closing; the label should be localized within the attribute.
-
-		// Check if there's a label attribute to localize.
 		if ( ! empty( $block['attrs']['label'] ) ) {
 			$label                   = $block['attrs']['label'];
 			$localized_label         = self::create_localized_string( $label, 'esc_attr__' );
@@ -305,10 +265,6 @@ class Pattern_Builder_Localization {
 	 * @return array Localized block.
 	 */
 	private static function localize_post_excerpt_block( $block ) {
-		// For post excerpt blocks, handle the moreText attribute.
-		// These blocks are self-closing; the moreText should be localized within the attribute.
-
-		// Check if there's a moreText attribute to localize.
 		if ( ! empty( $block['attrs']['moreText'] ) ) {
 			$more_text                  = $block['attrs']['moreText'];
 			$localized_more_text        = self::create_localized_string( $more_text, 'esc_attr__' );
@@ -326,7 +282,6 @@ class Pattern_Builder_Localization {
 	 */
 	private static function localize_details_block( $block ) {
 		if ( ! empty( $block['innerHTML'] ) ) {
-			// Localize summary content in innerHTML.
 			$block['innerHTML'] = preg_replace_callback(
 				'/<summary[^>]*>([^<]+)<\/summary>/',
 				function ( $matches ) {
@@ -339,16 +294,9 @@ class Pattern_Builder_Localization {
 				},
 				$block['innerHTML']
 			);
-
-			// Update innerContent if it exists and has been split.
 			if ( ! empty( $block['innerContent'] ) && is_array( $block['innerContent'] ) ) {
-				// For details blocks with inner blocks, innerContent typically has:
-				// [0] = opening part with summary, [1] = null (for inner blocks), [2] = closing </details>.
-
-				// Find the opening part that contains the summary and update it with localized content.
 				foreach ( $block['innerContent'] as $index => $content ) {
 					if ( is_string( $content ) && strpos( $content, '<summary' ) !== false ) {
-						// Apply the same localization to this part.
 						$block['innerContent'][ $index ] = preg_replace_callback(
 							'/<summary[^>]*>([^<]+)<\/summary>/',
 							function ( $matches ) {
@@ -377,10 +325,6 @@ class Pattern_Builder_Localization {
 	 * @return array Localized block.
 	 */
 	private static function localize_search_block( $block ) {
-		// For search blocks, we need to handle multiple text attributes:
-		// label, placeholder, and buttonText.
-		// These blocks are self-closing; attributes should be localized within the JSON.
-
 		$localizable_attributes = array( 'label', 'placeholder', 'buttonText' );
 
 		foreach ( $localizable_attributes as $attribute ) {
@@ -401,11 +345,8 @@ class Pattern_Builder_Localization {
 	 * @return string Extracted text content.
 	 */
 	private static function extract_text_content( $html ) {
-		// Remove opening and closing tags to get inner content.
-		$html = preg_replace( '/^<[^>]+>/', '', trim( $html ) );
-		$html = preg_replace( '/<\/[^>]+>$/', '', $html );
-
-		// Return the content if it's not empty after trimming.
+		$html    = preg_replace( '/^<[^>]+>/', '', trim( $html ) );
+		$html    = preg_replace( '/<\/[^>]+>$/', '', $html );
 		$content = trim( $html );
 		return ! empty( $content ) ? $html : '';
 	}
@@ -413,18 +354,14 @@ class Pattern_Builder_Localization {
 	/**
 	 * Creates a localized string with proper escaping.
 	 *
-	 * @param string $text            Text to localize.
-	 * @param string $escape_function WordPress escape/localization function to use (e.g. 'wp_kses_post', 'esc_attr__').
+	 * @param string $text Text to localize.
+	 * @param string $escape_function WordPress escape/localization function to use (e.g.
+	 * 'wp_kses_post', 'esc_attr__').
 	 * @return string Localized string in PHP format.
 	 */
 	private static function create_localized_string( $text, $escape_function = 'wp_kses_post' ) {
-		// Escape single quotes in the text.
 		$escaped_text = str_replace( "'", "\\'", $text );
-
-		// Get the text domain from the pattern or use default.
-		$text_domain = get_stylesheet();
-
-		// Create the PHP localization string.
+		$text_domain  = get_stylesheet();
 		return "<?php echo {$escape_function}( '{$escaped_text}', '{$text_domain}' ); ?>";
 	}
 }

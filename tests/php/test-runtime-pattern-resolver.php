@@ -15,7 +15,6 @@ use TwentyBellows\PatternBuilder\Pattern_Resolver;
  * @covers \TwentyBellows\PatternBuilder\Inner_HTML_Processor
  */
 class Test_Pattern_Resolver extends Pattern_Test_Case {
-
 	/**
 	 * Content is written into the pattern's markup.
 	 */
@@ -46,9 +45,6 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 
 	/**
 	 * A slot nothing was supplied for keeps its default and loses its binding.
-	 *
-	 * Left in place the binding would resolve to nothing outside a pattern, and
-	 * would make the block read-only in the editor.
 	 */
 	public function test_unfilled_slot_keeps_its_default_without_its_binding() {
 		$slug = $this->register_pattern( 'test/hero', $this->bound_heading() );
@@ -134,8 +130,6 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 		$this->assertStringContainsString( 'New label', $resolved );
 		$this->assertStringContainsString( 'https://example.org/new', $resolved );
 		$this->assertStringNotContainsString( 'Old label', $resolved );
-
-		// The wrapper block survived the rewrite.
 		$this->assertStringContainsString( '<div class="wp-block-buttons">', $resolved );
 		$this->assertStringContainsString( '<!-- /wp:buttons -->', $resolved );
 	}
@@ -179,8 +173,6 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 		$this->assertStringContainsString( '<p>One</p>', $resolved );
 		$this->assertStringContainsString( '<p>Two</p>', $resolved );
 		$this->assertStringContainsString( 'Three', $resolved );
-
-		// All three blocks landed inside the group, and it still closes.
 		$group = substr(
 			$resolved,
 			strpos( $resolved, '<div class="wp-block-group">' ),
@@ -189,9 +181,6 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 		$this->assertStringContainsString( '<p>One</p>', $group );
 		$this->assertStringContainsString( 'Three', $group );
 		$this->assertStringContainsString( '<!-- /wp:group -->', $resolved );
-
-		// The parse survives a round trip, which it would not if the inner
-		// content markers had fallen out of step with the inner blocks.
 		$blocks = parse_blocks( $resolved );
 		$this->assertCount( 1, array_filter( $blocks, static fn( $block ) => 'core/group' === $block['blockName'] ) );
 		$this->assertCount( 3, $blocks[0]['innerBlocks'] );
@@ -213,6 +202,82 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 		$this->assertStringContainsString( 'From the middle', $resolved );
 		$this->assertStringNotContainsString( 'Default headline', $resolved );
 		$this->assertStringNotContainsString( 'wp:pattern', $resolved );
+	}
+
+	/**
+	 * A reference to a synced pattern is kept as written, content included.
+	 */
+	public function test_synced_reference_is_kept() {
+		$hero = $this->register_pattern( 'test/hero', $this->bound_heading() );
+		$this->mark_synced( $hero );
+
+		$markup = $this->pattern_block( $hero, array( 'headline' => array( 'content' => 'Stays a reference' ) ) );
+
+		$this->assertSame( $markup, Pattern_Resolver::resolve( $markup ) );
+	}
+
+	/**
+	 * A synced reference reached through an unsynced pattern is kept too, while the pattern
+	 * around it is composed.
+	 */
+	public function test_synced_reference_inside_a_composed_pattern_is_kept() {
+		$hero = $this->register_pattern( 'test/hero', $this->bound_heading() );
+		$this->mark_synced( $hero );
+
+		$page = $this->register_pattern(
+			'test/page',
+			$this->bound_heading( 'Page title' )
+			. $this->pattern_block( $hero, array( 'headline' => array( 'content' => 'Section' ) ) )
+		);
+
+		$resolved = Pattern_Resolver::resolve(
+			$this->pattern_block( $page, array( 'headline' => array( 'content' => 'Composed title' ) ) )
+		);
+
+		$blocks = array_values( array_filter( parse_blocks( $resolved ), static fn( $block ) => null !== $block['blockName'] ) );
+
+		$this->assertSame( 'core/heading', $blocks[0]['blockName'] );
+		$this->assertStringContainsString( 'Composed title', $resolved );
+		$this->assertSame( 'core/pattern', $blocks[1]['blockName'] );
+		$this->assertSame( $hero, $blocks[1]['attrs']['slug'] );
+		$this->assertSame( array( 'headline' => array( 'content' => 'Section' ) ), $blocks[1]['attrs']['content'] );
+	}
+
+	/**
+	 * `compose()` inlines plain references the way core does, and only those.
+	 */
+	public function test_compose_inlines_plain_references_and_keeps_synced_ones() {
+		$hero  = $this->register_pattern( 'test/hero', $this->bound_heading(), array( 'title' => 'Hero' ) );
+		$plain = $this->register_pattern(
+			'test/plain',
+			'<!-- wp:paragraph --><p>Plain</p><!-- /wp:paragraph -->',
+			array( 'title' => 'Plain' )
+		);
+		$this->mark_synced( $hero );
+
+		$composed = Pattern_Resolver::compose( $this->pattern_block( $plain ) . $this->pattern_block( $hero ) );
+
+		$blocks = array_values( array_filter( parse_blocks( $composed ), static fn( $block ) => null !== $block['blockName'] ) );
+
+		$this->assertCount( 2, $blocks );
+		$this->assertSame( 'core/paragraph', $blocks[0]['blockName'] );
+		$this->assertSame( $plain, $blocks[0]['attrs']['metadata']['patternName'], 'An inlined pattern reads as an instance, as core marks it.' );
+		$this->assertSame( 'Plain', $blocks[0]['attrs']['metadata']['name'] );
+		$this->assertSame( 'core/pattern', $blocks[1]['blockName'] );
+		$this->assertSame( $hero, $blocks[1]['attrs']['slug'] );
+	}
+
+	/**
+	 * `compose()` does not change what `resolve()` does afterwards: a plain reference is
+	 * still left for core there.
+	 */
+	public function test_resolve_still_leaves_plain_references_after_compose() {
+		$plain = $this->register_pattern( 'test/plain', '<!-- wp:paragraph --><p>Plain</p><!-- /wp:paragraph -->' );
+
+		Pattern_Resolver::compose( $this->pattern_block( $plain ) );
+
+		$markup = $this->pattern_block( $plain );
+		$this->assertSame( $markup, Pattern_Resolver::resolve( $markup ) );
 	}
 
 	/**
@@ -302,5 +367,125 @@ class Test_Pattern_Resolver extends Pattern_Test_Case {
 
 		$this->assertStringContainsString( 'Default headline', $resolved );
 		$this->assertStringNotContainsString( 'Should not appear', $resolved );
+	}
+
+	/**
+	 * Emptying a caption takes the `figcaption` with it.
+	 */
+	public function test_empty_caption_removes_the_figcaption() {
+		$slug = $this->register_pattern(
+			'test/photo',
+			'<!-- wp:image {"metadata":{"name":"photo","bindings":{"__default":{"source":"core/pattern-overrides"}}}} -->'
+			. '<figure class="wp-block-image"><img src="https://example.org/default.png" alt="Default alt"/>'
+			. '<figcaption class="wp-element-caption">Default caption</figcaption></figure>'
+			. '<!-- /wp:image -->'
+		);
+
+		$resolved = Pattern_Resolver::resolve(
+			$this->pattern_block(
+				$slug,
+				array(
+					'photo' => array(
+						'url'     => 'https://example.org/filled.png',
+						'alt'     => 'Filled alt',
+						'caption' => '',
+					),
+				)
+			)
+		);
+
+		$this->assertStringNotContainsString( 'figcaption', $resolved );
+		$this->assertStringNotContainsString( 'Default caption', $resolved );
+		$this->assertStringContainsString( '<img src="https://example.org/filled.png" alt="Filled alt"/>', $resolved );
+		$this->assertStringContainsString( '</figure>', $resolved );
+	}
+
+	/**
+	 * A caption that has something in it is still written in place.
+	 */
+	public function test_caption_with_a_value_is_written_into_the_figcaption() {
+		$slug = $this->register_pattern(
+			'test/photo',
+			'<!-- wp:image {"metadata":{"name":"photo","bindings":{"__default":{"source":"core/pattern-overrides"}}}} -->'
+			. '<figure class="wp-block-image"><img src="https://example.org/default.png" alt="Default alt"/>'
+			. '<figcaption class="wp-element-caption">Default caption</figcaption></figure>'
+			. '<!-- /wp:image -->'
+		);
+
+		$resolved = Pattern_Resolver::resolve(
+			$this->pattern_block( $slug, array( 'photo' => array( 'caption' => 'Filled caption' ) ) )
+		);
+
+		$this->assertStringContainsString( '<figcaption class="wp-element-caption">Filled caption</figcaption>', $resolved );
+		$this->assertStringNotContainsString( 'Default caption', $resolved );
+	}
+
+	/**
+	 * An image with no caption to begin with is left exactly as it was.
+	 */
+	public function test_empty_caption_on_an_image_without_one_changes_nothing() {
+		$slug = $this->register_pattern(
+			'test/photo',
+			'<!-- wp:image {"metadata":{"name":"photo","bindings":{"__default":{"source":"core/pattern-overrides"}}}} -->'
+			. '<figure class="wp-block-image"><img src="https://example.org/default.png" alt="Default alt"/></figure>'
+			. '<!-- /wp:image -->'
+		);
+
+		$resolved = Pattern_Resolver::resolve(
+			$this->pattern_block(
+				$slug,
+				array(
+					'photo' => array(
+						'alt'     => 'Filled alt',
+						'caption' => '',
+					),
+				)
+			)
+		);
+
+		$this->assertStringContainsString( '<figure class="wp-block-image">', $resolved );
+		$this->assertStringContainsString( 'alt="Filled alt"', $resolved );
+		$this->assertStringNotContainsString( 'figcaption', $resolved );
+	}
+
+	/**
+	 * An element the block would have saved empty is emptied, not removed.
+	 */
+	public function test_empty_button_text_keeps_the_anchor() {
+		$slug = $this->register_pattern(
+			'test/cta',
+			'<!-- wp:button {"metadata":{"name":"cta","bindings":{"text":{"source":"core/pattern-overrides"}}}} -->'
+			. '<div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="https://example.org/old">Old label</a></div>'
+			. '<!-- /wp:button -->'
+		);
+
+		$resolved = Pattern_Resolver::resolve(
+			$this->pattern_block( $slug, array( 'cta' => array( 'text' => '' ) ) )
+		);
+
+		$this->assertStringContainsString(
+			'<a class="wp-block-button__link wp-element-button" href="https://example.org/old"></a>',
+			$resolved
+		);
+		$this->assertStringNotContainsString( 'Old label', $resolved );
+	}
+
+	/**
+	 * The same, for a paragraph, whose `p` is the block itself.
+	 */
+	public function test_empty_paragraph_content_keeps_the_paragraph() {
+		$slug = $this->register_pattern(
+			'test/hero',
+			'<!-- wp:paragraph {"metadata":{"name":"lede","bindings":{"__default":{"source":"core/pattern-overrides"}}}} -->'
+			. '<p>Default lede</p>'
+			. '<!-- /wp:paragraph -->'
+		);
+
+		$resolved = Pattern_Resolver::resolve(
+			$this->pattern_block( $slug, array( 'lede' => array( 'content' => '' ) ) )
+		);
+
+		$this->assertStringContainsString( '<p></p>', $resolved );
+		$this->assertStringNotContainsString( 'Default lede', $resolved );
 	}
 }

@@ -1,3 +1,6 @@
+@use "sass:math";
+@use "../pattern-tiles" as tiles;
+
 // The Appearance → Pattern Builder screen — browse mode only. Edit mode
 // hands the whole page to core's edit-post editor, which brings its own
 // styles.
@@ -29,8 +32,84 @@ body.appearance_page_pattern-builder {
 
 .pattern-builder-browser {
 	display: flex;
+	flex-direction: column;
 	flex: 1;
 	min-height: 0;
+
+	// ---- Header: brand, collection tabs, search, create. ----
+
+	&__header {
+		display: flex;
+		align-items: center;
+		gap: 24px;
+		padding: 12px 24px;
+		border-bottom: 1px solid #ddd;
+		background: #fff;
+	}
+
+	&__brand {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		flex: 0 0 auto;
+		color: #1e1e1e;
+	}
+
+	&__brand-name {
+		font-size: 15px;
+		font-weight: 600;
+		white-space: nowrap;
+	}
+
+	&__tabs {
+		display: flex;
+		gap: 4px;
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	&__tab {
+		background: none;
+		border: 0;
+		border-radius: 2px;
+		padding: 8px 14px;
+		font-size: 13px;
+		font-weight: 500;
+		color: #1e1e1e;
+		cursor: pointer;
+		position: relative;
+
+		&:hover {
+			background: #f0f0f0;
+		}
+
+		&.is-active {
+			color: var(--wp-admin-theme-color, #3858e9);
+
+			&::after {
+				content: "";
+				position: absolute;
+				left: 8px;
+				right: 8px;
+				bottom: -13px;
+				height: 2px;
+				background: currentcolor;
+			}
+		}
+	}
+
+	&__header-actions {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		flex: 0 0 auto;
+	}
+
+	&__body {
+		display: flex;
+		flex: 1;
+		min-height: 0;
+	}
 
 	&__loading {
 		display: flex;
@@ -48,10 +127,6 @@ body.appearance_page_pattern-builder {
 		overflow-y: auto;
 		padding: 16px 12px;
 		background: #f8f8f8;
-	}
-
-	&__title {
-		padding: 8px 12px 16px;
 	}
 
 	&__categories {
@@ -96,25 +171,22 @@ body.appearance_page_pattern-builder {
 		flex: 1;
 		min-width: 0;
 		overflow-y: auto;
-		padding: 24px 32px;
-	}
-
-	&__toolbar {
-		margin-bottom: 24px;
+		padding: 24px;
 	}
 
 	&__search {
-		min-width: 280px;
-		flex: 1;
-		max-width: 480px;
+		flex: 0 1 auto;
+		min-width: 150px;
+		max-width: 280px;
 	}
 
 	&__grid {
 		display: grid;
-		// Small base size so plenty of columns fit (three across even with
-		// the details sidebar open); cards stretch to fill the row.
-		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-		gap: 24px;
+		// Fixed tracks, not fluid ones: the cloud tiles scale their preview
+		// by a constant declared in CSS, which is only possible when the
+		// tile's width is known here rather than measured in the browser.
+		grid-template-columns: repeat(auto-fill, tiles.$tile * 1px);
+		gap: tiles.$gap * 1px;
 		align-items: start;
 	}
 
@@ -123,14 +195,47 @@ body.appearance_page_pattern-builder {
 	&__details {
 		flex: 0 0 320px;
 		border-left: 1px solid #ddd;
-		overflow: hidden;
+		overflow-y: auto;
 		display: flex;
 		flex-direction: column;
 		background: #fff;
 	}
 
-	&__create-modal .components-modal__content {
-		min-width: 360px;
+	// The create modal hands its whole body to the two-pane create panel,
+	// which draws its own edges — so the modal's own padding comes off.
+	&__create-modal {
+		// A fixed frame, so the two panes scroll inside it rather than
+		// growing the modal past the viewport.
+		width: min(880px, calc(100vw - 32px));
+		height: min(680px, calc(100vh - 64px));
+
+		.components-modal__header {
+			margin-bottom: 0;
+			padding-right: 16px;
+			padding-left: 24px;
+			border-bottom: 1px solid #e0e0e0;
+		}
+
+		.components-modal__content {
+			display: flex;
+			flex-direction: column;
+			padding: 0;
+			overflow: hidden;
+
+			// Core wraps the modal's children in a div of its own; without
+			// this the panel would sit at its content height rather than
+			// filling the frame, and the rail would stop short of the
+			// bottom edge. The header is positioned absolutely, so it is
+			// not a flex item here — excluded in case that ever changes.
+			> :not(.components-modal__header) {
+				flex: 1;
+				min-height: 0;
+			}
+		}
+
+		.pattern-builder-create {
+			height: 100%;
+		}
 	}
 
 	&__snackbars {
@@ -148,50 +253,75 @@ body.appearance_page_pattern-builder {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+	width: tiles.$tile * 1px;
 	padding: 0;
 	border: 0;
-	background: transparent;
-	text-align: left;
+	background: none;
 	cursor: pointer;
+	text-align: start;
 
 	&__preview {
-		display: block;
-		aspect-ratio: 1 / 1;
-		border: 1px solid #ddd;
-		border-radius: 8px;
-		overflow: hidden;
-		background: #fff;
+		// The square frame. The document inside centres a short pattern and
+		// starts a tall one at the top, so the frame only has to clip it.
 		position: relative;
-
-		// The preview scales by viewport width and reports its own height;
-		// the square crops it.
-		> div {
-			width: 100%;
-		}
-	}
-
-	&:hover &__preview {
-		border-color: var(--wp-admin-theme-color, #3858e9);
-	}
-
-	&.is-selected &__preview {
-		border-color: var(--wp-admin-theme-color, #3858e9);
-		box-shadow: 0 0 0 1.5px var(--wp-admin-theme-color, #3858e9);
-	}
-
-	&__placeholder {
-		display: block;
 		width: 100%;
-		height: 100%;
-		background: #f0f0f0;
+		aspect-ratio: 1 / 1;
+		overflow: hidden;
+		border-radius: 4px;
+		background: #fff;
+
+		// The hairline the Site Editor's grid draws over its media tiles.
+		&::after {
+			content: "";
+			position: absolute;
+			inset: 0;
+			border-radius: 4px;
+			box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+			pointer-events: none;
+		}
+
 	}
 
-	&__footer {
+	// Every tile is a document — the site's own render of a local pattern, or
+	// the service's of a cloud one — framed at the design width and scaled by
+	// the fixed ratio between the two, so a pattern is cropped at the same
+	// point in both grids.
+	&__preview iframe {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: tiles.$preview-width * 1px;
+		height: tiles.$preview-width * 1px;
+		border: 0;
+		transform-origin: 0 0;
+		transform: scale(math.div(tiles.$tile, tiles.$preview-width));
+		pointer-events: none;
+	}
+
+	&:hover &__preview::after {
+		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+	}
+
+	&.is-selected &__preview::after {
+		box-shadow:
+			inset 0 0 0 1px var(--wp-admin-theme-color, #3858e9),
+			inset 0 0 0 2px #fff;
+	}
+
+	&__title {
 		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		padding: 0 4px;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		font-size: 12px;
+		line-height: 16px;
 		min-width: 0;
+
+		> span:first-child {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
 	}
 }
 
@@ -227,12 +357,36 @@ body.appearance_page_pattern-builder {
 	}
 
 	&__actions {
-		padding: 16px;
-		border-top: 1px solid #ddd;
+		padding: 0;
 	}
 
 	&__action-button {
 		width: 100%;
 		justify-content: center;
 	}
+}
+
+// ---- Sidebar empty state. ----
+
+.pattern-builder-details.is-empty {
+	display: grid;
+	place-items: center;
+	padding: 32px 24px;
+	text-align: center;
+}
+
+.pattern-builder-details__header .pattern-builder-details__actions {
+	margin-top: 12px;
+}
+
+// ---- Edit mode: the page hosts core's editor for one pattern.
+// The document tab opens with core's post card — the post's title, its
+// description, word count and read time. A pattern's name and description
+// are edited in the Pattern Metadata panel, so the card only duplicates
+// them. Its own wrapper is emotion-classed, so the rule anchors on the one
+// stable class inside it; that keeps the Block tab, whose first child is
+// the block inspector, untouched.
+body.appearance_page_pattern-builder
+.editor-sidebar__panel > div > div:first-child:has(.editor-post-card-panel__title) {
+	display: none;
 }

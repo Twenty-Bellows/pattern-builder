@@ -1,0 +1,28 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/theme.json",
+	"version": 3,
+	"title": "Inset Panel",
+	"slug": "inset-panel",
+	"description": "A group set into the page: the surface colour, a hairline border and the theme's own padding. The worked example of a block style variation — a second kind of group, named once and applied with a class, rather than the same five attributes on every card.",
+	"blockTypes": [ "core/group" ],
+	"styles": {
+		"color": {
+			"background": "var(--wp--preset--color--surface)",
+			"text": "var(--wp--preset--color--contrast)"
+		},
+		"border": {
+			"color": "var(--wp--preset--color--hairline)",
+			"width": "1px",
+			"style": "solid",
+			"radius": "0"
+		},
+		"spacing": {
+			"padding": {
+				"top": "var(--wp--preset--spacing--50)",
+				"right": "var(--wp--preset--spacing--50)",
+				"bottom": "var(--wp--preset--spacing--50)",
+				"left": "var(--wp--preset--spacing--50)"
+			}
+		}
+	}
+}

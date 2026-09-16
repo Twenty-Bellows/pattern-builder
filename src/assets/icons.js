@@ -1,26 +1,242 @@
 import { Icon } from '@wordpress/components';
 
-export const patternBuilderAppIcon = () => {
-	return (
-		<Icon
-			icon={
-				<svg width="24" height="24" viewBox="0 0 24 24" version="1.1">
-					<path d="M20.763,1.605L20.43,1.248C20.17,0.97 19.744,0.966 19.48,1.24L15.826,5.036C15.561,5.31 15.558,5.759 15.818,6.037L16.152,6.394C16.412,6.672 16.837,6.676 17.102,6.401L20.756,2.606C21.02,2.331 21.024,1.883 20.763,1.605Z" />
-					<path d="M2,14L2,11L8,11L8,14" />
-					<path d="M2,14L2,11L8,11L8,14" />
-					<path d="M2,21L2,18L8,18L8,21" />
-					<path d="M8.5,21L8.5,18L15,18L15,21" />
-					<path d="M15.5,21L15.5,18L22,18L22,21" />
-					<path d="M5.5,17.5L5.5,14.5L11.5,14.5L11.5,17.5" />
-					<path d="M12,17.5L12,14.5L18,14.5L18,17.5" />
-					<path d="M5,15.9L5,17.5L2,17.5L2,14.5L5,14.5" />
-					<path d="M22,15.9L22,17.5L18.5,17.5L18.5,14.5L22,14.5" />
-					<rect x="15.706" y="5.407" width="1.362" height="3.661" />
-					<path d="M17.738,9.672L18.012,10.451C13.899,12.955 11.473,13.1 10.1,13.181C9.715,13.203 9.444,12.775 9.622,12.415C11.273,9.073 14.534,7.375 14.534,7.375L15.617,7.724" />
-				</svg>
-			}
-			size={ 24 }
-			style={ { width: '24px', height: '24px' } }
+/**
+ * The placeholder mark, ported from assets/logo_black.svg.
+ *
+ * Every stroke and fill is `currentColor`, so the mark takes the colour of
+ * whatever it sits in rather than carrying one of its own.
+ *
+ * @param {Object} props      Component props.
+ * @param {number} props.size Pixel size of the square mark.
+ */
+export const PatternBuilderLogo = ( { size = 24 } ) => (
+	<svg
+		width={ size }
+		height={ size }
+		viewBox="0 0 1000 1000"
+		xmlns="http://www.w3.org/2000/svg"
+		fillRule="evenodd"
+		clipRule="evenodd"
+		strokeLinejoin="bevel"
+		aria-hidden="true"
+		focusable="false"
+	>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M5266.3,9429L5266.3,4220.6"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
 		/>
-	);
-};
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M5266.3,4220.6L9823.7,4220.6"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M9823.7,4220.6L9823.7,7475.8"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M9823.7,7475.8L7870.5,7475.8"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M7870.5,7475.8L7870.5,6824.8"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M7870.5,6824.8L9172.6,6824.8"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M9172.6,6824.8L9172.6,4871.6"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M9172.6,4871.6L5917.4,4871.6"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M5917.4,4871.6L5917.4,9429"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M5917.4,9429L11777,9429"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M11777,9429L11777,4220.6"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M11777,4220.6L16334,4220.6"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M11126,3568.1L16985,3568.1"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M11126,8777.9L11126,3568.1"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M6568.4,8777.9L11126,8777.9"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M6568.4,5522.7L6568.4,8777.9"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M8521.6,5522.7L6568.4,5522.7"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M8521.6,6173.7L8521.6,5522.7"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M7219.5,6173.7L8521.6,6173.7"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M7219.5,8126.9L7219.5,6173.7"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M10475,8126.9L7219.5,8126.9"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M10475,3568.1L10475,8126.9"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M4613.8,3568.1L10475,3568.1"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M4613.8,8777.9L4613.8,3568.1"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M707.52,8777.9L4613.8,8777.9"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M20242,10731L707.52,10731"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.117627,0,0,0.118133,-460.161,-267.685)"
+			d="M707.52,10080L20242,10080"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="10.67"
+		/>
+		<path
+			transform="matrix(0.16469,0,0,0.165398,-493.21,-373.965)"
+			d="M706,2726L14658,2726L14658,2261L706,2261L706,2726Z"
+			fill="currentColor"
+			stroke="currentColor"
+			strokeWidth="7.62"
+			strokeLinejoin="miter"
+		/>
+		<path
+			transform="matrix(0.16469,0,0,0.165398,-493.21,-373.965)"
+			d="M3962,7377L3962,3657L7217,3657L7217,5982L5822,5982L5822,5517L6752,5517L6752,4122L4427,4122L4427,7377L8612,7377L8612,3657L11867,3657L11867,5982L10472,5982L10472,5517L11402,5517L11402,4122L9077,4122L9077,7377L13262,7377L13262,3657L14658,3657L14658,3191L12797,3191L12797,6912L9542,6912L9542,4587L10937,4587L10937,5052L10007,5052L10007,6447L12332,6447L12332,3191L8147,3191L8147,6912L4892,6912L4892,4587L6287,4587L6287,5052L5357,5052L5357,6447L7682,6447L7682,3191L3496,3191L3496,6912L706,6912L706,7377L3962,7377Z"
+			fill="currentColor"
+			stroke="currentColor"
+			strokeWidth="7.62"
+			strokeLinejoin="miter"
+		/>
+		<path
+			transform="matrix(0.0716743,0,0,0.165398,-50.6021,-373.965)"
+			d="M14658,7842L706,7842L706,8307L14658,8307L14658,7842Z"
+			fill="currentColor"
+			stroke="currentColor"
+			strokeWidth="7.62"
+			strokeLinejoin="miter"
+		/>
+	</svg>
+);
+
+export const patternBuilderAppIcon = () => (
+	<Icon icon={ <PatternBuilderLogo /> } size={ 24 } />
+);

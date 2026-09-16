@@ -12,12 +12,6 @@ import { navigateToPattern } from '../utils/patternNavigation';
 /**
  * The blocks an inserted copy of a pattern consists of.
  *
- * A synced pattern is inserted as a reference to itself, so the copy keeps
- * following the original: a synced THEME pattern as a `core/pattern` naming
- * the pattern file, a synced USER pattern as core's native `core/block`
- * referencing the wp_block post. Anything else is inserted as a copy of its
- * blocks.
- *
  * @param {Object} pattern The pattern.
  * @return {Array} Blocks to insert.
  */
@@ -31,8 +25,6 @@ function getInsertionBlocks( pattern ) {
 	}
 
 	const blocks = parse( pattern.content );
-
-	// Give the first block the metadata name.
 	if ( blocks.length > 0 ) {
 		blocks[ 0 ].attributes.metadata = {
 			...( blocks[ 0 ].attributes.metadata || {} ),
@@ -67,14 +59,11 @@ export const PatternList = ( { patterns, onEdit } ) => {
 	};
 
 	const handleDragStart = ( event, pattern ) => {
-		// The editor parses blocks straight from dropped HTML.
 		event.dataTransfer.effectAllowed = 'copy';
 		event.dataTransfer.setData(
 			'text/html',
 			serialize( getInsertionBlocks( pattern ) )
 		);
-
-		// Add drag image styling.
 		const dragImage = event.target.cloneNode( true );
 		dragImage.style.width = '300px';
 		dragImage.style.opacity = '0.8';

@@ -1,0 +1,2528 @@
+<?php
+
+namespace TwentyBellows\PatternBuilder;
+
+/**
+ * Abilities: what an agent can ask this site about its patterns, and what it can ask this
+ * site to store.
+ */
+class Pattern_Builder_Abilities {
+	const CATEGORY = 'pattern-builder';
+
+	/**
+	 * Hook the component into WordPress.
+	 */
+	public function __construct() {
+		if ( ! function_exists( 'wp_register_ability' ) ) {
+			return;
+		}
+
+		add_action( 'wp_abilities_api_categories_init', array( $this, 'register_category' ) );
+		add_action( 'wp_abilities_api_init', array( $this, 'register_abilities' ) );
+	}
+
+	/**
+	 * Register the category these abilities group under.
+	 */
+	public function register_category() {
+		wp_register_ability_category(
+			self::CATEGORY,
+			array(
+				'label'       => __( 'Pattern Builder', 'pattern-builder' ),
+				'description' => __( 'Read this site’s design system and blocks, and store patterns in its theme or database.', 'pattern-builder' ),
+			)
+		);
+	}
+
+	/**
+	 * Register every ability.
+	 */
+	public function register_abilities() {
+		$this->register_design_system();
+		$this->register_block_types();
+		$this->register_list_patterns();
+		$this->register_get_pattern();
+		$this->register_render_pattern();
+		$this->register_authoring_guide();
+		$this->register_validator();
+		$this->register_editor_scripts();
+		$this->register_create_pattern();
+		$this->register_update_pattern();
+		$this->register_add_design_tokens();
+		$this->register_set_global_styles();
+		$this->register_set_layout();
+		$this->register_add_block_style_variation();
+		$this->register_find_media();
+		$this->register_add_asset();
+		$this->register_add_placeholder_image();
+		$this->register_list_fonts();
+		$this->register_add_font();
+	}
+
+	/**
+	 * Anyone who may look at patterns in the editor may read these.
+	 *
+	 * @return bool
+	 */
+	public function can_read() {
+		return current_user_can( 'edit_posts' );
+	}
+
+	/**
+	 * Writing a theme pattern writes a file into the theme, which is the same authority the
+	 * REST controller asks for.
+	 *
+	 * @return bool
+	 */
+	public function can_write() {
+		return current_user_can( 'edit_theme_options' );
+	}
+
+	/**
+	 * The annotations shared by every read: no state changes, same answer twice.
+	 *
+	 * @return array
+	 */
+	private function read_annotations() {
+		return array(
+			'show_in_rest' => true,
+			'annotations'  => array(
+				'readonly'    => true,
+				'destructive' => false,
+				'idempotent'  => true,
+			),
+		);
+	}
+
+	/**
+	 * The design system as this site actually resolves it.
+	 */
+	private function register_design_system() {
+		wp_register_ability(
+			'pattern-builder/get-design-system',
+			array(
+				'label'               => __( 'Get the design system', 'pattern-builder' ),
+				'description'         => __( 'Returns this site’s resolved design system — the color palette and gradients, the spacing scale, typography, layout widths, the global styles already applied to the root, elements and blocks, and the block style variations registered here — as WordPress merges them from core, the parent theme, the child theme and the active style variation. Read this before writing markup: a pattern should reference these values rather than invent them, and should leave alone anything the site already styles.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'palette'      => array(
+							'type'        => 'array',
+							'description' => 'Color presets. Use the slug in a block\'s backgroundColor/textColor attribute, or var(--wp--preset--color--{slug}) in CSS.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'gradients'    => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'object' ),
+						),
+						'spacing'      => array(
+							'type'        => 'array',
+							'description' => 'Spacing presets. Reference as var(--wp--preset--spacing--{slug}).',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'fontSizes'    => array(
+							'type'        => 'array',
+							'description' => 'Font size presets. Use the slug in a block\'s fontSize attribute.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'fontFamilies' => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'object' ),
+						),
+						'layout'       => array(
+							'type'        => 'object',
+							'description' => 'contentSize and wideSize — the widths a constrained layout caps its children at — plus useRootPaddingAwareAlignments, which decides whether a full-width band escapes the root padding. Change them with set-layout; a pattern whose bands do not match these has to restate the width on every band.',
+						),
+						'variations'   => array(
+							'type'        => 'array',
+							'description' => 'Whole-site style variations the theme offers, by title.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'styles'       => array(
+							'type'        => 'object',
+							'description' => 'The global styles in effect: the root, per-element (heading, link, button) and per-block styling this site already applies. A pattern inherits all of it, so anything set here is something the pattern should not restate.',
+						),
+						'blockStyles'  => array(
+							'type'        => 'object',
+							'description' => 'Block style variations registered on this site, keyed by block name. Apply one with the given class. `portable` is true for one declared in a block\'s own block.json, which ships with WordPress; false for one this site registered, whose definition is this site\'s — an upload to patternbuilderwp.com carries it with the pattern, a copy made by hand arrives with the class and nothing styling it. A variation this theme defines as a styles/*.json partial also carries its `styles`, so you can tell whether an existing look already does what you want before adding another — including the `css` string where it has one, which is where a look\'s pseudo-elements, descendant rules and hover states live.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_design_system' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * Resolve the merged theme.json settings.
+	 *
+	 * @return array
+	 */
+	public function execute_design_system() {
+		$settings = \WP_Theme_JSON_Resolver::get_merged_data()->get_settings();
+
+		$variations = array();
+		foreach ( \WP_Theme_JSON_Resolver::get_style_variations() as $variation ) {
+			if ( isset( $variation['title'] ) ) {
+				$variations[] = (string) $variation['title'];
+			}
+		}
+
+		$merged = \WP_Theme_JSON_Resolver::get_merged_data()->get_raw_data();
+
+		return array(
+			'palette'      => $this->preset( $settings, array( 'color', 'palette' ) ),
+			'gradients'    => $this->preset( $settings, array( 'color', 'gradients' ) ),
+			'spacing'      => $this->preset( $settings, array( 'spacing', 'spacingSizes' ) ),
+			'fontSizes'    => $this->preset( $settings, array( 'typography', 'fontSizes' ) ),
+			'fontFamilies' => $this->preset( $settings, array( 'typography', 'fontFamilies' ) ),
+			'layout'       => array_merge(
+				isset( $settings['layout'] ) && is_array( $settings['layout'] ) ? $settings['layout'] : array(),
+				array( 'useRootPaddingAwareAlignments' => ! empty( $settings['useRootPaddingAwareAlignments'] ) )
+			),
+			'variations'   => $variations,
+			'styles'       => isset( $merged['styles'] ) && is_array( $merged['styles'] ) ? $merged['styles'] : array(),
+			'blockStyles'  => $this->block_styles(),
+		);
+	}
+
+	/**
+	 * The block style variations available here, and which of them travel.
+	 *
+	 * @return array Block name => list of variations.
+	 */
+	private function block_styles() {
+		$found = array();
+
+		foreach ( \WP_Block_Type_Registry::get_instance()->get_all_registered() as $block_name => $type ) {
+			if ( empty( $type->styles ) || ! is_array( $type->styles ) ) {
+				continue;
+			}
+			foreach ( $type->styles as $style ) {
+				if ( empty( $style['name'] ) ) {
+					continue;
+				}
+				$found[ $block_name ][ (string) $style['name'] ] = array(
+					'label'  => isset( $style['label'] ) ? (string) $style['label'] : (string) $style['name'],
+					'source' => 'block',
+				);
+			}
+		}
+
+		foreach ( \WP_Block_Styles_Registry::get_instance()->get_all_registered() as $block_name => $styles ) {
+			foreach ( $styles as $name => $style ) {
+				if ( isset( $found[ $block_name ][ (string) $name ] ) ) {
+					continue;
+				}
+				$found[ $block_name ][ (string) $name ] = array(
+					'label'  => isset( $style['label'] ) ? (string) $style['label'] : (string) $name,
+					'source' => 'site',
+				);
+			}
+		}
+		$partials = Pattern_Builder_Block_Style_Variations::all();
+
+		$answer = array();
+		foreach ( $found as $block_name => $styles ) {
+			foreach ( $styles as $name => $style ) {
+				$entry = array(
+					'name'     => (string) $name,
+					'label'    => $style['label'],
+					'class'    => 'is-style-' . $name,
+					'source'   => $style['source'],
+					'portable' => 'block' === $style['source'],
+				);
+
+				if ( 'site' === $style['source'] && isset( $partials[ $name ]['styles'] ) && is_array( $partials[ $name ]['styles'] ) ) {
+					$entry['styles'] = $partials[ $name ]['styles'];
+				}
+
+				$answer[ $block_name ][] = $entry;
+			}
+		}
+
+		return $answer;
+	}
+
+	/**
+	 * Read a preset list out of merged settings.
+	 *
+	 * @param array $settings Merged settings.
+	 * @param array $path Path to the preset group.
+	 * @return array
+	 */
+	private function preset( $settings, $path ) {
+		$node = $settings;
+		foreach ( $path as $key ) {
+			if ( ! isset( $node[ $key ] ) ) {
+				return array();
+			}
+			$node = $node[ $key ];
+		}
+
+		if ( ! is_array( $node ) ) {
+			return array();
+		}
+		if ( isset( $node[0] ) ) {
+			return array_values( $node );
+		}
+
+		$by_slug = array();
+		foreach ( array( 'default', 'theme', 'custom' ) as $origin ) {
+			if ( empty( $node[ $origin ] ) || ! is_array( $node[ $origin ] ) ) {
+				continue;
+			}
+			foreach ( $node[ $origin ] as $item ) {
+				if ( isset( $item['slug'] ) ) {
+					$by_slug[ $item['slug'] ] = $item;
+				}
+			}
+		}
+
+		return array_values( $by_slug );
+	}
+
+	/**
+	 * The block types this site actually has.
+	 */
+	private function register_block_types() {
+		wp_register_ability(
+			'pattern-builder/list-block-types',
+			array(
+				'label'               => __( 'List available block types', 'pattern-builder' ),
+				'description'         => __( 'Returns every block type registered on this site with its attribute schema and whether it supports inner blocks. Markup referencing a block that is not in this list will render as an unrecognised block, so check here before using a block that is not core.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'namespace' => array(
+							'type'        => 'string',
+							'description' => 'Optional: only return blocks in this namespace, e.g. "core".',
+						),
+						'blocks'    => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'description' => 'Optional: return only these blocks, by name. Naming blocks also returns their supports, since that is usually why you are asking about particular ones. A name this site does not have comes back under "unknown" rather than silently missing.',
+						),
+						'supports'  => array(
+							'type'        => 'boolean',
+							'description' => 'Include each block\'s supports: the contract that decides which classes its saved markup must carry, which no validator can check for you. Defaults to true when "blocks" names any and false otherwise, because supports is around two and a half times the size of everything else in a listing and a browse rarely needs it.',
+						),
+					),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'blocks' => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'object' ),
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_block_types' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * List registered block types.
+	 *
+	 * @param array $input Ability input.
+	 * @return array
+	 */
+	public function execute_block_types( $input = array() ) {
+		$namespace     = isset( $input['namespace'] ) ? (string) $input['namespace'] : '';
+		$wanted        = isset( $input['blocks'] ) ? array_map( 'strval', (array) $input['blocks'] ) : array();
+		$with_supports = isset( $input['supports'] ) ? (bool) $input['supports'] : ! empty( $wanted );
+
+		$registry = \WP_Block_Type_Registry::get_instance();
+		$blocks   = array();
+
+		foreach ( $registry->get_all_registered() as $name => $type ) {
+			if ( $wanted && ! in_array( $name, $wanted, true ) ) {
+				continue;
+			}
+
+			if ( '' !== $namespace && 0 !== strpos( $name, $namespace . '/' ) ) {
+				continue;
+			}
+
+			$entry = array(
+				'name'        => $name,
+				'title'       => isset( $type->title ) ? $type->title : '',
+				'category'    => isset( $type->category ) ? $type->category : '',
+				'attributes'  => is_array( $type->attributes ) ? $type->attributes : array(),
+				'usesContext' => is_array( $type->uses_context ) ? $type->uses_context : array(),
+				'dynamic'     => $type->is_dynamic(),
+			);
+
+			if ( $with_supports ) {
+				$entry['supports'] = is_array( $type->supports ) ? $type->supports : array();
+			}
+
+			$blocks[] = $entry;
+		}
+
+		$answer  = array( 'blocks' => $blocks );
+		$unknown = array_values(
+			array_filter(
+				$wanted,
+				function ( $name ) use ( $registry ) {
+					return null === $registry->get_registered( $name );
+				}
+			)
+		);
+
+		if ( $unknown ) {
+			$answer['unknown'] = $unknown;
+		}
+
+		return $answer;
+	}
+
+	/**
+	 * Every pattern on this site, both kinds.
+	 */
+	private function register_list_patterns() {
+		wp_register_ability(
+			'pattern-builder/list-patterns',
+			array(
+				'label'               => __( 'List patterns', 'pattern-builder' ),
+				'description'         => __( 'Returns the patterns on this site: theme patterns (PHP files in the theme) and user patterns (reusable blocks in the database), with their names, titles, categories, placement headers and synced status. Content is omitted; use get-pattern for one pattern\'s markup. Also returns the pattern categories registered here, which are the only ones the inserter files a pattern under — a category slug nothing registered lands the pattern in Uncategorized.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'source' => array(
+							'type'        => 'string',
+							'enum'        => array( 'theme', 'user', 'all' ),
+							'description' => 'Which patterns to return. Defaults to all.',
+						),
+					),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'patterns'   => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'object' ),
+						),
+						'categories' => array(
+							'type'        => 'array',
+							'description' => 'The pattern categories registered on this site: name (the slug a Categories header or a categories input uses) and label. Use one of these, or the pattern is filed under Uncategorized.',
+							'items'       => array( 'type' => 'object' ),
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_list_patterns' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * List patterns without their markup.
+	 *
+	 * @param array $input Ability input.
+	 * @return array
+	 */
+	public function execute_list_patterns( $input = array() ) {
+		$source = isset( $input['source'] ) ? (string) $input['source'] : 'all';
+		$store  = new Pattern_File_Store();
+		$found  = array();
+
+		if ( 'user' !== $source ) {
+			$found = array_merge( $found, $store->get_theme_patterns() );
+		}
+		if ( 'theme' !== $source ) {
+			$found = array_merge( $found, $store->get_user_patterns() );
+		}
+
+		$patterns = array();
+		foreach ( $found as $pattern ) {
+			$patterns[] = $this->summarize( $pattern );
+		}
+
+		return array(
+			'patterns'   => $patterns,
+			'categories' => $this->registered_categories(),
+		);
+	}
+
+	/**
+	 * The pattern categories this site has registered.
+	 *
+	 * @return array Each with name and label.
+	 */
+	private function registered_categories() {
+		$categories = array();
+
+		foreach ( \WP_Block_Pattern_Categories_Registry::get_instance()->get_all_registered() as $category ) {
+			if ( empty( $category['name'] ) ) {
+				continue;
+			}
+			$categories[] = array(
+				'name'  => (string) $category['name'],
+				'label' => isset( $category['label'] ) ? (string) $category['label'] : (string) $category['name'],
+			);
+		}
+
+		return $categories;
+	}
+
+	/**
+	 * The category slugs among these that nothing on this site registered.
+	 *
+	 * @param array $slugs Category slugs.
+	 * @return string[]
+	 */
+	private function unregistered_categories( $slugs ) {
+		$registry = \WP_Block_Pattern_Categories_Registry::get_instance();
+
+		return array_values(
+			array_filter(
+				array_map( 'strval', (array) $slugs ),
+				function ( $slug ) use ( $registry ) {
+					return '' !== $slug && ! $registry->is_registered( $slug );
+				}
+			)
+		);
+	}
+
+	/**
+	 * Say when a stored pattern's categories will not show in the inserter.
+	 *
+	 * @param array $answer The write's answer.
+	 * @param array $pattern The stored pattern's summary.
+	 * @return array
+	 */
+	private function with_category_note( $answer, $pattern ) {
+		$unregistered = $this->unregistered_categories( isset( $pattern['categories'] ) ? $pattern['categories'] : array() );
+		if ( ! $unregistered ) {
+			return $answer;
+		}
+
+		$answer['unregisteredCategories'] = $unregistered;
+		$answer['note']                   = sprintf(
+			/* translators: %s: category slugs, comma separated. */
+			__( 'Stored, but no pattern category named %s is registered on this site, so the inserter files this pattern under Uncategorized. Use a category list-patterns reports, or have the theme register this one with register_block_pattern_category().', 'pattern-builder' ),
+			implode( ', ', $unregistered )
+		);
+
+		return $answer;
+	}
+
+	/**
+	 * One pattern, with its markup.
+	 */
+	private function register_get_pattern() {
+		wp_register_ability(
+			'pattern-builder/get-pattern',
+			array(
+				'label'               => __( 'Get a pattern', 'pattern-builder' ),
+				'description'         => __( 'Returns one pattern including its raw block markup. Identify a theme pattern by its namespaced name (e.g. "my-theme/hero") and a user pattern by its numeric post ID. Useful for reading an existing pattern before composing something in the same style.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'id' => array(
+							'type'        => 'string',
+							'description' => 'Namespaced pattern name, or a user pattern\'s post ID.',
+							'minLength'   => 1,
+						),
+					),
+					'required'             => array( 'id' ),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'pattern' => array( 'type' => 'object' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_get_pattern' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * Fetch one pattern with content.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_get_pattern( $input ) {
+		$pattern = $this->find( isset( $input['id'] ) ? (string) $input['id'] : '' );
+		if ( is_wp_error( $pattern ) ) {
+			return $pattern;
+		}
+
+		$summary            = $this->summarize( $pattern );
+		$summary['content'] = $pattern->content;
+
+		return array( 'pattern' => $summary );
+	}
+
+	/**
+	 * What a stored pattern renders as on the front end.
+	 */
+	private function register_render_pattern() {
+		wp_register_ability(
+			'pattern-builder/render-pattern',
+			array(
+				'label'               => __( 'Render a pattern', 'pattern-builder' ),
+				'description'         => __( 'Returns the front-end HTML a stored pattern produces, with blocks resolved; which design tokens it references and whether this site defines them, since a preset missing here ships no value and arrives missing everywhere; and two URLs that render it as a whole page with this site\'s stylesheets — one standalone, one inside the page template. Open those in a browser to see what the pattern looks like; the HTML alone only shows which classes landed where, not what the CSS then does with them. Note that rendering correctly says nothing about whether the block markup is valid in the editor, which only a JavaScript block validator can decide.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'id' => array(
+							'type'        => 'string',
+							'description' => 'Namespaced pattern name, or a user pattern\'s post ID.',
+							'minLength'   => 1,
+						),
+					),
+					'required'             => array( 'id' ),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'html'    => array( 'type' => 'string' ),
+						'tokens'  => array(
+							'type'        => 'object',
+							'description' => 'The presets this pattern references: "defined" are the ones this site has, with the values an upload would ship; "undefined" are the ones it does not, which render as nothing here and would arrive as nothing anywhere else.',
+						),
+						'preview' => array(
+							'type'        => 'object',
+							'description' => 'URLs that render the pattern as a page: "standalone" for the pattern by itself with this site\'s styles, "page" for it inside this site\'s page template, and under "themes" the same page render against each theme this plugin carries for the purpose — "blank-theme", which defines nothing so the pattern shows only what it brings, and "opinionated-theme", a design system of somebody else\'s that the pattern has to survive. A pattern that looks right in both travels.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_render_pattern' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * Render a stored pattern.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_render_pattern( $input ) {
+		$pattern = $this->find( isset( $input['id'] ) ? (string) $input['id'] : '' );
+		if ( is_wp_error( $pattern ) ) {
+			return $pattern;
+		}
+		$referenced = Pattern_Builder_Cloud_Tokens::referenced( $pattern->content );
+		$defined    = Pattern_Builder_Cloud_Tokens::collect_tree( $pattern->content );
+		$has        = array();
+
+		foreach ( $defined as $token ) {
+			$has[ $token['type'] . '|' . $token['slug'] ] = true;
+		}
+
+		$undefined = array();
+
+		foreach ( $referenced as $type => $slugs ) {
+			foreach ( (array) $slugs as $slug ) {
+				if ( ! isset( $has[ $type . '|' . $slug ] ) ) {
+					$undefined[] = array(
+						'type' => $type,
+						'slug' => $slug,
+					);
+				}
+			}
+		}
+
+		$tokens = array(
+			'defined'   => $defined,
+			'undefined' => $undefined,
+		);
+
+		if ( $undefined ) {
+			$tokens['note'] = __( 'This pattern references presets this site does not define. They render as no styling at all here, and an upload carries no value for them, so they will render as nothing wherever the pattern is installed too. Add them with add-design-tokens, or reference presets that exist.', 'pattern-builder' );
+		}
+
+		$themes = array();
+		foreach ( array_keys( Pattern_Builder_Preview::bundled_themes() ) as $slug ) {
+			$themes[ $slug ] = Pattern_Builder_Preview::url_for( $pattern->id, 'page', $slug );
+		}
+
+		return array(
+			'html'    => do_blocks( $pattern->content ),
+			'tokens'  => $tokens,
+			'preview' => array(
+				'standalone' => Pattern_Builder_Preview::url_for( $pattern->id, 'standalone' ),
+				'page'       => Pattern_Builder_Preview::url_for( $pattern->id, 'page' ),
+				'themes'     => $themes,
+				'note'       => __( 'Open any URL in a browser, authenticated as you are here. "page" renders the pattern inside this site\'s page template, which is where an alignfull band either escapes the content width or does not. "themes" renders it the same way against a theme that defines nothing (what the pattern itself brings) and against one with a design system of its own (whether the pattern adapts); nothing on this site is changed by either.', 'pattern-builder' ),
+			),
+		);
+	}
+
+	/**
+	 * Hand an agent the knowledge, not just the mechanism.
+	 */
+	private function register_authoring_guide() {
+		wp_register_ability(
+			'pattern-builder/get-authoring-guide',
+			array(
+				'label'               => __( 'Get the pattern authoring guide', 'pattern-builder' ),
+				'description'         => __( 'Returns documentation on how to write good block patterns — what makes one good, the kinds of pattern and the headers each needs, which blocks are allowed where, the attribute-to-markup contract, and the design/content split with Pattern Overrides. Call it with no input for the index of available guides, then request one by name. The text is agent-facing instructions in Markdown: install it wherever your harness reads instructions from. Read this before writing pattern markup by hand.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'guide' => array(
+							'type'        => 'string',
+							'description' => 'Which guide to return. Omit for the index; "all" for every guide concatenated.',
+						),
+					),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'guides'   => array(
+							'type'        => 'array',
+							'description' => 'The index: name, title and size of each available guide.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'name'     => array( 'type' => 'string' ),
+						'format'   => array( 'type' => 'string' ),
+						'content'  => array(
+							'type'        => 'string',
+							'description' => 'Markdown. Agent-facing instructions, not user documentation.',
+						),
+						'validate' => array(
+							'type'        => 'object',
+							'description' => 'On the index only: the check to run before storing anything, and which abilities hand you the means to run it.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_authoring_guide' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * Where the guides live.
+	 *
+	 * @return string
+	 */
+	private function guide_dir() {
+		return plugin_dir_path( PATTERN_BUILDER_FILE ) . 'guides/';
+	}
+
+	/**
+	 * The guides this plugin ships, by name.
+	 *
+	 * @return array name => relative path.
+	 */
+	private function guide_files() {
+		return array(
+			'authoring'            => 'pattern-author/SKILL.md',
+			'pattern-kinds'        => 'pattern-author/references/pattern-kinds.md',
+			'block-vocabulary'     => 'pattern-author/references/block-vocabulary.md',
+			'block-markup'         => 'pattern-author/references/block-markup.md',
+			'design-system'        => 'pattern-author/references/design-system.md',
+			'composition'          => 'pattern-author/references/composition.md',
+			'design-content-split' => 'pattern-author/references/design-content-split.md',
+			'assets'               => 'pattern-author/references/assets.md',
+			'keeping-current'      => 'pattern-author/references/keeping-current.md',
+			'abilities'            => 'pattern-author/references/abilities.md',
+			'reproduction'         => 'design-reproduction/SKILL.md',
+			'reading-a-source'     => 'design-reproduction/references/reading-a-source.md',
+			'verifying'            => 'design-reproduction/references/verifying.md',
+		);
+	}
+
+	/**
+	 * Every guide this site offers, loaded and filtered.
+	 *
+	 * @return array name => array( title, content ).
+	 */
+	private function guides() {
+		$guides = array();
+
+		foreach ( $this->guide_files() as $name => $relative ) {
+			$text = $this->read_guide( $relative );
+			if ( null === $text ) {
+				continue;
+			}
+			$guides[ $name ] = array(
+				'title'   => $this->guide_title( $text, $name ),
+				'content' => $text,
+				'skill'   => (string) strstr( $relative, '/', true ),
+			);
+		}
+
+		/**
+		 * Filters the authoring guides an agent is given.
+		 *
+		 * @param array $guides Guides, keyed by name, each with `title` and `content`
+		 * (Markdown).
+		 */
+		$guides = apply_filters( 'pattern_builder_authoring_guides', $guides );
+		if ( ! is_array( $guides ) ) {
+			return array();
+		}
+
+		$clean = array();
+		foreach ( $guides as $name => $guide ) {
+			if ( ! is_array( $guide ) || empty( $guide['content'] ) || ! is_string( $guide['content'] ) ) {
+				continue;
+			}
+			$key = sanitize_key( (string) $name );
+			if ( '' === $key ) {
+				continue;
+			}
+			$clean[ $key ] = array(
+				'title'   => isset( $guide['title'] ) && is_string( $guide['title'] )
+					? $guide['title']
+					: $this->guide_title( $guide['content'], $key ),
+				'content' => $guide['content'],
+				'skill'   => isset( $guide['skill'] ) && is_string( $guide['skill'] ) ? $guide['skill'] : '',
+			);
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Serve the index, one guide, or all of them.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_authoring_guide( $input = array() ) {
+		$guides = $this->guides();
+		$wanted = isset( $input['guide'] ) ? sanitize_key( (string) $input['guide'] ) : '';
+
+		if ( '' === $wanted ) {
+			$index = array();
+			foreach ( $guides as $name => $guide ) {
+				$index[] = array(
+					'name'  => $name,
+					'title' => $guide['title'],
+					'words' => str_word_count( wp_strip_all_tags( $guide['content'] ) ),
+					'skill' => isset( $guide['skill'] ) ? $guide['skill'] : '',
+				);
+			}
+
+			return array(
+				'guides'   => $index,
+				'format'   => 'markdown',
+				'name'     => 'index',
+				'content'  => __( 'Agent-facing instructions for writing WordPress block patterns. Request one by name with input[guide], or "all" for everything. Install the Markdown wherever your harness reads instructions from.', 'pattern-builder' ),
+				'start'    => array(
+					array(
+						'guide' => 'authoring',
+						'skill' => 'pattern-author',
+						'when'  => __( 'Writing a pattern. Read this one either way: it owns the block vocabulary, the markup contract, the factor step and the validation this site cannot do for you.', 'pattern-builder' ),
+					),
+					array(
+						'guide' => 'reproduction',
+						'skill' => 'design-reproduction',
+						'when'  => __( 'The design already exists somewhere else and the job is to copy it — a live site, a Figma file, a screenshot, a PDF, a mockup. Read it alongside the one above, not instead of it.', 'pattern-builder' ),
+					),
+				),
+				'validate' => array(
+					'why'      => __( 'Validate markup before storing it. A block is valid only if re-running its save() reproduces the markup, and save() is JavaScript — no server can run it, so nothing here checks this for you. Invalid markup renders correctly on the front end and fails the moment an editor opens the pattern.', 'pattern-builder' ),
+					'before'   => array( 'pattern-builder/create-pattern', 'pattern-builder/update-pattern', 'pattern-builder/upload-pattern' ),
+					'tool'     => 'pattern-builder/get-validator',
+					'scripts'  => 'pattern-builder/get-editor-scripts',
+					'requires' => 'node, jsdom',
+					'guide'    => 'block-markup',
+				),
+			);
+		}
+
+		if ( 'all' === $wanted ) {
+			$parts = array();
+			foreach ( $guides as $name => $guide ) {
+				$parts[] = "<!-- guide: {$name} -->\n\n" . $guide['content'];
+			}
+
+			return array(
+				'name'    => 'all',
+				'format'  => 'markdown',
+				'content' => implode( "\n\n---\n\n", $parts ),
+			);
+		}
+
+		if ( ! isset( $guides[ $wanted ] ) ) {
+			return new \WP_Error(
+				'pb_guide_not_found',
+				/* translators: %s: comma separated guide names. */
+				sprintf( __( 'No guide by that name. Available: %s.', 'pattern-builder' ), implode( ', ', array_keys( $guides ) ) ),
+				array( 'status' => 404 )
+			);
+		}
+
+		return array(
+			'name'    => $wanted,
+			'format'  => 'markdown',
+			'content' => $guides[ $wanted ]['content'],
+		);
+	}
+
+	/**
+	 * Read one guide, with its YAML front matter stripped.
+	 *
+	 * @param string $relative Path under the guide directory.
+	 * @return string|null Null when the file is absent or unreadable.
+	 */
+	private function read_guide( $relative ) {
+		$path = $this->guide_dir() . $relative;
+		$real = realpath( $path );
+		$root = realpath( $this->guide_dir() );
+		if ( ! $real || ! $root || 0 !== strpos( $real, $root ) || ! is_readable( $real ) ) {
+			return null;
+		}
+
+		$text = file_get_contents( $real ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading a file this plugin ships.
+		if ( false === $text ) {
+			return null;
+		}
+
+		return trim( preg_replace( '/\A---\r?\n.*?\r?\n---\r?\n/s', '', $text ) );
+	}
+
+	/**
+	 * A guide's title, from its first heading.
+	 *
+	 * @param string $text Guide text.
+	 * @param string $fallback Name to use when there is no heading.
+	 * @return string
+	 */
+	private function guide_title( $text, $fallback ) {
+		if ( preg_match( '/^#\s+(.+)$/m', $text, $m ) ) {
+			return trim( $m[1] );
+		}
+		return $fallback;
+	}
+
+	/**
+	 * Hand over the validator itself.
+	 */
+	private function register_validator() {
+		wp_register_ability(
+			'pattern-builder/get-validator',
+			array(
+				'label'               => __( 'Get the pattern validator', 'pattern-builder' ),
+				'description'         => __( 'Returns the source of the block markup validator, as files to write next to each other and run with Node. Block validity is decided by re-running a block\'s save(), which is JavaScript, so no server can answer it and this site cannot validate on your behalf — but it can hand you the tool. Pair it with get-editor-scripts, which says where this site\'s own block code lives, and the check runs against the exact WordPress your pattern is destined for. Requires Node and jsdom (npm i --no-save jsdom).', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'files' => array(
+							'type'        => 'array',
+							'description' => 'Each with a name and its contents. Write them into one directory.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'entry' => array(
+							'type'        => 'string',
+							'description' => 'The file to run.',
+						),
+						'usage' => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_validator' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * The files the validator is made of.
+	 *
+	 * @return array|\WP_Error
+	 */
+	public function execute_validator() {
+		$files = array();
+
+		foreach ( array( 'validate-pattern.mjs', 'check-composition.mjs', 'wp-core.mjs' ) as $name ) {
+			$contents = $this->read_script( $name );
+			if ( null === $contents ) {
+				return new \WP_Error(
+					'pb_validator_missing',
+					/* translators: %s: file name. */
+					sprintf( __( 'The validator is not installed on this site: %s is missing.', 'pattern-builder' ), $name ),
+					array( 'status' => 500 )
+				);
+			}
+			$files[] = array(
+				'name'     => $name,
+				'contents' => $contents,
+			);
+		}
+
+		return array(
+			'files' => $files,
+			'entry' => 'validate-pattern.mjs',
+			'usage' => implode(
+				"\n",
+				array(
+					'Write both files into one directory, then:',
+					'',
+					'  npm i --no-save jsdom',
+					"  curl -u USER:APP_PASSWORD 'SITE/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-editor-scripts/run' > scripts.json",
+					'  node validate-pattern.mjs --scripts scripts.json pattern.html',
+					'  node check-composition.mjs patterns/',
+					'',
+					"The first run downloads this site's block code (about 4MB) and caches it.",
+					'Exit status is non-zero when anything is invalid, in an old form, or has lost an attribute.',
+					'',
+					'validate-pattern answers a question about one block. check-composition is the',
+					'cross-block half: it resolves core/pattern references against the theme files and',
+					'reports a flex or grid container whose children cannot size, which renders as a',
+					'vertical stack. That failure is valid markup, so nothing else reports it.',
+				)
+			),
+		);
+	}
+
+	/**
+	 * Where this site's own editor scripts are, in the order they load.
+	 */
+	private function register_editor_scripts() {
+		wp_register_ability(
+			'pattern-builder/get-editor-scripts',
+			array(
+				'label'               => __( 'Get this site\'s editor script URLs', 'pattern-builder' ),
+				'description'         => __( 'Returns the URLs of this site\'s own block editor JavaScript, in dependency order, for a validator to load. This is the block library this site actually runs, which is the only version whose opinion counts: whether markup is what a block writes today is a question different WordPress versions answer differently. Feed the response to the validator from get-validator.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'scripts'   => array(
+							'type'        => 'array',
+							'description' => 'Absolute URLs, dependencies first. Load them in this order.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'wordpress' => array( 'type' => 'string' ),
+						'site'      => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_editor_scripts' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * Resolve the block editor's scripts to URLs, in load order.
+	 *
+	 * @return array
+	 */
+	public function execute_editor_scripts() {
+		global $wp_version;
+		$scripts = new \WP_Scripts();
+		$scripts->all_deps( array( 'wp-blocks', 'wp-block-editor', 'wp-block-library' ) );
+
+		$urls = array();
+		foreach ( $scripts->to_do as $handle ) {
+			if ( empty( $scripts->registered[ $handle ]->src ) ) {
+				continue;
+			}
+
+			$item = $scripts->registered[ $handle ];
+			$src  = $item->src;
+			if ( ! preg_match( '|^(https?:)?//|', $src ) ) {
+				$src = site_url( $src );
+			}
+			$ver = isset( $item->ver ) ? $item->ver : $wp_version;
+			if ( $ver ) {
+				$src = add_query_arg( 'ver', $ver, $src );
+			}
+
+			$urls[] = $src;
+		}
+
+		return array(
+			'scripts'   => $urls,
+			'wordpress' => $wp_version,
+			'site'      => home_url(),
+		);
+	}
+
+	/**
+	 * Where the validator and its loader live.
+	 *
+	 * @return string
+	 */
+	private function script_dir() {
+		return $this->guide_dir() . 'pattern-author/scripts/';
+	}
+
+	/**
+	 * Read one of the shipped scripts.
+	 *
+	 * @param string $name File name under the scripts directory.
+	 * @return string|null Null when it is not there.
+	 */
+	private function read_script( $name ) {
+		$root = realpath( rtrim( $this->script_dir(), '/' ) );
+		$path = realpath( $this->script_dir() . $name );
+		if ( ! $root || ! $path || 0 !== strpos( $path, $root ) || ! is_readable( $path ) ) {
+			return null;
+		}
+
+		$contents = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading a file this plugin ships.
+
+		return false === $contents ? null : $contents;
+	}
+
+	/**
+	 * Store a new pattern.
+	 */
+	private function register_create_pattern() {
+		wp_register_ability(
+			'pattern-builder/create-pattern',
+			array(
+				'label'               => __( 'Create a pattern', 'pattern-builder' ),
+				'description'         => __( 'Stores finished block markup as a new pattern — either a PHP file in the active theme, or a reusable block in the database. This does not generate anything: supply markup you have already written and validated with a JavaScript block validator, because invalid markup renders correctly on the front end and only fails once an editor opens it, and no server can run a block\'s save(). What the site does refuse, by name, is what PHP can see: attribute JSON that does not parse, a heading or list contradicting its attributes, a block this site has not registered, a core/pattern reference that resolves to nothing or to the pattern itself, and a Pattern Overrides slot nothing can fill — a content key naming no slot, a binding with no metadata.name, or a binding on a block core cannot bind. Store the patterns a pattern references before it.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => $this->write_schema( true ),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'pattern' => array( 'type' => 'object' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_create_pattern' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						// These annotations select the HTTP method: readonly is GET,
+						// destructive and idempotent together are DELETE, anything else POST.
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => false,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Update an existing pattern.
+	 */
+	private function register_update_pattern() {
+		wp_register_ability(
+			'pattern-builder/update-pattern',
+			array(
+				'label'               => __( 'Update a pattern', 'pattern-builder' ),
+				'description'         => __( 'Replaces an existing pattern’s markup and metadata. Overwrites whatever is there, so read the pattern first if you mean to preserve part of it. As with create-pattern, validate the markup before sending it; the same checks as create-pattern refuse what PHP can see (malformed attribute JSON, contradictions, unregistered blocks, unresolved references, unfillable slots).', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => $this->write_schema( false ),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'pattern' => array( 'type' => 'object' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_update_pattern' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * The input both writes accept.
+	 *
+	 * @param bool $creating Whether this is the create schema.
+	 * @return array
+	 */
+	private function write_schema( $creating ) {
+		$properties = array(
+			'title'         => array(
+				'type'        => 'string',
+				'description' => 'Human-readable pattern title.',
+				'minLength'   => 1,
+			),
+			'content'       => array(
+				'type'        => 'string',
+				'description' => 'The pattern\'s block markup, complete and already validated.',
+				'minLength'   => 1,
+			),
+			'source'        => array(
+				'type'        => 'string',
+				'enum'        => array( 'theme', 'user' ),
+				'description' => 'Where to store it: "theme" writes a PHP file into the active theme, "user" creates a reusable block. Defaults to theme.',
+			),
+			'name'          => array(
+				'type'        => 'string',
+				'description' => 'Namespaced slug for a theme pattern, e.g. "my-theme/hero". Derived from the title when omitted.',
+			),
+			'description'   => array(
+				'type'        => 'string',
+				'description' => 'Short description shown in the inserter.',
+			),
+			'categories'    => array(
+				'type'        => 'array',
+				'description' => 'Pattern category slugs.',
+				'items'       => array( 'type' => 'string' ),
+			),
+			'keywords'      => array(
+				'type'  => 'array',
+				'items' => array( 'type' => 'string' ),
+			),
+			'synced'        => array(
+				'type'        => 'boolean',
+				'description' => 'Whether the pattern is synced. Defaults to false for either source: a theme pattern gets no Synced header, a user pattern is marked unsynced. A synced pattern is the one a core/pattern reference keeps pointing at, so a design pattern whose slots pages fill should be synced.',
+			),
+			'blockTypes'    => array(
+				'type'        => 'array',
+				'items'       => array( 'type' => 'string' ),
+				'description' => 'Blocks this pattern is offered for. ["core/post-content"] makes it a starting layout for new content; a block\'s own name offers it when that block is inserted still empty.',
+			),
+			'postTypes'     => array(
+				'type'        => 'array',
+				'items'       => array( 'type' => 'string' ),
+				'description' => 'Post types this pattern is offered for when new content is created, e.g. ["page"]. Takes effect alongside blockTypes ["core/post-content"].',
+			),
+			'templateTypes' => array(
+				'type'        => 'array',
+				'items'       => array( 'type' => 'string' ),
+				'description' => 'Template types this pattern is offered for, e.g. ["front-page"]. A whole-template pattern usually pairs this with inserter false.',
+			),
+			'inserter'      => array(
+				'type'        => 'boolean',
+				'description' => 'Whether the pattern appears in the block inserter. Defaults to true; a whole template is noise there, so template patterns set it false.',
+			),
+			'viewportWidth' => array(
+				'type'        => 'integer',
+				'description' => 'Preview width in pixels.',
+			),
+		);
+
+		if ( $creating ) {
+			return array(
+				'type'                 => 'object',
+				'properties'           => $properties,
+				'required'             => array( 'title', 'content' ),
+				'additionalProperties' => false,
+			);
+		}
+
+		$properties['id'] = array(
+			'type'        => 'string',
+			'description' => 'Namespaced pattern name, or a user pattern\'s post ID.',
+			'minLength'   => 1,
+		);
+
+		return array(
+			'type'                 => 'object',
+			'properties'           => $properties,
+			'required'             => array( 'id', 'content' ),
+			'additionalProperties' => false,
+			'default'              => array(),
+		);
+	}
+
+	/**
+	 * Create a pattern from finished markup.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_create_pattern( $input ) {
+		$source = isset( $input['source'] ) ? (string) $input['source'] : 'theme';
+		$self   = '';
+		if ( 'theme' === $source ) {
+			$self = Pattern_File_Store::namespaced_name(
+				isset( $input['name'] ) && '' !== $input['name'] ? (string) $input['name'] : sanitize_title( (string) $input['title'] )
+			);
+		}
+
+		$checked = Pattern_Builder_Markup_Checks::check( (string) $input['content'], $self );
+		if ( is_wp_error( $checked ) ) {
+			return $checked;
+		}
+
+		if ( 'user' === $source ) {
+			$post_id = wp_insert_post(
+				array(
+					'post_type'    => 'wp_block',
+					'post_status'  => 'publish',
+					'post_title'   => (string) $input['title'],
+					'post_content' => (string) $input['content'],
+					'post_excerpt' => isset( $input['description'] ) ? (string) $input['description'] : '',
+				),
+				true
+			);
+
+			if ( is_wp_error( $post_id ) ) {
+				return $post_id;
+			}
+
+			$this->write_user_pattern_meta( $post_id, $input );
+
+			$summary = $this->summarize( Abstract_Pattern::from_post( get_post( $post_id ) ) );
+
+			return $this->with_category_note( array( 'pattern' => $summary ), $summary );
+		}
+
+		$pattern = new Abstract_Pattern( $this->pattern_args( $input ) );
+		$store   = new Pattern_File_Store();
+		$result  = $store->update_theme_pattern( $pattern );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		$summary = $this->summarize( $pattern );
+
+		return $this->with_category_note( array( 'pattern' => $summary ), $summary );
+	}
+
+	/**
+	 * Replace an existing pattern.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_update_pattern( $input ) {
+		$existing = $this->find( (string) $input['id'] );
+		if ( is_wp_error( $existing ) ) {
+			return $existing;
+		}
+
+		$checked = Pattern_Builder_Markup_Checks::check(
+			(string) $input['content'],
+			'theme' === $existing->source ? (string) $existing->name : ''
+		);
+		if ( is_wp_error( $checked ) ) {
+			return $checked;
+		}
+
+		if ( 'user' === $existing->source ) {
+			$post_id = wp_update_post(
+				array(
+					'ID'           => (int) $existing->id,
+					'post_title'   => isset( $input['title'] ) ? (string) $input['title'] : $existing->title,
+					'post_content' => (string) $input['content'],
+					'post_excerpt' => isset( $input['description'] ) ? (string) $input['description'] : $existing->description,
+				),
+				true
+			);
+
+			if ( is_wp_error( $post_id ) ) {
+				return $post_id;
+			}
+
+			$this->write_user_pattern_meta( $post_id, $input, $existing );
+
+			$summary = $this->summarize( Abstract_Pattern::from_post( get_post( $post_id ) ) );
+
+			return $this->with_category_note( array( 'pattern' => $summary ), $summary );
+		}
+
+		$args         = $this->pattern_args( $input, $existing );
+		$args['name'] = $existing->name;
+
+		$pattern = new Abstract_Pattern( $args );
+		$store   = new Pattern_File_Store();
+		$result  = $store->update_theme_pattern( $pattern );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		$summary = $this->summarize( $pattern );
+
+		return $this->with_category_note( array( 'pattern' => $summary ), $summary );
+	}
+
+	/**
+	 * Adding a token is how a pattern's design ends up in the design system rather than
+	 * hard-coded into its markup.
+	 */
+	private function register_add_design_tokens() {
+		wp_register_ability(
+			'pattern-builder/add-design-tokens',
+			array(
+				'label'               => __( 'Add design tokens', 'pattern-builder' ),
+				'description'         => __( 'Adds colors, gradients, spacing sizes, font sizes and font families to this site\'s design system, so a pattern can reference them by slug instead of hard-coding values. Writes to the active theme\'s theme.json, or to the site\'s Global Styles. A slug this site already defines is left alone and reported as skipped — this never overwrites an existing token. Call get-design-system first to see what exists.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'tokens'      => array(
+							'type'        => 'array',
+							'description' => 'The tokens to add.',
+							'items'       => array(
+								'type'                 => 'object',
+								'properties'           => array(
+									'type'  => array(
+										'type'        => 'string',
+										'enum'        => array( 'color', 'gradient', 'spacing', 'fontSize', 'fontFamily' ),
+										'description' => 'Which part of the design system this belongs to.',
+									),
+									'slug'  => array(
+										'type'        => 'string',
+										'description' => 'The slug a pattern references it by, e.g. "accent" for var:preset|color|accent.',
+									),
+									'name'  => array(
+										'type'        => 'string',
+										'description' => 'The human-readable label shown in the editor.',
+									),
+									'value' => array(
+										'type'        => 'string',
+										'description' => 'The value: a CSS color, a gradient, a length, or a font-family stack. Font files are never carried — a fontFamily is a stack of names only.',
+									),
+								),
+								'required'             => array( 'type', 'slug', 'value' ),
+								'additionalProperties' => false,
+							),
+						),
+						'destination' => array(
+							'type'        => 'string',
+							'enum'        => array( 'theme', 'user' ),
+							'description' => '"theme" writes the active theme\'s theme.json, so the tokens travel with the theme and are versioned with it; "user" writes Global Styles, which stays in this site\'s database and is revertable in the editor. Defaults to "theme".',
+						),
+					),
+					'required'             => array( 'tokens' ),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'written'     => array(
+							'type'        => 'object',
+							'description' => 'The slugs added, by token type.',
+						),
+						'skipped'     => array(
+							'type'        => 'array',
+							'description' => 'Tokens this site already defines, which were left as they are.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'destination' => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_add_design_tokens' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Write the tokens this site does not already define.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_add_design_tokens( $input ) {
+		$tokens      = isset( $input['tokens'] ) ? (array) $input['tokens'] : array();
+		$destination = ( isset( $input['destination'] ) && 'user' === $input['destination'] ) ? 'user' : 'theme';
+		$known       = array_keys( Pattern_Builder_Cloud_Tokens::types() );
+
+		if ( ! $tokens ) {
+			return new \WP_Error(
+				'pb_no_tokens',
+				__( 'No tokens to add.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$normalized = array();
+		foreach ( $tokens as $token ) {
+			$token = (array) $token;
+			$type  = isset( $token['type'] ) ? (string) $token['type'] : '';
+			$slug  = isset( $token['slug'] ) ? sanitize_title( (string) $token['slug'] ) : '';
+
+			if ( ! in_array( $type, $known, true ) ) {
+				return new \WP_Error(
+					'pb_bad_token_type',
+					sprintf(
+						/* translators: 1: the type given, 2: the accepted types. */
+						__( '"%1$s" is not a design token type. Use one of: %2$s.', 'pattern-builder' ),
+						$type,
+						implode( ', ', $known )
+					),
+					array( 'status' => 400 )
+				);
+			}
+
+			if ( '' === $slug ) {
+				return new \WP_Error(
+					'pb_bad_token_slug',
+					__( 'Every token needs a slug of lower-case letters, digits and hyphens — it is the name a pattern references it by.', 'pattern-builder' ),
+					array( 'status' => 400 )
+				);
+			}
+
+			$normalized[] = array(
+				'type'  => $type,
+				'slug'  => $slug,
+				'name'  => isset( $token['name'] ) && '' !== trim( (string) $token['name'] )
+					? sanitize_text_field( (string) $token['name'] )
+					: ucwords( str_replace( '-', ' ', $slug ) ),
+				'value' => isset( $token['value'] ) ? (string) $token['value'] : '',
+			);
+		}
+		$missing_keys = array();
+		foreach ( Pattern_Builder_Cloud_Tokens::missing( $normalized ) as $token ) {
+			$missing_keys[] = $token['type'] . '|' . $token['slug'];
+		}
+
+		$skipped = array();
+		foreach ( $normalized as $token ) {
+			if ( ! in_array( $token['type'] . '|' . $token['slug'], $missing_keys, true ) ) {
+				$skipped[] = array(
+					'type' => $token['type'],
+					'slug' => $token['slug'],
+				);
+			}
+		}
+
+		$written = Pattern_Builder_Cloud_Tokens::apply( $normalized, $destination );
+		if ( is_wp_error( $written ) ) {
+			return $written;
+		}
+
+		return array(
+			'written'     => $written,
+			'skipped'     => $skipped,
+			'destination' => $destination,
+		);
+	}
+
+	/**
+	 * How to send bytes, in a shape an agent can act on without being told twice.
+	 *
+	 * @return array
+	 */
+	private function upload_instructions() {
+		return array(
+			'note'      => __( 'To add a JPEG, PNG, WebP, AVIF or GIF, POST the file to this route. Abilities cannot carry binary, and this route takes the bytes as the request body — so the file goes straight from disk to the site and never has to be read into your context or base64-encoded.', 'pattern-builder' ),
+			'route'     => rest_url( Pattern_Builder_Assets::REST_NAMESPACE . '/assets' ),
+			'method'    => 'POST',
+			'headers'   => array(
+				'Content-Disposition' => 'attachment; filename="hero.webp"',
+				'Content-Type'        => __( 'the file\'s own mime type, e.g. image/webp', 'pattern-builder' ),
+			),
+			'query'     => array(
+				'destination' => __( '"theme" (default) writes the active theme\'s assets/images; "media" adds a media library attachment.', 'pattern-builder' ),
+				'alt'         => __( 'Alternative text. Recorded on a media library attachment.', 'pattern-builder' ),
+			),
+			'example'   => 'curl -u "$WP_USER:$WP_APP_PASSWORD" '
+				. '-H \'Content-Disposition: attachment; filename="hero.webp"\' '
+				. '-H \'Content-Type: image/webp\' '
+				. '--data-binary @hero.webp '
+				. '"' . rest_url( Pattern_Builder_Assets::REST_NAMESPACE . '/assets' ) . '?destination=theme"',
+			'returns'   => __( 'The stored file, with a "reference" holding exactly what to put in the pattern markup — a PHP template tag for a theme asset, a URL for a media library one.', 'pattern-builder' ),
+			'limits'    => sprintf(
+				/* translators: 1: the longest edge kept, 2: the server's upload limit. */
+				__( 'Images over %1$dpx on the longest edge are resized down to it. The server accepts uploads up to %2$s.', 'pattern-builder' ),
+				(int) apply_filters( 'pattern_builder_max_asset_dimension', Pattern_Builder_Assets::MAX_DIMENSION ),
+				size_format( wp_max_upload_size() )
+			),
+			'multipart' => __( 'A multipart form works too — the first file field is taken, whatever it is named.', 'pattern-builder' ),
+		);
+	}
+
+	/**
+	 * Set the styles a pattern inherits.
+	 */
+	private function register_set_global_styles() {
+		wp_register_ability(
+			'pattern-builder/set-global-styles',
+			array(
+				'label'               => __( 'Set global styles', 'pattern-builder' ),
+				'description'         => __( 'Sets this site\'s global styles — the root typography, colors and spacing, the styling of elements such as headings, links and buttons, and per-block styles. This is what every block looks like before any pattern says otherwise, so it changes the whole site at once, including pages you have not seen: unlike add-design-tokens, which only ever adds, this replaces whatever is already set at each property it names. Properties it does not name are left alone. Writes the active theme\'s theme.json by default, or Global Styles. Call get-design-system first and set only what is not already covered. Raw CSS (a "css" property) is refused.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'styles'      => array(
+							'type'        => 'object',
+							'description' => 'A theme.json "styles" subtree — for example { "typography": { "fontSize": "var:preset|font-size|medium" }, "elements": { "heading": { "typography": { "fontFamily": "var:preset|font-family|fraunces" } }, "link": { "color": { "text": "var:preset|color|primary" } } } }. Merged property by property, so naming one thing does not clear the rest. Reference presets as var:preset|{type}|{slug} rather than hard-coding a value.',
+						),
+						'destination' => array(
+							'type'        => 'string',
+							'enum'        => array( 'theme', 'user' ),
+							'description' => '"theme" (default) writes the active theme\'s theme.json, so the styles travel with the theme and are versioned with it; "user" writes Global Styles, which stays in this site\'s database and can be reverted in the editor.',
+						),
+					),
+					'required'             => array( 'styles' ),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'written'     => array(
+							'type'        => 'array',
+							'description' => 'The style paths that were set.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'skipped'     => array(
+							'type'        => 'array',
+							'description' => 'Paths WordPress does not recognise as styles, which were dropped rather than written.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'destination' => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_set_global_styles' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Set the widths a constrained layout measures against.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_set_layout( $input ) {
+		$destination = ( isset( $input['destination'] ) && 'user' === $input['destination'] ) ? 'user' : 'theme';
+		$layout      = array();
+		$written     = array();
+
+		foreach ( array( 'contentSize', 'wideSize' ) as $key ) {
+			if ( ! isset( $input[ $key ] ) || '' === $input[ $key ] ) {
+				continue;
+			}
+
+			$value = Pattern_Builder_Cloud_Tokens::sanitize_value( 'spacing', $input[ $key ] );
+			if ( false === $value ) {
+				return new \WP_Error(
+					'pb_layout_value',
+					sprintf(
+						/* translators: 1: setting name, 2: the value given. */
+						__( '%1$s must be a plain CSS length such as "46rem" or a clamp() of them; "%2$s" is not one.', 'pattern-builder' ),
+						$key,
+						(string) $input[ $key ]
+					),
+					array( 'status' => 400 )
+				);
+			}
+
+			$layout[ $key ] = $value;
+			$written[]      = 'layout.' . $key;
+		}
+
+		$root_padding = null;
+		if ( isset( $input['useRootPaddingAwareAlignments'] ) ) {
+			$root_padding = (bool) $input['useRootPaddingAwareAlignments'];
+			$written[]    = 'useRootPaddingAwareAlignments';
+		}
+
+		if ( ! $written ) {
+			return new \WP_Error(
+				'pb_layout_empty',
+				__( 'Nothing to set: give contentSize, wideSize or useRootPaddingAwareAlignments.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+		$applied = array();
+
+		$result = Pattern_Builder_Theme_Json::edit(
+			$destination,
+			function ( $config ) use ( $layout, $root_padding, &$applied ) {
+				if ( ! isset( $config['settings'] ) || ! is_array( $config['settings'] ) ) {
+					$config['settings'] = array();
+				}
+
+				if ( $layout ) {
+					$existing                     = isset( $config['settings']['layout'] ) && is_array( $config['settings']['layout'] ) ? $config['settings']['layout'] : array();
+					$config['settings']['layout'] = array_merge( $existing, $layout );
+				}
+
+				if ( null !== $root_padding ) {
+					$config['settings']['useRootPaddingAwareAlignments'] = $root_padding;
+				}
+
+				$applied = array_merge(
+					isset( $config['settings']['layout'] ) ? $config['settings']['layout'] : array(),
+					array( 'useRootPaddingAwareAlignments' => ! empty( $config['settings']['useRootPaddingAwareAlignments'] ) )
+				);
+
+				return $config;
+			}
+		);
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return array(
+			'written'     => $written,
+			'layout'      => $applied,
+			'destination' => $destination,
+		);
+	}
+
+	/**
+	 * Merge the given styles into the destination.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_set_global_styles( $input ) {
+		$styles      = isset( $input['styles'] ) && is_array( $input['styles'] ) ? $input['styles'] : array();
+		$destination = ( isset( $input['destination'] ) && 'user' === $input['destination'] ) ? 'user' : 'theme';
+
+		return Pattern_Builder_Theme_Styles::apply( $styles, $destination );
+	}
+
+	/**
+	 * Register the ability that sets the widths a constrained layout measures against.
+	 */
+	private function register_set_layout() {
+		wp_register_ability(
+			'pattern-builder/set-layout',
+			array(
+				'label'               => __( 'Set the layout widths', 'pattern-builder' ),
+				'description'         => __( 'Sets settings.layout — the content width a constrained block caps its children at, and the wider width an "alignwide" block gets — plus whether the root padding is applied in a way that lets a full-width block still escape it. These are settings rather than styles or presets, so neither add-design-tokens nor set-global-styles can reach them, and a pattern whose bands do not match the site\'s measure has to restate the width on every band instead. Replaces the values it names and leaves the rest; call get-design-system first to see what they are now. Writes the active theme\'s theme.json by default.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'contentSize'                   => array(
+							'type'        => 'string',
+							'description' => 'The width a constrained layout caps ordinary children at, as a CSS length — for example "46rem" or "clamp(20rem, 60vw, 50rem)". This is the measure body copy is set to.',
+						),
+						'wideSize'                      => array(
+							'type'        => 'string',
+							'description' => 'The width an "alignwide" child gets, as a CSS length — for example "80rem". Usually wider than contentSize.',
+						),
+						'useRootPaddingAwareAlignments' => array(
+							'type'        => 'boolean',
+							'description' => 'When true, the root padding moves off the body and onto the blocks that honour it, so a full-width band still reaches the edges of the window instead of being inset by it. Turn this on before setting a root padding in set-global-styles, or every alignfull band will be inset.',
+						),
+						'destination'                   => array(
+							'type'        => 'string',
+							'enum'        => array( 'theme', 'user' ),
+							'description' => '"theme" (default) writes the active theme\'s theme.json, so the layout travels with the theme; "user" writes Global Styles, which stays in this site\'s database.',
+						),
+					),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'written'     => array(
+							'type'        => 'array',
+							'description' => 'The settings that were set.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'layout'      => array(
+							'type'        => 'object',
+							'description' => 'The layout as it now stands.',
+						),
+						'destination' => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_set_layout' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Add a named look a pattern applies with a class.
+	 */
+	private function register_add_block_style_variation() {
+		wp_register_ability(
+			'pattern-builder/add-block-style-variation',
+			array(
+				'label'               => __( 'Add a block style variation', 'pattern-builder' ),
+				'description'         => __( 'Registers a named block style — a second kind of button, a card treatment, an inset quote — that a pattern applies by putting the returned class on a block. Use this instead of setting the same attributes on every block: the styling lives in one place, the editor offers it by name, and it applies only where the class is, so it changes nothing else on the site. Writes a theme.json partial into the active theme\'s styles directory, which is what registers a variation without PHP. Call get-design-system first: its blockStyles lists what is already here, and reusing one of WordPress\'s own (is-style-outline and the like) beats defining a new one. This is the one writer that accepts literal CSS, in styles.css and nowhere deeper, because a variation\'s selector is a class the pattern\'s own markup carries: a sequence of declarations and then nested rules anchored on "&", as in: position: relative; & > * { z-index: 1; } &::before { content: ""; inset: 0; } — which is what expresses a pseudo-element, a descendant rule or a hover state. It goes through a safe-subset check that names what it refuses: no url() or any function outside a fixed list, no @media or other at-rule, no comments, no "<" anywhere, no comma, "+" or "~" in a selector, no backslash outside a quoted string, and a declaration must come before the first nested rule. A partial can carry style properties, elements and inner blocks but not a block state: WordPress reads it as a whole-theme styles tree, so a button variation\'s :hover goes in theme.json under styles.blocks.core/button.variations.{slug} through set-global-styles once the variation exists, and the answer says so when a state was given.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'slug'        => array(
+							'type'        => 'string',
+							'description' => 'The name, which the class is built from: "button-secondary" gives class "is-style-button-secondary".',
+						),
+						'blockTypes'  => array(
+							'type'        => 'array',
+							'description' => 'The blocks this applies to, e.g. ["core/button"]. At least one — WordPress skips a variation that names none.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'styles'      => array(
+							'type'        => 'object',
+							'description' => 'A theme.json "styles" subtree for this variation — for example { "color": { "background": "var:preset|color|accent" }, "border": { "radius": "999px" } }. Reference presets rather than hard-coding values. May also carry a "css" string of literal CSS at its top level — declarations, then nested rules anchored on "&" — for the pseudo-elements, descendant rules and states the style properties cannot express; a "css" any deeper is refused, and so is anything outside the safe subset, with the rule and the offending fragment named.',
+						),
+						'title'       => array(
+							'type'        => 'string',
+							'description' => 'The label shown in the editor\'s style picker. Derived from the slug when omitted.',
+						),
+						'description' => array(
+							'type'        => 'string',
+							'description' => 'What the variation is for.',
+						),
+					),
+					'required'             => array( 'slug', 'blockTypes', 'styles' ),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'slug'       => array( 'type' => 'string' ),
+						'title'      => array( 'type' => 'string' ),
+						'class'      => array(
+							'type'        => 'string',
+							'description' => 'The class to put on the block. This is what a pattern carries.',
+						),
+						'blockTypes' => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'string' ),
+						),
+						'path'       => array(
+							'type'        => 'string',
+							'description' => 'The partial written, relative to the theme.',
+						),
+						'written'    => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'string' ),
+						),
+						'skipped'    => array(
+							'type'        => 'array',
+							'description' => 'Style paths WordPress does not recognise in a partial, which were dropped. A block state such as ":hover" lands here, with the note saying where it belongs.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'note'       => array(
+							'type'        => 'string',
+							'description' => 'Present when a block state was given: the set-global-styles call that sets it, since a partial cannot hold one.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_add_block_style_variation' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Write the variation into the theme.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_add_block_style_variation( $input ) {
+		return Pattern_Builder_Block_Style_Variations::add(
+			array(
+				'slug'        => isset( $input['slug'] ) ? $input['slug'] : '',
+				'blockTypes'  => isset( $input['blockTypes'] ) ? $input['blockTypes'] : array(),
+				'styles'      => isset( $input['styles'] ) ? $input['styles'] : array(),
+				'title'       => isset( $input['title'] ) ? $input['title'] : '',
+				'description' => isset( $input['description'] ) ? $input['description'] : '',
+			)
+		);
+	}
+
+	/**
+	 * What this site already has to illustrate a pattern with.
+	 */
+	private function register_find_media() {
+		wp_register_ability(
+			'pattern-builder/find-media',
+			array(
+				'label'               => __( 'Find media', 'pattern-builder' ),
+				'description'         => __( 'Lists the images this site can already illustrate a pattern with: media library attachments, and the files in the active theme\'s assets/images directory. Each result carries the exact reference to put in pattern markup. Call this before adding an image — the site usually already has one — and read the "upload" block in the answer for how to add a file that it does not.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'search'   => array(
+							'type'        => 'string',
+							'description' => 'Match against title, filename and alt text.',
+						),
+						'type'     => array(
+							'type'        => 'string',
+							'description' => 'A mime type or prefix, e.g. "image" (default) or "image/webp". "any" for everything in the media library.',
+						),
+						'source'   => array(
+							'type'        => 'string',
+							'enum'        => array( 'all', 'media', 'theme' ),
+							'description' => 'Where to look. Defaults to both.',
+						),
+						'per_page' => array(
+							'type'        => 'integer',
+							'description' => 'How many media library items to return. Defaults to 20.',
+						),
+					),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'media'  => array(
+							'type'        => 'array',
+							'description' => 'Media library attachments.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'theme'  => array(
+							'type'        => 'array',
+							'description' => 'Files in the theme\'s assets/images directory.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'upload' => array(
+							'type'        => 'object',
+							'description' => 'How to add a file this site does not have.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_find_media' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * List the site's images.
+	 *
+	 * @param array $input Ability input.
+	 * @return array
+	 */
+	public function execute_find_media( $input = array() ) {
+		$found = Pattern_Builder_Assets::find(
+			array(
+				'search'   => isset( $input['search'] ) ? (string) $input['search'] : '',
+				'type'     => isset( $input['type'] ) ? (string) $input['type'] : 'image',
+				'source'   => isset( $input['source'] ) ? (string) $input['source'] : 'all',
+				'per_page' => isset( $input['per_page'] ) ? (int) $input['per_page'] : 20,
+			)
+		);
+
+		$found['upload'] = $this->upload_instructions();
+
+		return $found;
+	}
+
+	/**
+	 * Add an image a pattern needs, in the two forms that fit in JSON.
+	 */
+	private function register_add_asset() {
+		wp_register_ability(
+			'pattern-builder/add-asset',
+			array(
+				'label'               => __( 'Add an asset', 'pattern-builder' ),
+				'description'         => __( 'Stores an image for a pattern to reference, either as SVG markup you supply or by fetching a URL, and answers with the exact reference to put in the pattern. Writes to the active theme\'s assets/images, or to the media library. A JPEG, PNG, WebP or AVIF you hold as a file cannot travel through an ability — POST it to /pattern-builder/v1/assets instead, with the bytes as the request body and a Content-Disposition header naming the file; call find-media for the full instructions and an example.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'svg'         => array(
+							'type'        => 'string',
+							'description' => 'SVG markup. Scripts, external references and event handlers are stripped.',
+						),
+						'url'         => array(
+							'type'        => 'string',
+							'description' => 'A URL for this site to fetch. Use for an image already published somewhere.',
+						),
+						'filename'    => array(
+							'type'        => 'string',
+							'description' => 'The filename to store under. Required with "svg"; taken from the URL otherwise.',
+						),
+						'destination' => array(
+							'type'        => 'string',
+							'enum'        => array( 'theme', 'media' ),
+							'description' => '"theme" (default) writes the active theme\'s assets/images, so the file travels with the theme — which is what a theme pattern needs. "media" adds a media library attachment. SVG can only go to the theme, because WordPress does not accept SVG uploads.',
+						),
+						'alt'         => array(
+							'type'        => 'string',
+							'description' => 'Alternative text, recorded on a media library attachment.',
+						),
+					),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'destination' => array( 'type' => 'string' ),
+						'filename'    => array( 'type' => 'string' ),
+						'url'         => array( 'type' => 'string' ),
+						'reference'   => array(
+							'type'        => 'string',
+							'description' => 'What to put in the pattern markup.',
+						),
+						'width'       => array( 'type' => 'integer' ),
+						'height'      => array( 'type' => 'integer' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_add_asset' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => false,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Store an SVG or a fetched URL.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_add_asset( $input ) {
+		$svg         = isset( $input['svg'] ) ? (string) $input['svg'] : '';
+		$url         = isset( $input['url'] ) ? (string) $input['url'] : '';
+		$filename    = isset( $input['filename'] ) ? (string) $input['filename'] : '';
+		$destination = ( isset( $input['destination'] ) && 'media' === $input['destination'] ) ? 'media' : 'theme';
+		$alt         = isset( $input['alt'] ) ? (string) $input['alt'] : '';
+
+		if ( '' === $svg && '' === $url ) {
+			return new \WP_Error(
+				'pb_asset_nothing_given',
+				sprintf(
+					/* translators: %s: the upload route. */
+					__( 'Give either "svg" markup or a "url" to fetch. To send a file you hold, POST its bytes to %s instead.', 'pattern-builder' ),
+					rest_url( Pattern_Builder_Assets::REST_NAMESPACE . '/assets' )
+				),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( '' !== $svg && '' !== $url ) {
+			return new \WP_Error(
+				'pb_asset_ambiguous',
+				__( 'Give "svg" or "url", not both.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( '' !== $url ) {
+			return Pattern_Builder_Assets::apply_alt(
+				Pattern_Builder_Assets::store_from_url( $url, $destination, $filename ),
+				$alt
+			);
+		}
+
+		if ( '' === $filename ) {
+			return new \WP_Error(
+				'pb_asset_no_filename',
+				__( 'An SVG needs a "filename" to store it under.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+		if ( 'svg' !== strtolower( (string) pathinfo( $filename, PATHINFO_EXTENSION ) ) ) {
+			$filename .= '.svg';
+		}
+
+		return Pattern_Builder_Assets::apply_alt(
+			Pattern_Builder_Assets::store( $filename, $svg, $destination ),
+			$alt
+		);
+	}
+
+	/**
+	 * Draw a placeholder rather than shipping a pattern with no image.
+	 */
+	private function register_add_placeholder_image() {
+		wp_register_ability(
+			'pattern-builder/add-placeholder-image',
+			array(
+				'label'               => __( 'Add a placeholder image', 'pattern-builder' ),
+				'description'         => __( 'Draws a plain placeholder image at the size you ask for and stores it in the active theme\'s assets/images, answering with the reference to put in the pattern. Use it to fill a pattern\'s image slots without pointing at a remote placeholder service, which would make every page view fetch from somebody else\'s server. The file is an SVG, so it costs nothing to transfer and scales to any layout.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'width'    => array(
+							'type'        => 'integer',
+							'description' => 'Width in pixels. Defaults to 1200.',
+						),
+						'height'   => array(
+							'type'        => 'integer',
+							'description' => 'Height in pixels. Defaults to 800.',
+						),
+						'label'    => array(
+							'type'        => 'string',
+							'description' => 'Text drawn in the middle. Defaults to the dimensions.',
+						),
+						'filename' => array(
+							'type'        => 'string',
+							'description' => 'Filename to store under. Defaults to placeholder-{width}x{height}.svg.',
+						),
+					),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'filename'  => array( 'type' => 'string' ),
+						'url'       => array( 'type' => 'string' ),
+						'reference' => array(
+							'type'        => 'string',
+							'description' => 'What to put in the pattern markup.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_add_placeholder_image' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => false,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Draw and store a placeholder.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_add_placeholder_image( $input = array() ) {
+		$width  = isset( $input['width'] ) ? (int) $input['width'] : 1200;
+		$height = isset( $input['height'] ) ? (int) $input['height'] : 800;
+
+		$svg = Pattern_Builder_Assets::placeholder_svg(
+			array(
+				'width'  => $width,
+				'height' => $height,
+				'label'  => isset( $input['label'] ) ? (string) $input['label'] : '',
+			)
+		);
+
+		$filename = isset( $input['filename'] ) && '' !== (string) $input['filename']
+			? (string) $input['filename']
+			: 'placeholder-' . $width . 'x' . $height . '.svg';
+
+		if ( 'svg' !== strtolower( (string) pathinfo( $filename, PATHINFO_EXTENSION ) ) ) {
+			$filename .= '.svg';
+		}
+		return Pattern_Builder_Assets::store( $filename, $svg, 'theme' );
+	}
+
+	/**
+	 * What typefaces can be installed, so `add-font` is not a guess.
+	 */
+	private function register_list_fonts() {
+		wp_register_ability(
+			'pattern-builder/list-fonts',
+			array(
+				'label'               => __( 'List installable fonts', 'pattern-builder' ),
+				'description'         => __( 'Lists the font families available to install from the Google Fonts collection WordPress ships, filtered by name or category. Call this to confirm a family exists and how its name is spelled before calling add-font. Naming one family instead reports what that family actually offers — its weights, its styles, and whether it has a variable face, which is what decides whether an axis such as optical sizing is available or whether the design has to live with fixed instances.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'family'   => array(
+							'type'        => 'string',
+							'description' => 'One family by name or slug. Answers with that family alone, described in full: the weights and styles it offers and whether it has a variable face. The other filters are ignored when this is given.',
+						),
+						'search'   => array(
+							'type'        => 'string',
+							'description' => 'Substring of the family name.',
+						),
+						'category' => array(
+							'type'        => 'string',
+							'description' => 'A category slug: sans-serif, serif, display, handwriting, monospace.',
+						),
+						'limit'    => array(
+							'type'        => 'integer',
+							'description' => 'How many to return. Defaults to 20.',
+						),
+					),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'families' => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'object' ),
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_list_fonts' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * Search the font collection.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_list_fonts( $input = array() ) {
+		if ( isset( $input['family'] ) && '' !== $input['family'] ) {
+			$family = Pattern_Builder_Fonts::describe( (string) $input['family'] );
+
+			if ( is_wp_error( $family ) ) {
+				return $family;
+			}
+
+			return array( 'families' => array( $family ) );
+		}
+
+		$families = Pattern_Builder_Fonts::search(
+			isset( $input['search'] ) ? (string) $input['search'] : '',
+			isset( $input['category'] ) ? (string) $input['category'] : '',
+			isset( $input['limit'] ) ? (int) $input['limit'] : 20
+		);
+
+		if ( is_wp_error( $families ) ) {
+			return $families;
+		}
+
+		return array( 'families' => $families );
+	}
+
+	/**
+	 * Install a typeface and register it as a preset.
+	 */
+	private function register_add_font() {
+		wp_register_ability(
+			'pattern-builder/add-font',
+			array(
+				'label'               => __( 'Add a font', 'pattern-builder' ),
+				'description'         => __( 'Installs a font family from the Google Fonts collection WordPress ships — the files are copied to this site and served from it, never fetched from Google at render time — and registers it as a fontFamily preset so a pattern can reference it by slug. Writes to the active theme (theme.json plus assets/fonts, so the font travels with the theme) or to this site (Global Styles plus the font library). Call list-fonts first to confirm the family name. Font files can only be installed from the collection this way; to self-host a licensed font you hold, add the files to the theme and register the preset with add-design-tokens.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'family'      => array(
+							'type'        => 'string',
+							'description' => 'The family name as the collection lists it, e.g. "Fraunces".',
+						),
+						'weights'     => array(
+							'type'        => 'array',
+							'description' => 'Weights to install, e.g. ["400","700"]. Defaults to 400 and 700. A variable font covering the weight is installed once and serves the range.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'styles'      => array(
+							'type'        => 'array',
+							'description' => 'Styles to install. Defaults to ["normal"].',
+							'items'       => array(
+								'type' => 'string',
+								'enum' => array( 'normal', 'italic' ),
+							),
+						),
+						'destination' => array(
+							'type'        => 'string',
+							'enum'        => array( 'theme', 'user' ),
+							'description' => '"theme" (default) writes theme.json and assets/fonts, so the font is part of the theme; "user" writes Global Styles and the site\'s font library, which stays in the database and is manageable in the editor.',
+						),
+					),
+					'required'             => array( 'family' ),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'family'      => array( 'type' => 'string' ),
+						'slug'        => array( 'type' => 'string' ),
+						'fontFamily'  => array( 'type' => 'string' ),
+						'destination' => array( 'type' => 'string' ),
+						'faces'       => array(
+							'type'        => 'array',
+							'description' => 'The files installed.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'reference'   => array(
+							'type'        => 'object',
+							'description' => 'How to reference the font: the block attribute, the class, and the CSS custom property.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_add_font' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Install a font family.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_add_font( $input ) {
+		$family = isset( $input['family'] ) ? trim( (string) $input['family'] ) : '';
+
+		if ( '' === $family ) {
+			return new \WP_Error(
+				'pb_font_no_family',
+				__( 'Name the font family to install.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return Pattern_Builder_Fonts::install(
+			$family,
+			isset( $input['weights'] ) ? (array) $input['weights'] : array(),
+			isset( $input['styles'] ) ? (array) $input['styles'] : array(),
+			( isset( $input['destination'] ) && 'user' === $input['destination'] ) ? 'user' : 'theme'
+		);
+	}
+
+	/**
+	 * The part of a user pattern that is not a post field.
+	 *
+	 * @param int                   $post_id The wp_block post.
+	 * @param array                 $input Ability input.
+	 * @param Abstract_Pattern|null $existing The pattern being replaced, on an update.
+	 */
+	private function write_user_pattern_meta( $post_id, $input, $existing = null ) {
+		if ( isset( $input['synced'] ) ) {
+			$synced = (bool) $input['synced'];
+		} elseif ( $existing ) {
+			$synced = (bool) $existing->synced;
+		} else {
+			$synced = false;
+		}
+
+		if ( $synced ) {
+			delete_post_meta( $post_id, 'wp_pattern_sync_status' );
+		} else {
+			update_post_meta( $post_id, 'wp_pattern_sync_status', 'unsynced' );
+		}
+
+		if ( isset( $input['categories'] ) ) {
+			wp_set_object_terms( $post_id, array_map( 'sanitize_title', (array) $input['categories'] ), 'wp_pattern_category', false );
+		}
+
+		if ( isset( $input['keywords'] ) ) {
+			$keywords = array_filter( array_map( 'sanitize_text_field', (array) $input['keywords'] ) );
+			if ( $keywords ) {
+				update_post_meta( $post_id, 'wp_pattern_keywords', implode( ', ', $keywords ) );
+			} else {
+				delete_post_meta( $post_id, 'wp_pattern_keywords' );
+			}
+		}
+	}
+
+	/**
+	 * Build constructor args, falling back to an existing pattern's values.
+	 *
+	 * @param array                 $input Ability input.
+	 * @param Abstract_Pattern|null $existing Pattern being replaced, if any.
+	 * @return array
+	 */
+	private function pattern_args( $input, $existing = null ) {
+		$fallback = function ( $key, $fallback_value ) use ( $existing ) {
+			if ( $existing && isset( $existing->$key ) ) {
+				return $existing->$key;
+			}
+			return $fallback_value;
+		};
+
+		$args = array(
+			'title'       => isset( $input['title'] ) ? (string) $input['title'] : $fallback( 'title', '' ),
+			'content'     => (string) $input['content'],
+			'description' => isset( $input['description'] ) ? (string) $input['description'] : $fallback( 'description', '' ),
+			'categories'  => isset( $input['categories'] ) ? array_map( 'sanitize_title', (array) $input['categories'] ) : $fallback( 'categories', array() ),
+			'keywords'    => isset( $input['keywords'] ) ? array_map( 'sanitize_text_field', (array) $input['keywords'] ) : $fallback( 'keywords', array() ),
+			'synced'      => isset( $input['synced'] ) ? (bool) $input['synced'] : $fallback( 'synced', false ),
+			'source'      => 'theme',
+		);
+
+		if ( isset( $input['name'] ) && '' !== $input['name'] ) {
+			$args['name'] = (string) $input['name'];
+		}
+		foreach ( array( 'blockTypes', 'postTypes', 'templateTypes' ) as $list ) {
+			if ( isset( $input[ $list ] ) ) {
+				$args[ $list ] = array_values( array_filter( array_map( 'sanitize_text_field', (array) $input[ $list ] ) ) );
+			} else {
+				$args[ $list ] = $fallback( $list, array() );
+			}
+		}
+
+		if ( isset( $input['inserter'] ) ) {
+			$args['inserter'] = (bool) $input['inserter'];
+		} else {
+			$args['inserter'] = (bool) $fallback( 'inserter', true );
+		}
+
+		if ( isset( $input['viewportWidth'] ) ) {
+			$args['viewportWidth'] = (int) $input['viewportWidth'];
+		} else {
+			$args['viewportWidth'] = $fallback( 'viewportWidth', null );
+		}
+		$args['origin'] = (string) $fallback( 'origin', '' );
+		$args['cloud']  = (string) $fallback( 'cloud', '' );
+
+		return $args;
+	}
+
+	/**
+	 * Find a pattern of either kind by the id an agent supplied.
+	 *
+	 * @param string $id Namespaced name or post ID.
+	 * @return Abstract_Pattern|\WP_Error
+	 */
+	private function find( $id ) {
+		if ( '' === $id ) {
+			return new \WP_Error( 'pb_pattern_not_found', __( 'No pattern identifier was given.', 'pattern-builder' ), array( 'status' => 404 ) );
+		}
+
+		if ( ctype_digit( $id ) ) {
+			$post = get_post( (int) $id );
+			if ( $post && 'wp_block' === $post->post_type ) {
+				return Abstract_Pattern::from_post( $post );
+			}
+		}
+
+		$store   = new Pattern_File_Store();
+		$pattern = $store->find_theme_pattern( $id );
+		if ( ! $pattern ) {
+			$namespaced = Pattern_File_Store::namespaced_name( $id );
+			if ( $namespaced !== $id ) {
+				$pattern = $store->find_theme_pattern( $namespaced );
+			}
+		}
+
+		if ( ! $pattern ) {
+			return new \WP_Error(
+				'pb_pattern_not_found',
+				/* translators: %s: pattern identifier. */
+				sprintf( __( 'No pattern named %s on this site.', 'pattern-builder' ), $id ),
+				array( 'status' => 404 )
+			);
+		}
+
+		return $pattern;
+	}
+
+	/**
+	 * A pattern as an agent should see it, without its markup.
+	 *
+	 * @param Abstract_Pattern $pattern Pattern.
+	 * @return array
+	 */
+	private function summarize( $pattern ) {
+		$summary = array(
+			'id'            => $pattern->id,
+			'name'          => $pattern->name,
+			'title'         => $pattern->title,
+			'description'   => $pattern->description,
+			'categories'    => is_array( $pattern->categories ) ? $pattern->categories : array(),
+			'keywords'      => is_array( $pattern->keywords ) ? $pattern->keywords : array(),
+			'source'        => $pattern->source,
+			'synced'        => (bool) $pattern->synced,
+			'blockTypes'    => is_array( $pattern->blockTypes ) ? array_values( $pattern->blockTypes ) : array(), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			'postTypes'     => is_array( $pattern->postTypes ) ? array_values( $pattern->postTypes ) : array(), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			'templateTypes' => is_array( $pattern->templateTypes ) ? array_values( $pattern->templateTypes ) : array(), // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			'inserter'      => (bool) $pattern->inserter,
+			'viewportWidth' => $pattern->viewportWidth ? (int) $pattern->viewportWidth : null, // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		);
+
+		if ( ! empty( $pattern->origin ) ) {
+			$summary['origin'] = (string) $pattern->origin;
+		}
+
+		if ( ! empty( $pattern->cloud ) ) {
+			$summary['cloud'] = (string) $pattern->cloud;
+		}
+
+		return $summary;
+	}
+}
