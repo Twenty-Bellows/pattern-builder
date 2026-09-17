@@ -1112,6 +1112,442 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A flat list of documents is not something anything can install. Every one of these
+	 * guides names the others by relative path, so a copy has to reproduce the layout or
+	 * each of those links points at nothing — and the index is where the layout is said.
+	 */
+	public function test_every_guide_says_where_it_sits_in_its_skill() {
+		$index   = $this->abilities->execute_authoring_guide();
+		$entries = array();
+
+		foreach ( $index['guides'] as $guide ) {
+			$this->assertNotEmpty( $guide['path'], $guide['name'] . ' says nothing about where it belongs.' );
+			$this->assertFileExists(
+				plugin_dir_path( PATTERN_BUILDER_FILE ) . 'guides/' . $guide['skill'] . '/' . $guide['path'],
+				$guide['name'] . ' reports a path that is not where the file is.'
+			);
+
+			if ( 'SKILL.md' === $guide['path'] ) {
+				$entries[] = $guide['skill'];
+			}
+		}
+
+		$this->assertSame(
+			array( 'pattern-author', 'design-reproduction' ),
+			$entries,
+			'Each skill is entered through exactly one SKILL.md.'
+		);
+	}
+
+	/**
+	 * The checksum is what makes a copy checkable, so it has to be over the text this site
+	 * serves rather than over the file as it shipped — and the index has to agree with the
+	 * guide itself, or an agent comparing the cheap one is comparing the wrong thing.
+	 */
+	public function test_a_guides_checksum_is_of_the_text_it_serves() {
+		$rows  = array_column( $this->abilities->execute_authoring_guide()['guides'], null, 'name' );
+		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'block-markup' ) );
+
+		$this->assertSame( hash( 'sha256', $guide['content'] ), $guide['checksum'] );
+		$this->assertSame(
+			$rows['block-markup']['checksum'],
+			$guide['checksum'],
+			'The index and the guide disagree about the same text.'
+		);
+	}
+
+	/**
+	 * Fourteen documents are two skills, and a skill is the unit that gets installed. So an
+	 * agent holding a copy compares one checksum rather than fourteen, and that one answer
+	 * has to cover the scripts the prose tells it to run as well as the prose.
+	 */
+	public function test_the_index_says_what_each_skill_is_made_of() {
+		$index = $this->abilities->execute_authoring_guide();
+
+		$this->assertArrayHasKey( 'skills', $index );
+		$skills = array_column( $index['skills'], null, 'name' );
+		$this->assertSame( array( 'pattern-author', 'design-reproduction' ), array_keys( $skills ) );
+
+		foreach ( $skills as $name => $skill ) {
+			$this->assertSame( 'SKILL.md', $skill['entry'] );
+			$this->assertNotEmpty( $skill['title'], $name . ' has no title.' );
+			$this->assertGreaterThan( 1, $skill['files'], $name . ' is a single file, which cannot be right.' );
+			$this->assertGreaterThan( 0, $skill['bytes'] );
+			$this->assertMatchesRegularExpression( '/^[0-9a-f]{64}$/', $skill['checksum'] );
+		}
+
+		$this->assertSame(
+			14,
+			$skills['pattern-author']['files'],
+			"The pattern-author skill's four scripts travel with its ten documents."
+		);
+		$this->assertSame( 3, $skills['design-reproduction']['files'] );
+	}
+
+	/**
+	 * The filter is how a theme adds its house rules, which makes it the thing a version
+	 * read off the plugin could never see: a copy made before the theme amended a guide has
+	 * to read as out of date, and only a checksum over the served text says so.
+	 */
+	public function test_a_theme_amending_a_guide_moves_its_skills_checksum() {
+		$before = $this->skill_checksum_for( 'pattern-author' );
+
+		add_filter( 'pattern_builder_authoring_guides', array( $this, 'amend_a_guide' ) );
+		$amended = $this->skill_checksum_for( 'pattern-author' );
+		remove_filter( 'pattern_builder_authoring_guides', array( $this, 'amend_a_guide' ) );
+
+		$this->assertNotSame( $before, $amended, 'A theme amended a guide and the skill reports the same checksum.' );
+		$this->assertSame( $before, $this->skill_checksum_for( 'pattern-author' ), 'The checksum did not come back when the amendment went.' );
+	}
+
+	/**
+	 * The description in a skill's front matter is the sentence a harness matches a task
+	 * against — the thing that decides whether the skill is reached for at all. Serving the
+	 * prose and dropping it left an installed copy strictly worse at triggering than the
+	 * one in this repository, so it travels as a field of its own.
+	 */
+	public function test_each_skill_carries_the_description_that_makes_it_trigger() {
+		$skills = array_column( $this->abilities->execute_authoring_guide()['skills'], null, 'name' );
+
+		foreach ( $skills as $name => $skill ) {
+			$this->assertNotEmpty( $skill['description'], $name . ' travels without the sentence that makes it trigger.' );
+			$this->assertGreaterThan( 200, strlen( $skill['description'] ), $name . "'s description is too thin to match a task against." );
+
+			$front = file_get_contents( plugin_dir_path( PATTERN_BUILDER_FILE ) . 'guides/' . $name . '/SKILL.md' );
+			$this->assertStringContainsString(
+				'name: ' . $name,
+				$front,
+				$name . ' is filed under a name its own front matter does not claim.'
+			);
+			$this->assertStringContainsString( $skill['description'], $front, $name . "'s description is not the one in the file." );
+		}
+
+		$this->assertStringContainsString( 'block patterns', $skills['pattern-author']['description'] );
+		$this->assertStringContainsString( 'already exists', $skills['design-reproduction']['description'] );
+	}
+
+	/**
+	 * Bumped by hand when the guidance moves, and the only thing here a checksum cannot
+	 * say: whether what changed was a typo or the workflow.
+	 */
+	public function test_each_skill_says_which_version_of_itself_this_is() {
+		foreach ( $this->abilities->execute_authoring_guide()['skills'] as $skill ) {
+			$this->assertMatchesRegularExpression(
+				'/^\d+\.\d+\.\d+$/',
+				$skill['version'],
+				$skill['name'] . ' has no version in its front matter metadata.'
+			);
+		}
+	}
+
+	/**
+	 * Front matter is Agent Skills metadata and means nothing to a harness without a notion
+	 * of a skill, so the prose is served without it — and a reference, which never had any,
+	 * has to come back whole rather than with its first section eaten by the parser.
+	 */
+	public function test_the_prose_is_served_without_its_front_matter() {
+		foreach ( $this->abilities->execute_authoring_guide()['guides'] as $row ) {
+			$guide = $this->abilities->execute_authoring_guide( array( 'guide' => $row['name'] ) );
+
+			$this->assertStringStartsNotWith( '---', $guide['content'], $row['name'] . ' still carries its front matter.' );
+			$this->assertStringStartsWith( '#', $guide['content'], $row['name'] . ' does not start with its heading.' );
+		}
+	}
+
+	/**
+	 * Reading a guide and keeping one are different jobs. Reading is by name; keeping needs
+	 * the layout, which is why a skill is addressed by path — what comes back can be written
+	 * straight to disk in the shape the prose's own links expect.
+	 */
+	public function test_a_skill_comes_back_as_files_to_write() {
+		$skill = $this->abilities->execute_authoring_guide( array( 'skill' => 'pattern-author' ) );
+
+		$this->assertSame( 'pattern-author', $skill['name'] );
+		$this->assertSame( 'SKILL.md', $skill['entry'] );
+		$this->assertNotEmpty( $skill['description'] );
+		$this->assertNotEmpty( $skill['version'] );
+		$this->assertCount( 14, $skill['files'] );
+
+		$paths = wp_list_pluck( $skill['files'], 'path' );
+		$this->assertSame( 'SKILL.md', $paths[0], 'The entry is not the first thing an installer writes.' );
+		$this->assertContains( 'references/block-markup.md', $paths );
+		$this->assertContains(
+			'scripts/check-slots.php',
+			$paths,
+			'design-content-split.md names check-slots.php, so a skill that travels without it sends an agent after a file nothing hands over.'
+		);
+
+		foreach ( $skill['files'] as $file ) {
+			$this->assertGreaterThan( 0, $file['bytes'], $file['path'] . ' is empty.' );
+			$this->assertMatchesRegularExpression( '/^[0-9a-f]{64}$/', $file['checksum'] );
+		}
+
+		$this->assertStringContainsString( 'input[skill]=pattern-author', $skill['install'] );
+		$this->assertStringContainsString( 'input[file]=', $skill['install'] );
+		$this->assertStringContainsString( 'overwrites', $skill['install'], 'The install says nothing about what happens to a copy already there.' );
+	}
+
+	/**
+	 * Every file the manifest promises has to come back at the path it promised it at, and
+	 * hash to what the manifest said, or an installer cannot trust either.
+	 */
+	public function test_every_file_a_skill_lists_can_be_fetched_at_that_path() {
+		foreach ( array( 'pattern-author', 'design-reproduction' ) as $name ) {
+			$skill = $this->abilities->execute_authoring_guide( array( 'skill' => $name ) );
+
+			foreach ( $skill['files'] as $file ) {
+				$served = $this->abilities->execute_authoring_guide(
+					array(
+						'skill' => $name,
+						'file'  => $file['path'],
+					)
+				);
+
+				$this->assertNotWPError( $served, $name . '/' . $file['path'] . ' is listed and cannot be fetched.' );
+				$this->assertSame( $file['path'], $served['path'] );
+				$this->assertSame( $file['checksum'], $served['checksum'] );
+				$this->assertSame( hash( 'sha256', $served['content'] ), $served['checksum'] );
+			}
+		}
+	}
+
+	/**
+	 * The entry is the one file that needs more than its prose: written without front matter
+	 * it has no name and no description, and what it records about where it came from is all
+	 * the later checking has to go on.
+	 */
+	public function test_the_entry_file_carries_the_front_matter_a_copy_needs() {
+		$skill = $this->abilities->execute_authoring_guide( array( 'skill' => 'pattern-author' ) );
+		$entry = $this->abilities->execute_authoring_guide(
+			array(
+				'skill' => 'pattern-author',
+				'file'  => 'SKILL.md',
+			)
+		);
+
+		$front = $entry['frontmatter'];
+		$this->assertStringStartsWith( "---\nname: pattern-author\n", $front );
+		$this->assertStringContainsString( 'description: "', $front );
+		$this->assertStringContainsString( '  version: "' . $skill['version'] . '"', $front );
+		$this->assertStringContainsString( '  source: "' . home_url() . '"', $front );
+		$this->assertStringContainsString(
+			'  checksum: "' . $skill['checksum'] . '"',
+			$front,
+			'A copy records a checksum that is not the one the index will be compared against.'
+		);
+
+		// Front matter, a blank line, then the prose it was written above.
+		$this->assertStringEndsWith( "---\n\n", $front );
+		$this->assertStringStartsWith( '#', $entry['content'] );
+
+		$reference = $this->abilities->execute_authoring_guide(
+			array(
+				'skill' => 'pattern-author',
+				'file'  => 'references/block-markup.md',
+			)
+		);
+		$this->assertArrayNotHasKey( 'frontmatter', $reference, 'A reference was given front matter it never had.' );
+	}
+
+	/**
+	 * A path from a caller never reaches the filesystem: it is looked up in the skill's own
+	 * inventory, so nothing can be named that this site was not already offering.
+	 */
+	public function test_a_file_outside_the_skill_cannot_be_asked_for() {
+		foreach ( array( '../../pattern-builder.php', '../../../wp-config.php', '/etc/passwd', 'references/../../../uninstall.php' ) as $path ) {
+			$served = $this->abilities->execute_authoring_guide(
+				array(
+					'skill' => 'pattern-author',
+					'file'  => $path,
+				)
+			);
+
+			$this->assertWPError( $served, $path . ' was served rather than refused.' );
+			$this->assertSame( 'pb_skill_file_not_found', $served->get_error_code() );
+		}
+	}
+
+	/**
+	 * And the two ways of asking for nothing say what could have been asked for instead.
+	 */
+	public function test_asking_for_a_skill_that_is_not_here_says_which_ones_are() {
+		$missing = $this->abilities->execute_authoring_guide( array( 'skill' => 'pattern-wizard' ) );
+		$this->assertWPError( $missing );
+		$this->assertSame( 'pb_skill_not_found', $missing->get_error_code() );
+		$this->assertStringContainsString( 'pattern-author', $missing->get_error_message() );
+
+		$unanchored = $this->abilities->execute_authoring_guide( array( 'file' => 'SKILL.md' ) );
+		$this->assertWPError( $unanchored );
+		$this->assertSame( 'pb_skill_missing', $unanchored->get_error_code() );
+	}
+
+	/**
+	 * The point of installing a skill by path rather than by name is that the prose's own
+	 * links keep working. So every relative path these documents name has to be a file that
+	 * travels with the skill — or, where one names another skill's, with that one.
+	 */
+	public function test_every_relative_reference_resolves_to_a_file_that_travels() {
+		$paths = array();
+		foreach ( array( 'pattern-author', 'design-reproduction' ) as $name ) {
+			$skill          = $this->abilities->execute_authoring_guide( array( 'skill' => $name ) );
+			$paths[ $name ] = wp_list_pluck( $skill['files'], 'path' );
+		}
+
+		$checked = 0;
+		foreach ( $paths as $name => $files ) {
+			foreach ( $files as $path ) {
+				if ( '.md' !== substr( $path, -3 ) ) {
+					continue;
+				}
+
+				$content = $this->abilities->execute_authoring_guide(
+					array(
+						'skill' => $name,
+						'file'  => $path,
+					)
+				)['content'];
+
+				preg_match_all(
+					'#(?:`(?P<owner>[a-z-]+)`(?:\'|\x{2019})s\s+)?`(?P<path>(?:references|scripts)/[A-Za-z0-9._-]+)`#u',
+					$content,
+					$found,
+					PREG_SET_ORDER
+				);
+
+				foreach ( $found as $match ) {
+					$owner = '' !== $match['owner'] ? $match['owner'] : $name;
+
+					$this->assertArrayHasKey( $owner, $paths, $name . '/' . $path . ' names a skill that is not here: ' . $owner );
+					$this->assertContains(
+						$match['path'],
+						$paths[ $owner ],
+						$name . '/' . $path . ' points at ' . $owner . "'s " . $match['path'] . ', which does not travel with it.'
+					);
+					++$checked;
+				}
+			}
+		}
+
+		$this->assertGreaterThan( 30, $checked, 'Hardly anything was checked, so this test is not doing its job.' );
+	}
+
+	/**
+	 * A copy has to carry the means of noticing it has gone stale, because nothing else
+	 * will: the site does not know who holds one, and an out-of-date instruction renders,
+	 * validates and is simply wrong.
+	 */
+	public function test_an_installed_skill_is_told_how_to_check_itself() {
+		foreach ( array( 'pattern-author', 'design-reproduction' ) as $name ) {
+			$entry = $this->abilities->execute_authoring_guide(
+				array(
+					'skill' => $name,
+					'file'  => 'SKILL.md',
+				)
+			)['content'];
+
+			$this->assertStringContainsString( '## Staying current', $entry, $name . ' never tells a copy of itself how to notice it is stale.' );
+			$this->assertStringContainsString( 'metadata.source', $entry, $name . ' does not say where a copy came from.' );
+			$this->assertStringContainsString(
+				'.skills[] | select(.name == "' . $name . '")',
+				$entry,
+				$name . "'s check does not ask about " . $name . '.'
+			);
+			$this->assertStringContainsString(
+				'pattern_builder_authoring_guides',
+				$entry,
+				$name . ' says a copy is overwritten without saying where a change worth keeping belongs instead.'
+			);
+		}
+	}
+
+	/**
+	 * And the maintainer has to be told to move the one field that is not derived. The
+	 * checksum says that something changed; only the version says whether it mattered.
+	 */
+	public function test_the_maintenance_pass_covers_copies_as_well_as_wordpress() {
+		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'keeping-current' ) )['content'];
+
+		$this->assertStringContainsString( 'metadata.version', $guide );
+		$this->assertStringContainsString(
+			'Bump it in the same commit that changes',
+			$guide,
+			'Nothing tells a maintainer when the version moves.'
+		);
+	}
+
+	/**
+	 * The filter supplies text, and now also the path that text installs at — which is a
+	 * path on somebody else's disk. A theme may add a file to a shipped skill; it may not
+	 * choose a place outside the directory the installer picked.
+	 */
+	public function test_a_filtered_guide_cannot_choose_where_an_installer_writes() {
+		add_filter( 'pattern_builder_authoring_guides', array( $this, 'add_theme_guides' ) );
+		$index = $this->abilities->execute_authoring_guide();
+		$skill = $this->abilities->execute_authoring_guide( array( 'skill' => 'pattern-author' ) );
+		remove_filter( 'pattern_builder_authoring_guides', array( $this, 'add_theme_guides' ) );
+
+		$rows  = array_column( $index['guides'], null, 'name' );
+		$paths = wp_list_pluck( $skill['files'], 'path' );
+
+		$this->assertArrayHasKey( 'house_escape', $rows, 'A theme can still add a guide.' );
+		$this->assertSame( '', $rows['house_escape']['path'], 'A path that climbs out of the skill was passed on as a place to write.' );
+		$this->assertNotContains( '../../../.bashrc', $paths );
+
+		$this->assertContains(
+			'references/house-rules.md',
+			$paths,
+			'A theme could not add a reference to a shipped skill, which is the point of the filter.'
+		);
+	}
+
+	/**
+	 * One guide that belongs in the skill's layout, and one that tries to escape it.
+	 *
+	 * @param array $guides The guides.
+	 * @return array
+	 */
+	public function add_theme_guides( $guides ) {
+		$guides['house_escape'] = array(
+			'title'   => 'Escaping',
+			'content' => "# Escaping\n\nNot a place to write.\n",
+			'skill'   => 'pattern-author',
+			'path'    => '../../../.bashrc',
+		);
+		$guides['house_rules']  = array(
+			'title'   => 'House rules',
+			'content' => "# House rules\n\nBands are full width here.\n",
+			'skill'   => 'pattern-author',
+			'path'    => 'references/house-rules.md',
+		);
+
+		return $guides;
+	}
+
+	/**
+	 * Appends a house rule, as a theme would.
+	 *
+	 * @param array $guides The guides.
+	 * @return array
+	 */
+	public function amend_a_guide( $guides ) {
+		$guides['block-markup']['content'] .= "\n\nHouse rule: bands are full width here.\n";
+
+		return $guides;
+	}
+
+	/**
+	 * One skill's fingerprint, from the index.
+	 *
+	 * @param string $name Skill name.
+	 * @return string
+	 */
+	private function skill_checksum_for( $name ) {
+		$skills = array_column( $this->abilities->execute_authoring_guide()['skills'], null, 'name' );
+
+		return $skills[ $name ]['checksum'];
+	}
+
+	/**
 	 * The reproduction skill's whole first step is deciding whether the source's values can
 	 * be read or must be inferred, because that answer decides both how exact the result
 	 * may claim to be and whether it can be checked at the end.
