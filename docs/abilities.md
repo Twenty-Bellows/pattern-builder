@@ -29,7 +29,7 @@ sets it).
 
 | Ability | Answers |
 |---|---|
-| `get-authoring-guide` | The pattern-authoring documentation as Markdown. |
+| `get-authoring-guide` | The pattern-authoring documentation as Markdown, and the two skills it makes up, as files to install. |
 | `get-design-system` | The merged presets, the `styles` a pattern inherits, and the `blockStyles` registered here — each marked `portable`. |
 | `list-block-types` | What is registered *on this site*; naming blocks also returns each one's `supports`. |
 | `list-patterns` | Every pattern's summary with its placement headers, any `origin` or `cloud` reference, and the registered pattern categories. |
@@ -190,6 +190,49 @@ the three writes to run the check before (`create-pattern`, `update-pattern`,
 `upload-pattern`): an agent that goes straight to a write reads no guide, so
 the one step it cannot afford to skip sits where anyone asking what to read
 sees it first. A test asserts the abilities it names are registered.
+
+### Keeping a copy
+
+Reading a guide and keeping one are different jobs, and the ability answers
+both. Reading is by name (`input[guide]`). Keeping is by skill
+(`input[skill]`), which answers with a manifest — every file the skill is made
+of, each with the path to write it at, its size and its checksum — and an
+`install` recipe. Files are then fetched by path (`input[file]`), because an
+installer needs the layout: every one of these documents names the others by
+relative path, so a copy that flattened them would have a dangling link on
+every page. A path from a caller never reaches the filesystem; it is looked up
+in the skill's own inventory, so nothing can be named that the site was not
+already offering.
+
+The recipe fetches each file straight to disk, so the bytes never pass through
+the agent's context — the same reason an image is uploaded as a request body
+rather than base64 inside JSON. The entry file also comes back with
+`frontmatter` to write above it: the name and description that make the skill
+trigger, which the prose alone does not carry, plus the site it came from and
+the skill's checksum.
+
+A skill's **scripts travel with it**, `check-slots.php` included. That one runs
+under WP-CLI rather than Node, which is why `get-validator` does not carry it —
+that ability hands over one tool that runs anywhere — but `design-content-split.md`
+names it, so a skill without it would send an agent after a file nothing would
+hand over.
+
+**Staleness is a checksum, not a version.** Each guide's checksum is taken over
+the text the site serves, *after* `pattern_builder_authoring_guides` runs, and
+rolled up per skill over paths and checksums so that adding or removing a file
+moves it too. Taking it after the filter is the point: a version read off the
+plugin cannot see a theme's house rules, and would call a copy made before them
+current. `metadata.version` in each SKILL.md is the other half and is
+hand-moved — the checksum says that something changed, the version says whether
+it was a typo or the workflow — and it is versioned apart from the plugin, so a
+patch release that does not touch the prose does not read as a change to it.
+
+**A copy is replaced, never merged.** There is no conflict state and nothing
+local to preserve, which is why the installed SKILL.md says that a change worth
+keeping belongs in the theme behind that filter, where it reaches every agent
+that asks the site rather than one checkout. `references/keeping-current.md`
+carries the maintainer's half: bump the version in the same commit that changes
+the guidance.
 
 ## Media and fonts
 
