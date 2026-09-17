@@ -10,91 +10,42 @@ import {
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalText as Text,
 } from '@wordpress/components';
-import { useSelect, useDispatch } from '@wordpress/data';
+import { useSelect } from '@wordpress/data';
 import { store as coreStore } from '@wordpress/core-data';
-import { store as noticesStore } from '@wordpress/notices';
 
 import { PatternSourcePanel } from './PatternSourcePanel';
-import { PatternSyncedStatusPanel } from './PatternSyncedStatusPanel';
-import { PatternMetadataPanel } from './PatternMetadataPanel';
-import { PatternAssociationsPanel } from './PatternAssociationsPanel';
 import { PatternActionsPanel } from './PatternActionsPanel';
 import { PatternPhpNotice } from './PatternPhpNotice';
 
 /**
- * The browse screen's details sidebar for the selected pattern — the same panels the editor
- * shows for a pattern document (Source, Synced Status, and for theme patterns Metadata and
- * Associations), staged on the entity and persisted by the Save button; Edit opens the
- * pattern's editor.
+ * The browse screen's details sidebar for the selected pattern: where it is stored, and
+ * what can be done with it, under an Edit action that opens the pattern's own editor.
+ *
+ * Both panels act on the pattern through the REST API as they are used, rather than
+ * staging an edit on the entity, so there is nothing here to save. Everything that is
+ * edited rather than acted on is edited in the pattern's editor.
  *
  * @param {Object}   props         Component props.
  * @param {Object}   props.pattern The selected pattern, or null for the empty state.
  * @param {Function} props.onEdit  Called with the pattern to open its editor.
- * @param {Function} props.onSaved Called after a successful save.
+ * @param {Function} props.onSaved Called after the pattern list changes.
  */
 export const PatternDetailsPanel = ( { pattern, onEdit, onSaved } ) => {
 	const postType = pattern?.source === 'theme' ? 'pb_pattern' : 'wp_block';
-	const isThemePattern = postType === 'pb_pattern';
 
-	const { record, hasEdits, isSaving } = useSelect(
-		( select ) => {
-			const {
-				getEditedEntityRecord,
-				hasEditsForEntityRecord,
-				isSavingEntityRecord,
-			} = select( coreStore );
-
-			if ( ! pattern?.id ) {
-				return { record: null, hasEdits: false, isSaving: false };
-			}
-
-			return {
-				record: getEditedEntityRecord(
-					'postType',
-					postType,
-					pattern?.id
-				),
-				hasEdits: hasEditsForEntityRecord(
-					'postType',
-					postType,
-					pattern?.id
-				),
-				isSaving: isSavingEntityRecord(
-					'postType',
-					postType,
-					pattern?.id
-				),
-			};
-		},
+	const record = useSelect(
+		( select ) =>
+			pattern?.id
+				? select( coreStore ).getEditedEntityRecord(
+						'postType',
+						postType,
+						pattern.id
+				  )
+				: null,
 		[ postType, pattern?.id ]
 	);
 
-	const { saveEditedEntityRecord } = useDispatch( coreStore );
-	const { createSuccessNotice, createErrorNotice } =
-		useDispatch( noticesStore );
-
 	const isLoaded = !! record && Object.keys( record ).length > 0;
-
-	const save = async () => {
-		try {
-			await saveEditedEntityRecord( 'postType', postType, pattern.id, {
-				throwOnError: true,
-			} );
-			createSuccessNotice( __( 'Pattern saved.', 'pattern-builder' ), {
-				type: 'snackbar',
-			} );
-
-			if ( onSaved ) {
-				onSaved();
-			}
-		} catch ( error ) {
-			createErrorNotice(
-				error?.message ||
-					__( 'The pattern could not be saved.', 'pattern-builder' ),
-				{ type: 'snackbar' }
-			);
-		}
-	};
 
 	if ( ! pattern ) {
 		return (
