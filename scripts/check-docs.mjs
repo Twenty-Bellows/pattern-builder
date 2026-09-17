@@ -60,8 +60,6 @@ const ALLOW = new Set( [
 	'edit_themes',
 	'get_the_content()',
 	'NON_CONTEXTUAL_POST_TYPES',
-	// A sniff belonging to the WordPress Coding Standards, not to this tree.
-	'WordPress.WP.I18n.MissingSingularPlaceholder',
 	// The host environment and other repositories.
 	'sqlite-database-integration',
 	'db.copy',
