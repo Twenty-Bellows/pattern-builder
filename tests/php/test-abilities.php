@@ -1476,6 +1476,54 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The filter supplies text, and now also the path that text installs at — which is a
+	 * path on somebody else's disk. A theme may add a file to a shipped skill; it may not
+	 * choose a place outside the directory the installer picked.
+	 */
+	public function test_a_filtered_guide_cannot_choose_where_an_installer_writes() {
+		add_filter( 'pattern_builder_authoring_guides', array( $this, 'add_theme_guides' ) );
+		$index = $this->abilities->execute_authoring_guide();
+		$skill = $this->abilities->execute_authoring_guide( array( 'skill' => 'pattern-author' ) );
+		remove_filter( 'pattern_builder_authoring_guides', array( $this, 'add_theme_guides' ) );
+
+		$rows  = array_column( $index['guides'], null, 'name' );
+		$paths = wp_list_pluck( $skill['files'], 'path' );
+
+		$this->assertArrayHasKey( 'house_escape', $rows, 'A theme can still add a guide.' );
+		$this->assertSame( '', $rows['house_escape']['path'], 'A path that climbs out of the skill was passed on as a place to write.' );
+		$this->assertNotContains( '../../../.bashrc', $paths );
+
+		$this->assertContains(
+			'references/house-rules.md',
+			$paths,
+			'A theme could not add a reference to a shipped skill, which is the point of the filter.'
+		);
+	}
+
+	/**
+	 * One guide that belongs in the skill's layout, and one that tries to escape it.
+	 *
+	 * @param array $guides The guides.
+	 * @return array
+	 */
+	public function add_theme_guides( $guides ) {
+		$guides['house_escape'] = array(
+			'title'   => 'Escaping',
+			'content' => "# Escaping\n\nNot a place to write.\n",
+			'skill'   => 'pattern-author',
+			'path'    => '../../../.bashrc',
+		);
+		$guides['house_rules']  = array(
+			'title'   => 'House rules',
+			'content' => "# House rules\n\nBands are full width here.\n",
+			'skill'   => 'pattern-author',
+			'path'    => 'references/house-rules.md',
+		);
+
+		return $guides;
+	}
+
+	/**
 	 * Appends a house rule, as a theme would.
 	 *
 	 * @param array $guides The guides.

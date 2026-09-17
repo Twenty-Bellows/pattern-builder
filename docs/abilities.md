@@ -204,6 +204,13 @@ every page. A path from a caller never reaches the filesystem; it is looked up
 in the skill's own inventory, so nothing can be named that the site was not
 already offering.
 
+A theme's filtered guide may carry a `path` too, which puts it in a shipped
+skill's layout and makes it install alongside the rest — a house reference
+beside the plugin's own. It may not carry a path that leaves the directory the
+installer chose: one that climbs out is dropped rather than corrected, leaving
+that guide where a guide with no place in a layout belongs, in the flat index
+and part of no skill.
+
 The recipe fetches each file straight to disk, so the bytes never pass through
 the agent's context — the same reason an image is uploaded as a request body
 rather than base64 inside JSON. The entry file also comes back with

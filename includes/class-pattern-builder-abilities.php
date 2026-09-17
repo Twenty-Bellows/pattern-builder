@@ -865,7 +865,7 @@ class Pattern_Builder_Abilities {
 					: $this->guide_title( $guide['content'], $key ),
 				'content'     => $guide['content'],
 				'skill'       => isset( $guide['skill'] ) && is_string( $guide['skill'] ) ? $guide['skill'] : '',
-				'path'        => isset( $guide['path'] ) && is_string( $guide['path'] ) ? $guide['path'] : '',
+				'path'        => isset( $guide['path'] ) && is_string( $guide['path'] ) ? $this->safe_relative_path( $guide['path'] ) : '',
 				'description' => isset( $guide['description'] ) && is_string( $guide['description'] ) ? $guide['description'] : '',
 				'version'     => isset( $guide['version'] ) && is_string( $guide['version'] ) ? $guide['version'] : '',
 
@@ -1319,6 +1319,33 @@ class Pattern_Builder_Abilities {
 			return trim( $m[1] );
 		}
 		return $fallback;
+	}
+
+	/**
+	 * A path is only a path if it stays inside the skill.
+	 *
+	 * The shipped paths come from guide_files() and are safe by construction.
+	 * A theme's guide arrives through the filter and can carry anything. The
+	 * value never reaches the filesystem — a filtered guide is text, and the
+	 * filter supplied it — but it is handed to whatever is installing as the
+	 * place to write, so a `..` in it would put a file outside the directory
+	 * the installer chose. A path that will not stay put is dropped rather than
+	 * corrected, which leaves that guide where a guide with no place in a
+	 * layout belongs: in the flat index, readable, and part of no skill.
+	 *
+	 * @param string $path Candidate path.
+	 * @return string The path, or '' when it is not one.
+	 */
+	private function safe_relative_path( $path ) {
+		if ( '' === $path || '/' === $path[0] || false !== strpos( $path, '\\' ) ) {
+			return '';
+		}
+
+		if ( preg_match( '#(^|/)\.\.(/|$)#', $path ) ) {
+			return '';
+		}
+
+		return $path;
 	}
 
 	/**
