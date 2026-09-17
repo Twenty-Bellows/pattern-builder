@@ -43,7 +43,7 @@ signal that a pattern is wanted**, and it is easy to read as content.
 |---|---|---|---|
 | **Element** | the smallest named thing | markup, with slots | many times |
 | **Section** | a full-width band | a heading and references to elements | sometimes across pages |
-| **Page** | a whole page | references to sections | once |
+| **Page** | a whole page | references to sections, and this page's own markup | once |
 
 A pattern at any level may reference patterns below it, **and the nesting is
 not limited to one hop**. A page references sections. A section references
@@ -56,6 +56,12 @@ for a different reason — it is a named part of a page, so a page can be
 assembled from names rather than from markup, and a band shared by two pages is
 shared rather than copied. A section that appears exactly once is still a
 section pattern.
+
+A **page** is where the rule stops. It is the one level that does not repeat,
+so nothing about it has to be reusable, and it may hold plain blocks alongside
+its references wherever naming a thing would buy nothing — see **When not to
+factor** below. Every level *above* the page is composition; the page itself is
+allowed to be a page.
 
 ## Filling in the inventory
 
@@ -176,12 +182,27 @@ than one cut too coarse.
 
 - **Two occurrences with no name** — leave inline. A repeated group wrapper is
   not a pattern.
+- **A single styled block.** A pattern whose whole content is one paragraph,
+  one heading or one image with a class on it is indirection with nothing
+  inside it. The reusable thing there is the *style*, and a block style
+  variation already carries it: `styles/callout.json` registers
+  `is-style-callout`, the editor offers it on every paragraph, and any markup
+  that wants the treatment writes `{"className":"is-style-callout"}`. Wrapping
+  that in a pattern adds a name to remember, a file to open and a reference to
+  resolve, and it reaches one place instead of every paragraph on the site.
+  Write the block where it goes. The same holds for a block whose difference is
+  an attribute — a font size, an alignment, a background: those travel in the
+  markup, and a pattern around them travels nowhere the markup did not.
+
+  What flips it back is content, not styling: once the thing has *slots* that
+  different pages fill differently, it is an element and it wants a pattern.
 - **A part that varies structurally** rather than in its leaves — two
   "cards" where one has an image above and the other beside it are two designs,
   not one pattern with a slot.
 - **A whole page's worth of genuinely one-off copy** — an about page's three
-  paragraphs are content. They belong in a section pattern's markup, or in the
-  page pattern that fills a section's slots.
+  paragraphs are content. They belong in a section pattern's markup, or written
+  directly into the page pattern, whichever reads better. A pattern per
+  paragraph is the confetti this section exists to prevent.
 - **When the pattern is bound for a site with neither runtime.** References
   and `content` need Pattern Builder or Synced Patterns for Themes at the far
   end; every site these abilities run on has one, and the service requires
