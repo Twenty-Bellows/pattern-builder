@@ -51,6 +51,17 @@ this pattern supplying the words.
 - This is the **content half of the split**: it fills the slots that synced
   design patterns expose.
 
+**It may hold ordinary blocks, and often should.** A page pattern is a page's
+worth of markup, not a manifest — references where a section is worth naming,
+plain blocks where it is not. The test is the one in `composition.md`: a
+pattern earns its existence by being reusable, so a band that repeats or has a
+domain name gets referenced, and a paragraph that appears once on one page is
+written where it appears. Wrapping that paragraph in a pattern does not make it
+reusable; it makes it a pattern nobody would install, named for the page that
+is already the only thing using it. Projects that layer more strictly than this
+say so in their own conventions — follow those where they exist, and do not
+infer them here.
+
 ### Block Starter Pattern
 
 *Offered when a block is inserted.*

@@ -157,17 +157,20 @@ Then place each row at its level:
 |---|---|---|
 | **Element** | the smallest named repeated thing | markup, with slots |
 | **Section** | a full-width band | a heading and *references to elements* |
-| **Page** | the whole page | *references to sections* |
+| **Page** | the whole page | *references to sections*, plus its own markup |
 
 **Nesting is not limited to one hop** — a section may reference other sections.
 The failure to avoid is stopping after one level: bands as patterns, everything
 inside written out longhand.
 
-Two bounds: **Pattern Overrides binds `core/paragraph`, `core/heading`,
+Three bounds. **Pattern Overrides binds `core/paragraph`, `core/heading`,
 `core/image` and `core/button`** — plus `core/list-item` from WordPress 6.9 —
-so a slot must land on one of those; you cannot slot "some blocks". And **don't
+so a slot must land on one of those; you cannot slot "some blocks". **Don't
 factor what does not repeat**: a band appearing once is a section pattern
-because it is a named part of the page, not because it repeats.
+because it is a named part of the page, not because it repeats. And **don't
+factor a single styled block** — one paragraph with a class on it is not a
+pattern, it is a block style variation applied where the paragraph goes, and a
+page pattern is allowed to hold that paragraph directly.
 
 `references/composition.md` has the worked example.
 
