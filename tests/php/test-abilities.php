@@ -1201,6 +1201,60 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The description in a skill's front matter is the sentence a harness matches a task
+	 * against — the thing that decides whether the skill is reached for at all. Serving the
+	 * prose and dropping it left an installed copy strictly worse at triggering than the
+	 * one in this repository, so it travels as a field of its own.
+	 */
+	public function test_each_skill_carries_the_description_that_makes_it_trigger() {
+		$skills = array_column( $this->abilities->execute_authoring_guide()['skills'], null, 'name' );
+
+		foreach ( $skills as $name => $skill ) {
+			$this->assertNotEmpty( $skill['description'], $name . ' travels without the sentence that makes it trigger.' );
+			$this->assertGreaterThan( 200, strlen( $skill['description'] ), $name . "'s description is too thin to match a task against." );
+
+			$front = file_get_contents( plugin_dir_path( PATTERN_BUILDER_FILE ) . 'guides/' . $name . '/SKILL.md' );
+			$this->assertStringContainsString(
+				'name: ' . $name,
+				$front,
+				$name . ' is filed under a name its own front matter does not claim.'
+			);
+			$this->assertStringContainsString( $skill['description'], $front, $name . "'s description is not the one in the file." );
+		}
+
+		$this->assertStringContainsString( 'block patterns', $skills['pattern-author']['description'] );
+		$this->assertStringContainsString( 'already exists', $skills['design-reproduction']['description'] );
+	}
+
+	/**
+	 * Bumped by hand when the guidance moves, and the only thing here a checksum cannot
+	 * say: whether what changed was a typo or the workflow.
+	 */
+	public function test_each_skill_says_which_version_of_itself_this_is() {
+		foreach ( $this->abilities->execute_authoring_guide()['skills'] as $skill ) {
+			$this->assertMatchesRegularExpression(
+				'/^\d+\.\d+\.\d+$/',
+				$skill['version'],
+				$skill['name'] . ' has no version in its front matter metadata.'
+			);
+		}
+	}
+
+	/**
+	 * Front matter is Agent Skills metadata and means nothing to a harness without a notion
+	 * of a skill, so the prose is served without it — and a reference, which never had any,
+	 * has to come back whole rather than with its first section eaten by the parser.
+	 */
+	public function test_the_prose_is_served_without_its_front_matter() {
+		foreach ( $this->abilities->execute_authoring_guide()['guides'] as $row ) {
+			$guide = $this->abilities->execute_authoring_guide( array( 'guide' => $row['name'] ) );
+
+			$this->assertStringStartsNotWith( '---', $guide['content'], $row['name'] . ' still carries its front matter.' );
+			$this->assertStringStartsWith( '#', $guide['content'], $row['name'] . ' does not start with its heading.' );
+		}
+	}
+
+	/**
 	 * Appends a house rule, as a theme would.
 	 *
 	 * @param array $guides The guides.

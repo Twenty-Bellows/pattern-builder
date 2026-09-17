@@ -715,7 +715,7 @@ class Pattern_Builder_Abilities {
 						),
 						'skills'   => array(
 							'type'        => 'array',
-							'description' => 'On the index only: the skills these guides make up, each with a checksum over all of its files. Compare it against the one a copy recorded to tell whether that copy is still current.',
+							'description' => 'On the index only: the skills these guides make up, each with its own description and version, and a checksum over all of its files. Compare the checksum against the one a copy recorded to tell whether that copy is still current.',
 							'items'       => array( 'type' => 'object' ),
 						),
 						'name'     => array( 'type' => 'string' ),
@@ -786,15 +786,19 @@ class Pattern_Builder_Abilities {
 		$guides = array();
 
 		foreach ( $this->guide_files() as $name => $relative ) {
-			$text = $this->read_guide( $relative );
-			if ( null === $text ) {
+			$guide = $this->read_guide( $relative );
+			if ( null === $guide ) {
 				continue;
 			}
-			$skill           = (string) strstr( $relative, '/', true );
+
+			$front = $guide['front'];
+			$meta  = isset( $front['metadata'] ) && is_array( $front['metadata'] ) ? $front['metadata'] : array();
+			$skill = (string) strstr( $relative, '/', true );
+
 			$guides[ $name ] = array(
-				'title'   => $this->guide_title( $text, $name ),
-				'content' => $text,
-				'skill'   => $skill,
+				'title'       => $this->guide_title( $guide['content'], $name ),
+				'content'     => $guide['content'],
+				'skill'       => $skill,
 
 				/*
 				 * Where the file sits inside its skill. A guide names the
@@ -802,7 +806,15 @@ class Pattern_Builder_Abilities {
 				 * so a copy installed anywhere else has to reproduce the
 				 * layout or every one of those links dangles.
 				 */
-				'path'    => (string) substr( $relative, strlen( $skill ) + 1 ),
+				'path'        => (string) substr( $relative, strlen( $skill ) + 1 ),
+
+				/*
+				 * Only an entry document carries either: the description is
+				 * what a harness matches a task against, and the version is
+				 * the maintainer's own signal about how much moved.
+				 */
+				'description' => isset( $front['description'] ) ? (string) $front['description'] : '',
+				'version'     => isset( $meta['version'] ) ? (string) $meta['version'] : '',
 			);
 		}
 
@@ -827,19 +839,21 @@ class Pattern_Builder_Abilities {
 				continue;
 			}
 			$clean[ $key ] = array(
-				'title'    => isset( $guide['title'] ) && is_string( $guide['title'] )
+				'title'       => isset( $guide['title'] ) && is_string( $guide['title'] )
 					? $guide['title']
 					: $this->guide_title( $guide['content'], $key ),
-				'content'  => $guide['content'],
-				'skill'    => isset( $guide['skill'] ) && is_string( $guide['skill'] ) ? $guide['skill'] : '',
-				'path'     => isset( $guide['path'] ) && is_string( $guide['path'] ) ? $guide['path'] : '',
+				'content'     => $guide['content'],
+				'skill'       => isset( $guide['skill'] ) && is_string( $guide['skill'] ) ? $guide['skill'] : '',
+				'path'        => isset( $guide['path'] ) && is_string( $guide['path'] ) ? $guide['path'] : '',
+				'description' => isset( $guide['description'] ) && is_string( $guide['description'] ) ? $guide['description'] : '',
+				'version'     => isset( $guide['version'] ) && is_string( $guide['version'] ) ? $guide['version'] : '',
 
 				/*
 				 * Taken after the filter, over the text this site actually
 				 * serves. A version read off the plugin could not see a theme's
 				 * amendments, and would report a copy made before them current.
 				 */
-				'checksum' => hash( 'sha256', $guide['content'] ),
+				'checksum'    => hash( 'sha256', $guide['content'] ),
 			);
 		}
 
@@ -931,10 +945,18 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
-	 * Read one guide, with its YAML front matter stripped.
+	 * Read one guide: the prose, and the front matter that sat over it.
+	 *
+	 * The prose is what gets served. The front matter is not — it is Agent
+	 * Skills metadata, which means nothing to a harness with no notion of a
+	 * skill — but its `description` is the sentence that decides whether a
+	 * harness reaches for the skill at all, so it is far too load-bearing to
+	 * drop on the floor. Returned beside the prose, it can be handed over as
+	 * fields and written back in whatever shape the caller's own format wants.
 	 *
 	 * @param string $relative Path under the guide directory.
-	 * @return string|null Null when the file is absent or unreadable.
+	 * @return array|null `content` and `front`, or null when the file is absent
+	 *                    or unreadable.
 	 */
 	private function read_guide( $relative ) {
 		$path = $this->guide_dir() . $relative;
@@ -949,7 +971,84 @@ class Pattern_Builder_Abilities {
 			return null;
 		}
 
-		return trim( preg_replace( '/\A---\r?\n.*?\r?\n---\r?\n/s', '', $text ) );
+		$front = array();
+		if ( preg_match( '/\A---\r?\n(.*?)\r?\n---\r?\n/s', $text, $matched ) ) {
+			$front = $this->parse_front_matter( $matched[1] );
+			$text  = substr( $text, strlen( $matched[0] ) );
+		}
+
+		return array(
+			'content' => trim( $text ),
+			'front'   => $front,
+		);
+	}
+
+	/**
+	 * The front matter of a file this plugin ships, as a map.
+	 *
+	 * Deliberately not a YAML parser. It reads `key: value` at the margin and
+	 * one level of indented keys under a key with no value of its own, which is
+	 * the whole of the shape these files use. Anything else it does not see —
+	 * which is the right failure for a reader of files the plugin ships: it
+	 * cannot misread a construct, only miss one, and a missed one shows up as
+	 * an empty field rather than as a wrong value.
+	 *
+	 * @param string $yaml The text between the `---` markers.
+	 * @return array
+	 */
+	private function parse_front_matter( $yaml ) {
+		$front  = array();
+		$parent = '';
+
+		foreach ( preg_split( '/\r?\n/', $yaml ) as $line ) {
+			if ( '' === trim( $line ) || 0 === strpos( ltrim( $line ), '#' ) ) {
+				continue;
+			}
+
+			if ( preg_match( '/^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/', $line, $matched ) ) {
+				$key   = $matched[1];
+				$value = $this->unquote( $matched[2] );
+
+				if ( '' === $value ) {
+					// A key with nothing after it opens a block: `metadata:`.
+					$parent           = $key;
+					$front[ $parent ] = array();
+					continue;
+				}
+
+				$parent        = '';
+				$front[ $key ] = $value;
+				continue;
+			}
+
+			if ( '' !== $parent && preg_match( '/^\s+([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/', $line, $matched ) ) {
+				$front[ $parent ][ $matched[1] ] = $this->unquote( $matched[2] );
+			}
+		}
+
+		return $front;
+	}
+
+	/**
+	 * Strip one pair of matching quotes from a scalar.
+	 *
+	 * @param string $value Raw value.
+	 * @return string
+	 */
+	private function unquote( $value ) {
+		$value = trim( $value );
+
+		if ( strlen( $value ) < 2 ) {
+			return $value;
+		}
+
+		$quote = $value[0];
+
+		if ( in_array( $quote, array( '"', "'" ), true ) && substr( $value, -1 ) === $quote ) {
+			return substr( $value, 1, -1 );
+		}
+
+		return $value;
 	}
 
 	/**
@@ -1103,12 +1202,14 @@ class Pattern_Builder_Abilities {
 			}
 
 			$skills[ $name ] = array(
-				'name'     => $name,
-				'title'    => $entry['title'],
-				'entry'    => self::SKILL_ENTRY,
-				'files'    => count( $files ),
-				'bytes'    => array_sum( wp_list_pluck( $files, 'bytes' ) ),
-				'checksum' => $this->skill_checksum( $files ),
+				'name'        => $name,
+				'title'       => $entry['title'],
+				'description' => $entry['description'],
+				'version'     => $entry['version'],
+				'entry'       => self::SKILL_ENTRY,
+				'files'       => count( $files ),
+				'bytes'       => array_sum( wp_list_pluck( $files, 'bytes' ) ),
+				'checksum'    => $this->skill_checksum( $files ),
 			);
 		}
 
