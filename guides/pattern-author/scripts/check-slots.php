@@ -70,6 +70,20 @@ if ( file_exists( $args[0] ) ) {
 		WP_CLI::warning( 'No wp:pattern references with content found — nothing to check.' );
 		exit( 0 );
 	}
+} elseif ( preg_match( '/[\\/]|\.(php|html)$/', $args[0] ) ) {
+	/*
+	 * It was a path, and there is nothing at it. The usual reason is that the
+	 * command ran through wp-env or Docker: WP-CLI is inside the container, so a
+	 * path from the host's checkout does not exist where this script looks.
+	 * Falling through to the JSON form would ask for slot values, which is a
+	 * puzzle rather than an answer.
+	 */
+	WP_CLI::error(
+		sprintf(
+			'No file at %s. If WP-CLI runs in a container (wp-env, Docker), give the path the container sees — under its wp-content mount, e.g. /var/www/html/wp-content/… — not the host\'s.',
+			$args[0]
+		)
+	);
 } else {
 	if ( empty( $args[1] ) ) {
 		WP_CLI::error( 'Give the slot values as JSON: wp eval-file check-slots.php <slug> \'{"slot":{"content":"…"}}\'' );

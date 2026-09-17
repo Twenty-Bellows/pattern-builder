@@ -16,6 +16,13 @@ class Test_Fonts extends WP_UnitTestCase {
 	 */
 	private $theme_dir;
 
+	/**
+	 * When set, the stand-in collection answers like a host with no route out.
+	 *
+	 * @var bool
+	 */
+	private $collection_unreachable = false;
+
 	public function set_up() {
 		parent::set_up();
 
@@ -40,6 +47,16 @@ class Test_Fonts extends WP_UnitTestCase {
 
 	public function tear_down() {
 		remove_filter( 'pre_http_request', array( $this, 'mock_http' ), 10 );
+
+		// Core's collection object keeps the first WP_Error it met for the rest
+		// of the process (`WP_Font_Collection::get_data()` returns it before
+		// looking again), and the font library is a singleton, so one test's
+		// unreachable collection would poison every test after it. Drop the
+		// instance and let core register a fresh one.
+		if ( $this->collection_unreachable ) {
+			\WP_Font_Library::get_instance()->unregister_font_collection( Pattern_Builder_Fonts::COLLECTION );
+			_wp_register_default_font_collections();
+		}
 		remove_filter( 'stylesheet_directory', array( $this, 'theme_dir' ) );
 		remove_filter( 'template_directory', array( $this, 'theme_dir' ) );
 
@@ -82,6 +99,9 @@ class Test_Fonts extends WP_UnitTestCase {
 		}
 
 		if ( false !== strpos( $url, 's.w.org' ) ) {
+			if ( $this->collection_unreachable ) {
+				return new WP_Error( 'http_request_failed', 'cURL error 7: Failed to connect to s.w.org port 443' );
+			}
 			return array(
 				'headers'  => array(),
 				'body'     => wp_json_encode( $this->collection_fixture() ),
@@ -151,6 +171,25 @@ class Test_Fonts extends WP_UnitTestCase {
 				),
 			),
 		);
+	}
+
+	/**
+	 * A host that cannot reach the collection is told so, and told the way round it.
+	 *
+	 * Core's own error names the request; the agent needs the situation — every
+	 * font ability fails identically until the files are vendored by hand.
+	 */
+	public function test_an_unreachable_collection_names_the_offline_route() {
+		$this->collection_unreachable = true;
+
+		$families = Pattern_Builder_Fonts::search();
+
+		$this->assertWPError( $families );
+		$this->assertSame( 'pb_fonts_unreachable', $families->get_error_code() );
+		$this->assertStringContainsString( 'Without a site', $families->get_error_message() );
+		$this->assertStringContainsString( 'fontFace', $families->get_error_message() );
+		$this->assertSame( 502, $families->get_error_data()['status'] );
+		$this->assertSame( 'font_collection_request_error', $families->get_error_data()['reason'] );
 	}
 
 	/**

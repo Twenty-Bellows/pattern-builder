@@ -406,3 +406,18 @@ Everything the reads provide is available from the files:
 - existing patterns → the theme's `patterns/` directory
 
 Which is the normal case when authoring in a theme repository, and works fine.
+
+**Fonts, without a site or with one that cannot reach the collection.** A
+site inside a container behind an egress proxy answers `list-fonts` and
+`add-font` alike with `pb_fonts_unreachable`: WordPress fetches the Google
+Fonts collection from s.w.org, and nothing in the plugin can route around a
+host with no way out. The by-hand route is the same one `add-font` automates.
+Download the family's woff2 files — the Google Fonts CSS API answers a modern
+browser's request for `css2?family=Fraunces:ital,wght@0,300..900;1,300..900`
+with one variable file per script subset, and the `latin` one is usually all a
+site needs — into `assets/fonts/<slug>/`, then write the `fontFamily` preset
+into `theme.json` **with** its `fontFace` entries, each `src` a
+`file:./assets/fonts/<slug>/<file>` reference. The preset without `fontFace` is
+a font nothing renders. Only families under an open license are in the
+collection, so the licensing question that makes an arbitrary URL unsafe does
+not arise for one of them.

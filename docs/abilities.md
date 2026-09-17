@@ -274,6 +274,15 @@ The source is core's own registered `google-fonts` collection and nothing else,
 because every family in it is open-licensed and fetching a font from an
 arbitrary URL is a licensing decision that is not an agent's to make.
 
+That source is also the one thing the font abilities cannot do without. A
+host with no outbound route to s.w.org — a container behind an egress proxy, a
+sandbox — fails every one of them identically, and core's own error names the
+request rather than the situation. `Pattern_Builder_Fonts::collection()`
+rewraps it as `pb_fonts_unreachable`, with the by-hand route in the message:
+vendor the files, write the preset with its `fontFace`, which the guide's
+"Without a site" section spells out. The agent that hits it once is not meant
+to hit it twice.
+
 SVG is accepted for the theme and refused for the media library — core does not
 allow SVG uploads, and enabling it site-wide to satisfy one pattern is a poor
 trade — and scrubbed of scripts, handlers, external references and doctypes on

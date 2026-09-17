@@ -58,7 +58,27 @@ class Pattern_Builder_Fonts {
 		$data = $collection->get_data();
 
 		if ( is_wp_error( $data ) ) {
-			return $data;
+			/*
+			 * Core's error here (`font_collection_request_error`, or a JSON
+			 * failure) names the request that failed, not the situation: a site
+			 * that cannot reach s.w.org at all. That is the norm inside a
+			 * container behind an egress proxy or a sandbox with no outbound
+			 * route, and every font ability fails identically there, so the
+			 * answer says what to do instead of retrying — vendor the files by
+			 * hand, the route the pattern-author guide already documents.
+			 */
+			return new \WP_Error(
+				'pb_fonts_unreachable',
+				sprintf(
+					/* translators: %s: the error WordPress reported while fetching the collection. */
+					__( 'The site could not fetch the Google Fonts collection (%s). A host with no outbound route to s.w.org — a container behind a proxy, a sandbox — fails this way on every font ability. Vendor the woff2 files into the theme and write the fontFamily preset with its fontFace entries by hand; the pattern-author guide describes that route under "Without a site".', 'pattern-builder' ),
+					$data->get_error_message()
+				),
+				array(
+					'status' => 502,
+					'reason' => $data->get_error_code(),
+				)
+			);
 		}
 
 		if ( empty( $data['font_families'] ) || ! is_array( $data['font_families'] ) ) {
