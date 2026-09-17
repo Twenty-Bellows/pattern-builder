@@ -5,6 +5,7 @@
 	"author": "twentybellows",
 	"main": "build/index.js",
 	"scripts": {
+		"prepare": "node scripts/install-hooks.mjs",
 		"build": "wp-scripts build --webpack-copy-php --experimental-modules",
 		"watch": "wp-scripts start --webpack-copy-php --experimental-modules --hot",
 		"format": "wp-scripts format",

@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Refuse a push that would leave a lint error or a stale document on a branch.
+# Everything here is clean and the three together take about nine seconds; run
+# `git push --no-verify` on the occasions when that is the wrong trade.
+#
+# PHP is deliberately absent: phpcs still reports one pre-existing error, and a
+# gate that never passes is a gate everybody learns to skip.
+
+set -e
+
+# A docs-only push from a fresh clone should not be blocked by tooling that was
+# never installed.
+if [ ! -d node_modules ]; then
+	printf 'pattern-builder: node_modules missing, skipping pre-push checks.\n'
+	exit 0
+fi
+
+printf 'pattern-builder: checking before push\n'
+
+npm run --silent lint:js
+npm run --silent lint:css
+npm run --silent check:docs
+
+printf 'pattern-builder: ok\n'

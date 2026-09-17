@@ -46,6 +46,17 @@ Node 18+, PHP 7.4+ with Composer, Docker for `wp-env` and the PHP tests.
 | `npm run plugin-test` | Build, zip and open in WP Playground. |
 | `npm run version-bump` | Bump the patch version everywhere it is tracked; `npm run version-bump -- 2.2.0` sets one outright. |
 
+**A pre-push check** runs `lint:js`, `lint:css` and `check:docs` — together about
+nine seconds, and all three are clean. It lives in `.githooks/`, and `npm install`
+points git at it through `prepare` (`scripts/install-hooks.mjs`), so a clone picks
+it up without anyone being told it exists. `git push --no-verify` skips it on the
+occasions when that is the right trade, and a checkout with no `node_modules` is
+waved through rather than blocked by tooling it never installed.
+
+PHPCS is deliberately not in that gate. One pre-existing error remains
+(`WordPress.WP.I18n.MissingSingularPlaceholder`), and a gate that cannot pass is
+one everybody learns to skip; add PHP to it once that is settled.
+
 **No Docker?** The PHP suite runs host-native on SQLite: download WordPress and
 the `sqlite-database-integration` plugin, copy that plugin's `db.copy` to
 `wp-content/db.php` with its two placeholders filled, write a
