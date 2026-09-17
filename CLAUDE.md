@@ -46,16 +46,14 @@ Node 18+, PHP 7.4+ with Composer, Docker for `wp-env` and the PHP tests.
 | `npm run plugin-test` | Build, zip and open in WP Playground. |
 | `npm run version-bump` | Bump the patch version everywhere it is tracked; `npm run version-bump -- 2.2.0` sets one outright. |
 
-**A pre-push check** runs `lint:js`, `lint:css` and `check:docs` — together about
-nine seconds, and all three are clean. It lives in `.githooks/`, and `npm install`
-points git at it through `prepare` (`scripts/install-hooks.mjs`), so a clone picks
-it up without anyone being told it exists. `git push --no-verify` skips it on the
-occasions when that is the right trade, and a checkout with no `node_modules` is
-waved through rather than blocked by tooling it never installed.
-
-PHPCS is deliberately not in that gate. One pre-existing error remains
-(`WordPress.WP.I18n.MissingSingularPlaceholder`), and a gate that cannot pass is
-one everybody learns to skip; add PHP to it once that is settled.
+**A pre-push check** runs `lint:js`, `lint:css`, `check:docs` and PHPCS —
+together about eleven seconds, and all four are clean. It lives in `.githooks/`,
+and `npm install` points git at it through `prepare`
+(`scripts/install-hooks.mjs`), so a clone picks it up without anyone being told
+it exists. `git push --no-verify` skips it on the occasions when that is the
+right trade. Each toolchain is looked for separately, so a checkout that
+installed only one of the two still gets that half rather than being waved past
+both.
 
 **No Docker?** The PHP suite runs host-native on SQLite: download WordPress and
 the `sqlite-database-integration` plugin, copy that plugin's `db.copy` to
@@ -179,8 +177,8 @@ correctly absent.
   without this the suite fails to *load* rather than failing a test.
 - **CSS/SCSS:** Stylelint via `@wordpress/scripts`. **Formatting:** Prettier
   (wp-prettier).
-- Some pre-existing PHPCS violations remain (Yoda conditions, inline comment
-  formatting). Fix them in files you touch; don't go looking.
+- **PHPCS, ESLint and Stylelint all report nothing**, and the pre-push check
+  keeps it that way. A violation on a branch is that branch's, not the tree's.
 
 ## Versioning
 

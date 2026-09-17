@@ -1,25 +1,33 @@
 #!/bin/sh
 #
 # Refuse a push that would leave a lint error or a stale document on a branch.
-# Everything here is clean and the three together take about nine seconds; run
+# All four checks are clean and together take about eleven seconds; run
 # `git push --no-verify` on the occasions when that is the wrong trade.
-#
-# PHP is deliberately absent: phpcs still reports one pre-existing error, and a
-# gate that never passes is a gate everybody learns to skip.
 
 set -e
 
-# A docs-only push from a fresh clone should not be blocked by tooling that was
-# never installed.
-if [ ! -d node_modules ]; then
-	printf 'pattern-builder: node_modules missing, skipping pre-push checks.\n'
-	exit 0
-fi
-
 printf 'pattern-builder: checking before push\n'
 
-npm run --silent lint:js
-npm run --silent lint:css
-npm run --silent check:docs
+checked=''
 
-printf 'pattern-builder: ok\n'
+# Each toolchain is looked for separately, so a checkout that installed one of
+# them is not waved past its checks because the other is missing.
+if [ -d node_modules ]; then
+	npm run --silent lint:js
+	npm run --silent lint:css
+	npm run --silent check:docs
+	checked='js, css, docs'
+fi
+
+# phpcs finds phpcs.xml.dist on its own, which is the standard this repository
+# is linted against.
+if [ -x vendor/bin/phpcs ]; then
+	vendor/bin/phpcs -q
+	checked="${checked:+$checked, }php"
+fi
+
+if [ -z "$checked" ]; then
+	printf 'pattern-builder: neither node_modules nor vendor installed, nothing checked.\n'
+else
+	printf 'pattern-builder: ok (%s)\n' "$checked"
+fi
