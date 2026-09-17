@@ -1255,6 +1255,133 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Reading a guide and keeping one are different jobs. Reading is by name; keeping needs
+	 * the layout, which is why a skill is addressed by path — what comes back can be written
+	 * straight to disk in the shape the prose's own links expect.
+	 */
+	public function test_a_skill_comes_back_as_files_to_write() {
+		$skill = $this->abilities->execute_authoring_guide( array( 'skill' => 'pattern-author' ) );
+
+		$this->assertSame( 'pattern-author', $skill['name'] );
+		$this->assertSame( 'SKILL.md', $skill['entry'] );
+		$this->assertNotEmpty( $skill['description'] );
+		$this->assertNotEmpty( $skill['version'] );
+		$this->assertCount( 14, $skill['files'] );
+
+		$paths = wp_list_pluck( $skill['files'], 'path' );
+		$this->assertSame( 'SKILL.md', $paths[0], 'The entry is not the first thing an installer writes.' );
+		$this->assertContains( 'references/block-markup.md', $paths );
+		$this->assertContains(
+			'scripts/check-slots.php',
+			$paths,
+			'design-content-split.md names check-slots.php, so a skill that travels without it sends an agent after a file nothing hands over.'
+		);
+
+		foreach ( $skill['files'] as $file ) {
+			$this->assertGreaterThan( 0, $file['bytes'], $file['path'] . ' is empty.' );
+			$this->assertMatchesRegularExpression( '/^[0-9a-f]{64}$/', $file['checksum'] );
+		}
+
+		$this->assertStringContainsString( 'input[skill]=pattern-author', $skill['install'] );
+		$this->assertStringContainsString( 'input[file]=', $skill['install'] );
+		$this->assertStringContainsString( 'overwrites', $skill['install'], 'The install says nothing about what happens to a copy already there.' );
+	}
+
+	/**
+	 * Every file the manifest promises has to come back at the path it promised it at, and
+	 * hash to what the manifest said, or an installer cannot trust either.
+	 */
+	public function test_every_file_a_skill_lists_can_be_fetched_at_that_path() {
+		foreach ( array( 'pattern-author', 'design-reproduction' ) as $name ) {
+			$skill = $this->abilities->execute_authoring_guide( array( 'skill' => $name ) );
+
+			foreach ( $skill['files'] as $file ) {
+				$served = $this->abilities->execute_authoring_guide(
+					array(
+						'skill' => $name,
+						'file'  => $file['path'],
+					)
+				);
+
+				$this->assertNotWPError( $served, $name . '/' . $file['path'] . ' is listed and cannot be fetched.' );
+				$this->assertSame( $file['path'], $served['path'] );
+				$this->assertSame( $file['checksum'], $served['checksum'] );
+				$this->assertSame( hash( 'sha256', $served['content'] ), $served['checksum'] );
+			}
+		}
+	}
+
+	/**
+	 * The entry is the one file that needs more than its prose: written without front matter
+	 * it has no name and no description, and what it records about where it came from is all
+	 * the later checking has to go on.
+	 */
+	public function test_the_entry_file_carries_the_front_matter_a_copy_needs() {
+		$skill = $this->abilities->execute_authoring_guide( array( 'skill' => 'pattern-author' ) );
+		$entry = $this->abilities->execute_authoring_guide(
+			array(
+				'skill' => 'pattern-author',
+				'file'  => 'SKILL.md',
+			)
+		);
+
+		$front = $entry['frontmatter'];
+		$this->assertStringStartsWith( "---\nname: pattern-author\n", $front );
+		$this->assertStringContainsString( 'description: "', $front );
+		$this->assertStringContainsString( '  version: "' . $skill['version'] . '"', $front );
+		$this->assertStringContainsString( '  source: "' . home_url() . '"', $front );
+		$this->assertStringContainsString(
+			'  checksum: "' . $skill['checksum'] . '"',
+			$front,
+			'A copy records a checksum that is not the one the index will be compared against.'
+		);
+
+		// Front matter, a blank line, then the prose it was written above.
+		$this->assertStringEndsWith( "---\n\n", $front );
+		$this->assertStringStartsWith( '#', $entry['content'] );
+
+		$reference = $this->abilities->execute_authoring_guide(
+			array(
+				'skill' => 'pattern-author',
+				'file'  => 'references/block-markup.md',
+			)
+		);
+		$this->assertArrayNotHasKey( 'frontmatter', $reference, 'A reference was given front matter it never had.' );
+	}
+
+	/**
+	 * A path from a caller never reaches the filesystem: it is looked up in the skill's own
+	 * inventory, so nothing can be named that this site was not already offering.
+	 */
+	public function test_a_file_outside_the_skill_cannot_be_asked_for() {
+		foreach ( array( '../../pattern-builder.php', '../../../wp-config.php', '/etc/passwd', 'references/../../../uninstall.php' ) as $path ) {
+			$served = $this->abilities->execute_authoring_guide(
+				array(
+					'skill' => 'pattern-author',
+					'file'  => $path,
+				)
+			);
+
+			$this->assertWPError( $served, $path . ' was served rather than refused.' );
+			$this->assertSame( 'pb_skill_file_not_found', $served->get_error_code() );
+		}
+	}
+
+	/**
+	 * And the two ways of asking for nothing say what could have been asked for instead.
+	 */
+	public function test_asking_for_a_skill_that_is_not_here_says_which_ones_are() {
+		$missing = $this->abilities->execute_authoring_guide( array( 'skill' => 'pattern-wizard' ) );
+		$this->assertWPError( $missing );
+		$this->assertSame( 'pb_skill_not_found', $missing->get_error_code() );
+		$this->assertStringContainsString( 'pattern-author', $missing->get_error_message() );
+
+		$unanchored = $this->abilities->execute_authoring_guide( array( 'file' => 'SKILL.md' ) );
+		$this->assertWPError( $unanchored );
+		$this->assertSame( 'pb_skill_missing', $unanchored->get_error_code() );
+	}
+
+	/**
 	 * Appends a house rule, as a theme would.
 	 *
 	 * @param array $guides The guides.
