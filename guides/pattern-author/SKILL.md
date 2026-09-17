@@ -419,3 +419,34 @@ said to extend the system, add it with `pattern-builder/add-design-tokens`
 - `references/abilities.md` — asking a running site for what it has
 - `references/keeping-current.md` — bringing these guides to a new WordPress release
 - The `design-reproduction` skill — rebuilding a design that already exists
+
+## Staying current
+
+If you are reading this from a project rather than from the site, it is a
+copy. Which site it came from is in the front matter above, under
+`metadata.source`, beside the checksum the whole skill hashed to when it was
+taken.
+
+That site is the original, and not only because it shipped these files: a
+theme amends them through the `pattern_builder_authoring_guides` filter, so
+what a site serves is its house rules as well as the plugin's documents, and
+those are the part general documentation cannot know.
+
+To see whether the copy still matches:
+
+```bash
+curl -fsS -u "$WP_USER:$WP_APP_PASSWORD" \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-authoring-guide/run" \
+  | jq -r '.skills[] | select(.name == "pattern-author") | .checksum'
+```
+
+Different from the one recorded above, ask the same ability for
+`input[skill]=pattern-author` and run the `install` recipe it answers with. It
+overwrites, which is the whole contract — there is nothing here to merge and
+no local edit to keep. A change worth keeping belongs in the theme, behind
+that filter, where it reaches every agent that asks the site instead of this
+one checkout.
+
+Nothing here is worth checking on a schedule. Check when the site is to hand
+and something reads as off — prose describing an ability the site does not
+offer is the clearest sign, and the cheapest one to confirm.

@@ -1382,6 +1382,100 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The point of installing a skill by path rather than by name is that the prose's own
+	 * links keep working. So every relative path these documents name has to be a file that
+	 * travels with the skill — or, where one names another skill's, with that one.
+	 */
+	public function test_every_relative_reference_resolves_to_a_file_that_travels() {
+		$paths = array();
+		foreach ( array( 'pattern-author', 'design-reproduction' ) as $name ) {
+			$skill          = $this->abilities->execute_authoring_guide( array( 'skill' => $name ) );
+			$paths[ $name ] = wp_list_pluck( $skill['files'], 'path' );
+		}
+
+		$checked = 0;
+		foreach ( $paths as $name => $files ) {
+			foreach ( $files as $path ) {
+				if ( '.md' !== substr( $path, -3 ) ) {
+					continue;
+				}
+
+				$content = $this->abilities->execute_authoring_guide(
+					array(
+						'skill' => $name,
+						'file'  => $path,
+					)
+				)['content'];
+
+				preg_match_all(
+					'#(?:`(?P<owner>[a-z-]+)`(?:\'|\x{2019})s\s+)?`(?P<path>(?:references|scripts)/[A-Za-z0-9._-]+)`#u',
+					$content,
+					$found,
+					PREG_SET_ORDER
+				);
+
+				foreach ( $found as $match ) {
+					$owner = '' !== $match['owner'] ? $match['owner'] : $name;
+
+					$this->assertArrayHasKey( $owner, $paths, $name . '/' . $path . ' names a skill that is not here: ' . $owner );
+					$this->assertContains(
+						$match['path'],
+						$paths[ $owner ],
+						$name . '/' . $path . ' points at ' . $owner . "'s " . $match['path'] . ', which does not travel with it.'
+					);
+					++$checked;
+				}
+			}
+		}
+
+		$this->assertGreaterThan( 30, $checked, 'Hardly anything was checked, so this test is not doing its job.' );
+	}
+
+	/**
+	 * A copy has to carry the means of noticing it has gone stale, because nothing else
+	 * will: the site does not know who holds one, and an out-of-date instruction renders,
+	 * validates and is simply wrong.
+	 */
+	public function test_an_installed_skill_is_told_how_to_check_itself() {
+		foreach ( array( 'pattern-author', 'design-reproduction' ) as $name ) {
+			$entry = $this->abilities->execute_authoring_guide(
+				array(
+					'skill' => $name,
+					'file'  => 'SKILL.md',
+				)
+			)['content'];
+
+			$this->assertStringContainsString( '## Staying current', $entry, $name . ' never tells a copy of itself how to notice it is stale.' );
+			$this->assertStringContainsString( 'metadata.source', $entry, $name . ' does not say where a copy came from.' );
+			$this->assertStringContainsString(
+				'.skills[] | select(.name == "' . $name . '")',
+				$entry,
+				$name . "'s check does not ask about " . $name . '.'
+			);
+			$this->assertStringContainsString(
+				'pattern_builder_authoring_guides',
+				$entry,
+				$name . ' says a copy is overwritten without saying where a change worth keeping belongs instead.'
+			);
+		}
+	}
+
+	/**
+	 * And the maintainer has to be told to move the one field that is not derived. The
+	 * checksum says that something changed; only the version says whether it mattered.
+	 */
+	public function test_the_maintenance_pass_covers_copies_as_well_as_wordpress() {
+		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'keeping-current' ) )['content'];
+
+		$this->assertStringContainsString( 'metadata.version', $guide );
+		$this->assertStringContainsString(
+			'Bump it in the same commit that changes',
+			$guide,
+			'Nothing tells a maintainer when the version moves.'
+		);
+	}
+
+	/**
 	 * Appends a house rule, as a theme would.
 	 *
 	 * @param array $guides The guides.
