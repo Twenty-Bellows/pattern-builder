@@ -10,6 +10,12 @@ class Pattern_Builder_Abilities {
 	const CATEGORY = 'pattern-builder';
 
 	/**
+	 * The file a skill is entered through, and the only one of its files that
+	 * carries front matter.
+	 */
+	const SKILL_ENTRY = 'SKILL.md';
+
+	/**
 	 * Hook the component into WordPress.
 	 */
 	public function __construct() {
@@ -704,11 +710,24 @@ class Pattern_Builder_Abilities {
 					'properties' => array(
 						'guides'   => array(
 							'type'        => 'array',
-							'description' => 'The index: name, title and size of each available guide.',
+							'description' => 'The index: each guide\'s name, title, size, the skill it belongs to and its path within it, and a checksum of the text this site serves.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'skills'   => array(
+							'type'        => 'array',
+							'description' => 'On the index only: the skills these guides make up, each with a checksum over all of its files. Compare it against the one a copy recorded to tell whether that copy is still current.',
 							'items'       => array( 'type' => 'object' ),
 						),
 						'name'     => array( 'type' => 'string' ),
 						'format'   => array( 'type' => 'string' ),
+						'path'     => array(
+							'type'        => 'string',
+							'description' => 'Where this guide sits inside its skill.',
+						),
+						'checksum' => array(
+							'type'        => 'string',
+							'description' => 'sha256 of the text served, the theme\'s amendments included.',
+						),
 						'content'  => array(
 							'type'        => 'string',
 							'description' => 'Markdown. Agent-facing instructions, not user documentation.',
@@ -771,10 +790,19 @@ class Pattern_Builder_Abilities {
 			if ( null === $text ) {
 				continue;
 			}
+			$skill           = (string) strstr( $relative, '/', true );
 			$guides[ $name ] = array(
 				'title'   => $this->guide_title( $text, $name ),
 				'content' => $text,
-				'skill'   => (string) strstr( $relative, '/', true ),
+				'skill'   => $skill,
+
+				/*
+				 * Where the file sits inside its skill. A guide names the
+				 * others by relative path — `references/block-markup.md` —
+				 * so a copy installed anywhere else has to reproduce the
+				 * layout or every one of those links dangles.
+				 */
+				'path'    => (string) substr( $relative, strlen( $skill ) + 1 ),
 			);
 		}
 
@@ -799,11 +827,19 @@ class Pattern_Builder_Abilities {
 				continue;
 			}
 			$clean[ $key ] = array(
-				'title'   => isset( $guide['title'] ) && is_string( $guide['title'] )
+				'title'    => isset( $guide['title'] ) && is_string( $guide['title'] )
 					? $guide['title']
 					: $this->guide_title( $guide['content'], $key ),
-				'content' => $guide['content'],
-				'skill'   => isset( $guide['skill'] ) && is_string( $guide['skill'] ) ? $guide['skill'] : '',
+				'content'  => $guide['content'],
+				'skill'    => isset( $guide['skill'] ) && is_string( $guide['skill'] ) ? $guide['skill'] : '',
+				'path'     => isset( $guide['path'] ) && is_string( $guide['path'] ) ? $guide['path'] : '',
+
+				/*
+				 * Taken after the filter, over the text this site actually
+				 * serves. A version read off the plugin could not see a theme's
+				 * amendments, and would report a copy made before them current.
+				 */
+				'checksum' => hash( 'sha256', $guide['content'] ),
 			);
 		}
 
@@ -824,15 +860,18 @@ class Pattern_Builder_Abilities {
 			$index = array();
 			foreach ( $guides as $name => $guide ) {
 				$index[] = array(
-					'name'  => $name,
-					'title' => $guide['title'],
-					'words' => str_word_count( wp_strip_all_tags( $guide['content'] ) ),
-					'skill' => isset( $guide['skill'] ) ? $guide['skill'] : '',
+					'name'     => $name,
+					'title'    => $guide['title'],
+					'words'    => str_word_count( wp_strip_all_tags( $guide['content'] ) ),
+					'skill'    => $guide['skill'],
+					'path'     => $guide['path'],
+					'checksum' => $guide['checksum'],
 				);
 			}
 
 			return array(
 				'guides'   => $index,
+				'skills'   => $this->skills( $guides ),
 				'format'   => 'markdown',
 				'name'     => 'index',
 				'content'  => __( 'Agent-facing instructions for writing WordPress block patterns. Request one by name with input[guide], or "all" for everything. Install the Markdown wherever your harness reads instructions from.', 'pattern-builder' ),
@@ -882,9 +921,12 @@ class Pattern_Builder_Abilities {
 		}
 
 		return array(
-			'name'    => $wanted,
-			'format'  => 'markdown',
-			'content' => $guides[ $wanted ]['content'],
+			'name'     => $wanted,
+			'format'   => 'markdown',
+			'skill'    => $guides[ $wanted ]['skill'],
+			'path'     => $guides[ $wanted ]['path'],
+			'checksum' => $guides[ $wanted ]['checksum'],
+			'content'  => $guides[ $wanted ]['content'],
 		);
 	}
 
@@ -922,6 +964,155 @@ class Pattern_Builder_Abilities {
 			return trim( $m[1] );
 		}
 		return $fallback;
+	}
+
+	/**
+	 * The scripts each skill ships, by skill.
+	 *
+	 * Kept apart from guide_files() because these are not documentation: they
+	 * carry no title, no word count, and the guides filter has no business
+	 * rewriting a tool's source. What they share with the guides is that a
+	 * skill's prose names them by relative path, so a copy installed without
+	 * them dangles exactly as one missing a reference document would.
+	 *
+	 * @return array skill => file names under that skill's scripts directory.
+	 */
+	private function skill_scripts() {
+		return array(
+			'pattern-author' => array(
+				'validate-pattern.mjs',
+				'check-composition.mjs',
+				'wp-core.mjs',
+
+				/*
+				 * Runs under WP-CLI rather than Node, which is why
+				 * get-validator does not carry it: that ability hands over one
+				 * tool that runs anywhere, and this one runs only where
+				 * WordPress does. design-content-split.md names it all the
+				 * same, so a skill that travelled without it would send an
+				 * agent after a file nothing here would hand over.
+				 */
+				'check-slots.php',
+			),
+		);
+	}
+
+	/**
+	 * A skill's entry document.
+	 *
+	 * @param string $skill  Skill name.
+	 * @param array  $guides The filtered guide set.
+	 * @return array|null The guide row with its name, or null when there is none.
+	 */
+	private function skill_entry( $skill, $guides ) {
+		foreach ( $guides as $name => $guide ) {
+			if ( $skill === $guide['skill'] && self::SKILL_ENTRY === $guide['path'] ) {
+				return array( 'name' => $name ) + $guide;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Every file one skill is made of.
+	 *
+	 * @param string $skill  Skill name.
+	 * @param array  $guides The filtered guide set, so a theme's amendments are
+	 *                       what gets checksummed and what gets installed.
+	 * @return array Rows of path, bytes and checksum; prose also names the
+	 *               guide that serves it.
+	 */
+	private function skill_files( $skill, $guides ) {
+		$files = array();
+
+		foreach ( $guides as $name => $guide ) {
+			if ( $skill !== $guide['skill'] || '' === $guide['path'] ) {
+				continue;
+			}
+			$files[] = array(
+				'path'     => $guide['path'],
+				'guide'    => $name,
+				'bytes'    => strlen( $guide['content'] ),
+				'checksum' => $guide['checksum'],
+			);
+		}
+
+		$scripts = $this->skill_scripts();
+		$scripts = isset( $scripts[ $skill ] ) ? $scripts[ $skill ] : array();
+
+		foreach ( $scripts as $name ) {
+			$contents = $this->read_script( $skill, $name );
+			if ( null === $contents ) {
+				continue;
+			}
+			$files[] = array(
+				'path'     => 'scripts/' . $name,
+				'bytes'    => strlen( $contents ),
+				'checksum' => hash( 'sha256', $contents ),
+			);
+		}
+
+		return $files;
+	}
+
+	/**
+	 * One fingerprint for a whole skill.
+	 *
+	 * Over the files' paths and checksums rather than their bytes, so it moves
+	 * when a file is added or removed as well as when one is edited. Sorted, so
+	 * reordering guide_files() for readability does not read as a change to
+	 * every copy installed from it.
+	 *
+	 * @param array $files Rows from skill_files().
+	 * @return string
+	 */
+	private function skill_checksum( $files ) {
+		$lines = array();
+
+		foreach ( $files as $file ) {
+			$lines[] = $file['path'] . "\0" . $file['checksum'];
+		}
+		sort( $lines );
+
+		return hash( 'sha256', implode( "\n", $lines ) );
+	}
+
+	/**
+	 * The skills this site offers, each as one unit an agent can check.
+	 *
+	 * A guide a theme supplied belongs to no skill and appears only in the
+	 * flat index: it has no place in a layout on disk, and nothing to install.
+	 *
+	 * @param array $guides The filtered guide set.
+	 * @return array
+	 */
+	private function skills( $guides ) {
+		$skills = array();
+
+		foreach ( $guides as $guide ) {
+			$name = $guide['skill'];
+			if ( '' === $name || isset( $skills[ $name ] ) ) {
+				continue;
+			}
+
+			$entry = $this->skill_entry( $name, $guides );
+			$files = $this->skill_files( $name, $guides );
+			if ( ! $entry || ! $files ) {
+				continue;
+			}
+
+			$skills[ $name ] = array(
+				'name'     => $name,
+				'title'    => $entry['title'],
+				'entry'    => self::SKILL_ENTRY,
+				'files'    => count( $files ),
+				'bytes'    => array_sum( wp_list_pluck( $files, 'bytes' ) ),
+				'checksum' => $this->skill_checksum( $files ),
+			);
+		}
+
+		return array_values( $skills );
 	}
 
 	/**
@@ -971,7 +1162,7 @@ class Pattern_Builder_Abilities {
 		$files = array();
 
 		foreach ( array( 'validate-pattern.mjs', 'check-composition.mjs', 'wp-core.mjs' ) as $name ) {
-			$contents = $this->read_script( $name );
+			$contents = $this->read_script( 'pattern-author', $name );
 			if ( null === $contents ) {
 				return new \WP_Error(
 					'pb_validator_missing',
@@ -1083,23 +1274,25 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
-	 * Where the validator and its loader live.
+	 * Where a skill's scripts live.
 	 *
+	 * @param string $skill Skill name.
 	 * @return string
 	 */
-	private function script_dir() {
-		return $this->guide_dir() . 'pattern-author/scripts/';
+	private function script_dir( $skill ) {
+		return $this->guide_dir() . $skill . '/scripts/';
 	}
 
 	/**
 	 * Read one of the shipped scripts.
 	 *
-	 * @param string $name File name under the scripts directory.
+	 * @param string $skill Skill the script belongs to.
+	 * @param string $name  File name under that skill's scripts directory.
 	 * @return string|null Null when it is not there.
 	 */
-	private function read_script( $name ) {
-		$root = realpath( rtrim( $this->script_dir(), '/' ) );
-		$path = realpath( $this->script_dir() . $name );
+	private function read_script( $skill, $name ) {
+		$root = realpath( rtrim( $this->script_dir( $skill ), '/' ) );
+		$path = realpath( $this->script_dir( $skill ) . $name );
 		if ( ! $root || ! $path || 0 !== strpos( $path, $root ) || ! is_readable( $path ) ) {
 			return null;
 		}

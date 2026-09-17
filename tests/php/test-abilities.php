@@ -1112,6 +1112,119 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A flat list of documents is not something anything can install. Every one of these
+	 * guides names the others by relative path, so a copy has to reproduce the layout or
+	 * each of those links points at nothing — and the index is where the layout is said.
+	 */
+	public function test_every_guide_says_where_it_sits_in_its_skill() {
+		$index   = $this->abilities->execute_authoring_guide();
+		$entries = array();
+
+		foreach ( $index['guides'] as $guide ) {
+			$this->assertNotEmpty( $guide['path'], $guide['name'] . ' says nothing about where it belongs.' );
+			$this->assertFileExists(
+				plugin_dir_path( PATTERN_BUILDER_FILE ) . 'guides/' . $guide['skill'] . '/' . $guide['path'],
+				$guide['name'] . ' reports a path that is not where the file is.'
+			);
+
+			if ( 'SKILL.md' === $guide['path'] ) {
+				$entries[] = $guide['skill'];
+			}
+		}
+
+		$this->assertSame(
+			array( 'pattern-author', 'design-reproduction' ),
+			$entries,
+			'Each skill is entered through exactly one SKILL.md.'
+		);
+	}
+
+	/**
+	 * The checksum is what makes a copy checkable, so it has to be over the text this site
+	 * serves rather than over the file as it shipped — and the index has to agree with the
+	 * guide itself, or an agent comparing the cheap one is comparing the wrong thing.
+	 */
+	public function test_a_guides_checksum_is_of_the_text_it_serves() {
+		$rows  = array_column( $this->abilities->execute_authoring_guide()['guides'], null, 'name' );
+		$guide = $this->abilities->execute_authoring_guide( array( 'guide' => 'block-markup' ) );
+
+		$this->assertSame( hash( 'sha256', $guide['content'] ), $guide['checksum'] );
+		$this->assertSame(
+			$rows['block-markup']['checksum'],
+			$guide['checksum'],
+			'The index and the guide disagree about the same text.'
+		);
+	}
+
+	/**
+	 * Fourteen documents are two skills, and a skill is the unit that gets installed. So an
+	 * agent holding a copy compares one checksum rather than fourteen, and that one answer
+	 * has to cover the scripts the prose tells it to run as well as the prose.
+	 */
+	public function test_the_index_says_what_each_skill_is_made_of() {
+		$index = $this->abilities->execute_authoring_guide();
+
+		$this->assertArrayHasKey( 'skills', $index );
+		$skills = array_column( $index['skills'], null, 'name' );
+		$this->assertSame( array( 'pattern-author', 'design-reproduction' ), array_keys( $skills ) );
+
+		foreach ( $skills as $name => $skill ) {
+			$this->assertSame( 'SKILL.md', $skill['entry'] );
+			$this->assertNotEmpty( $skill['title'], $name . ' has no title.' );
+			$this->assertGreaterThan( 1, $skill['files'], $name . ' is a single file, which cannot be right.' );
+			$this->assertGreaterThan( 0, $skill['bytes'] );
+			$this->assertMatchesRegularExpression( '/^[0-9a-f]{64}$/', $skill['checksum'] );
+		}
+
+		$this->assertSame(
+			14,
+			$skills['pattern-author']['files'],
+			"The pattern-author skill's four scripts travel with its ten documents."
+		);
+		$this->assertSame( 3, $skills['design-reproduction']['files'] );
+	}
+
+	/**
+	 * The filter is how a theme adds its house rules, which makes it the thing a version
+	 * read off the plugin could never see: a copy made before the theme amended a guide has
+	 * to read as out of date, and only a checksum over the served text says so.
+	 */
+	public function test_a_theme_amending_a_guide_moves_its_skills_checksum() {
+		$before = $this->skill_checksum_for( 'pattern-author' );
+
+		add_filter( 'pattern_builder_authoring_guides', array( $this, 'amend_a_guide' ) );
+		$amended = $this->skill_checksum_for( 'pattern-author' );
+		remove_filter( 'pattern_builder_authoring_guides', array( $this, 'amend_a_guide' ) );
+
+		$this->assertNotSame( $before, $amended, 'A theme amended a guide and the skill reports the same checksum.' );
+		$this->assertSame( $before, $this->skill_checksum_for( 'pattern-author' ), 'The checksum did not come back when the amendment went.' );
+	}
+
+	/**
+	 * Appends a house rule, as a theme would.
+	 *
+	 * @param array $guides The guides.
+	 * @return array
+	 */
+	public function amend_a_guide( $guides ) {
+		$guides['block-markup']['content'] .= "\n\nHouse rule: bands are full width here.\n";
+
+		return $guides;
+	}
+
+	/**
+	 * One skill's fingerprint, from the index.
+	 *
+	 * @param string $name Skill name.
+	 * @return string
+	 */
+	private function skill_checksum_for( $name ) {
+		$skills = array_column( $this->abilities->execute_authoring_guide()['skills'], null, 'name' );
+
+		return $skills[ $name ]['checksum'];
+	}
+
+	/**
 	 * The reproduction skill's whole first step is deciding whether the source's values can
 	 * be read or must be inferred, because that answer decides both how exact the result
 	 * may claim to be and whether it can be checked at the end.
