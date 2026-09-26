@@ -384,14 +384,27 @@ it sits outside the header comment and would be dropped just the same, so the
 conservative answer is the safe one. The cost is about the same as the `include`
 that already happens for every pattern read.
 
-There is one exception, and it is the plugin's own. A localized write turns a
-pattern's text into `<?php echo wp_kses_post( 'text', 'domain' ); ?>` and writes
-it out again the same way, so a file carrying those is still one the plugin can
-rebuild. `localized_string_ends_at()` matches that shape exactly — `echo`, one
-of `LOCALIZED_STRING_FUNCTIONS`, two quoted literals — and a variable, a
-concatenation or any other function fails it. A hand-written `esc_html_e()` is
-therefore custom PHP, correctly: its string would survive the round trip but the
-call around it would not.
+The exceptions are the plugin's own writes, and there are two of them.
+A localized write turns a pattern's text into
+`<?php echo wp_kses_post( 'text', 'domain' ); ?>`, and importing a pattern's
+images turns each one into `Pattern_Builder_Assets::theme_reference()` —
+`<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/images/x.svg' ); ?>`.
+Both round-trip: reading the file runs the call, writing it puts the same call
+back, so a file carrying either is still one the plugin can rebuild.
+
+`written_call_shapes()` names those two shapes in tokens and `shape_ends_at()`
+matches one exactly, down to the identifier in each position — the escape
+function is one of `LOCALIZED_STRING_FUNCTIONS`, the asset call is `esc_url`
+around `get_stylesheet_directory_uri`. A variable where a literal belongs, a
+different concatenation, or any other function fails. A hand-written
+`esc_html_e()` is therefore custom PHP, correctly, and so is the same `esc_url`
+reaching for a directory that is not the theme's: the string would survive the
+round trip but the call around it would not.
+
+Getting this list wrong is not a quiet failure. A pattern the plugin wrote
+itself, read back and misjudged, becomes a pattern the plugin refuses to save —
+so the shapes here and the strings the two writers produce have to be changed
+together.
 
 `hasCustomPhp` carries the answer through the REST response and an agent's pattern
 summary, and `refuse_if_file_has_custom_php()` turns it into a 409 at both

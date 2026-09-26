@@ -286,12 +286,12 @@ class Abstract_Pattern {
 	}
 
 	/**
-	 * The calls this plugin writes into pattern markup itself.
+	 * The escape functions a localized write wraps a pattern's text in.
 	 */
 	const LOCALIZED_STRING_FUNCTIONS = array( 'wp_kses_post', 'esc_attr__' );
 
 	/**
-	 * Whether a pattern file holds PHP beyond the localized strings this plugin writes.
+	 * Whether a pattern file holds PHP beyond the calls this plugin writes itself.
 	 *
 	 * @param string $pattern_file Absolute path to the pattern file.
 	 * @return bool
@@ -315,7 +315,7 @@ class Abstract_Pattern {
 				continue;
 			}
 
-			$ends_at = self::localized_string_ends_at( $tokens, $index );
+			$ends_at = self::written_call_ends_at( $tokens, $index );
 
 			if ( null === $ends_at ) {
 				return true;
@@ -328,14 +328,56 @@ class Abstract_Pattern {
 	}
 
 	/**
-	 * Matches one of this plugin's localized strings, starting at the given token.
+	 * The calls this plugin writes into pattern markup itself, as token shapes. An element is
+	 * a token type, a literal character, or a type paired with the one identifier accepted in
+	 * that position.
+	 *
+	 * @return array[]
+	 */
+	private static function written_call_shapes() {
+		$shapes = array();
+
+		// A localized string, as Pattern_Builder_Localization writes it, e.g.
+		// `echo wp_kses_post( 'text', 'domain' );`.
+		foreach ( self::LOCALIZED_STRING_FUNCTIONS as $escape ) {
+			$shapes[] = array( T_ECHO, array( T_STRING, $escape ), '(', T_CONSTANT_ENCAPSED_STRING, ',', T_CONSTANT_ENCAPSED_STRING, ')', ';' );
+		}
+
+		// An image the theme carries, as Pattern_Builder_Assets::theme_reference() writes it, e.g.
+		// `echo esc_url( get_stylesheet_directory_uri() . '/assets/images/square-1.svg' );`.
+		$shapes[] = array( T_ECHO, array( T_STRING, 'esc_url' ), '(', array( T_STRING, 'get_stylesheet_directory_uri' ), '(', ')', '.', T_CONSTANT_ENCAPSED_STRING, ')', ';' );
+
+		return $shapes;
+	}
+
+	/**
+	 * Matches one of the calls this plugin writes, starting at the given token.
 	 *
 	 * @param array $tokens The file's tokens, from `token_get_all()`.
 	 * @param int   $start  Index to match from.
 	 * @return int|null The index the call ends at, or null when it is not one.
 	 */
-	private static function localized_string_ends_at( array $tokens, $start ) {
-		$shape = array( T_ECHO, T_STRING, '(', T_CONSTANT_ENCAPSED_STRING, ',', T_CONSTANT_ENCAPSED_STRING, ')', ';' );
+	private static function written_call_ends_at( array $tokens, $start ) {
+		foreach ( self::written_call_shapes() as $shape ) {
+			$ends_at = self::shape_ends_at( $tokens, $start, $shape );
+
+			if ( null !== $ends_at ) {
+				return $ends_at;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Matches one token shape, skipping the whitespace between its parts.
+	 *
+	 * @param array $tokens The file's tokens, from `token_get_all()`.
+	 * @param int   $start  Index to match from.
+	 * @param array $shape  The shape to match, as `written_call_shapes()` describes one.
+	 * @return int|null The index the shape ends at, or null when it does not match.
+	 */
+	private static function shape_ends_at( array $tokens, $start, array $shape ) {
 		$index = $start;
 		$count = count( $tokens );
 
@@ -351,11 +393,13 @@ class Abstract_Pattern {
 			$token = $tokens[ $index ];
 			$type  = is_array( $token ) ? $token[0] : $token;
 
-			if ( $type !== $expected ) {
+			$wanted = is_array( $expected ) ? $expected[0] : $expected;
+
+			if ( $wanted !== $type ) {
 				return null;
 			}
 
-			if ( T_STRING === $expected && ! in_array( $token[1], self::LOCALIZED_STRING_FUNCTIONS, true ) ) {
+			if ( is_array( $expected ) && $token[1] !== $expected[1] ) {
 				return null;
 			}
 

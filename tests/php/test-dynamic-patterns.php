@@ -195,6 +195,42 @@ class Test_Dynamic_Patterns extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The other thing the plugin writes: importing a pattern's images rewrites them as
+	 * `Pattern_Builder_Assets::theme_reference()`, which is the same round trip — reading
+	 * resolves the URL, writing points it back at the theme.
+	 */
+	public function test_the_plugins_own_theme_asset_references_do_not_count() {
+		$reference = \TwentyBellows\PatternBuilder\Pattern_Builder_Assets::theme_reference( '/assets/images/square-1.svg' );
+
+		$path = $this->given_file(
+			'with-an-image',
+			"<?php\n/**\n * Title: With an image\n * Slug: simple-theme/with-an-image\n */\n?>\n" .
+			"<!-- wp:image -->\n" .
+			'<figure class="wp-block-image"><img src="' . $reference . '" alt=""/></figure>' . "\n" .
+			"<!-- /wp:image -->\n"
+		);
+
+		$this->assertFalse( Abstract_Pattern::file_has_custom_php( $path ) );
+		$this->assertFalse( Abstract_Pattern::from_file( $path )->hasCustomPhp );
+	}
+
+	/**
+	 * The same call reaching for anything but the theme's own directory is not one the
+	 * plugin wrote, and is not a round trip it can make.
+	 */
+	public function test_an_asset_reference_the_plugin_does_not_write_does_count() {
+		$path = $this->given_file(
+			'foreign-asset',
+			"<?php\n/**\n * Title: Foreign asset\n * Slug: simple-theme/foreign-asset\n */\n?>\n" .
+			"<!-- wp:image -->\n" .
+			'<figure class="wp-block-image"><img src="<?php echo esc_url( plugin_dir_url( __FILE__ ) . \'/x.svg\' ); ?>" alt=""/></figure>' . "\n" .
+			"<!-- /wp:image -->\n"
+		);
+
+		$this->assertTrue( Abstract_Pattern::file_has_custom_php( $path ) );
+	}
+
+	/**
 	 * Anything else in that position is a call this plugin cannot reproduce — the string
 	 * would survive the round trip but the call around it would not.
 	 */
