@@ -276,17 +276,42 @@ and the tab fetches them the first time it is opened. A pattern plugin can
 register hundreds, and the editor's own sidebar — which lists everything the
 unqualified route returns — wants none of them.
 
-**A copy is an ordinary create.** `POST /patterns` takes `fromPlugin` beside
-`fromWpBlock`, and `source` says where the copy lands: a theme file through
-`update_theme_pattern()`, which pulls the images the pattern points at into the
-theme's `assets/images` on the way, or a `wp_block` through
-`create_user_pattern()`, which exports them to the media library instead. The
-user picked a pattern rather than a slug, so a name the theme already uses is
-numbered rather than refused. The copy carries a line in its header comment
-saying which registered pattern it came from — `additionalMetadata`, which
-WordPress ignores, the theme carries, and [the cloud deliberately leaves
-behind](cloud.md). `Origin:` is not used for it: that header names a cloud
-pattern and the service validates its shape.
+**A copy takes the tree, and only into the theme.** `POST /patterns` takes
+`fromPlugin` beside `fromWpBlock`, and `Pattern_File_Store::copy_plugin_pattern()`
+writes the pattern and every pattern it places, leaves first, repointing each
+`core/pattern` reference at the copy through `repoint_references()`. The
+destination is not offered: a section has to stay reachable by `core/pattern`,
+which resolves against the block pattern registry, and a `wp_block` is never in
+it — the same reason a cloud install lands a dependency as a theme pattern.
+`update_theme_pattern()` pulls the images each one points at into the theme's
+`assets/images` on the way.
+
+Four things can be at the end of a reference, and each is answered differently:
+a pattern of the theme's own is left alone, because the reference already
+reaches it; one the theme already has a copy of is pointed at rather than
+copied again; a plugin pattern is copied; and a name nothing on this site
+answers to is left as it is and reported, since the plugin's own pattern
+renders it no better and refusing the copy would help nobody. A loop is
+refused, naming it.
+
+**Copying is idempotent**, which is what makes the second of two pages that
+share a section find the section already there rather than write `hero-2`. It
+rests on `Origin:` being machine-readable: `find_copy_of_plugin_pattern()`
+matches on the exact value, which a note in the header comment could not
+support. A name the theme uses for something *else* is still numbered — the
+user picked a pattern, not a slug.
+
+**`Origin:` records which registered pattern a copy came from**, under a
+scheme: `plugin:twentig/hero`. The scheme is the whole point. An origin is
+otherwise a cloud name, `{handle}/{collection}/{slug}`, which the service
+resolves to a pattern page and renders as a link — so a plugin's name reaching
+the service would publish a link to nothing. Counting segments would not have
+told the two apart, because nothing stops a plugin registering `acme/blocks/hero`
+and Pattern Builder writes three-segment names itself for cloud installs. A
+colon cannot occur in a cloud name, every segment of which is a slug, so the
+rule is exact and states itself: **an origin carrying a scheme never leaves
+this site**. `Pattern_File_Store::is_cloud_origin()` is that rule, and the
+porter asks it before putting an origin in a package.
 
 ## Creating a pattern
 

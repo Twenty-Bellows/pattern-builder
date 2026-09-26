@@ -13,10 +13,38 @@ import { store as blockEditorStore } from '@wordpress/block-editor';
 import { useState } from '@wordpress/element';
 
 import { navigateToPattern } from '../utils/patternNavigation';
+import { PLUGIN_ORIGIN_SCHEME } from '../utils/origin';
 import {
 	usePatternCloudState,
 	PatternCloudControls,
 } from './PatternCloudPanel';
+
+/**
+ * The one line a pattern's `Origin:` is shown as.
+ *
+ * A bare origin is a cloud name and says so plainly. One carrying a scheme names something
+ * that is not on the cloud — today only a pattern a plugin registered — and is said
+ * differently, because "originally from twentig/hero" would read as a cloud pattern anyone
+ * could go and look at.
+ *
+ * @param {string} origin The pattern's origin.
+ * @return {string} The line to show.
+ */
+function describeOrigin( origin ) {
+	if ( origin.startsWith( PLUGIN_ORIGIN_SCHEME ) ) {
+		return sprintf(
+			/* translators: %s: the registered pattern this one was copied from, e.g. twentig/hero. */
+			__( 'Copied from the plugin pattern %s', 'pattern-builder' ),
+			origin.slice( PLUGIN_ORIGIN_SCHEME.length )
+		);
+	}
+
+	return sprintf(
+		/* translators: %s: the pattern this one was copied from, e.g. studio-a/heroes/hero. */
+		__( 'Originally from %s', 'pattern-builder' ),
+		origin
+	);
+}
 
 /**
  * Shows where a pattern is stored and converts it to the other storage.
@@ -141,11 +169,7 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 
 			{ !! patternPost.origin && (
 				<Text variant="muted" size="12px">
-					{ sprintf(
-						/* translators: %s: the pattern this one was copied from, e.g. studio-a/heroes/hero. */
-						__( 'Originally from %s', 'pattern-builder' ),
-						patternPost.origin
-					) }
+					{ describeOrigin( patternPost.origin ) }
 				</Text>
 			) }
 

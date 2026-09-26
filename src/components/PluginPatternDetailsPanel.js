@@ -44,33 +44,65 @@ export const PluginPatternDetailsPanel = ( { pattern, onEdit, onCopied } ) => {
 		);
 	}
 
-	const copyTo = ( destination ) => {
-		setBusy( destination );
+	const copy = () => {
+		setBusy( 'copy' );
 
 		apiFetch( {
 			path: '/pattern-builder/v1/patterns',
 			method: 'POST',
-			data: { fromPlugin: pattern.name, source: destination },
+			data: { fromPlugin: pattern.name },
 		} )
 			.then( ( created ) => {
 				setBusy( '' );
-				createSuccessNotice(
-					'user' === destination
-						? __(
-								'Copied to your user patterns.',
-								'pattern-builder'
-						  )
-						: __( 'Copied into your theme.', 'pattern-builder' ),
+
+				const brought = ( created.copied || [] ).length;
+				const edit = [
 					{
-						type: 'snackbar',
-						actions: [
-							{
-								label: __( 'Edit', 'pattern-builder' ),
-								onClick: () => onEdit( created ),
-							},
-						],
-					}
-				);
+						label: __( 'Edit', 'pattern-builder' ),
+						onClick: () => onEdit( created ),
+					},
+				];
+
+				if ( ! created.created ) {
+					createSuccessNotice(
+						__(
+							'Already in your theme — opening that copy.',
+							'pattern-builder'
+						),
+						{ type: 'snackbar', actions: edit }
+					);
+				} else {
+					createSuccessNotice(
+						brought > 1
+							? sprintf(
+									/* translators: %d: how many patterns were written, the copy and the ones it places. */
+									__(
+										'Copied into your theme, with the %d patterns it uses.',
+										'pattern-builder'
+									),
+									brought - 1
+							  )
+							: __(
+									'Copied into your theme.',
+									'pattern-builder'
+							  ),
+						{ type: 'snackbar', actions: edit }
+					);
+				}
+
+				if ( ( created.unresolved || [] ).length ) {
+					createErrorNotice(
+						sprintf(
+							/* translators: %s: comma-separated pattern names. */
+							__(
+								'The copy places patterns nothing on this site registers, so they render as nothing: %s',
+								'pattern-builder'
+							),
+							created.unresolved.join( ', ' )
+						),
+						{ type: 'snackbar' }
+					);
+				}
 
 				if ( onCopied ) {
 					onCopied();
@@ -144,24 +176,15 @@ export const PluginPatternDetailsPanel = ( { pattern, onEdit, onCopied } ) => {
 						<Button
 							__next40pxDefaultSize
 							variant="primary"
-							isBusy={ 'theme' === busy }
+							isBusy={ 'copy' === busy }
 							disabled={ !! busy }
-							onClick={ () => copyTo( 'theme' ) }
+							onClick={ copy }
 						>
 							{ __( 'Copy to Theme', 'pattern-builder' ) }
 						</Button>
-						<Button
-							__next40pxDefaultSize
-							variant="secondary"
-							isBusy={ 'user' === busy }
-							disabled={ !! busy }
-							onClick={ () => copyTo( 'user' ) }
-						>
-							{ __( 'Copy to User Patterns', 'pattern-builder' ) }
-						</Button>
 						<Text variant="muted" size="12px">
 							{ __(
-								'A copy is yours: edit it, and upload it to a cloud collection from its own details. A theme copy pulls the images it uses into the theme; a user copy puts them in the media library.',
+								'A copy is yours: edit it, and upload it to a cloud collection from its own details. The images it uses come into the theme with it, and so do the patterns it places — a copy of one you already have is used rather than made again.',
 								'pattern-builder'
 							) }
 						</Text>

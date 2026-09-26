@@ -265,7 +265,38 @@ class Test_Plugin_Patterns extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( '_links', $banner );
 	}
 
-	public function test_copying_to_the_theme_writes_a_file_that_says_where_it_came_from() {
+	/**
+	 * Sends a copy request for one registered pattern.
+	 *
+	 * @param string $name The registered pattern name.
+	 * @param array  $extra Further body parameters.
+	 * @return WP_REST_Response
+	 */
+	private function copy( $name, $extra = array() ) {
+		$request = $this->request( 'POST', '/pattern-builder/v1/patterns' );
+		$request->set_body_params( array_merge( array( 'fromPlugin' => $name ), $extra ) );
+
+		return rest_get_server()->dispatch( $request );
+	}
+
+	/**
+	 * Registers a pattern that places the patterns named.
+	 *
+	 * @param string   $slug The pattern's name.
+	 * @param string[] $places The names it places.
+	 * @return string The slug.
+	 */
+	private function register_page( $slug, $places ) {
+		$content = '';
+
+		foreach ( $places as $place ) {
+			$content .= '<!-- wp:pattern {"slug":"' . $place . '"} /-->' . "\n";
+		}
+
+		return $this->register( $slug, array( 'content' => $content ) );
+	}
+
+	public function test_copying_to_the_theme_writes_a_file_that_records_where_it_came_from() {
 		$this->register(
 			'acme/banner',
 			array(
@@ -275,9 +306,7 @@ class Test_Plugin_Patterns extends WP_UnitTestCase {
 			)
 		);
 
-		$request = $this->request( 'POST', '/pattern-builder/v1/patterns' );
-		$request->set_body_params( array( 'fromPlugin' => 'acme/banner' ) );
-		$response = rest_get_server()->dispatch( $request );
+		$response = $this->copy( 'acme/banner' );
 
 		$this->assertSame( 201, $response->get_status() );
 
@@ -286,75 +315,159 @@ class Test_Plugin_Patterns extends WP_UnitTestCase {
 		$this->assertSame( 'plugin-pattern-test-theme/banner', $data['name'] );
 		$this->assertSame( 'Acme Banner', $data['title']['raw'] );
 		$this->assertSame( array( 'banner' ), $data['categories'] );
+		$this->assertTrue( $data['created'] );
+		$this->assertSame( array( 'plugin-pattern-test-theme/banner' ), $data['copied'] );
+		$this->assertSame( 'plugin:acme/banner', $data['origin'] );
 
 		$file = $this->theme_dir . '/patterns/banner.php';
 		$this->assertFileExists( $file );
 
 		$contents = file_get_contents( $file );
 		$this->assertStringContainsString( 'Slug: plugin-pattern-test-theme/banner', $contents );
+		$this->assertStringContainsString( 'Origin: plugin:acme/banner', $contents );
 		$this->assertStringContainsString( 'From a plugin.', $contents );
-		$this->assertStringContainsString( 'Copied from the pattern acme/banner registered by', $contents );
 
 		// The plugin still has its own, untouched.
 		$this->assertNotNull( $this->store->find_plugin_pattern( 'acme/banner' ) );
 	}
 
-	public function test_copying_twice_numbers_the_second_rather_than_refusing_it() {
+	/**
+	 * Copying is idempotent. A second copy of the same plugin pattern is the first one
+	 * answered back, not a second file — which is what keeps two pages that share a section
+	 * sharing one copy of it.
+	 */
+	public function test_copying_twice_answers_with_the_copy_that_is_already_there() {
 		$this->register( 'acme/banner' );
 
-		$first = rest_get_server()->dispatch( $this->copy_request() );
+		$first = $this->copy( 'acme/banner' );
 		$this->assertSame( 201, $first->get_status() );
+		$this->assertTrue( $first->get_data()['created'] );
 
-		$second = rest_get_server()->dispatch( $this->copy_request() );
-		$this->assertSame( 201, $second->get_status() );
+		$second = $this->copy( 'acme/banner' );
+		$this->assertSame( 200, $second->get_status() );
+		$this->assertFalse( $second->get_data()['created'] );
+		$this->assertSame( array(), $second->get_data()['copied'] );
 
-		$this->assertSame( 'plugin-pattern-test-theme/banner', $first->get_data()['name'] );
-		$this->assertSame( 'plugin-pattern-test-theme/banner-2', $second->get_data()['name'] );
-		$this->assertFileExists( $this->theme_dir . '/patterns/banner-2.php' );
+		$this->assertSame( $first->get_data()['name'], $second->get_data()['name'] );
+		$this->assertFileDoesNotExist( $this->theme_dir . '/patterns/banner-2.php' );
 	}
 
-	private function copy_request() {
-		$request = $this->request( 'POST', '/pattern-builder/v1/patterns' );
-		$request->set_body_params( array( 'fromPlugin' => 'acme/banner' ) );
+	public function test_a_copy_brings_the_patterns_it_places_and_points_at_them() {
+		$this->register( 'acme/hero' );
+		$this->register( 'acme/cta' );
+		$this->register_page( 'acme/page', array( 'acme/hero', 'acme/cta' ) );
 
-		return $request;
-	}
-
-	public function test_copying_to_the_user_patterns_makes_a_wp_block() {
-		$this->register(
-			'acme/banner',
-			array(
-				'title'       => 'Acme Banner',
-				'description' => 'A banner.',
-				'categories'  => array( 'banner' ),
-			)
-		);
-
-		$request = $this->request( 'POST', '/pattern-builder/v1/patterns' );
-		$request->set_body_params(
-			array(
-				'fromPlugin' => 'acme/banner',
-				'source'     => 'user',
-			)
-		);
-		$response = rest_get_server()->dispatch( $request );
+		$response = $this->copy( 'acme/page' );
 
 		$this->assertSame( 201, $response->get_status() );
 
 		$data = $response->get_data();
-		$this->assertSame( 'user', $data['source'] );
-		$this->assertIsInt( $data['id'] );
 
-		$post = get_post( $data['id'] );
-		$this->assertSame( 'wp_block', $post->post_type );
-		$this->assertSame( 'Acme Banner', $post->post_title );
-		$this->assertSame( 'banner', $post->post_name );
-		$this->assertStringContainsString( 'From a plugin.', $post->post_content );
-		// A registered pattern is not synced, and an unsynced user pattern is its equivalent.
-		$this->assertSame( 'unsynced', get_post_meta( $post->ID, 'wp_pattern_sync_status', true ) );
-		$this->assertContains( 'banner', wp_get_object_terms( $post->ID, 'wp_pattern_category', array( 'fields' => 'slugs' ) ) );
+		// Leaves first, so nothing is ever written pointing at a pattern that is not there yet.
+		$this->assertSame(
+			array(
+				'plugin-pattern-test-theme/hero',
+				'plugin-pattern-test-theme/cta',
+				'plugin-pattern-test-theme/page',
+			),
+			$data['copied']
+		);
 
-		// Nothing was written into the theme.
+		$this->assertFileExists( $this->theme_dir . '/patterns/hero.php' );
+		$this->assertFileExists( $this->theme_dir . '/patterns/cta.php' );
+
+		$page = file_get_contents( $this->theme_dir . '/patterns/page.php' );
+		$this->assertStringContainsString( '"slug":"plugin-pattern-test-theme/hero"', $page );
+		$this->assertStringContainsString( '"slug":"plugin-pattern-test-theme/cta"', $page );
+		$this->assertStringNotContainsString( 'acme/hero', $page );
+		$this->assertStringNotContainsString( 'acme/cta', $page );
+	}
+
+	public function test_a_section_already_copied_is_used_rather_than_copied_again() {
+		$this->register( 'acme/hero' );
+		$this->register_page( 'acme/page-one', array( 'acme/hero' ) );
+		$this->register_page( 'acme/page-two', array( 'acme/hero' ) );
+
+		$this->copy( 'acme/page-one' );
+		$second = $this->copy( 'acme/page-two' );
+
+		$this->assertSame( 201, $second->get_status() );
+		// The hero was already there, so only the second page was written.
+		$this->assertSame( array( 'plugin-pattern-test-theme/page-two' ), $second->get_data()['copied'] );
+		$this->assertFileDoesNotExist( $this->theme_dir . '/patterns/hero-2.php' );
+
+		$page = file_get_contents( $this->theme_dir . '/patterns/page-two.php' );
+		$this->assertStringContainsString( '"slug":"plugin-pattern-test-theme/hero"', $page );
+	}
+
+	public function test_a_reference_the_theme_already_answers_to_is_left_alone() {
+		file_put_contents(
+			$this->theme_dir . '/patterns/mine.php',
+			"<?php\n/**\n * Title: Mine\n * Slug: plugin-pattern-test-theme/mine\n */\n?>\n<!-- wp:paragraph --><p>Mine.</p><!-- /wp:paragraph -->\n"
+		);
+
+		$this->register_page( 'acme/page', array( 'plugin-pattern-test-theme/mine' ) );
+
+		$response = $this->copy( 'acme/page' );
+
+		$this->assertSame( 201, $response->get_status() );
+		$this->assertSame( array( 'plugin-pattern-test-theme/page' ), $response->get_data()['copied'] );
+
+		$page = file_get_contents( $this->theme_dir . '/patterns/page.php' );
+		$this->assertStringContainsString( '"slug":"plugin-pattern-test-theme/mine"', $page );
+	}
+
+	/**
+	 * The plugin's own pattern renders an unknown reference no better than the copy will, so
+	 * refusing the copy would help nobody. It is reported instead.
+	 */
+	public function test_a_reference_nothing_registers_is_reported_and_left_as_it_is() {
+		$this->register_page( 'acme/page', array( 'acme/nowhere' ) );
+
+		$response = $this->copy( 'acme/page' );
+
+		$this->assertSame( 201, $response->get_status() );
+		$this->assertSame( array( 'acme/nowhere' ), $response->get_data()['unresolved'] );
+
+		$page = file_get_contents( $this->theme_dir . '/patterns/page.php' );
+		$this->assertStringContainsString( '"slug":"acme/nowhere"', $page );
+	}
+
+	public function test_patterns_that_place_each_other_are_refused_rather_than_copied_forever() {
+		$this->register_page( 'acme/a', array( 'acme/b' ) );
+		$this->register_page( 'acme/b', array( 'acme/a' ) );
+
+		$response = $this->copy( 'acme/a' );
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( 'pattern_builder_reference_cycle', $response->get_data()['code'] );
+	}
+
+	public function test_a_name_the_theme_already_uses_for_something_else_is_numbered() {
+		file_put_contents(
+			$this->theme_dir . '/patterns/banner.php',
+			"<?php\n/**\n * Title: My banner\n * Slug: plugin-pattern-test-theme/banner\n */\n?>\n<!-- wp:paragraph --><p>Mine.</p><!-- /wp:paragraph -->\n"
+		);
+
+		$this->register( 'acme/banner' );
+
+		$response = $this->copy( 'acme/banner' );
+
+		$this->assertSame( 201, $response->get_status() );
+		$this->assertSame( 'plugin-pattern-test-theme/banner-2', $response->get_data()['name'] );
+	}
+
+	/**
+	 * A section has to stay reachable by `core/pattern`, which resolves against the block
+	 * pattern registry, and a user pattern is never in it.
+	 */
+	public function test_copying_to_the_user_patterns_is_refused() {
+		$this->register( 'acme/banner' );
+
+		$response = $this->copy( 'acme/banner', array( 'source' => 'user' ) );
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( 'pattern_builder_plugin_copy_is_theme_only', $response->get_data()['code'] );
 		$this->assertFileDoesNotExist( $this->theme_dir . '/patterns/banner.php' );
 	}
 

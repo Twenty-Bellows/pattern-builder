@@ -7,7 +7,8 @@ Guidance for Claude Code and other AI coding agents working in this repository.
 **Pattern Builder** is a WordPress plugin by [Twenty Bellows](https://twentybellows.com)
 for creating, editing and organising block patterns in the admin. It unifies
 theme patterns (PHP files) and user patterns (`wp_block` posts) in one UI,
-browses the read-only ones a plugin registers beside them, and connects to
+browses the read-only ones a plugin registers beside them — copying one into the
+theme with the patterns it places — and connects to
 [patternbuilderwp.com](https://patternbuilderwp.com) for sharing them.
 
 - **Requires:** WordPress 6.8+, PHP 7.4+ · **License:** GPL-2.0-or-later
@@ -100,9 +101,13 @@ The things that bite. Each is expanded in the document beside it.
 - **A plugin pattern is read-only, and nothing is written back to one.** It
   lives in the block pattern registry and nowhere else, so the Plugin tab offers
   a copy rather than an edit — which is also the only way one reaches the cloud,
-  since an upload needs somewhere to keep its `Cloud:` reference.
-  ([architecture](docs/architecture.md))
-
+  since an upload needs somewhere to keep its `Cloud:` reference. The copy goes
+  into the theme and takes the patterns it places with it, because a section has
+  to stay reachable by `core/pattern`. ([architecture](docs/architecture.md))
+- **An `Origin:` carrying a scheme never leaves this site.** A bare origin is a
+  cloud name, which the service resolves to a page and links; `plugin:` names a
+  registered pattern and is kept out of the package.
+  ([dependencies](docs/dependencies.md))
 - **Block validity is decided in the browser and nowhere else.** `save()` is
   JavaScript; no server can re-run it. ([architecture](docs/architecture.md))
 - **Ability annotations select the HTTP method** — `readonly` is GET,

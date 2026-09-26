@@ -237,6 +237,280 @@ class Pattern_File_Store {
 	}
 
 	/**
+	 * The patterns a piece of markup places, at any depth — the `slug` of every
+	 * `core/pattern` block, deduplicated, in document order. A `core/block` is not one of
+	 * these: it names a `wp_block` post, which the pattern registry never holds.
+	 *
+	 * @param string $content Block markup.
+	 * @return string[] Referenced pattern names.
+	 */
+	public static function references_of( $content ) {
+		if ( ! is_string( $content ) || '' === trim( $content ) ) {
+			return array();
+		}
+
+		return array_values( array_unique( self::reference_slugs( parse_blocks( $content ) ) ) );
+	}
+
+	/**
+	 * Walk a parsed tree collecting `core/pattern` slugs.
+	 *
+	 * @param array $blocks Parsed blocks.
+	 * @return string[]
+	 */
+	private static function reference_slugs( $blocks ) {
+		$found = array();
+
+		foreach ( (array) $blocks as $block ) {
+			if ( isset( $block['blockName'], $block['attrs']['slug'] ) && 'core/pattern' === $block['blockName'] ) {
+				$slug = trim( (string) $block['attrs']['slug'] );
+				if ( '' !== $slug ) {
+					$found[] = $slug;
+				}
+			}
+
+			if ( ! empty( $block['innerBlocks'] ) ) {
+				$found = array_merge( $found, self::reference_slugs( $block['innerBlocks'] ) );
+			}
+		}
+
+		return $found;
+	}
+
+	/**
+	 * Point a pattern's references at the names given, leaving every other reference alone.
+	 *
+	 * @param string $content Block markup.
+	 * @param array  $map Referenced name => the name to use instead.
+	 * @return string
+	 */
+	public static function repoint_references( $content, array $map ) {
+		foreach ( $map as $from => $to ) {
+			if ( $from === $to ) {
+				continue;
+			}
+
+			$content = preg_replace(
+				'/("slug"\s*:\s*)"' . preg_quote( (string) $from, '/' ) . '"/',
+				'$1"' . str_replace( '$', '\\$', (string) $to ) . '"',
+				$content
+			);
+		}
+
+		return $content;
+	}
+
+	/**
+	 * The scheme an `Origin:` carries when it names something that is not a pattern on the
+	 * cloud. An origin with a scheme is local to this site and never travels with an upload;
+	 * a cloud name has none, and is the only kind the service can resolve. A colon cannot
+	 * occur in a cloud name, whose every segment is a slug, so the two can never be mistaken
+	 * for one another.
+	 */
+	const ORIGIN_PLUGIN_SCHEME = 'plugin:';
+
+	/**
+	 * How a copy of a plugin pattern records what it came from.
+	 *
+	 * @param string $name The registered pattern name.
+	 * @return string
+	 */
+	public static function plugin_origin( $name ) {
+		return self::ORIGIN_PLUGIN_SCHEME . $name;
+	}
+
+	/**
+	 * Whether an `Origin:` names something on the cloud, which is the only kind that can be
+	 * sent with an upload or resolved to a page there.
+	 *
+	 * @param string $origin The origin.
+	 * @return bool
+	 */
+	public static function is_cloud_origin( $origin ) {
+		$origin = (string) $origin;
+
+		return '' !== $origin && false === strpos( $origin, ':' );
+	}
+
+	/**
+	 * Copies a pattern a plugin registered into the theme, with every pattern it places at
+	 * any depth, and points its references at the copies.
+	 *
+	 * Copying is idempotent: a plugin pattern the theme already carries a copy of is reused
+	 * rather than copied again, so copying two pages that share a section leaves one section
+	 * that both of them place. `Origin:` is what makes that exact — a free-text note could
+	 * not be matched on.
+	 *
+	 * A reference the theme already answers to is left alone, and one nothing on this site
+	 * answers to is left alone and reported: the plugin's own pattern renders it no better,
+	 * so refusing the copy would help nobody.
+	 *
+	 * @param Abstract_Pattern $pattern The plugin pattern to copy.
+	 * @param array            $overrides Fields to set on the copy before it is written.
+	 * @return array|WP_Error { pattern: Abstract_Pattern, created: bool, copied: string[],
+	 * unresolved: string[] }
+	 */
+	public function copy_plugin_pattern( Abstract_Pattern $pattern, $overrides = array() ) {
+		$copied     = array();
+		$unresolved = array();
+
+		$copy = $this->copy_plugin_tree( $pattern, $overrides, array(), $copied, $unresolved );
+
+		if ( is_wp_error( $copy ) ) {
+			return $copy;
+		}
+
+		return array(
+			'pattern'    => $copy['pattern'],
+			'created'    => $copy['created'],
+			'copied'     => $copied,
+			'unresolved' => array_values( array_unique( $unresolved ) ),
+		);
+	}
+
+	/**
+	 * Copies one plugin pattern, its references first.
+	 *
+	 * @param Abstract_Pattern $pattern    The plugin pattern to copy.
+	 * @param array            $overrides  Fields to set on the copy before it is written.
+	 * @param array            $path       The names being copied above this one, for cycles.
+	 * @param array            $copied     Accumulates the names written, leaves first.
+	 * @param array            $unresolved Accumulates references nothing here answers to.
+	 * @return array|WP_Error { pattern: Abstract_Pattern, created: bool }
+	 */
+	private function copy_plugin_tree( Abstract_Pattern $pattern, $overrides, $path, &$copied, &$unresolved ) {
+		$existing = $this->find_copy_of_plugin_pattern( $pattern->name );
+
+		if ( null !== $existing ) {
+			return array(
+				'pattern' => $existing,
+				'created' => false,
+			);
+		}
+
+		$map = array();
+
+		foreach ( self::references_of( (string) $pattern->content ) as $reference ) {
+			if ( in_array( $reference, $path, true ) ) {
+				return new WP_Error(
+					'pattern_builder_reference_cycle',
+					sprintf(
+						/* translators: %s: the chain of pattern names that loops. */
+						__( 'These patterns place each other in a loop, so there is no order to copy them in: %s', 'pattern-builder' ),
+						implode( ' → ', array_merge( $path, array( $reference ) ) )
+					),
+					array( 'status' => 400 )
+				);
+			}
+
+			// Already a pattern of this theme's: the reference reaches it as it stands.
+			if ( null !== $this->find_theme_pattern( $reference ) ) {
+				continue;
+			}
+
+			$already = $this->find_copy_of_plugin_pattern( $reference );
+
+			if ( null !== $already ) {
+				$map[ $reference ] = $already->name;
+				continue;
+			}
+
+			$dependency = $this->find_plugin_pattern( $reference );
+
+			if ( null === $dependency ) {
+				$unresolved[] = $reference;
+				continue;
+			}
+
+			$written = $this->copy_plugin_tree(
+				$dependency,
+				array(),
+				array_merge( $path, array( $pattern->name ) ),
+				$copied,
+				$unresolved
+			);
+
+			if ( is_wp_error( $written ) ) {
+				return $written;
+			}
+
+			$map[ $reference ] = $written['pattern']->name;
+		}
+
+		$copy = clone $pattern;
+
+		$copy->name         = basename( (string) $pattern->name );
+		$copy->source       = 'theme';
+		$copy->plugin       = '';
+		$copy->id           = null;
+		$copy->filePath     = null;
+		$copy->hasCustomPhp = false;
+		$copy->origin       = self::plugin_origin( $pattern->name );
+		$copy->content      = self::repoint_references( (string) $pattern->content, $map );
+
+		foreach ( $overrides as $field => $value ) {
+			$copy->{$field} = $value;
+		}
+
+		$copy->name = self::namespaced_name( $copy->name );
+
+		if ( null !== $this->find_theme_pattern( $copy->name ) ) {
+			// Copying is not naming: the user picked a pattern, not a slug, so a name the
+			// theme already uses for something else gets a number rather than an error.
+			$copy->name = $this->unused_theme_name( $copy->name );
+		}
+
+		$copy->id = $copy->name;
+		$saved    = $this->update_theme_pattern( $copy );
+
+		if ( is_wp_error( $saved ) ) {
+			return $saved;
+		}
+
+		$copied[] = $saved->name;
+
+		return array(
+			'pattern' => $saved,
+			'created' => true,
+		);
+	}
+
+	/**
+	 * The theme's own copy of a plugin pattern, by what that copy records it came from.
+	 *
+	 * @param string $name The registered pattern name.
+	 * @return Abstract_Pattern|null
+	 */
+	public function find_copy_of_plugin_pattern( $name ) {
+		$origin = self::plugin_origin( $name );
+
+		foreach ( $this->get_theme_patterns() as $pattern ) {
+			if ( (string) $pattern->origin === $origin ) {
+				return $pattern;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * A namespaced name the theme is not already using, numbering the one given until it is
+	 * free.
+	 *
+	 * @param string $name The namespaced name a copy would like.
+	 * @return string
+	 */
+	public function unused_theme_name( $name ) {
+		$suffix = 2;
+
+		while ( null !== $this->find_theme_pattern( $name . '-' . $suffix ) ) {
+			++$suffix;
+		}
+
+		return $name . '-' . $suffix;
+	}
+
+	/**
 	 * Every cloud name a local pattern answers to, with the pattern it names.
 	 *
 	 * @return array name => { type: string, id: string|int, title: string }

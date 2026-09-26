@@ -183,22 +183,13 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function create_item( $request ) {
-		$from_post   = null;
-		$from_plugin = null;
+		$from_post = null;
 
 		if ( ! empty( $request['fromPlugin'] ) ) {
-			$from_plugin = $this->store->find_plugin_pattern( (string) $request['fromPlugin'] );
+			return $this->copy_plugin_pattern( $request );
+		}
 
-			if ( null === $from_plugin ) {
-				return new WP_Error(
-					'pattern_builder_plugin_pattern_not_found',
-					__( 'No plugin on this site registers a pattern with that name.', 'pattern-builder' ),
-					array( 'status' => 404 )
-				);
-			}
-
-			$pattern = self::copy_of_plugin_pattern( $from_plugin );
-		} elseif ( ! empty( $request['fromWpBlock'] ) ) {
+		if ( ! empty( $request['fromWpBlock'] ) ) {
 			$from_post = get_post( (int) $request['fromWpBlock'] );
 
 			if ( ! $from_post || 'wp_block' !== $from_post->post_type ) {
@@ -224,20 +215,6 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 
 		$pattern = $this->apply_request_to_pattern( $pattern, $request );
 
-		if ( $from_plugin && 'user' === $request['source'] ) {
-			$pattern->source = 'user';
-			$saved           = $this->store->create_user_pattern( $pattern );
-
-			if ( is_wp_error( $saved ) ) {
-				return $this->as_rest_error( $saved );
-			}
-
-			$response = rest_ensure_response( $this->prepare_pattern_for_response( $saved, $request ) );
-			$response->set_status( 201 );
-
-			return $response;
-		}
-
 		if ( false === strpos( $pattern->name, '/' ) ) {
 			$pattern->name = get_stylesheet() . '/' . $pattern->name;
 		}
@@ -247,18 +224,11 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 		$pattern->filePath = null;
 
 		if ( null !== $this->store->find_theme_pattern( $pattern->name ) ) {
-			// Copying is not naming: the user picked a pattern, not a slug, so a name the theme
-			// already uses gets a number rather than an error.
-			if ( ! $from_plugin ) {
-				return new WP_Error(
-					'pattern_builder_pattern_exists',
-					__( 'A theme pattern with this name already exists.', 'pattern-builder' ),
-					array( 'status' => 400 )
-				);
-			}
-
-			$pattern->name = $this->unused_theme_name( $pattern->name );
-			$pattern->id   = $pattern->name;
+			return new WP_Error(
+				'pattern_builder_pattern_exists',
+				__( 'A theme pattern with this name already exists.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
 		}
 
 		if ( $from_post ) {
@@ -350,54 +320,75 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * A plugin pattern as a pattern of this site's own: the same blocks and the same metadata,
-	 * under a bare name for the theme to namespace, carrying a line in its header comment
-	 * saying where it came from. That note is `additionalMetadata`, which WordPress ignores,
-	 * the theme carries, and the cloud deliberately leaves behind.
+	 * Copies a pattern a plugin registered into the theme, with everything it places.
 	 *
-	 * @param Abstract_Pattern $plugin_pattern The pattern to copy.
-	 * @return Abstract_Pattern
+	 * Only into the theme: a section has to stay reachable by `core/pattern`, which resolves
+	 * against the block pattern registry, and a `wp_block` is never in it. The same reason
+	 * makes a cloud install land a dependency as a theme pattern.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return WP_REST_Response|WP_Error
 	 */
-	protected static function copy_of_plugin_pattern( Abstract_Pattern $plugin_pattern ) {
-		$copy = clone $plugin_pattern;
-
-		$copy->name               = basename( (string) $plugin_pattern->name );
-		$copy->source             = 'theme';
-		$copy->plugin             = '';
-		$copy->id                 = null;
-		$copy->filePath           = null;
-		$copy->hasCustomPhp       = false;
-		$copy->additionalMetadata = $plugin_pattern->plugin
-			? sprintf(
-				/* translators: 1: the pattern's registered name, e.g. twentig/hero-1. 2: what registered it, e.g. Twentig. */
-				__( 'Copied from the pattern %1$s registered by %2$s.', 'pattern-builder' ),
-				$plugin_pattern->name,
-				$plugin_pattern->plugin
-			)
-			: sprintf(
-				/* translators: %s: the pattern's registered name, e.g. twentig/hero-1. */
-				__( 'Copied from the registered pattern %s.', 'pattern-builder' ),
-				$plugin_pattern->name
+	protected function copy_plugin_pattern( WP_REST_Request $request ) {
+		if ( 'user' === $request['source'] ) {
+			return new WP_Error(
+				'pattern_builder_plugin_copy_is_theme_only',
+				__( 'A plugin pattern can only be copied into the theme. The patterns it places have to stay in the block pattern registry to be reachable, and a user pattern is never in it.', 'pattern-builder' ),
+				array( 'status' => 400 )
 			);
+		}
 
-		return $copy;
+		$plugin_pattern = $this->store->find_plugin_pattern( (string) $request['fromPlugin'] );
+
+		if ( null === $plugin_pattern ) {
+			return new WP_Error(
+				'pattern_builder_plugin_pattern_not_found',
+				__( 'No plugin on this site registers a pattern with that name.', 'pattern-builder' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$copied = $this->store->copy_plugin_pattern( $plugin_pattern, $this->copy_overrides( $request ) );
+
+		if ( is_wp_error( $copied ) ) {
+			return $this->as_rest_error( $copied );
+		}
+
+		$data               = $this->prepare_pattern_for_response( $copied['pattern'], $request );
+		$data['created']    = $copied['created'];
+		$data['copied']     = $copied['copied'];
+		$data['unresolved'] = $copied['unresolved'];
+
+		$response = rest_ensure_response( $data );
+		$response->set_status( $copied['created'] ? 201 : 200 );
+
+		return $response;
 	}
 
 	/**
-	 * A namespaced name the theme is not already using, numbering the one given until it is
-	 * free.
+	 * The fields a copy request sets on the copy itself, as against on the patterns it brings
+	 * with it — which keep the names and titles they were registered under.
 	 *
-	 * @param string $name The namespaced name a copy would like.
-	 * @return string
+	 * @param WP_REST_Request $request The request.
+	 * @return array
 	 */
-	protected function unused_theme_name( $name ) {
-		$suffix = 2;
+	protected function copy_overrides( WP_REST_Request $request ) {
+		$overrides = array();
+		$title     = $request['title'];
 
-		while ( null !== $this->store->find_theme_pattern( $name . '-' . $suffix ) ) {
-			++$suffix;
+		if ( is_array( $title ) && isset( $title['raw'] ) ) {
+			$title = $title['raw'];
 		}
 
-		return $name . '-' . $suffix;
+		if ( is_string( $title ) && '' !== trim( $title ) ) {
+			$overrides['title'] = $title;
+		}
+
+		if ( is_string( $request['name'] ) && '' !== $request['name'] ) {
+			$overrides['name'] = $request['name'];
+		}
+
+		return $overrides;
 	}
 
 	/**
@@ -737,7 +728,7 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 					'type'        => 'integer',
 				),
 				'fromPlugin'         => array(
-					'description' => __( 'On creation, the registered name of a plugin pattern to copy. The plugin keeps its own; `source` says whether the copy is a theme pattern or a user one, and a name the theme already uses is numbered rather than refused.', 'pattern-builder' ),
+					'description' => __( 'On creation, the registered name of a plugin pattern to copy into the theme, with every pattern it places. The plugin keeps its own. A plugin pattern the theme already carries a copy of is answered with that copy rather than copied again, so the request is safe to repeat.', 'pattern-builder' ),
 					'type'        => 'string',
 				),
 			),

@@ -18,7 +18,7 @@ Pattern Builder transforms how you work with WordPress block patterns, providing
 
 **Pattern Management Made Easy**
 * **Unified Interface** - Manage both theme patterns and user-created patterns in one place
-* **Plugin patterns** - Browse the patterns your plugins register, and copy any of them into your theme or your own patterns to make it yours
+* **Plugin patterns** - Browse the patterns your plugins register, and copy any of them into your theme to make it yours, with the sections it is built from
 * **Visual Editor** - Create patterns using the familiar WordPress block editor
 * **Live Preview** - See your patterns in action before saving
 
@@ -121,7 +121,7 @@ Yes. Anything registered as post meta with show_in_rest is offered automatically
 
 = 2.2.0 =
 * A Plugin tab in Appearance → Pattern Builder browses the patterns your plugins register, with the same previews, search and categories as your own
-* Copy any of them into your theme or your user patterns — images and all — and it is yours to edit, to build on, and to upload to a cloud collection
+* Copy any of them into your theme — images and all, and with every pattern it is built from — and it is yours to edit, to build on, and to upload to a cloud collection
 
 = 2.1.1 =
 * Editing a theme pattern no longer discards the rest of its file header: the @package block a theme carries, or a note written beside it, is kept exactly as it was and can be edited in the Pattern Metadata panel
