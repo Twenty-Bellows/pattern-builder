@@ -40,8 +40,10 @@ thing an instance carries of its own is the content of its slots.
 *Offered when new content is created.*
 
 What WordPress shows in the "choose a pattern" modal when someone starts a new
-page. Usually an assembly: several design patterns referenced together, with
-this pattern supplying the words.
+page: an example page, whole, for somebody to start from and edit. What it
+holds is whatever a page of that kind holds — references to the patterns that
+make up its sections, and ordinary blocks where those are what the page is made
+of.
 
 - `Block Types: core/post-content` — that header is what makes WordPress offer
   it for new content.
@@ -50,6 +52,16 @@ this pattern supplying the words.
   headers; a `wp_block` in the database has nowhere to put them.
 - This is the **content half of the split**: it fills the slots that synced
   design patterns expose.
+
+**It is a page's worth of markup, not a manifest.** The test for what gets
+referenced is the one in `composition.md`: a pattern earns its existence by
+being reusable, so a band that repeats or carries a domain name gets
+referenced, and a paragraph that appears once on one page is written where it
+appears. Wrapping that paragraph in a pattern does not make it reusable; it
+makes it a pattern nobody would install, named for the page that is already the
+only thing using it. Projects that layer more strictly than this say so in
+their own conventions — follow those where they exist, and do not infer them
+here.
 
 ### Block Starter Pattern
 

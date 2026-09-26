@@ -6,7 +6,7 @@ import {
 	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
 } from '@wordpress/components';
 import { dispatch } from '@wordpress/data';
-import { useState, useEffect } from '@wordpress/element';
+import { useState, useEffect, useCallback } from '@wordpress/element';
 
 /**
  * Toggles a pattern between synced and unsynced.
@@ -18,26 +18,30 @@ import { useState, useEffect } from '@wordpress/element';
 export const PatternSyncedStatusPanel = ( { patternPost, postType } ) => {
 	const isThemePattern = postType === 'pb_pattern';
 
-	const getSyncedValue = () => {
+	// Memoized on the fields it reads, so the effect below re-runs when one of them
+	// changes and not on every render. Listing those fields on the effect instead left
+	// them to be kept in step with this function by hand.
+	const getSyncedValue = useCallback( () => {
 		if ( isThemePattern ) {
-			return patternPost.synced ? 'true' : 'false';
+			return patternPost?.synced ? 'true' : 'false';
 		}
 
-		return patternPost.wp_pattern_sync_status === 'unsynced' ||
-			patternPost.meta?.wp_pattern_sync_status === 'unsynced'
+		return patternPost?.wp_pattern_sync_status === 'unsynced' ||
+			patternPost?.meta?.wp_pattern_sync_status === 'unsynced'
 			? 'false'
 			: 'true';
-	};
+	}, [
+		isThemePattern,
+		patternPost?.synced,
+		patternPost?.wp_pattern_sync_status,
+		patternPost?.meta?.wp_pattern_sync_status,
+	] );
 
-	const [ synced, setSynced ] = useState( getSyncedValue() );
+	const [ synced, setSynced ] = useState( getSyncedValue );
 
 	useEffect( () => {
 		setSynced( getSyncedValue() );
-	}, [
-		patternPost.synced,
-		patternPost.wp_pattern_sync_status,
-		patternPost.meta?.wp_pattern_sync_status,
-	] );
+	}, [ getSyncedValue ] );
 
 	if ( ! patternPost ) {
 		return null;

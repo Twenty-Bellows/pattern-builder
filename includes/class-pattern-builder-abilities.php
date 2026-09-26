@@ -10,6 +10,12 @@ class Pattern_Builder_Abilities {
 	const CATEGORY = 'pattern-builder';
 
 	/**
+	 * The file a skill is entered through, and the only one of its files that
+	 * carries front matter.
+	 */
+	const SKILL_ENTRY = 'SKILL.md';
+
+	/**
 	 * Hook the component into WordPress.
 	 */
 	public function __construct() {
@@ -686,7 +692,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/get-authoring-guide',
 			array(
 				'label'               => __( 'Get the pattern authoring guide', 'pattern-builder' ),
-				'description'         => __( 'Returns documentation on how to write good block patterns — what makes one good, the kinds of pattern and the headers each needs, which blocks are allowed where, the attribute-to-markup contract, and the design/content split with Pattern Overrides. Call it with no input for the index of available guides, then request one by name. The text is agent-facing instructions in Markdown: install it wherever your harness reads instructions from. Read this before writing pattern markup by hand.', 'pattern-builder' ),
+				'description'         => __( 'Returns documentation on how to write good block patterns — what makes one good, the kinds of pattern and the headers each needs, which blocks are allowed where, the attribute-to-markup contract, and the design/content split with Pattern Overrides. Call it with no input for the index, then request one guide by name with input[guide]. The index also lists the two skills these guides make up, each with a checksum: ask for one with input[skill] and the answer is its manifest and a recipe that writes every file where your own harness looks for instructions, which is worth doing when pattern work here will recur. Compare that checksum against the one an installed copy recorded to know whether to install it again. Read this before writing pattern markup by hand.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -695,6 +701,14 @@ class Pattern_Builder_Abilities {
 							'type'        => 'string',
 							'description' => 'Which guide to return. Omit for the index; "all" for every guide concatenated.',
 						),
+						'skill' => array(
+							'type'        => 'string',
+							'description' => 'A skill to install: its manifest, every file it is made of, and how to write them where a harness will find them.',
+						),
+						'file'  => array(
+							'type'        => 'string',
+							'description' => 'One file of that skill, by the path its manifest gives. Needs input[skill].',
+						),
 					),
 					'additionalProperties' => false,
 					'default'              => array(),
@@ -702,18 +716,44 @@ class Pattern_Builder_Abilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'guides'   => array(
+						'guides'      => array(
 							'type'        => 'array',
-							'description' => 'The index: name, title and size of each available guide.',
+							'description' => 'The index: each guide\'s name, title, size, the skill it belongs to and its path within it, and a checksum of the text this site serves.',
 							'items'       => array( 'type' => 'object' ),
 						),
-						'name'     => array( 'type' => 'string' ),
-						'format'   => array( 'type' => 'string' ),
-						'content'  => array(
+						'skills'      => array(
+							'type'        => 'array',
+							'description' => 'On the index only: the skills these guides make up, each with its own description and version, and a checksum over all of its files. Compare the checksum against the one a copy recorded to tell whether that copy is still current.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'name'        => array( 'type' => 'string' ),
+						'format'      => array( 'type' => 'string' ),
+						'path'        => array(
+							'type'        => 'string',
+							'description' => 'Where this guide sits inside its skill.',
+						),
+						'checksum'    => array(
+							'type'        => 'string',
+							'description' => 'sha256 of the text served, the theme\'s amendments included. On a skill, over all of its files at once.',
+						),
+						'files'       => array(
+							'type'        => 'array',
+							'description' => 'On a skill: every file it is made of, each with the path to write it at, its size and its checksum.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'install'     => array(
+							'type'        => 'string',
+							'description' => 'On a skill: where a copy belongs, the loop that writes one, and how to tell later that it has gone stale.',
+						),
+						'frontmatter' => array(
+							'type'        => 'string',
+							'description' => 'On a skill\'s entry file: the YAML to write above the prose. Carries the name and description that make the skill trigger, and records this site and the checksum so the copy can be checked later.',
+						),
+						'content'     => array(
 							'type'        => 'string',
 							'description' => 'Markdown. Agent-facing instructions, not user documentation.',
 						),
-						'validate' => array(
+						'validate'    => array(
 							'type'        => 'object',
 							'description' => 'On the index only: the check to run before storing anything, and which abilities hand you the means to run it.',
 						),
@@ -767,14 +807,35 @@ class Pattern_Builder_Abilities {
 		$guides = array();
 
 		foreach ( $this->guide_files() as $name => $relative ) {
-			$text = $this->read_guide( $relative );
-			if ( null === $text ) {
+			$guide = $this->read_guide( $relative );
+			if ( null === $guide ) {
 				continue;
 			}
+
+			$front = $guide['front'];
+			$meta  = isset( $front['metadata'] ) && is_array( $front['metadata'] ) ? $front['metadata'] : array();
+			$skill = (string) strstr( $relative, '/', true );
+
 			$guides[ $name ] = array(
-				'title'   => $this->guide_title( $text, $name ),
-				'content' => $text,
-				'skill'   => (string) strstr( $relative, '/', true ),
+				'title'       => $this->guide_title( $guide['content'], $name ),
+				'content'     => $guide['content'],
+				'skill'       => $skill,
+
+				/*
+				 * Where the file sits inside its skill. A guide names the
+				 * others by relative path — `references/block-markup.md` —
+				 * so a copy installed anywhere else has to reproduce the
+				 * layout or every one of those links dangles.
+				 */
+				'path'        => (string) substr( $relative, strlen( $skill ) + 1 ),
+
+				/*
+				 * Only an entry document carries either: the description is
+				 * what a harness matches a task against, and the version is
+				 * the maintainer's own signal about how much moved.
+				 */
+				'description' => isset( $front['description'] ) ? (string) $front['description'] : '',
+				'version'     => isset( $meta['version'] ) ? (string) $meta['version'] : '',
 			);
 		}
 
@@ -799,11 +860,21 @@ class Pattern_Builder_Abilities {
 				continue;
 			}
 			$clean[ $key ] = array(
-				'title'   => isset( $guide['title'] ) && is_string( $guide['title'] )
+				'title'       => isset( $guide['title'] ) && is_string( $guide['title'] )
 					? $guide['title']
 					: $this->guide_title( $guide['content'], $key ),
-				'content' => $guide['content'],
-				'skill'   => isset( $guide['skill'] ) && is_string( $guide['skill'] ) ? $guide['skill'] : '',
+				'content'     => $guide['content'],
+				'skill'       => isset( $guide['skill'] ) && is_string( $guide['skill'] ) ? $guide['skill'] : '',
+				'path'        => isset( $guide['path'] ) && is_string( $guide['path'] ) ? $this->safe_relative_path( $guide['path'] ) : '',
+				'description' => isset( $guide['description'] ) && is_string( $guide['description'] ) ? $guide['description'] : '',
+				'version'     => isset( $guide['version'] ) && is_string( $guide['version'] ) ? $guide['version'] : '',
+
+				/*
+				 * Taken after the filter, over the text this site actually
+				 * serves. A version read off the plugin could not see a theme's
+				 * amendments, and would report a copy made before them current.
+				 */
+				'checksum'    => hash( 'sha256', $guide['content'] ),
 			);
 		}
 
@@ -819,23 +890,40 @@ class Pattern_Builder_Abilities {
 	public function execute_authoring_guide( $input = array() ) {
 		$guides = $this->guides();
 		$wanted = isset( $input['guide'] ) ? sanitize_key( (string) $input['guide'] ) : '';
+		$skill  = isset( $input['skill'] ) ? sanitize_key( (string) $input['skill'] ) : '';
+		$file   = isset( $input['file'] ) ? (string) $input['file'] : '';
+
+		if ( '' !== $skill ) {
+			return $this->serve_skill( $skill, $file, $guides );
+		}
+
+		if ( '' !== $file ) {
+			return new \WP_Error(
+				'pb_skill_missing',
+				__( 'Name the skill the file belongs to with input[skill].', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
 
 		if ( '' === $wanted ) {
 			$index = array();
 			foreach ( $guides as $name => $guide ) {
 				$index[] = array(
-					'name'  => $name,
-					'title' => $guide['title'],
-					'words' => str_word_count( wp_strip_all_tags( $guide['content'] ) ),
-					'skill' => isset( $guide['skill'] ) ? $guide['skill'] : '',
+					'name'     => $name,
+					'title'    => $guide['title'],
+					'words'    => str_word_count( wp_strip_all_tags( $guide['content'] ) ),
+					'skill'    => $guide['skill'],
+					'path'     => $guide['path'],
+					'checksum' => $guide['checksum'],
 				);
 			}
 
 			return array(
 				'guides'   => $index,
+				'skills'   => $this->skills( $guides ),
 				'format'   => 'markdown',
 				'name'     => 'index',
-				'content'  => __( 'Agent-facing instructions for writing WordPress block patterns. Request one by name with input[guide], or "all" for everything. Install the Markdown wherever your harness reads instructions from.', 'pattern-builder' ),
+				'content'  => __( 'Agent-facing instructions for writing WordPress block patterns. Request one by name with input[guide], or "all" for everything. To keep a copy rather than read one, ask for a skill with input[skill]: the answer says which files it is made of and how to write them where your harness will find them.', 'pattern-builder' ),
 				'start'    => array(
 					array(
 						'guide' => 'authoring',
@@ -882,17 +970,249 @@ class Pattern_Builder_Abilities {
 		}
 
 		return array(
-			'name'    => $wanted,
-			'format'  => 'markdown',
-			'content' => $guides[ $wanted ]['content'],
+			'name'     => $wanted,
+			'format'   => 'markdown',
+			'skill'    => $guides[ $wanted ]['skill'],
+			'path'     => $guides[ $wanted ]['path'],
+			'checksum' => $guides[ $wanted ]['checksum'],
+			'content'  => $guides[ $wanted ]['content'],
 		);
 	}
 
 	/**
-	 * Read one guide, with its YAML front matter stripped.
+	 * A whole skill: its manifest, or one of its files.
+	 *
+	 * Addressed by path rather than by guide name, so that what comes back can
+	 * be written straight to disk in the layout the prose's own relative links
+	 * expect. Reading is still by name — that is what an agent that only wants
+	 * to *know* something asks for — and the two do not overlap.
+	 *
+	 * @param string $skill  Skill name.
+	 * @param string $file   One of its files, by path; empty for the manifest.
+	 * @param array  $guides The filtered guide set.
+	 * @return array|\WP_Error
+	 */
+	private function serve_skill( $skill, $file, $guides ) {
+		$entry = $this->skill_entry( $skill, $guides );
+		$files = $this->skill_files( $skill, $guides );
+
+		if ( ! $entry || ! $files ) {
+			return new \WP_Error(
+				'pb_skill_not_found',
+				sprintf(
+					/* translators: %s: comma separated skill names. */
+					__( 'No skill by that name. Available: %s.', 'pattern-builder' ),
+					implode( ', ', wp_list_pluck( $this->skills( $guides ), 'name' ) )
+				),
+				array( 'status' => 404 )
+			);
+		}
+
+		if ( '' !== $file ) {
+			return $this->serve_skill_file( $skill, $file, $entry, $files, $guides );
+		}
+
+		return array(
+			'name'        => $skill,
+			'title'       => $entry['title'],
+			'description' => $entry['description'],
+			'version'     => $entry['version'],
+			'entry'       => self::SKILL_ENTRY,
+			'checksum'    => $this->skill_checksum( $files ),
+			'files'       => $files,
+			'install'     => $this->install_recipe( $skill ),
+		);
+	}
+
+	/**
+	 * One file of a skill, as it should land on disk.
+	 *
+	 * The path is never used to reach the filesystem: it is looked up in the
+	 * skill's own inventory and the entry found there decides what is read, so
+	 * a caller can name nothing this site was not already offering.
+	 *
+	 * @param string $skill  Skill name.
+	 * @param string $file   The path, as the manifest gives it.
+	 * @param array  $entry  The skill's entry document.
+	 * @param array  $files  The skill's inventory.
+	 * @param array  $guides The filtered guide set.
+	 * @return array|\WP_Error
+	 */
+	private function serve_skill_file( $skill, $file, $entry, $files, $guides ) {
+		$row = null;
+
+		foreach ( $files as $candidate ) {
+			if ( $candidate['path'] === $file ) {
+				$row = $candidate;
+				break;
+			}
+		}
+
+		if ( null === $row ) {
+			return new \WP_Error(
+				'pb_skill_file_not_found',
+				sprintf(
+					/* translators: 1: skill name, 2: file path. */
+					__( 'The %1$s skill has no file at %2$s.', 'pattern-builder' ),
+					$skill,
+					$file
+				),
+				array( 'status' => 404 )
+			);
+		}
+
+		$contents = isset( $row['guide'] )
+			? $guides[ $row['guide'] ]['content']
+			: $this->read_script( $skill, basename( $row['path'] ) );
+
+		if ( null === $contents ) {
+			return new \WP_Error(
+				'pb_skill_file_unreadable',
+				sprintf(
+					/* translators: %s: file path. */
+					__( 'This site cannot read %s.', 'pattern-builder' ),
+					$file
+				),
+				array( 'status' => 500 )
+			);
+		}
+
+		$served = array(
+			'skill'    => $skill,
+			'path'     => $row['path'],
+			'format'   => '.md' === substr( $row['path'], -3 ) ? 'markdown' : 'text',
+			'checksum' => $row['checksum'],
+			'content'  => $contents,
+		);
+
+		if ( isset( $row['guide'] ) ) {
+			$served['name'] = $row['guide'];
+		}
+
+		/*
+		 * The entry is the one file that needs more than its prose: written
+		 * without front matter it has no name and no description, and a
+		 * harness that matches a task against the description would never
+		 * reach for it. Handed over separately rather than glued on, so a
+		 * caller whose format is not SKILL.md can ignore it.
+		 */
+		if ( self::SKILL_ENTRY === $row['path'] ) {
+			$served['frontmatter'] = $this->skill_front_matter( $skill, $entry, $files );
+		}
+
+		return $served;
+	}
+
+	/**
+	 * The front matter an installed copy carries.
+	 *
+	 * Beyond the name and description, which are what make the skill trigger,
+	 * it records where the copy came from and what the skill hashed to when it
+	 * was taken. That is all the checking described in `install` needs, and it
+	 * lives in the file itself so a copy that is moved, vendored or committed
+	 * still knows what it is.
+	 *
+	 * @param string $skill Skill name.
+	 * @param array  $entry The skill's entry document.
+	 * @param array  $files The skill's inventory.
+	 * @return string
+	 */
+	private function skill_front_matter( $skill, $entry, $files ) {
+		return implode(
+			"\n",
+			array(
+				'---',
+				'name: ' . $skill,
+				'description: ' . $this->yaml_quote( $entry['description'] ),
+				'metadata:',
+				'  version: ' . $this->yaml_quote( $entry['version'] ),
+				'  source: ' . $this->yaml_quote( home_url() ),
+				'  checksum: ' . $this->yaml_quote( $this->skill_checksum( $files ) ),
+				'---',
+				'',
+				'',
+			)
+		);
+	}
+
+	/**
+	 * A scalar as one double-quoted YAML line.
+	 *
+	 * Quoted rather than bare because a description is a sentence, and a bare
+	 * scalar carrying a colon and a space is a mapping rather than a string.
+	 *
+	 * @param string $text Value.
+	 * @return string
+	 */
+	private function yaml_quote( $text ) {
+		$text = trim( preg_replace( '/\s+/', ' ', (string) $text ) );
+
+		return '"' . str_replace( array( '\\', '"' ), array( '\\\\', '\\"' ), $text ) . '"';
+	}
+
+	/**
+	 * How to put a skill where a harness will find it.
+	 *
+	 * Not translated, deliberately, as the validator's usage is not: this is a
+	 * command line recipe rather than interface copy. It fetches each file
+	 * straight to disk, so the bytes never pass through the agent's context —
+	 * the same reason an image is uploaded as a request body rather than as
+	 * base64 inside JSON.
+	 *
+	 * @param string $skill Skill name.
+	 * @return string
+	 */
+	private function install_recipe( $skill ) {
+		$run = rest_url( 'wp-abilities/v1/abilities/pattern-builder/get-authoring-guide/run' );
+
+		return implode(
+			"\n",
+			array(
+				'Install this where your harness reads instructions from: .claude/skills/' . $skill . '/',
+				'for Claude Code, otherwise an AGENTS.md, a rules file or a system prompt. Worth',
+				'doing when pattern work on this project will recur. For a one-off, read the',
+				'guides and install nothing.',
+				'',
+				'Write every file at the path the manifest gives it. Each one names the others by',
+				'relative path, so a copy that flattens them has a dangling link on every page.',
+				'',
+				'  RUN="' . $run . '"',
+				'  DEST=.claude/skills/' . $skill,
+				'',
+				'  for f in $(curl -fsS -u "$WP_USER:$WP_APP_PASSWORD" -G \\',
+				'    --data-urlencode "input[skill]=' . $skill . '" "$RUN" | jq -r ".files[].path"); do',
+				'    mkdir -p "$DEST/$(dirname "$f")"',
+				'    curl -fsS -u "$WP_USER:$WP_APP_PASSWORD" -G \\',
+				'      --data-urlencode "input[skill]=' . $skill . '" \\',
+				'      --data-urlencode "input[file]=$f" "$RUN" \\',
+				'      | jq -r \'(.frontmatter // "") + .content\' > "$DEST/$f"',
+				'  done',
+				'',
+				'Staying current: SKILL.md records this site and the skill\'s checksum under',
+				'metadata. Ask this ability for the index, compare skills[].checksum against the',
+				'recorded one, and run the loop again when they differ. It overwrites, which is',
+				'the whole contract — there is no merge and no local edit to preserve. A change',
+				'worth keeping belongs in the theme, through the pattern_builder_authoring_guides',
+				'filter, where it reaches every agent that asks this site rather than one',
+				'checkout; the checksum covers what that filter returns, so a house rule added',
+				'there is itself a reason this reads as out of date.',
+			)
+		);
+	}
+
+	/**
+	 * Read one guide: the prose, and the front matter that sat over it.
+	 *
+	 * The prose is what gets served. The front matter is not — it is Agent
+	 * Skills metadata, which means nothing to a harness with no notion of a
+	 * skill — but its `description` is the sentence that decides whether a
+	 * harness reaches for the skill at all, so it is far too load-bearing to
+	 * drop on the floor. Returned beside the prose, it can be handed over as
+	 * fields and written back in whatever shape the caller's own format wants.
 	 *
 	 * @param string $relative Path under the guide directory.
-	 * @return string|null Null when the file is absent or unreadable.
+	 * @return array|null `content` and `front`, or null when the file is absent
+	 *                    or unreadable.
 	 */
 	private function read_guide( $relative ) {
 		$path = $this->guide_dir() . $relative;
@@ -907,7 +1227,84 @@ class Pattern_Builder_Abilities {
 			return null;
 		}
 
-		return trim( preg_replace( '/\A---\r?\n.*?\r?\n---\r?\n/s', '', $text ) );
+		$front = array();
+		if ( preg_match( '/\A---\r?\n(.*?)\r?\n---\r?\n/s', $text, $matched ) ) {
+			$front = $this->parse_front_matter( $matched[1] );
+			$text  = substr( $text, strlen( $matched[0] ) );
+		}
+
+		return array(
+			'content' => trim( $text ),
+			'front'   => $front,
+		);
+	}
+
+	/**
+	 * The front matter of a file this plugin ships, as a map.
+	 *
+	 * Deliberately not a YAML parser. It reads `key: value` at the margin and
+	 * one level of indented keys under a key with no value of its own, which is
+	 * the whole of the shape these files use. Anything else it does not see —
+	 * which is the right failure for a reader of files the plugin ships: it
+	 * cannot misread a construct, only miss one, and a missed one shows up as
+	 * an empty field rather than as a wrong value.
+	 *
+	 * @param string $yaml The text between the `---` markers.
+	 * @return array
+	 */
+	private function parse_front_matter( $yaml ) {
+		$front  = array();
+		$parent = '';
+
+		foreach ( preg_split( '/\r?\n/', $yaml ) as $line ) {
+			if ( '' === trim( $line ) || 0 === strpos( ltrim( $line ), '#' ) ) {
+				continue;
+			}
+
+			if ( preg_match( '/^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/', $line, $matched ) ) {
+				$key   = $matched[1];
+				$value = $this->unquote( $matched[2] );
+
+				if ( '' === $value ) {
+					// A key with nothing after it opens a block: `metadata:`.
+					$parent           = $key;
+					$front[ $parent ] = array();
+					continue;
+				}
+
+				$parent        = '';
+				$front[ $key ] = $value;
+				continue;
+			}
+
+			if ( '' !== $parent && preg_match( '/^\s+([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/', $line, $matched ) ) {
+				$front[ $parent ][ $matched[1] ] = $this->unquote( $matched[2] );
+			}
+		}
+
+		return $front;
+	}
+
+	/**
+	 * Strip one pair of matching quotes from a scalar.
+	 *
+	 * @param string $value Raw value.
+	 * @return string
+	 */
+	private function unquote( $value ) {
+		$value = trim( $value );
+
+		if ( strlen( $value ) < 2 ) {
+			return $value;
+		}
+
+		$quote = $value[0];
+
+		if ( in_array( $quote, array( '"', "'" ), true ) && substr( $value, -1 ) === $quote ) {
+			return substr( $value, 1, -1 );
+		}
+
+		return $value;
 	}
 
 	/**
@@ -922,6 +1319,184 @@ class Pattern_Builder_Abilities {
 			return trim( $m[1] );
 		}
 		return $fallback;
+	}
+
+	/**
+	 * A path is only a path if it stays inside the skill.
+	 *
+	 * The shipped paths come from guide_files() and are safe by construction.
+	 * A theme's guide arrives through the filter and can carry anything. The
+	 * value never reaches the filesystem — a filtered guide is text, and the
+	 * filter supplied it — but it is handed to whatever is installing as the
+	 * place to write, so a `..` in it would put a file outside the directory
+	 * the installer chose. A path that will not stay put is dropped rather than
+	 * corrected, which leaves that guide where a guide with no place in a
+	 * layout belongs: in the flat index, readable, and part of no skill.
+	 *
+	 * @param string $path Candidate path.
+	 * @return string The path, or '' when it is not one.
+	 */
+	private function safe_relative_path( $path ) {
+		if ( '' === $path || '/' === $path[0] || false !== strpos( $path, '\\' ) ) {
+			return '';
+		}
+
+		if ( preg_match( '#(^|/)\.\.(/|$)#', $path ) ) {
+			return '';
+		}
+
+		return $path;
+	}
+
+	/**
+	 * The scripts each skill ships, by skill.
+	 *
+	 * Kept apart from guide_files() because these are not documentation: they
+	 * carry no title, no word count, and the guides filter has no business
+	 * rewriting a tool's source. What they share with the guides is that a
+	 * skill's prose names them by relative path, so a copy installed without
+	 * them dangles exactly as one missing a reference document would.
+	 *
+	 * @return array skill => file names under that skill's scripts directory.
+	 */
+	private function skill_scripts() {
+		return array(
+			'pattern-author' => array(
+				'validate-pattern.mjs',
+				'check-composition.mjs',
+				'wp-core.mjs',
+
+				/*
+				 * Runs under WP-CLI rather than Node, which is why
+				 * get-validator does not carry it: that ability hands over one
+				 * tool that runs anywhere, and this one runs only where
+				 * WordPress does. design-content-split.md names it all the
+				 * same, so a skill that travelled without it would send an
+				 * agent after a file nothing here would hand over.
+				 */
+				'check-slots.php',
+			),
+		);
+	}
+
+	/**
+	 * A skill's entry document.
+	 *
+	 * @param string $skill  Skill name.
+	 * @param array  $guides The filtered guide set.
+	 * @return array|null The guide row with its name, or null when there is none.
+	 */
+	private function skill_entry( $skill, $guides ) {
+		foreach ( $guides as $name => $guide ) {
+			if ( $skill === $guide['skill'] && self::SKILL_ENTRY === $guide['path'] ) {
+				return array( 'name' => $name ) + $guide;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Every file one skill is made of.
+	 *
+	 * @param string $skill  Skill name.
+	 * @param array  $guides The filtered guide set, so a theme's amendments are
+	 *                       what gets checksummed and what gets installed.
+	 * @return array Rows of path, bytes and checksum; prose also names the
+	 *               guide that serves it.
+	 */
+	private function skill_files( $skill, $guides ) {
+		$files = array();
+
+		foreach ( $guides as $name => $guide ) {
+			if ( $skill !== $guide['skill'] || '' === $guide['path'] ) {
+				continue;
+			}
+			$files[] = array(
+				'path'     => $guide['path'],
+				'guide'    => $name,
+				'bytes'    => strlen( $guide['content'] ),
+				'checksum' => $guide['checksum'],
+			);
+		}
+
+		$scripts = $this->skill_scripts();
+		$scripts = isset( $scripts[ $skill ] ) ? $scripts[ $skill ] : array();
+
+		foreach ( $scripts as $name ) {
+			$contents = $this->read_script( $skill, $name );
+			if ( null === $contents ) {
+				continue;
+			}
+			$files[] = array(
+				'path'     => 'scripts/' . $name,
+				'bytes'    => strlen( $contents ),
+				'checksum' => hash( 'sha256', $contents ),
+			);
+		}
+
+		return $files;
+	}
+
+	/**
+	 * One fingerprint for a whole skill.
+	 *
+	 * Over the files' paths and checksums rather than their bytes, so it moves
+	 * when a file is added or removed as well as when one is edited. Sorted, so
+	 * reordering guide_files() for readability does not read as a change to
+	 * every copy installed from it.
+	 *
+	 * @param array $files Rows from skill_files().
+	 * @return string
+	 */
+	private function skill_checksum( $files ) {
+		$lines = array();
+
+		foreach ( $files as $file ) {
+			$lines[] = $file['path'] . "\0" . $file['checksum'];
+		}
+		sort( $lines );
+
+		return hash( 'sha256', implode( "\n", $lines ) );
+	}
+
+	/**
+	 * The skills this site offers, each as one unit an agent can check.
+	 *
+	 * A guide a theme supplied belongs to no skill and appears only in the
+	 * flat index: it has no place in a layout on disk, and nothing to install.
+	 *
+	 * @param array $guides The filtered guide set.
+	 * @return array
+	 */
+	private function skills( $guides ) {
+		$skills = array();
+
+		foreach ( $guides as $guide ) {
+			$name = $guide['skill'];
+			if ( '' === $name || isset( $skills[ $name ] ) ) {
+				continue;
+			}
+
+			$entry = $this->skill_entry( $name, $guides );
+			$files = $this->skill_files( $name, $guides );
+			if ( ! $entry || ! $files ) {
+				continue;
+			}
+
+			$skills[ $name ] = array(
+				'name'        => $name,
+				'title'       => $entry['title'],
+				'description' => $entry['description'],
+				'version'     => $entry['version'],
+				'entry'       => self::SKILL_ENTRY,
+				'files'       => count( $files ),
+				'bytes'       => array_sum( wp_list_pluck( $files, 'bytes' ) ),
+				'checksum'    => $this->skill_checksum( $files ),
+			);
+		}
+
+		return array_values( $skills );
 	}
 
 	/**
@@ -971,7 +1546,7 @@ class Pattern_Builder_Abilities {
 		$files = array();
 
 		foreach ( array( 'validate-pattern.mjs', 'check-composition.mjs', 'wp-core.mjs' ) as $name ) {
-			$contents = $this->read_script( $name );
+			$contents = $this->read_script( 'pattern-author', $name );
 			if ( null === $contents ) {
 				return new \WP_Error(
 					'pb_validator_missing',
@@ -1083,23 +1658,25 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
-	 * Where the validator and its loader live.
+	 * Where a skill's scripts live.
 	 *
+	 * @param string $skill Skill name.
 	 * @return string
 	 */
-	private function script_dir() {
-		return $this->guide_dir() . 'pattern-author/scripts/';
+	private function script_dir( $skill ) {
+		return $this->guide_dir() . $skill . '/scripts/';
 	}
 
 	/**
 	 * Read one of the shipped scripts.
 	 *
-	 * @param string $name File name under the scripts directory.
+	 * @param string $skill Skill the script belongs to.
+	 * @param string $name  File name under that skill's scripts directory.
 	 * @return string|null Null when it is not there.
 	 */
-	private function read_script( $name ) {
-		$root = realpath( rtrim( $this->script_dir(), '/' ) );
-		$path = realpath( $this->script_dir() . $name );
+	private function read_script( $skill, $name ) {
+		$root = realpath( rtrim( $this->script_dir( $skill ), '/' ) );
+		$path = realpath( $this->script_dir( $skill ) . $name );
 		if ( ! $root || ! $path || 0 !== strpos( $path, $root ) || ! is_readable( $path ) ) {
 			return null;
 		}

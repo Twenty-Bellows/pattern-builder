@@ -1,6 +1,8 @@
 ---
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
+metadata:
+  version: 1.0.0
 ---
 
 # Authoring block patterns
@@ -157,17 +159,20 @@ Then place each row at its level:
 |---|---|---|
 | **Element** | the smallest named repeated thing | markup, with slots |
 | **Section** | a full-width band | a heading and *references to elements* |
-| **Page** | the whole page | *references to sections* |
+| **Page** | the whole page | *references to sections*, plus its own markup |
 
 **Nesting is not limited to one hop** — a section may reference other sections.
 The failure to avoid is stopping after one level: bands as patterns, everything
 inside written out longhand.
 
-Two bounds: **Pattern Overrides binds `core/paragraph`, `core/heading`,
+Three bounds. **Pattern Overrides binds `core/paragraph`, `core/heading`,
 `core/image` and `core/button`** — plus `core/list-item` from WordPress 6.9 —
-so a slot must land on one of those; you cannot slot "some blocks". And **don't
+so a slot must land on one of those; you cannot slot "some blocks". **Don't
 factor what does not repeat**: a band appearing once is a section pattern
-because it is a named part of the page, not because it repeats.
+because it is a named part of the page, not because it repeats. And **don't
+factor a single styled block** — one paragraph with a class on it is not a
+pattern, it is a block style variation applied where the paragraph goes, and a
+page pattern is allowed to hold that paragraph directly.
 
 `references/composition.md` has the worked example.
 
@@ -414,3 +419,34 @@ said to extend the system, add it with `pattern-builder/add-design-tokens`
 - `references/abilities.md` — asking a running site for what it has
 - `references/keeping-current.md` — bringing these guides to a new WordPress release
 - The `design-reproduction` skill — rebuilding a design that already exists
+
+## Staying current
+
+If you are reading this from a project rather than from the site, it is a
+copy. Which site it came from is in the front matter above, under
+`metadata.source`, beside the checksum the whole skill hashed to when it was
+taken.
+
+That site is the original, and not only because it shipped these files: a
+theme amends them through the `pattern_builder_authoring_guides` filter, so
+what a site serves is its house rules as well as the plugin's documents, and
+those are the part general documentation cannot know.
+
+To see whether the copy still matches:
+
+```bash
+curl -fsS -u "$WP_USER:$WP_APP_PASSWORD" \
+  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-authoring-guide/run" \
+  | jq -r '.skills[] | select(.name == "pattern-author") | .checksum'
+```
+
+Different from the one recorded above, ask the same ability for
+`input[skill]=pattern-author` and run the `install` recipe it answers with. It
+overwrites, which is the whole contract — there is nothing here to merge and
+no local edit to keep. A change worth keeping belongs in the theme, behind
+that filter, where it reaches every agent that asks the site instead of this
+one checkout.
+
+Nothing here is worth checking on a schedule. Check when the site is to hand
+and something reads as off — prose describing an ability the site does not
+offer is the clearest sign, and the cheapest one to confirm.

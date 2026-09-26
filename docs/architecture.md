@@ -203,8 +203,12 @@ this screen to users who can already edit the pattern.
 Appearance → Pattern Builder is a Site-Editor-style library: a header with five
 collection tabs (Theme, User, Plugin, Uploaded, Directory — the last two served
 by the cloud browser), each with its own search and category rail, over a grid
-of fixed-size square tiles, plus an always-present details sidebar whose Save
-and Edit actions sit above the same panels the editor shows.
+of fixed-size square tiles, plus an always-present details sidebar: an Edit
+action that opens the pattern's own editor, over the Source and Actions panels.
+Those two act on the pattern as they are used rather than staging an edit, so
+the sidebar has nothing to save — everything that is edited rather than acted on
+is edited in the editor. Plugin is the exception to the Edit action, and has its
+own sidebar: those patterns belong to a plugin and can only be copied.
 
 **Every tile is a document drawn by a server.** A cloud tile is the service's
 preview document; a local tile is this site's own front-end render

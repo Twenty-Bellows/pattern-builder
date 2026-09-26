@@ -144,6 +144,50 @@ of writing — and the authority is `Pattern_Validator::allowed_blocks()`. Read
 it rather than transcribing the log, which records what was decided and not
 necessarily what the code settled on.
 
+## Copies of these guides, elsewhere
+
+Everything above is these documents going stale against WordPress. They go
+stale in the other direction too. A site serves them over
+`get-authoring-guide`, and anything that asked for a skill rather than a guide
+installed a copy — so the moment you edit a file here, every copy in the world
+is holding text that no longer matches.
+
+Nothing reconciles that for you. Two fields make it checkable, and they answer
+different questions:
+
+- **The checksum** is computed per file and rolled up per skill, over the text
+  a site actually serves — the `pattern_builder_authoring_guides` filter
+  included, so a theme's house rules move it exactly as an edit here does. It
+  is what a copy compares itself against, and it needs no maintenance: it is
+  derived, never written.
+- **The version** is `metadata.version` in each SKILL.md, and it is the one
+  thing here that is yours to move. **Bump it in the same commit that changes
+  the guidance.** The checksum already says that something changed; the
+  version is the only thing that says whether what changed was a typo or the
+  workflow.
+
+Patch for a correction that changes no instruction, minor for guidance that is
+new, major when something a copy was relying on is gone — a step removed, an
+ability renamed, a claim reversed.
+
+A copy is replaced whole rather than merged, so there is no compatibility to
+keep and no migration to write. Refetching is driven by the checksum rather
+than by the version, which means bumping the version costs nothing, and
+forgetting to bump it costs a reader the one thing the checksum cannot tell
+them.
+
+Two things are worth running after any edit here, for the same reason the pass
+above exists — a claim that goes stale fails quietly:
+
+```bash
+# Every file of every skill is still fetchable at the path its manifest gives,
+# and every relative reference in the prose resolves to a file that travels.
+vendor/bin/phpunit --filter 'skill'
+```
+
+And the evals in step 4, which are the only check on whether the *guidance*
+still produces good patterns.
+
 ## What not to do
 
 **Do not turn `block-markup.md` into a catalogue of every core block.** It

@@ -42,14 +42,8 @@ class Pattern_Builder_Markup_Checks {
 		return new WP_Error(
 			'pb_markup_refused',
 			sprintf(
-				/* translators: 1: how many problems, 2: the problems, each a sentence. */
-				_n(
-					'The markup was not stored: %2$s',
-					'The markup was not stored, for %1$d reasons: %2$s',
-					count( $problems ),
-					'pattern-builder'
-				),
-				count( $problems ),
+				/* translators: %s: the problems, each a sentence. */
+				__( 'The markup was not stored: %s', 'pattern-builder' ),
 				implode( ' ', $problems )
 			),
 			array(

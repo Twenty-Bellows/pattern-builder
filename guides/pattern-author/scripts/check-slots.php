@@ -64,6 +64,7 @@ if ( empty( $args[0] ) ) {
 }
 
 if ( file_exists( $args[0] ) ) {
+	// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- A local path this script was handed on the command line.
 	$checks = pb_slot_refs( file_get_contents( $args[0] ) );
 	if ( ! $checks ) {
 		WP_CLI::warning( 'No wp:pattern references with content found — nothing to check.' );
