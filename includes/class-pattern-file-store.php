@@ -889,7 +889,29 @@ class Pattern_File_Store {
 			return $response;
 		}
 
+		self::forget_compiled( $path );
+
 		return $pattern;
+	}
+
+	/**
+	 * Drop a pattern file from PHP's caches, having just written it.
+	 *
+	 * A pattern file is read by running it, and a write is normally followed by a read — the
+	 * response to a save is the pattern as it now is. PHP has two reasons to hand back the
+	 * file as it *was*: the stat cache, and opcache, which under the usual
+	 * `validate_timestamps` with a `revalidate_freq` of a second or two does not look at the
+	 * file's mtime again for that long. Either one makes a save appear not to have taken.
+	 *
+	 * @param string $path The file just written.
+	 * @return void
+	 */
+	private static function forget_compiled( $path ) {
+		clearstatcache( true, $path );
+
+		if ( function_exists( 'opcache_invalidate' ) && ini_get( 'opcache.enable' ) ) {
+			opcache_invalidate( $path, true );
+		}
 	}
 
 	/**

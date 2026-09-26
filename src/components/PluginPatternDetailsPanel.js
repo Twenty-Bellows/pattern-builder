@@ -172,23 +172,15 @@ export const PluginPatternDetailsPanel = ( { pattern, onEdit, onCopied } ) => {
 					title={ __( 'Make a Copy', 'pattern-builder' ) }
 					initialOpen
 				>
-					<VStack spacing={ 2 }>
-						<Button
-							__next40pxDefaultSize
-							variant="primary"
-							isBusy={ 'copy' === busy }
-							disabled={ !! busy }
-							onClick={ copy }
-						>
-							{ __( 'Copy to Theme', 'pattern-builder' ) }
-						</Button>
-						<Text variant="muted" size="12px">
-							{ __(
-								'A copy is yours: edit it, and upload it to a cloud collection from its own details. The images it uses come into the theme with it, and so do the patterns it places — a copy of one you already have is used rather than made again.',
-								'pattern-builder'
-							) }
-						</Text>
-					</VStack>
+					<Button
+						__next40pxDefaultSize
+						variant="primary"
+						isBusy={ 'copy' === busy }
+						disabled={ !! busy }
+						onClick={ copy }
+					>
+						{ __( 'Copy to Theme', 'pattern-builder' ) }
+					</Button>
 				</PanelBody>
 
 				<PanelBody

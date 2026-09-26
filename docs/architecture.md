@@ -431,6 +431,14 @@ itself, read back and misjudged, becomes a pattern the plugin refuses to save â€
 so the shapes here and the strings the two writers produce have to be changed
 together.
 
+**A write is followed by a read, so the file has to be forgotten first.** A save
+answers with the pattern as it now is, which means running the file that was
+just written â€” and PHP will hand back the file as it *was*, from the stat cache
+and from opcache, which under the usual `validate_timestamps` does not look at
+an mtime again for a second or two. `forget_compiled()` drops both after every
+write. Without it a save appears not to have taken: the response, and anything
+read in the moment after it, describe the markup that was replaced.
+
 `hasCustomPhp` carries the answer through the REST response and an agent's pattern
 summary, and `refuse_if_file_has_custom_php()` turns it into a 409 at both
 `update_theme_pattern()`, before anything has been imported or localized, and

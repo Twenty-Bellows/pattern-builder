@@ -11,7 +11,10 @@ import {
 	__experimentalVStack as VStack,
 } from '@wordpress/components';
 import { cloudUpload } from '@wordpress/icons';
-import { useDispatch } from '@wordpress/data';
+import { parse, serialize } from '@wordpress/blocks';
+import { useDispatch, useSelect } from '@wordpress/data';
+import { store as coreStore } from '@wordpress/core-data';
+import { store as editorStore } from '@wordpress/editor';
 import { store as noticesStore } from '@wordpress/notices';
 import { addQueryArgs } from '@wordpress/url';
 
@@ -33,6 +36,21 @@ import {
 
 const BASE = '/pattern-builder/v1/cloud';
 const LAST_COLLECTION_KEY = 'cloud-last-collection';
+
+/**
+ * A sentence naming blocks and the attributes each one lost, for a notice.
+ *
+ * @param {Array} blocks Entries from findOutdatedBlocks() with a `dropped` list.
+ * @return {string} e.g. `cover (overlayColor), group (layout)`.
+ */
+function describeDropped( blocks ) {
+	return blocks
+		.map(
+			( block ) =>
+				`${ block.title } (${ ( block.dropped || [] ).join( ', ' ) })`
+		)
+		.join( ', ' );
+}
 
 /**
  * The account's collections, fetched once the panel knows it is connected.
@@ -171,6 +189,29 @@ export function PatternCloudControls( {
 		() => findOutdatedBlocks( content ),
 		[ content ]
 	);
+	// Two different things, and only one of them is fixed by rewriting. A block stored in an
+	// old form is rewritten into the current one; an attribute the block type does not read
+	// is sitting in the markup unread, and a rewrite is what would finally discard it.
+	const oldForm = useMemo(
+		() => outdated.filter( ( block ) => block.reason === 'old-form' ),
+		[ outdated ]
+	);
+	const dropping = useMemo(
+		() =>
+			outdated.filter(
+				( block ) => block.reason === 'dropped-attribute'
+			),
+		[ outdated ]
+	);
+
+	const postType = 'theme' === patternType ? 'pb_pattern' : 'wp_block';
+	// In the editor this pattern's blocks are already the parsed, current ones, so saving is
+	// the rewrite — and writing the entity from here would go behind the canvas's back.
+	const isOpenInTheEditor = useSelect(
+		( select ) => select( editorStore )?.getCurrentPostId() === patternId,
+		[ patternId ]
+	);
+	const { receiveEntityRecords } = useDispatch( coreStore );
 
 	if ( ! state ) {
 		return <Spinner />;
@@ -223,6 +264,58 @@ export function PatternCloudControls( {
 				);
 			} );
 	};
+	/**
+	 * Parse the saved markup and write it back out, which is what opening the pattern in the
+	 * editor and saving it does: every block is read through its deprecations and serialized
+	 * in the form its current `save()` produces.
+	 *
+	 * The answer is put straight into the store rather than the request being left to settle
+	 * on its own, because a theme pattern is written through `format_block_markup()` and read
+	 * back by running its file — so what the pattern now is, is whatever the server says it
+	 * is, and the notice has to be recomputed from that.
+	 */
+	const rewrite = async () => {
+		if ( busy ) {
+			return;
+		}
+		setBusy( 'rewrite' );
+		setError( '' );
+
+		try {
+			const saved = await apiFetch( {
+				path:
+					'theme' === patternType
+						? `/pattern-builder/v1/patterns/${ patternId }`
+						: `/wp/v2/blocks/${ patternId }`,
+				method: 'PUT',
+				data: { content: serialize( parse( content ) ) },
+			} );
+
+			receiveEntityRecords(
+				'postType',
+				postType,
+				saved,
+				undefined,
+				true
+			);
+			setBusy( '' );
+			createSuccessNotice(
+				__( 'Pattern rewritten.', 'pattern-builder' ),
+				{ type: 'snackbar' }
+			);
+			onRefresh();
+		} catch ( err ) {
+			setBusy( '' );
+			setError(
+				err?.message ||
+					__(
+						'The pattern could not be rewritten.',
+						'pattern-builder'
+					)
+			);
+		}
+	};
+
 	const deleteFromCloud = () => {
 		if ( busy ) {
 			return;
@@ -380,15 +473,49 @@ export function PatternCloudControls( {
 				</Notice>
 			) }
 
-			{ ! blockedByInvalidBlocks && outdated.length > 0 && (
+			{ ! blockedByInvalidBlocks && oldForm.length > 0 && (
+				<Notice status="warning" isDismissible={ false }>
+					<VStack spacing={ 2 }>
+						<span>
+							{ sprintf(
+								/* translators: %s: comma separated block names, e.g. "heading (2), list". */
+								__(
+									'Stored in an older form: %s. These upload and render, but WordPress reads them as a previous version of the block, so styling set on them may not be applied.',
+									'pattern-builder'
+								),
+								describeBlocks( oldForm )
+							) }
+						</span>
+						{ isOpenInTheEditor ? (
+							<span>
+								{ __(
+									'Save the pattern to rewrite them.',
+									'pattern-builder'
+								) }
+							</span>
+						) : (
+							<Button
+								variant="secondary"
+								isBusy={ busy === 'rewrite' }
+								disabled={ !! busy }
+								onClick={ rewrite }
+							>
+								{ __( 'Rewrite pattern', 'pattern-builder' ) }
+							</Button>
+						) }
+					</VStack>
+				</Notice>
+			) }
+
+			{ ! blockedByInvalidBlocks && dropping.length > 0 && (
 				<Notice status="warning" isDismissible={ false }>
 					{ sprintf(
-						/* translators: %s: comma separated block names, e.g. "heading (2), list". */
+						/* translators: %s: block names with the attributes each one lost, e.g. "cover (overlayColor)". */
 						__(
-							'Stored in an older form: %s. These upload and render, but WordPress reads them as a previous version of the block, so styling set on them may not be applied. Open the pattern in the editor and save it to rewrite them.',
+							'Settings no block type reads are stored on: %s. They are in the markup but nothing applies them, and saving the pattern — here or in the editor — is what would discard them. Open it in the editor and set what you meant on the block itself.',
 							'pattern-builder'
 						),
-						describeBlocks( outdated )
+						describeDropped( dropping )
 					) }
 				</Notice>
 			) }
