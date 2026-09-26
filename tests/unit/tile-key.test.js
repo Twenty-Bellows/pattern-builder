@@ -119,6 +119,35 @@ describe( 'tileUrls', () => {
 		);
 	} );
 
+	it( 'redraws a theme pattern that places a plugin one', () => {
+		// A `core/pattern` reference resolves against the registry, which holds plugin
+		// patterns as well as theme ones, so a plugin pattern is indexed by name too.
+		const banner = {
+			id: 'acme/banner',
+			name: 'acme/banner',
+			source: 'plugin',
+			content: paragraph( 'Banner' ),
+		};
+		const holder = theme( 'site/holder', reference( 'acme/banner' ) );
+		const before = tileUrls(
+			[ banner, holder ],
+			'https://example.test/',
+			'd1'
+		);
+		const after = tileUrls(
+			[ { ...banner, content: paragraph( 'New banner' ) }, holder ],
+			'https://example.test/',
+			'd1'
+		);
+
+		expect( after.get( 'site/holder' ) ).not.toBe(
+			before.get( 'site/holder' )
+		);
+		expect( before.get( 'acme/banner' ) ).toMatch(
+			/pattern_builder_tile=acme%2Fbanner/
+		);
+	} );
+
 	it( 'gives a page a new URL when a section changes, and no one else', () => {
 		const before = tileUrls(
 			[ hero, page, alone ],

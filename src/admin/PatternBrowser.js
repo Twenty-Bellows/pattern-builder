@@ -13,10 +13,11 @@ import { useSelect, useDispatch } from '@wordpress/data';
 import { store as coreStore } from '@wordpress/core-data';
 import { store as noticesStore } from '@wordpress/notices';
 
-import { fetchAllPatterns } from '../utils/resolvers';
+import { fetchAllPatterns, fetchPluginPatterns } from '../utils/resolvers';
 import { tileUrls } from '../utils/tileKey';
 import { PatternCard } from '../components/PatternCard';
 import { PatternDetailsPanel } from '../components/PatternDetailsPanel';
+import { PluginPatternDetailsPanel } from '../components/PluginPatternDetailsPanel';
 import { PatternCreatePanel } from '../components/PatternCreatePanel';
 import { PatternBuilderLogo } from '../assets/icons';
 import { TelemetryPrompt } from '../components/TelemetryPrompt';
@@ -31,16 +32,18 @@ const ALL = 'all';
 const UNCATEGORIZED = 'uncategorized';
 
 /**
- * The four collections a pattern can come from.
+ * The five collections a pattern can come from.
  */
 const THEME = 'theme';
 const USER = 'user';
+const PLUGIN = 'plugin';
 const UPLOADED = 'uploaded';
 const COMMUNITY = 'community';
 
 const COLLECTIONS = [
 	{ key: THEME, label: __( 'Theme', 'pattern-builder' ) },
 	{ key: USER, label: __( 'User', 'pattern-builder' ) },
+	{ key: PLUGIN, label: __( 'Plugin', 'pattern-builder' ) },
 	{ key: UPLOADED, label: __( 'Uploaded', 'pattern-builder' ) },
 	{ key: COMMUNITY, label: __( 'Directory', 'pattern-builder' ) },
 ];
@@ -119,9 +122,9 @@ function CategoryRail( { categories, active, onSelect } ) {
 }
 
 /**
- * The browse screen: a header with the four collection tabs, a category rail scoped to the
+ * The browse screen: a header with the five collection tabs, a category rail scoped to the
  * active tab (none on Directory, whose landing is its collections), a grid, and a details
- * sidebar that is always present.
+ * sidebar that is always present — read-only on Plugin, whose patterns belong to a plugin.
  *
  * @param {Object}   props                Component props.
  * @param {Function} props.onEdit         Called with the pattern to open its editor.
@@ -136,6 +139,9 @@ export function PatternBrowser( {
 	designVersion,
 } ) {
 	const [ patterns, setPatterns ] = useState( null );
+	// Null until the Plugin tab is first opened: a pattern plugin can register hundreds, and
+	// the other tabs never want them.
+	const [ pluginPatterns, setPluginPatterns ] = useState( null );
 	const [ search, setSearch ] = useState( '' );
 	const [ collection, setCollection ] = useState( THEME );
 	const [ category, setCategory ] = useState( ALL );
@@ -151,6 +157,7 @@ export function PatternBrowser( {
 	}, [] );
 
 	const isCloud = CLOUD_COLLECTIONS.includes( collection );
+	const isPlugin = collection === PLUGIN;
 
 	const refresh = useCallback( () => {
 		fetchAllPatterns()
@@ -159,13 +166,30 @@ export function PatternBrowser( {
 	}, [] );
 
 	useEffect( refresh, [ refresh ] );
+
+	useEffect( () => {
+		if ( ! isPlugin || null !== pluginPatterns ) {
+			return;
+		}
+
+		fetchPluginPatterns()
+			.then( setPluginPatterns )
+			.catch( () => setPluginPatterns( [] ) );
+	}, [ isPlugin, pluginPatterns ] );
 	const registeredCategories = useSelect(
 		( select ) => select( coreStore ).getBlockPatternCategories(),
 		[]
 	);
+	// Over both lists at once: a pattern in either can place one from the other, and its tile
+	// has to be redrawn when what it places changes.
 	const tiles = useMemo(
-		() => tileUrls( patterns, tileBase, designVersion ),
-		[ patterns, tileBase, designVersion ]
+		() =>
+			tileUrls(
+				[ ...( patterns || [] ), ...( pluginPatterns || [] ) ],
+				tileBase,
+				designVersion
+			),
+		[ patterns, pluginPatterns, tileBase, designVersion ]
 	);
 
 	const snackbarNotices = useSelect(
@@ -184,15 +208,17 @@ export function PatternBrowser( {
 		setSelectedId( null );
 		setCloudCollections( [] );
 	};
-	const collectionPatterns = useMemo(
-		() =>
-			( patterns || [] ).filter( ( pattern ) =>
-				collection === USER
-					? pattern.source === 'user'
-					: pattern.source === 'theme'
-			),
-		[ patterns, collection ]
-	);
+	const collectionPatterns = useMemo( () => {
+		if ( isPlugin ) {
+			return pluginPatterns || [];
+		}
+
+		return ( patterns || [] ).filter( ( pattern ) =>
+			collection === USER
+				? pattern.source === 'user'
+				: pattern.source === 'theme'
+		);
+	}, [ patterns, pluginPatterns, collection, isPlugin ] );
 
 	const categories = useMemo( () => {
 		if ( isCloud ) {
@@ -293,11 +319,20 @@ export function PatternBrowser( {
 
 	const selectedPattern = useMemo(
 		() =>
-			( patterns || [] ).find(
+			collectionPatterns.find(
 				( pattern ) => pattern.id === selectedId
 			) || null,
-		[ patterns, selectedId ]
+		[ collectionPatterns, selectedId ]
 	);
+
+	const isLoadingPlugins = isPlugin && null === pluginPatterns;
+	const emptyMessage =
+		isPlugin && collectionPatterns.length === 0
+			? __(
+					'No plugin on this site registers any patterns.',
+					'pattern-builder'
+			  )
+			: __( 'No patterns found.', 'pattern-builder' );
 
 	if ( null === patterns ) {
 		return (
@@ -378,14 +413,12 @@ export function PatternBrowser( {
 					{ ! isCloud && (
 						<>
 							<main className="pattern-builder-browser__main">
-								{ filteredPatterns.length === 0 && (
-									<p>
-										{ __(
-											'No patterns found.',
-											'pattern-builder'
-										) }
-									</p>
-								) }
+								{ isLoadingPlugins && <Spinner /> }
+
+								{ ! isLoadingPlugins &&
+									filteredPatterns.length === 0 && (
+										<p>{ emptyMessage }</p>
+									) }
 
 								<div className="pattern-builder-browser__grid">
 									{ filteredPatterns.map( ( pattern ) => (
@@ -409,12 +442,21 @@ export function PatternBrowser( {
 							</main>
 
 							<aside className="pattern-builder-browser__details">
-								<PatternDetailsPanel
-									key={ selectedPattern?.id || 'none' }
-									pattern={ selectedPattern }
-									onEdit={ onEdit }
-									onSaved={ refresh }
-								/>
+								{ isPlugin ? (
+									<PluginPatternDetailsPanel
+										key={ selectedPattern?.id || 'none' }
+										pattern={ selectedPattern }
+										onEdit={ onEdit }
+										onCopied={ refresh }
+									/>
+								) : (
+									<PatternDetailsPanel
+										key={ selectedPattern?.id || 'none' }
+										pattern={ selectedPattern }
+										onEdit={ onEdit }
+										onSaved={ refresh }
+									/>
+								) }
 							</aside>
 						</>
 					) }

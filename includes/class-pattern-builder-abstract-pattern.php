@@ -94,11 +94,20 @@ class Abstract_Pattern {
 	public $postTypes; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.PropertyNotSnakeCase
 
 	/**
-	 * Pattern source: 'theme' or 'user'.
+	 * Pattern source: 'theme', 'user', or 'plugin'.
 	 *
 	 * @var string
 	 */
 	public $source;
+
+	/**
+	 * What registered a plugin pattern, as a label to show — the plugin's name when one on
+	 * this site answers to the pattern's namespace, the namespace itself otherwise. Always
+	 * '' for a theme or user pattern.
+	 *
+	 * @var string
+	 */
+	public $plugin;
 
 	/**
 	 * Whether the pattern is synced.
@@ -177,6 +186,7 @@ class Abstract_Pattern {
 		$this->content     = $args['content'] ?? '';
 
 		$this->source   = $args['source'] ?? 'theme';
+		$this->plugin   = (string) ( $args['plugin'] ?? '' );
 		$this->synced   = $args['synced'] ?? false;
 		$this->inserter = $args['inserter'] ?? true;
 
@@ -195,7 +205,7 @@ class Abstract_Pattern {
 		$this->additionalMetadata = (string) ( $args['additionalMetadata'] ?? '' ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 		$this->hasCustomPhp       = (bool) ( $args['hasCustomPhp'] ?? false ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName
 
-		$this->id = $args['id'] ?? ( 'theme' === $this->source ? $this->name : null );
+		$this->id = $args['id'] ?? ( 'user' === $this->source ? null : $this->name );
 	}
 
 	/**
@@ -384,6 +394,37 @@ class Abstract_Pattern {
 		// Blank lines within the block are the author's paragraph breaks and are kept; the
 		// ones the opening and closing lines leave behind are not.
 		return trim( implode( "\n", $lines ), "\n" );
+	}
+
+	/**
+	 * Creates an Abstract_Pattern from an entry in the block pattern registry — a pattern
+	 * some plugin registered in PHP, which this site can render and copy but never write.
+	 *
+	 * @param array  $registered The pattern as WP_Block_Patterns_Registry reports it.
+	 * @param string $plugin     A label for what registered it, or '' when it is unknown.
+	 * @return self
+	 */
+	public static function from_registered( array $registered, $plugin = '' ) {
+		return new self(
+			array(
+				'name'          => (string) ( $registered['name'] ?? '' ),
+				'title'         => (string) ( $registered['title'] ?? '' ),
+				'description'   => (string) ( $registered['description'] ?? '' ),
+				'content'       => (string) ( $registered['content'] ?? '' ),
+				'categories'    => array_values( (array) ( $registered['categories'] ?? array() ) ),
+				'keywords'      => array_values( (array) ( $registered['keywords'] ?? array() ) ),
+				'blockTypes'    => array_values( (array) ( $registered['blockTypes'] ?? array() ) ),
+				'postTypes'     => array_values( (array) ( $registered['postTypes'] ?? array() ) ),
+				'templateTypes' => array_values( (array) ( $registered['templateTypes'] ?? array() ) ),
+				'viewportWidth' => $registered['viewportWidth'] ?? null,
+				'inserter'      => false !== ( $registered['inserter'] ?? true ),
+				'source'        => 'plugin',
+				'plugin'        => $plugin,
+				// A registered pattern has no `Synced:` header to read, and nothing to write
+				// one to, so it is only ever an ordinary pattern.
+				'synced'        => false,
+			)
+		);
 	}
 
 	/**

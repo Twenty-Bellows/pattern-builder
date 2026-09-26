@@ -730,7 +730,8 @@ class Pattern_Builder_Preview {
 	}
 
 	/**
-	 * Find a pattern by name or post ID.
+	 * Find a pattern by name or post ID, in the order the site owns them: a user pattern's
+	 * post, then the theme's own files, then the patterns a plugin registered.
 	 *
 	 * @param string $id Pattern id.
 	 * @return Abstract_Pattern|\WP_Error
@@ -754,6 +755,10 @@ class Pattern_Builder_Preview {
 
 		$store   = new Pattern_File_Store();
 		$pattern = $store->find_theme_pattern( $id );
+
+		if ( ! $pattern ) {
+			$pattern = $store->find_plugin_pattern( $id );
+		}
 
 		if ( ! $pattern ) {
 			return new \WP_Error(

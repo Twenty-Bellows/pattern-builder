@@ -12,6 +12,6 @@ export {
 	setImportImagesSetting,
 } from './localStorage';
 
-export { fetchAllPatterns } from './resolvers';
+export { fetchAllPatterns, fetchPluginPatterns } from './resolvers';
 
 export { PatternSaveMonitor } from './patternSaveMonitor';

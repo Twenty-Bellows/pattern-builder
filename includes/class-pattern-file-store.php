@@ -116,6 +116,127 @@ class Pattern_File_Store {
 	}
 
 	/**
+	 * Every pattern registered in PHP by something other than this site's own theme — what
+	 * the browse page files under Plugin. Read-only: there is no file to write and no row to
+	 * update, so a copy is the only way to change one.
+	 *
+	 * @return Abstract_Pattern[]
+	 */
+	public function get_plugin_patterns() {
+		$theme_slugs = $this->theme_pattern_slugs();
+		$patterns    = array();
+
+		foreach ( \WP_Block_Patterns_Registry::get_instance()->get_all_registered() as $registered ) {
+			$name = (string) ( $registered['name'] ?? '' );
+
+			if ( '' === $name || isset( $theme_slugs[ $name ] ) || self::is_wordpress_own( $registered ) ) {
+				continue;
+			}
+
+			$patterns[] = Abstract_Pattern::from_registered( $registered, self::plugin_label( $name ) );
+		}
+
+		return $patterns;
+	}
+
+	/**
+	 * Finds a single plugin pattern by its registered name.
+	 *
+	 * @param string $name Pattern name including namespace.
+	 * @return Abstract_Pattern|null
+	 */
+	public function find_plugin_pattern( $name ) {
+		$name       = (string) $name;
+		$registered = \WP_Block_Patterns_Registry::get_instance()->get_registered( $name );
+
+		if ( ! is_array( $registered ) || self::is_wordpress_own( $registered ) || isset( $this->theme_pattern_slugs()[ $name ] ) ) {
+			return null;
+		}
+
+		return Abstract_Pattern::from_registered( $registered, self::plugin_label( $name ) );
+	}
+
+	/**
+	 * Whether a registered pattern is one WordPress itself put there — a core pattern or one
+	 * fetched from the pattern directory. Core is the only thing that sets `source`; a
+	 * pattern a theme or plugin registered carries none.
+	 *
+	 * @param array $registered The pattern as the registry reports it.
+	 * @return bool
+	 */
+	private static function is_wordpress_own( array $registered ) {
+		$source = (string) ( $registered['source'] ?? '' );
+
+		return 'core' === $source || 0 === strpos( $source, 'pattern-directory' );
+	}
+
+	/**
+	 * The slugs the theme's own pattern files claim, as a lookup.
+	 *
+	 * The registry cannot be asked which of its entries came from the theme: resolving a
+	 * pattern's content unsets the `filePath` that would say so, so by the second time
+	 * anything looks it is gone. So the files are read — the same directories everything else
+	 * here reads, which is what keeps this honest while a lab theme is worn, and only their
+	 * `Slug:` header rather than a full scan, which would render every one of them.
+	 *
+	 * @return array slug => true
+	 */
+	private function theme_pattern_slugs() {
+		$slugs = array();
+
+		foreach ( $this->get_pattern_directories() as $directory ) {
+			foreach ( $this->pattern_files_in( $directory ) as $pattern_file ) {
+				$slug = trim( get_file_data( $pattern_file, array( 'slug' => 'Slug' ) )['slug'] );
+
+				if ( '' !== $slug ) {
+					$slugs[ $slug ] = true;
+				}
+			}
+		}
+
+		return $slugs;
+	}
+
+	/**
+	 * What to call the thing that registered a pattern: the name of an installed plugin whose
+	 * directory or text domain matches the pattern's namespace, or the namespace itself.
+	 *
+	 * @param string $name Pattern name including namespace.
+	 * @return string
+	 */
+	private static function plugin_label( $name ) {
+		static $names = null;
+
+		$namespace = strtok( (string) $name, '/' );
+
+		if ( ! is_string( $namespace ) || '' === $namespace ) {
+			return '';
+		}
+
+		if ( null === $names ) {
+			if ( ! function_exists( 'get_plugins' ) ) {
+				require_once ABSPATH . 'wp-admin/includes/plugin.php';
+			}
+
+			$names = array();
+
+			foreach ( get_plugins() as $file => $plugin ) {
+				if ( empty( $plugin['Name'] ) ) {
+					continue;
+				}
+
+				foreach ( array( dirname( $file ), $plugin['TextDomain'] ?? '' ) as $key ) {
+					if ( '' !== $key && '.' !== $key && ! isset( $names[ $key ] ) ) {
+						$names[ $key ] = (string) $plugin['Name'];
+					}
+				}
+			}
+		}
+
+		return $names[ $namespace ] ?? $namespace;
+	}
+
+	/**
 	 * Every cloud name a local pattern answers to, with the pattern it names.
 	 *
 	 * @return array name => { type: string, id: string|int, title: string }
@@ -300,7 +421,40 @@ class Pattern_File_Store {
 		}
 
 		$filepath = $this->get_pattern_filepath( $pattern );
-		$pattern  = $this->export_pattern_image_assets( $pattern );
+		$created  = $this->create_user_pattern( $pattern );
+
+		if ( is_wp_error( $created ) ) {
+			return $created;
+		}
+
+		if ( ! is_wp_error( $filepath ) && $filepath ) {
+			$deleted = Pattern_Builder_Security::safe_file_delete(
+				$filepath,
+				array(
+					get_stylesheet_directory() . '/patterns',
+					get_template_directory() . '/patterns',
+				)
+			);
+
+			if ( is_wp_error( $deleted ) ) {
+				return $deleted;
+			}
+		}
+
+		$this->flush_pattern_caches();
+
+		return $created;
+	}
+
+	/**
+	 * Writes a pattern into the database as a new `wp_block`, exporting the images it points
+	 * at into the media library so the post does not depend on the files it came from.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern to write.
+	 * @return Abstract_Pattern|WP_Error The new user pattern, with its post ID.
+	 */
+	public function create_user_pattern( Abstract_Pattern $pattern ) {
+		$pattern = $this->export_pattern_image_assets( $pattern );
 
 		$post_id = wp_insert_post(
 			array(
@@ -331,21 +485,6 @@ class Pattern_File_Store {
 		if ( $pattern->cloud ) {
 			update_post_meta( $post_id, self::META_CLOUD, $pattern->cloud );
 		}
-		if ( ! is_wp_error( $filepath ) && $filepath ) {
-			$deleted = Pattern_Builder_Security::safe_file_delete(
-				$filepath,
-				array(
-					get_stylesheet_directory() . '/patterns',
-					get_template_directory() . '/patterns',
-				)
-			);
-
-			if ( is_wp_error( $deleted ) ) {
-				return $deleted;
-			}
-		}
-
-		$this->flush_pattern_caches();
 
 		return Abstract_Pattern::from_post( get_post( $post_id ) );
 	}

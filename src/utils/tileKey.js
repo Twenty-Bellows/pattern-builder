@@ -88,7 +88,11 @@ export function tileKey( pattern, resolve, designVersion ) {
 /**
  * The tile URL of every pattern in a listing, by pattern id.
  *
- * @param {Array}  patterns      Every local pattern: `id`, `name`, `source`, `content`.
+ * A `core/pattern` reference resolves against the block pattern registry, which holds theme
+ * and plugin patterns and never user ones — so those two are indexed by name and a user
+ * pattern by the post id a `core/block` names.
+ *
+ * @param {Array}  patterns      Every pattern on screen: `id`, `name`, `source`, `content`.
  * @param {string} base          Where tiles are drawn (the site's front end).
  * @param {string} designVersion What every tile depends on.
  * @return {Map} Pattern id => tile URL.
@@ -97,10 +101,10 @@ export function tileUrls( patterns, base, designVersion ) {
 	const byName = new Map();
 	const byId = new Map();
 	for ( const pattern of patterns || [] ) {
-		if ( pattern.source === 'theme' ) {
-			byName.set( pattern.name, pattern.content );
-		} else {
+		if ( pattern.source === 'user' ) {
 			byId.set( String( pattern.id ), pattern.content );
+		} else {
+			byName.set( pattern.name, pattern.content );
 		}
 	}
 

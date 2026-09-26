@@ -492,6 +492,27 @@ class Test_Preview extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The browse grid's Plugin tab draws its tiles the same way, so a pattern a plugin
+	 * registered has to be findable by name like a theme pattern is.
+	 */
+	public function test_a_tile_draws_a_pattern_a_plugin_registered() {
+		register_block_pattern(
+			'acme/tile-probe',
+			array(
+				'title'   => 'Acme Tile Probe',
+				'content' => '<!-- wp:paragraph --><p>Registered copy.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$tile = $this->preview->tile( 'acme/tile-probe', true );
+
+		unregister_block_pattern( 'acme/tile-probe' );
+
+		$this->assertSame( 200, $tile['status'] );
+		$this->assertStringContainsString( 'Registered copy.', $tile['body'] );
+	}
+
+	/**
 	 * The part of every tile's key that is not the pattern: it holds still, and moves when
 	 * something every tile depends on does.
 	 */

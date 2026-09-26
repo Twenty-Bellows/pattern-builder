@@ -200,11 +200,11 @@ this screen to users who can already edit the pattern.
 
 ## The browse page
 
-Appearance → Pattern Builder is a Site-Editor-style library: a header with four
-collection tabs (User, Theme, Uploaded, Directory — the last two served by the
-cloud browser), each with its own search and category rail, over a grid of
-fixed-size square tiles, plus an always-present details sidebar whose Save and
-Edit actions sit above the same panels the editor shows.
+Appearance → Pattern Builder is a Site-Editor-style library: a header with five
+collection tabs (Theme, User, Plugin, Uploaded, Directory — the last two served
+by the cloud browser), each with its own search and category rail, over a grid
+of fixed-size square tiles, plus an always-present details sidebar whose Save
+and Edit actions sit above the same panels the editor shows.
 
 **Every tile is a document drawn by a server.** A cloud tile is the service's
 preview document; a local tile is this site's own front-end render
@@ -240,6 +240,53 @@ The page prints the server-registered block bindings sources, as
 `edit-form-blocks.php` does: without those label-bearing stubs core's
 `registerBlockBindingsSource()` refuses every source silently, and a pattern
 filling another's slots renders the other pattern's placeholder copy.
+
+### Patterns a plugin registered (`Plugin`)
+
+A pattern plugin puts its patterns in the block pattern registry and nowhere
+else. There is no file this plugin may write and no row to update, so the
+Plugin tab is the one read-only collection of local patterns:
+`PluginPatternDetailsPanel` shows what the plugin declared and offers a copy
+rather than an edit, and the only way to change one — or to put one on the
+cloud, which needs somewhere to keep the `Cloud:` reference — is to copy it
+first.
+
+**What counts as one** is decided by `Pattern_File_Store::get_plugin_patterns()`:
+everything in the registry except what WordPress itself put there (`source` of
+`core` or `pattern-directory/*`, which core sets and nothing else does) and
+every slug the theme's own pattern files claim. The registry cannot be asked
+which of its entries came from the theme — `get_all_registered()` unsets a
+pattern's `filePath` as a side effect of resolving its content, so by the
+second call it is gone — which is why `theme_pattern_slugs()` reads the `Slug:`
+header of the files in `get_pattern_directories()`. Those are the same
+directories the rest of the store reads, so the answer stays right while a lab
+theme is worn, and a header read is not the render a full scan would be.
+
+A pattern registered by a *theme*, from its `functions.php` rather than a file
+in `patterns/`, lands here too. It is rare, and it is read-only for the same
+reason, so the tab is right about it even though its label is not.
+
+**Which plugin** is a label, not a fact the registry keeps: `plugin_label()`
+matches the pattern's namespace against the installed plugins by directory slug
+and text domain, and falls back to the namespace itself.
+
+**The listing is asked for.** `GET /pattern-builder/v1/patterns` still answers
+with the patterns this site owns; `?source=plugin` answers with these instead,
+and the tab fetches them the first time it is opened. A pattern plugin can
+register hundreds, and the editor's own sidebar — which lists everything the
+unqualified route returns — wants none of them.
+
+**A copy is an ordinary create.** `POST /patterns` takes `fromPlugin` beside
+`fromWpBlock`, and `source` says where the copy lands: a theme file through
+`update_theme_pattern()`, which pulls the images the pattern points at into the
+theme's `assets/images` on the way, or a `wp_block` through
+`create_user_pattern()`, which exports them to the media library instead. The
+user picked a pattern rather than a slug, so a name the theme already uses is
+numbered rather than refused. The copy carries a line in its header comment
+saying which registered pattern it came from — `additionalMetadata`, which
+WordPress ignores, the theme carries, and [the cloud deliberately leaves
+behind](cloud.md). `Origin:` is not used for it: that header names a cloud
+pattern and the service validates its shape.
 
 ## Creating a pattern
 
@@ -366,6 +413,11 @@ a different capability, which a multisite site administrator does not have.
 styles: `standalone` on its own, `page` inside the resolved page template, and
 either one against a bundled lab theme through the route's `theme` parameter.
 
+`find()` resolves what to render in the order the site owns them — a numeric id
+as a `wp_block` post, then the theme's own files, then the registry — which is
+what lets the browse grid draw a tile for a plugin pattern the same way it
+draws one for a theme pattern.
+
 Every render needs a post to exist, so a stand-in is primed into the object
 cache for one request and never written. Two things make it work:
 `core/post-content` checks `$block->context['postId']` and refuses without it,
@@ -422,8 +474,8 @@ map*, then deletes the rows and the old capabilities.
 |---|---|
 | `Pattern_Builder` | Singleton bootstrap; requires and wires every component. |
 | `Pattern_Builder_Entity` | The rowless `pb_pattern` post type. |
-| `Pattern_Builder_REST_Patterns_Controller` | String-ID CRUD for theme patterns; the collection also lists `wp_block` so one request paints the library. |
-| `Pattern_File_Store` | The file pipeline: theme scanning, header round-trip, image import/export, conversions, cache flushing. |
+| `Pattern_Builder_REST_Patterns_Controller` | String-ID CRUD for theme patterns; the collection also lists `wp_block` so one request paints the library, and answers `?source=plugin` with the registered ones. |
+| `Pattern_File_Store` | The file pipeline: theme scanning, the registry read behind the Plugin tab, header round-trip, image import/export, conversions, cache flushing. |
 | `Pattern_Builder_API` | `POST /pattern-builder/v1/process-theme` (bulk localize / import images). |
 | `Pattern_Builder_Admin` | Appearance → Pattern Builder: the browse grid and the edit-mode boot. |
 | `Pattern_Builder_Editor` | Enqueues the management bundle on block-editor screens. |
@@ -457,8 +509,8 @@ Three webpack bundles:
 
 Supporting modules: `src/admin/` (App, PatternBrowser, editor-boot),
 `src/cloud/` (see [`cloud.md`](cloud.md)), `src/components/`, `src/objects/`,
-`src/utils/` (`tileKey`, `patternTree`, `blockValidity`, `telemetry`,
-`bindings`), and
+`src/utils/` (`tileKey`, `patternTree`, `blockValidity`, `patternExport`,
+`telemetry`, `bindings`), and
 `src/runtime/` (vendored; keep identical to the companion's `src/`).
 
 State comes from the core data stores (`core`, `core/editor`,

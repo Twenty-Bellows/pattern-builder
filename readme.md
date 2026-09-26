@@ -4,6 +4,8 @@ A WordPress plugin for creating, editing and organising block patterns in the
 admin. Theme patterns (PHP files in `patterns/`) and user patterns (`wp_block`
 posts) are managed in one interface, edited in the WordPress editor, and
 optionally shared through [patternbuilderwp.com](https://patternbuilderwp.com).
+Patterns a plugin registers are browsable beside them, and copying one makes it
+yours to edit.
 
 Agents can drive the same operations through WordPress core's Abilities API.
 

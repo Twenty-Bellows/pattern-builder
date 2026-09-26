@@ -12,26 +12,10 @@ import { store as editorStore } from '@wordpress/editor';
 import { store as noticesStore } from '@wordpress/notices';
 
 import { getBrowseUrl, navigateToPattern } from '../utils/patternNavigation';
-
-/**
- * Hand the browser a file without a round trip to the server.
- *
- * @param {string} filename Download filename.
- * @param {string} contents File contents.
- * @param {string} mime     MIME type.
- */
-function downloadFile( filename, contents, mime ) {
-	const url = window.URL.createObjectURL(
-		new window.Blob( [ contents ], { type: mime } )
-	);
-	const link = document.createElement( 'a' );
-	link.href = url;
-	link.download = filename;
-	document.body.appendChild( link );
-	link.click();
-	link.remove();
-	window.URL.revokeObjectURL( url );
-}
+import {
+	downloadPatternJson,
+	downloadPatternMarkup,
+} from '../utils/patternExport';
 
 /**
  * Whole-pattern actions: duplicate, delete, and the two exports.
@@ -181,29 +165,19 @@ export const PatternActionsPanel = ( { patternPost, postType, onChanged } ) => {
 			);
 	};
 
-	const exportJson = () => {
-		downloadFile(
-			`${ slug || 'pattern' }.json`,
-			JSON.stringify(
-				{
-					title,
-					slug,
-					description: patternPost.description || '',
-					categories: patternPost.categories || [],
-					keywords: patternPost.keywords || [],
-					viewportWidth: patternPost.viewportWidth || undefined,
-					synced: !! patternPost.synced,
-					content,
-				},
-				null,
-				2
-			),
-			'application/json'
-		);
+	const exportable = {
+		title,
+		slug,
+		description: patternPost.description || '',
+		categories: patternPost.categories || [],
+		keywords: patternPost.keywords || [],
+		viewportWidth: patternPost.viewportWidth || undefined,
+		synced: !! patternPost.synced,
+		content,
 	};
 
-	const exportMarkup = () =>
-		downloadFile( `${ slug || 'pattern' }.html`, content, 'text/html' );
+	const exportJson = () => downloadPatternJson( exportable );
+	const exportMarkup = () => downloadPatternMarkup( exportable );
 
 	return (
 		<VStack spacing={ 2 }>
