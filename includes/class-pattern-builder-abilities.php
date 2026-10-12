@@ -401,15 +401,15 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/list-patterns',
 			array(
 				'label'               => __( 'List patterns', 'pattern-builder' ),
-				'description'         => __( 'Returns the patterns on this site: theme patterns (PHP files in the theme) and user patterns (reusable blocks in the database), with their names, titles, categories, placement headers and synced status. Content is omitted; use get-pattern for one pattern\'s markup. Also returns the pattern categories registered here, which are the only ones the inserter files a pattern under — a category slug nothing registered lands the pattern in Uncategorized.', 'pattern-builder' ),
+				'description'         => __( 'Returns the patterns on this site: theme patterns (PHP files in the theme), user patterns (reusable blocks in the database), and the ones a plugin registers, with their names, titles, categories, placement headers and synced status. A plugin pattern is read-only — it lives in the block pattern registry and there is no file or row behind it, so update-pattern refuses one; read it to compose in its style, or copy it from the Plugin tab to get one of your own. A site with a pattern plugin can have hundreds of them, so narrow with `source` when you only want what you can edit. Content is omitted; use get-pattern for one pattern\'s markup. Also returns the pattern categories registered here, which are the only ones the inserter files a pattern under — a category slug nothing registered lands the pattern in Uncategorized.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
 					'properties'           => array(
 						'source' => array(
 							'type'        => 'string',
-							'enum'        => array( 'theme', 'user', 'all' ),
-							'description' => 'Which patterns to return. Defaults to all.',
+							'enum'        => array( 'theme', 'user', 'plugin', 'all' ),
+							'description' => 'Which patterns to return: the theme\'s files, the database\'s user patterns, the read-only ones a plugin registered, or all three. Defaults to all.',
 						),
 					),
 					'additionalProperties' => false,
@@ -447,11 +447,18 @@ class Pattern_Builder_Abilities {
 		$store  = new Pattern_File_Store();
 		$found  = array();
 
-		if ( 'user' !== $source ) {
+		$wants = static function ( $which ) use ( $source ) {
+			return 'all' === $source || $which === $source;
+		};
+
+		if ( $wants( 'theme' ) ) {
 			$found = array_merge( $found, $store->get_theme_patterns() );
 		}
-		if ( 'theme' !== $source ) {
+		if ( $wants( 'user' ) ) {
 			$found = array_merge( $found, $store->get_user_patterns() );
+		}
+		if ( $wants( 'plugin' ) ) {
+			$found = array_merge( $found, $store->get_plugin_patterns() );
 		}
 
 		$patterns = array();
@@ -1915,6 +1922,18 @@ class Pattern_Builder_Abilities {
 			return $existing;
 		}
 
+		if ( 'plugin' === $existing->source ) {
+			return new \WP_Error(
+				'pb_pattern_is_read_only',
+				sprintf(
+					/* translators: %s: pattern identifier. */
+					__( '%s is registered by a plugin, which owns it: it lives in the block pattern registry, with no file or row here to write. Copy it from the Plugin tab in Appearance → Pattern Builder — that brings it, and the patterns it places, into the theme as patterns of your own — and update that copy instead.', 'pattern-builder' ),
+					(string) $existing->name
+				),
+				array( 'status' => 409 )
+			);
+		}
+
 		$checked = Pattern_Builder_Markup_Checks::check(
 			(string) $input['content'],
 			'theme' === $existing->source ? (string) $existing->name : ''
@@ -3063,6 +3082,12 @@ class Pattern_Builder_Abilities {
 			if ( $namespaced !== $id ) {
 				$pattern = $store->find_theme_pattern( $namespaced );
 			}
+		}
+
+		// A pattern a plugin registered is found last and is read-only: every caller that
+		// writes checks the source it gets back.
+		if ( ! $pattern ) {
+			$pattern = $store->find_plugin_pattern( $id );
 		}
 
 		if ( ! $pattern ) {

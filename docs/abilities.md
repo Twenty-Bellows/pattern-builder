@@ -32,8 +32,8 @@ sets it).
 | `get-authoring-guide` | The pattern-authoring documentation as Markdown, and the two skills it makes up, as files to install. |
 | `get-design-system` | The merged presets, the `styles` a pattern inherits, and the `blockStyles` registered here — each marked `portable`. |
 | `list-block-types` | What is registered *on this site*; naming blocks also returns each one's `supports`. |
-| `list-patterns` | Every pattern's summary with its placement headers, any `origin` or `cloud` reference, and the registered pattern categories. |
-| `get-pattern` | One pattern. |
+| `list-patterns` | Every pattern's summary with its placement headers, any `origin` or `cloud` reference, and the registered pattern categories. `source` narrows it to the theme's files, the database's user patterns, or the read-only ones a plugin registered. |
+| `get-pattern` | One pattern, whichever of the three sources it comes from. |
 | `render-pattern` | The rendered HTML plus preview URLs — `standalone`, `page`, and `themes` against each lab theme. |
 | `find-media` | The images a pattern can point at, plus how to upload one. |
 | `list-fonts` | The font collection; naming a `family` describes that one, including whether it has a variable face. |
@@ -61,7 +61,7 @@ name this site does not have comes back under `unknown`.
 
 | Ability | Does |
 |---|---|
-| `create-pattern`, `update-pattern` | Take **finished markup** and persist it. |
+| `create-pattern`, `update-pattern` | Take **finished markup** and persist it. `update-pattern` refuses a pattern a plugin registered, which has no file or row here to write. |
 | `add-design-tokens` | Writes presets into the theme's `theme.json` or Global Styles. |
 | `set-global-styles` | Sets the `styles` a pattern inherits. |
 | `add-block-style-variation` | Registers a named look as a `styles/{slug}.json` partial. |

@@ -844,6 +844,46 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
+	 * An agent can see the patterns a plugin registers, read one, and render one — all three
+	 * go through the same lookup — but is told plainly that it cannot write one.
+	 */
+	public function test_an_agent_sees_the_patterns_a_plugin_registers() {
+		register_block_pattern(
+			'acme/agent-visible',
+			array(
+				'title'      => 'Acme Agent Visible',
+				'content'    => '<!-- wp:paragraph --><p>From a plugin.</p><!-- /wp:paragraph -->',
+				'categories' => array( 'banner' ),
+			)
+		);
+
+		$names = static function ( $listed ) {
+			return wp_list_pluck( $listed['patterns'], 'name' );
+		};
+
+		$this->assertContains( 'acme/agent-visible', $names( $this->abilities->execute_list_patterns( array( 'source' => 'plugin' ) ) ) );
+		$this->assertContains( 'acme/agent-visible', $names( $this->abilities->execute_list_patterns() ), 'the default listing is every source' );
+		$this->assertNotContains( 'acme/agent-visible', $names( $this->abilities->execute_list_patterns( array( 'source' => 'theme' ) ) ) );
+		$this->assertNotContains( 'acme/agent-visible', $names( $this->abilities->execute_list_patterns( array( 'source' => 'user' ) ) ) );
+
+		$read = $this->abilities->execute_get_pattern( array( 'id' => 'acme/agent-visible' ) );
+		$this->assertSame( 'plugin', $read['pattern']['source'] );
+		$this->assertStringContainsString( 'From a plugin.', $read['pattern']['content'] );
+
+		$refused = $this->abilities->execute_update_pattern(
+			array(
+				'id'      => 'acme/agent-visible',
+				'content' => '<!-- wp:paragraph --><p>Mine now.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$this->assertWPError( $refused );
+		$this->assertSame( 'pb_pattern_is_read_only', $refused->get_error_code() );
+
+		unregister_block_pattern( 'acme/agent-visible' );
+	}
+
+	/**
 	 * Rendering hands back somewhere to look, not just markup.
 	 */
 	public function test_rendering_offers_somewhere_to_look() {
