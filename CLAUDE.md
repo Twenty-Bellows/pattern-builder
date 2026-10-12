@@ -56,6 +56,15 @@ right trade. Each toolchain is looked for separately, so a checkout that
 installed only one of the two still gets that half rather than being waved past
 both.
 
+**A PHP test that writes a theme pattern must point the theme somewhere it owns
+first** — `use_a_writable_theme()` in the abilities tests, or the filtered temp
+directory the others set up. Left alone, `update_theme_pattern()` writes into
+the PHPUnit suite's own `default` fixture theme, which is the `template` for
+every test: the files survive `npm run clean`, and from then on every test that
+counts theme patterns sees two it did not create. It fails somewhere else, in a
+directory nobody thinks to look in, and stashing the test that wrote them does
+not undo it.
+
 **No Docker?** The PHP suite runs host-native on SQLite: download WordPress and
 the `sqlite-database-integration` plugin, copy that plugin's `db.copy` to
 `wp-content/db.php` with its two placeholders filled, write a
