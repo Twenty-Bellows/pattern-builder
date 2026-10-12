@@ -54,6 +54,7 @@ class Pattern_Builder_Abilities {
 		$this->register_editor_scripts();
 		$this->register_create_pattern();
 		$this->register_update_pattern();
+		$this->register_copy_plugin_pattern();
 		$this->register_add_design_tokens();
 		$this->register_set_global_styles();
 		$this->register_set_layout();
@@ -1754,6 +1755,116 @@ class Pattern_Builder_Abilities {
 					),
 				),
 			)
+		);
+	}
+
+	/**
+	 * Copy a pattern a plugin registered into the theme.
+	 */
+	private function register_copy_plugin_pattern() {
+		wp_register_ability(
+			'pattern-builder/copy-plugin-pattern',
+			array(
+				'label'               => __( 'Copy a plugin pattern', 'pattern-builder' ),
+				'description'         => __( 'Copies a pattern a plugin registered into the active theme, together with every pattern it places, and points the copy\'s references at the copies. The plugin keeps its own; the copy is yours to edit with update-pattern and to upload. Use this rather than reading a plugin pattern and storing its markup with create-pattern: that would leave a page pattern pointing at the plugin\'s sections, which cannot be uploaded, and would record nothing about where it came from. Copying the same pattern twice answers with the copy already in the theme rather than making a second, so two pages that place the same section end up sharing one copy of it. The markup is the plugin\'s and is copied as it stands, so the checks create-pattern runs over markup you wrote are not run here.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'name'  => array(
+							'type'        => 'string',
+							'description' => 'The registered name of the pattern to copy, as list-patterns reports it for a plugin pattern (e.g. "twentig/hero").',
+							'minLength'   => 1,
+						),
+						'title' => array(
+							'type'        => 'string',
+							'description' => 'A title for the copy. Defaults to the one the plugin registered. The patterns it places keep theirs.',
+						),
+					),
+					'required'             => array( 'name' ),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'pattern'    => array( 'type' => 'object' ),
+						'created'    => array(
+							'type'        => 'boolean',
+							'description' => 'False when the theme already carried a copy, which is the one returned.',
+						),
+						'copied'     => array(
+							'type'        => 'array',
+							'description' => 'The patterns written, leaves first: the copy and any it places that were not already here.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'unresolved' => array(
+							'type'        => 'array',
+							'description' => 'References nothing on this site answers to, left as they are. The plugin\'s own pattern renders them no better.',
+							'items'       => array( 'type' => 'string' ),
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_copy_plugin_pattern' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						// Copying the same pattern again answers with the copy already there.
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Copy a plugin pattern, and everything it places, into the theme.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_copy_plugin_pattern( $input ) {
+		$name  = isset( $input['name'] ) ? (string) $input['name'] : '';
+		$store = new Pattern_File_Store();
+
+		$plugin_pattern = $store->find_plugin_pattern( $name );
+
+		if ( null === $plugin_pattern ) {
+			return new \WP_Error(
+				'pb_plugin_pattern_not_found',
+				sprintf(
+					/* translators: %s: pattern identifier. */
+					__( 'No plugin on this site registers a pattern named %s. list-patterns with source "plugin" reports the ones it does.', 'pattern-builder' ),
+					$name
+				),
+				array( 'status' => 404 )
+			);
+		}
+
+		$overrides = array();
+		if ( isset( $input['title'] ) && '' !== trim( (string) $input['title'] ) ) {
+			$overrides['title'] = (string) $input['title'];
+		}
+
+		$copied = $store->copy_plugin_pattern( $plugin_pattern, $overrides );
+
+		if ( is_wp_error( $copied ) ) {
+			return $copied;
+		}
+
+		$summary = $this->summarize( $copied['pattern'] );
+
+		return $this->with_category_note(
+			array(
+				'pattern'    => $summary,
+				'created'    => $copied['created'],
+				'copied'     => $copied['copied'],
+				'unresolved' => $copied['unresolved'],
+			),
+			$summary
 		);
 	}
 

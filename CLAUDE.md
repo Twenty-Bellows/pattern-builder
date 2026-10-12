@@ -23,7 +23,7 @@ is right.
 | Document | Covers |
 |---|---|
 | [`docs/architecture.md`](docs/architecture.md) | The shape of the plugin: the rowless `pb_pattern` entity, the file store, editing surfaces, the browse grid and its tiles, previews and lab themes, the vendored runtime, the webpack bundles, the 1.x migration. |
-| [`docs/abilities.md`](docs/abilities.md) | The agent interface: the 26 abilities, how annotations pick the HTTP method, the markup checks, the validator, the authoring guides, media and fonts. |
+| [`docs/abilities.md`](docs/abilities.md) | The agent interface: the 27 abilities, how annotations pick the HTTP method, the markup checks, the validator, the authoring guides, media and fonts. |
 | [`docs/cloud.md`](docs/cloud.md) | patternbuilderwp.com: connecting, the proxy, the `pbp/1` porter, what travels with a pattern, `Safe_Css`, accounts and telemetry. |
 | [`docs/collections.md`](docs/collections.md) | Collections as the plugin sees them. |
 | [`docs/dependencies.md`](docs/dependencies.md) | Dependency trees and attribution. |

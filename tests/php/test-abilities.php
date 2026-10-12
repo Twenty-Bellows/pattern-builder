@@ -171,7 +171,7 @@ class Test_Abilities extends WP_UnitTestCase {
 			$this->assertTrue( $meta['show_in_rest'], $read . ' must be reachable over REST.' );
 		}
 
-		foreach ( array( 'create-pattern', 'update-pattern', 'add-design-tokens', 'set-global-styles', 'add-block-style-variation', 'set-layout', 'add-asset', 'add-placeholder-image', 'add-font' ) as $write ) {
+		foreach ( array( 'create-pattern', 'update-pattern', 'copy-plugin-pattern', 'add-design-tokens', 'set-global-styles', 'add-block-style-variation', 'set-layout', 'add-asset', 'add-placeholder-image', 'add-font' ) as $write ) {
 			$meta = wp_get_ability( 'pattern-builder/' . $write )->get_meta();
 			$this->assertFalse( $meta['annotations']['readonly'], $write . ' is not a read.' );
 			$this->assertFalse(
@@ -881,6 +881,60 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertSame( 'pb_pattern_is_read_only', $refused->get_error_code() );
 
 		unregister_block_pattern( 'acme/agent-visible' );
+	}
+
+	/**
+	 * Copying is the one way a plugin pattern becomes a pattern an agent can write, and it
+	 * brings the sections the pattern places with it rather than leaving them behind.
+	 */
+	public function test_an_agent_can_copy_a_plugin_pattern_with_what_it_places() {
+		// The copy writes pattern files, so it writes them somewhere this test owns.
+		$this->use_a_writable_theme();
+
+		register_block_pattern(
+			'acme/agent-hero',
+			array(
+				'title'   => 'Acme Agent Hero',
+				'content' => '<!-- wp:paragraph --><p>Hero.</p><!-- /wp:paragraph -->',
+			)
+		);
+		register_block_pattern(
+			'acme/agent-page',
+			array(
+				'title'   => 'Acme Agent Page',
+				'content' => '<!-- wp:pattern {"slug":"acme/agent-hero"} /-->',
+			)
+		);
+
+		$copied = $this->abilities->execute_copy_plugin_pattern( array( 'name' => 'acme/agent-page' ) );
+
+		$this->assertNotWPError( $copied );
+		$this->assertTrue( $copied['created'] );
+		$this->assertSame( array(), $copied['unresolved'] );
+		// Leaves first, so nothing is written pointing at a pattern that is not there yet.
+		$this->assertCount( 2, $copied['copied'] );
+		$this->assertStringEndsWith( '/agent-hero', $copied['copied'][0] );
+		$this->assertStringEndsWith( '/agent-page', $copied['copied'][1] );
+		$this->assertSame( 'theme', $copied['pattern']['source'] );
+		$this->assertSame( 'plugin:acme/agent-page', $copied['pattern']['origin'] );
+
+		// The copy places this site's own section, not the plugin's.
+		$read = $this->abilities->execute_get_pattern( array( 'id' => $copied['pattern']['name'] ) );
+		$this->assertStringContainsString( $copied['copied'][0], $read['pattern']['content'] );
+		$this->assertStringNotContainsString( 'acme/agent-hero', $read['pattern']['content'] );
+
+		// Asking again answers with the copy already there rather than making a second.
+		$again = $this->abilities->execute_copy_plugin_pattern( array( 'name' => 'acme/agent-page' ) );
+		$this->assertFalse( $again['created'] );
+		$this->assertSame( array(), $again['copied'] );
+		$this->assertSame( $copied['pattern']['name'], $again['pattern']['name'] );
+
+		$missing = $this->abilities->execute_copy_plugin_pattern( array( 'name' => 'acme/nothing' ) );
+		$this->assertWPError( $missing );
+		$this->assertSame( 'pb_plugin_pattern_not_found', $missing->get_error_code() );
+
+		unregister_block_pattern( 'acme/agent-page' );
+		unregister_block_pattern( 'acme/agent-hero' );
 	}
 
 	/**

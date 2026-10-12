@@ -1,6 +1,6 @@
 # Abilities — the agent interface
 
-Pattern Builder registers **26 abilities** with WordPress core's Abilities API:
+Pattern Builder registers **27 abilities** with WordPress core's Abilities API:
 nineteen in `Pattern_Builder_Abilities` and seven more for the cloud in
 `Pattern_Builder_Cloud_Abilities` (see [`cloud.md`](cloud.md)). Core exposes the
 registry over REST at `wp-abilities/v1`, and an MCP bridge over that surface
@@ -62,6 +62,7 @@ name this site does not have comes back under `unknown`.
 | Ability | Does |
 |---|---|
 | `create-pattern`, `update-pattern` | Take **finished markup** and persist it. `update-pattern` refuses a pattern a plugin registered, which has no file or row here to write. |
+| `copy-plugin-pattern` | Copies a plugin's pattern into the theme with everything it places, repointing its references at the copies. The one way one of those becomes a pattern an agent can write. |
 | `add-design-tokens` | Writes presets into the theme's `theme.json` or Global Styles. |
 | `set-global-styles` | Sets the `styles` a pattern inherits. |
 | `add-block-style-variation` | Registers a named look as a `styles/{slug}.json` partial. |
@@ -190,6 +191,13 @@ the three writes to run the check before (`create-pattern`, `update-pattern`,
 `upload-pattern`): an agent that goes straight to a write reads no guide, so
 the one step it cannot afford to skip sits where anyone asking what to read
 sees it first. A test asserts the abilities it names are registered.
+
+`copy-plugin-pattern` is a write and is deliberately not among them. The markup
+it stores is the plugin's, copied as it stands, and the checks exist to stop an
+agent persisting markup *it* composed — refusing a faithful copy over a fault in
+somebody else's pattern would close the only route by which that pattern becomes
+one this site can edit, while leaving the plugin's own copy rendering on the page
+regardless.
 
 ### Keeping a copy
 
