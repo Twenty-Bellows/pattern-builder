@@ -200,14 +200,15 @@ this screen to users who can already edit the pattern.
 
 ## The browse page
 
-Appearance → Pattern Builder is a Site-Editor-style library: a header with four
-collection tabs (User, Theme, Uploaded, Directory — the last two served by the
-cloud browser), each with its own search and category rail, over a grid of
-fixed-size square tiles, plus an always-present details sidebar: an Edit action
-that opens the pattern's own editor, over the Source and Actions panels. Those
-two act on the pattern as they are used rather than staging an edit, so the
-sidebar has nothing to save — everything that is edited rather than acted on is
-edited in the editor.
+Appearance → Pattern Builder is a Site-Editor-style library: a header with five
+collection tabs (Theme, User, Plugin, Uploaded, Directory — the last two served
+by the cloud browser), each with its own search and category rail, over a grid
+of fixed-size square tiles, plus an always-present details sidebar: an Edit
+action that opens the pattern's own editor, over the Source and Actions panels.
+Those two act on the pattern as they are used rather than staging an edit, so
+the sidebar has nothing to save — everything that is edited rather than acted on
+is edited in the editor. Plugin is the exception to the Edit action, and has its
+own sidebar: those patterns belong to a plugin and can only be copied.
 
 **Every tile is a document drawn by a server.** A cloud tile is the service's
 preview document; a local tile is this site's own front-end render
@@ -243,6 +244,78 @@ The page prints the server-registered block bindings sources, as
 `edit-form-blocks.php` does: without those label-bearing stubs core's
 `registerBlockBindingsSource()` refuses every source silently, and a pattern
 filling another's slots renders the other pattern's placeholder copy.
+
+### Patterns a plugin registered (`Plugin`)
+
+A pattern plugin puts its patterns in the block pattern registry and nowhere
+else. There is no file this plugin may write and no row to update, so the
+Plugin tab is the one read-only collection of local patterns:
+`PluginPatternDetailsPanel` shows what the plugin declared and offers a copy
+rather than an edit, and the only way to change one — or to put one on the
+cloud, which needs somewhere to keep the `Cloud:` reference — is to copy it
+first.
+
+**What counts as one** is decided by `Pattern_File_Store::get_plugin_patterns()`:
+everything in the registry except what WordPress itself put there (`source` of
+`core` or `pattern-directory/*`, which core sets and nothing else does) and
+every slug the theme's own pattern files claim. The registry cannot be asked
+which of its entries came from the theme — `get_all_registered()` unsets a
+pattern's `filePath` as a side effect of resolving its content, so by the
+second call it is gone — which is why `theme_pattern_slugs()` reads the `Slug:`
+header of the files in `get_pattern_directories()`. Those are the same
+directories the rest of the store reads, so the answer stays right while a lab
+theme is worn, and a header read is not the render a full scan would be.
+
+A pattern registered by a *theme*, from its `functions.php` rather than a file
+in `patterns/`, lands here too. It is rare, and it is read-only for the same
+reason, so the tab is right about it even though its label is not.
+
+**Which plugin** is a label, not a fact the registry keeps: `plugin_label()`
+matches the pattern's namespace against the installed plugins by directory slug
+and text domain, and falls back to the namespace itself.
+
+**The listing is asked for.** `GET /pattern-builder/v1/patterns` still answers
+with the patterns this site owns; `?source=plugin` answers with these instead,
+and the tab fetches them the first time it is opened. A pattern plugin can
+register hundreds, and the editor's own sidebar — which lists everything the
+unqualified route returns — wants none of them.
+
+**A copy takes the tree, and only into the theme.** `POST /patterns` takes
+`fromPlugin` beside `fromWpBlock`, and `Pattern_File_Store::copy_plugin_pattern()`
+writes the pattern and every pattern it places, leaves first, repointing each
+`core/pattern` reference at the copy through `repoint_references()`. The
+destination is not offered: a section has to stay reachable by `core/pattern`,
+which resolves against the block pattern registry, and a `wp_block` is never in
+it — the same reason a cloud install lands a dependency as a theme pattern.
+`update_theme_pattern()` pulls the images each one points at into the theme's
+`assets/images` on the way.
+
+Four things can be at the end of a reference, and each is answered differently:
+a pattern of the theme's own is left alone, because the reference already
+reaches it; one the theme already has a copy of is pointed at rather than
+copied again; a plugin pattern is copied; and a name nothing on this site
+answers to is left as it is and reported, since the plugin's own pattern
+renders it no better and refusing the copy would help nobody. A loop is
+refused, naming it.
+
+**Copying is idempotent**, which is what makes the second of two pages that
+share a section find the section already there rather than write `hero-2`. It
+rests on `Origin:` being machine-readable: `find_copy_of_plugin_pattern()`
+matches on the exact value, which a note in the header comment could not
+support. A name the theme uses for something *else* is still numbered — the
+user picked a pattern, not a slug.
+
+**`Origin:` records which registered pattern a copy came from**, under a
+scheme: `plugin:twentig/hero`. The scheme is the whole point. An origin is
+otherwise a cloud name, `{handle}/{collection}/{slug}`, which the service
+resolves to a pattern page and renders as a link — so a plugin's name reaching
+the service would publish a link to nothing. Counting segments would not have
+told the two apart, because nothing stops a plugin registering `acme/blocks/hero`
+and Pattern Builder writes three-segment names itself for cloud installs. A
+colon cannot occur in a cloud name, every segment of which is a slug, so the
+rule is exact and states itself: **an origin carrying a scheme never leaves
+this site**. `Pattern_File_Store::is_cloud_origin()` is that rule, and the
+porter asks it before putting an origin in a package.
 
 ## Creating a pattern
 
@@ -340,14 +413,35 @@ it sits outside the header comment and would be dropped just the same, so the
 conservative answer is the safe one. The cost is about the same as the `include`
 that already happens for every pattern read.
 
-There is one exception, and it is the plugin's own. A localized write turns a
-pattern's text into `<?php echo wp_kses_post( 'text', 'domain' ); ?>` and writes
-it out again the same way, so a file carrying those is still one the plugin can
-rebuild. `localized_string_ends_at()` matches that shape exactly — `echo`, one
-of `LOCALIZED_STRING_FUNCTIONS`, two quoted literals — and a variable, a
-concatenation or any other function fails it. A hand-written `esc_html_e()` is
-therefore custom PHP, correctly: its string would survive the round trip but the
-call around it would not.
+The exceptions are the plugin's own writes, and there are two of them.
+A localized write turns a pattern's text into
+`<?php echo wp_kses_post( 'text', 'domain' ); ?>`, and importing a pattern's
+images turns each one into `Pattern_Builder_Assets::theme_reference()` —
+`<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/images/x.svg' ); ?>`.
+Both round-trip: reading the file runs the call, writing it puts the same call
+back, so a file carrying either is still one the plugin can rebuild.
+
+`written_call_shapes()` names those two shapes in tokens and `shape_ends_at()`
+matches one exactly, down to the identifier in each position — the escape
+function is one of `LOCALIZED_STRING_FUNCTIONS`, the asset call is `esc_url`
+around `get_stylesheet_directory_uri`. A variable where a literal belongs, a
+different concatenation, or any other function fails. A hand-written
+`esc_html_e()` is therefore custom PHP, correctly, and so is the same `esc_url`
+reaching for a directory that is not the theme's: the string would survive the
+round trip but the call around it would not.
+
+Getting this list wrong is not a quiet failure. A pattern the plugin wrote
+itself, read back and misjudged, becomes a pattern the plugin refuses to save —
+so the shapes here and the strings the two writers produce have to be changed
+together.
+
+**A write is followed by a read, so the file has to be forgotten first.** A save
+answers with the pattern as it now is, which means running the file that was
+just written — and PHP will hand back the file as it *was*, from the stat cache
+and from opcache, which under the usual `validate_timestamps` does not look at
+an mtime again for a second or two. `forget_compiled()` drops both after every
+write. Without it a save appears not to have taken: the response, and anything
+read in the moment after it, describe the markup that was replaced.
 
 `hasCustomPhp` carries the answer through the REST response and an agent's pattern
 summary, and `refuse_if_file_has_custom_php()` turns it into a 409 at both
@@ -368,6 +462,11 @@ a different capability, which a multisite site administrator does not have.
 `Pattern_Builder_Preview` renders a pattern as a whole page with the site's
 styles: `standalone` on its own, `page` inside the resolved page template, and
 either one against a bundled lab theme through the route's `theme` parameter.
+
+`find()` resolves what to render in the order the site owns them — a numeric id
+as a `wp_block` post, then the theme's own files, then the registry — which is
+what lets the browse grid draw a tile for a plugin pattern the same way it
+draws one for a theme pattern.
 
 Every render needs a post to exist, so a stand-in is primed into the object
 cache for one request and never written. Two things make it work:
@@ -425,8 +524,8 @@ map*, then deletes the rows and the old capabilities.
 |---|---|
 | `Pattern_Builder` | Singleton bootstrap; requires and wires every component. |
 | `Pattern_Builder_Entity` | The rowless `pb_pattern` post type. |
-| `Pattern_Builder_REST_Patterns_Controller` | String-ID CRUD for theme patterns; the collection also lists `wp_block` so one request paints the library. |
-| `Pattern_File_Store` | The file pipeline: theme scanning, header round-trip, image import/export, conversions, cache flushing. |
+| `Pattern_Builder_REST_Patterns_Controller` | String-ID CRUD for theme patterns; the collection also lists `wp_block` so one request paints the library, and answers `?source=plugin` with the registered ones. |
+| `Pattern_File_Store` | The file pipeline: theme scanning, the registry read behind the Plugin tab, header round-trip, image import/export, conversions, cache flushing. |
 | `Pattern_Builder_API` | `POST /pattern-builder/v1/process-theme` (bulk localize / import images). |
 | `Pattern_Builder_Admin` | Appearance → Pattern Builder: the browse grid and the edit-mode boot. |
 | `Pattern_Builder_Editor` | Enqueues the management bundle on block-editor screens. |
@@ -460,8 +559,8 @@ Three webpack bundles:
 
 Supporting modules: `src/admin/` (App, PatternBrowser, editor-boot),
 `src/cloud/` (see [`cloud.md`](cloud.md)), `src/components/`, `src/objects/`,
-`src/utils/` (`tileKey`, `patternTree`, `blockValidity`, `telemetry`,
-`bindings`), and
+`src/utils/` (`tileKey`, `patternTree`, `blockValidity`, `patternExport`,
+`telemetry`, `bindings`), and
 `src/runtime/` (vendored; keep identical to the companion's `src/`).
 
 State comes from the core data stores (`core`, `core/editor`,

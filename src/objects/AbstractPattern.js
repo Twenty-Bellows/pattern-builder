@@ -19,6 +19,9 @@ export class AbstractPattern {
 	synced = false;
 	inserter = true;
 
+	// What registered a plugin pattern, to show in its details. '' for a theme or user one.
+	plugin = '';
+
 	blockTypes = [];
 	templateTypes = [];
 	postTypes = [];
@@ -39,6 +42,7 @@ export class AbstractPattern {
 		this.content = options.content?.raw ?? options.content ?? '';
 
 		this.source = options.source || '';
+		this.plugin = options.plugin || '';
 		this.synced = options.synced || false;
 		this.inserter = options.inserter === false ? false : true;
 

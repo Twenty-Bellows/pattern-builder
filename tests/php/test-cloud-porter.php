@@ -40,6 +40,45 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		);
 	}
 
+	/**
+	 * A user pattern with no image, carrying whatever origin the test wants.
+	 *
+	 * @param string $origin The origin to record.
+	 * @return int The post ID.
+	 */
+	private function make_user_pattern_with_origin( $origin ) {
+		$post_id = wp_insert_post(
+			array(
+				'post_title'   => 'Has an origin',
+				'post_name'    => 'has-an-origin',
+				'post_content' => '<!-- wp:paragraph --><p>Body.</p><!-- /wp:paragraph -->',
+				'post_type'    => 'wp_block',
+				'post_status'  => 'publish',
+			)
+		);
+		update_post_meta( $post_id, \TwentyBellows\PatternBuilder\Pattern_File_Store::META_ORIGIN, $origin );
+
+		return $post_id;
+	}
+
+	/**
+	 * The service resolves an origin to a pattern page and links it, so only a name it can
+	 * hold travels. A cloud name is bare; anything else carries a scheme and stays here.
+	 */
+	public function test_export_sends_a_cloud_origin() {
+		$porter   = new Pattern_Builder_Cloud_Porter();
+		$exported = $porter->export_local( 'user', $this->make_user_pattern_with_origin( 'studio-a/heroes/hero' ) );
+
+		$this->assertSame( 'studio-a/heroes/hero', $exported['pbp']['origin']['pattern'] );
+	}
+
+	public function test_export_keeps_a_plugin_origin_off_the_wire() {
+		$porter   = new Pattern_Builder_Cloud_Porter();
+		$exported = $porter->export_local( 'user', $this->make_user_pattern_with_origin( 'plugin:twentig/hero' ) );
+
+		$this->assertSame( '', $exported['pbp']['origin']['pattern'] );
+	}
+
 	public function test_export_user_pattern_bundles_assets() {
 		$fixture = $this->make_user_pattern_with_image();
 

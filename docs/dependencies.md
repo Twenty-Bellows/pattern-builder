@@ -63,7 +63,20 @@ The `Origin:` file header, and `pattern_builder_origin` post meta for user patte
 | Install, package carries an `origin` | Write it, unchanged. |
 | Install, no `origin`, and the package's handle is not the connected account's | Write the package's own name. |
 | Install, no `origin`, and it is the account's own pattern | Write nothing. |
-| Upload | Send the header if there is one. |
+| Copy from the Plugin tab | Write `plugin:` and the registered name. |
+| Upload | Send the header, unless it carries a scheme. |
+
+**An origin carrying a scheme never leaves this site.** A bare origin is a cloud
+name and the only kind the service can resolve: it renders one as *"Originally
+from {name}"* linking to that pattern's page, so a name it cannot hold would
+publish a link to nothing. A copy made from the Plugin tab names a registered
+pattern instead, which is not a cloud name, so it is written `plugin:twentig/hero`
+and `Pattern_File_Store::is_cloud_origin()` keeps it out of the package. Segment
+count would not have separated them — nothing stops a plugin registering
+`acme/blocks/hero`, and a cloud install writes three-segment names here itself —
+while a colon cannot occur in a cloud name, every segment of which is a slug.
+The plugin's credit therefore stops at the cloud boundary, as it would with a
+header of its own: the `pbp/1` payload is an explicit list of fields.
 
 Core parses a fixed list of pattern-file headers and ignores the rest, so `Origin:` is inert to WordPress and travels with the theme — which is the point. It sits beside the `Cloud:` header and is not the same thing: `Cloud:` names this pattern's own copy on the cloud and changes whenever the pattern goes up somewhere new, while an **origin** names whose work it started as and is never rewritten. A pattern installed from somebody else's collection and then shared again from yours carries both.
 

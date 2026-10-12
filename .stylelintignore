@@ -1,0 +1,14 @@
+# Stylelint reads this instead of its packaged defaults, so the directories any
+# run would skip are named first.
+node_modules/
+vendor/
+build/
+
+# And the three that sit in the working folder without being part of the tree,
+# none of them this repository's code: the wp.org working copy the ship scripts
+# check out, the WordPress themes wp-env is pointed at, and an agent's worktree.
+# Stylelint cannot read the ESLint config or phpcs.xml.dist, so the same list is
+# repeated here.
+svn/
+dev-assets/
+.claude/

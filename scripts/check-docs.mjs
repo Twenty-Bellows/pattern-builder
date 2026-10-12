@@ -69,10 +69,14 @@ const ALLOW = new Set( [
 	'DB_FILE',
 	'includes/patterns/class-safe-css.php',
 	'docs/decisions.md',
+	// The wp.org working copy the ship scripts check out: in the working folder,
+	// gitignored, so nothing tracked is ever under it.
+	'svn/',
 	// Illustrative, and one service nobody should be pointing a pattern at.
 	'patterns/studio-a/heroes/hero.php',
 	'my-theme/hero',
 	'studio-a/heroes/hero',
+	'acme/blocks/hero',
 	'placehold.co',
 	// A theme's own directory, a block's own manifest, and the theme.json
 	// property that happens to be spelled like a stylesheet.

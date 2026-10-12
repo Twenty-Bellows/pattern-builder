@@ -89,7 +89,10 @@ class Pattern_Builder_Cloud_Porter {
 			'origin'             => array(
 				'site'    => home_url(),
 				'kind'    => $type,
-				'pattern' => (string) $pattern->origin,
+				// Only a cloud name travels. The service resolves an origin to a pattern page
+				// and links it, so a name it cannot hold — a plugin's, which carries a scheme —
+				// would publish a link to nothing.
+				'pattern' => Pattern_File_Store::is_cloud_origin( $pattern->origin ) ? (string) $pattern->origin : '',
 			),
 		);
 
@@ -117,36 +120,7 @@ class Pattern_Builder_Cloud_Porter {
 	 * @return string[] Referenced pattern names, deduplicated, in document order.
 	 */
 	public static function references_of( $content ) {
-		if ( ! is_string( $content ) || '' === trim( $content ) ) {
-			return array();
-		}
-
-		return array_values( array_unique( self::reference_slugs( parse_blocks( $content ) ) ) );
-	}
-
-	/**
-	 * Walk a parsed tree collecting `core/pattern` slugs.
-	 *
-	 * @param array $blocks Parsed blocks.
-	 * @return string[]
-	 */
-	private static function reference_slugs( $blocks ) {
-		$found = array();
-
-		foreach ( $blocks as $block ) {
-			if ( isset( $block['blockName'], $block['attrs']['slug'] ) && 'core/pattern' === $block['blockName'] ) {
-				$slug = trim( (string) $block['attrs']['slug'] );
-				if ( '' !== $slug ) {
-					$found[] = $slug;
-				}
-			}
-
-			if ( ! empty( $block['innerBlocks'] ) ) {
-				$found = array_merge( $found, self::reference_slugs( $block['innerBlocks'] ) );
-			}
-		}
-
-		return $found;
+		return Pattern_File_Store::references_of( $content );
 	}
 
 	/**
@@ -211,16 +185,35 @@ class Pattern_Builder_Cloud_Porter {
 		}
 
 		if ( $missing ) {
+			// A reference a plugin answers to is not missing here — it is missing everywhere
+			// else, which is what stops the upload. Saying so is the difference between an
+			// error the user can act on and one that looks like a bug.
+			$from_plugin = array_values(
+				array_filter(
+					$missing,
+					function ( $name ) {
+						return null !== $this->store->find_plugin_pattern( $name );
+					}
+				)
+			);
+
 			return new WP_Error(
 				'pb_cloud_reference_missing',
-				sprintf(
-					/* translators: %s: comma-separated list of pattern names. */
-					__( 'This pattern uses patterns that are not on this site: %s', 'pattern-builder' ),
-					implode( ', ', $missing )
-				),
+				$from_plugin === $missing
+					? sprintf(
+						/* translators: %s: comma-separated list of pattern names. */
+						__( 'This pattern uses patterns a plugin registers, which cannot travel with it: %s. Copy this pattern from the Plugin tab instead — that brings the patterns it uses into your theme, where they can be uploaded.', 'pattern-builder' ),
+						implode( ', ', $missing )
+					)
+					: sprintf(
+						/* translators: %s: comma-separated list of pattern names. */
+						__( 'This pattern uses patterns that are not on this site: %s', 'pattern-builder' ),
+						implode( ', ', $missing )
+					),
 				array(
-					'status'  => 400,
-					'missing' => $missing,
+					'status'     => 400,
+					'missing'    => $missing,
+					'fromPlugin' => $from_plugin,
 				)
 			);
 		}

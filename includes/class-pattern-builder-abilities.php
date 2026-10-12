@@ -54,6 +54,7 @@ class Pattern_Builder_Abilities {
 		$this->register_editor_scripts();
 		$this->register_create_pattern();
 		$this->register_update_pattern();
+		$this->register_copy_plugin_pattern();
 		$this->register_add_design_tokens();
 		$this->register_set_global_styles();
 		$this->register_set_layout();
@@ -401,15 +402,15 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/list-patterns',
 			array(
 				'label'               => __( 'List patterns', 'pattern-builder' ),
-				'description'         => __( 'Returns the patterns on this site: theme patterns (PHP files in the theme) and user patterns (reusable blocks in the database), with their names, titles, categories, placement headers and synced status. Content is omitted; use get-pattern for one pattern\'s markup. Also returns the pattern categories registered here, which are the only ones the inserter files a pattern under — a category slug nothing registered lands the pattern in Uncategorized.', 'pattern-builder' ),
+				'description'         => __( 'Returns the patterns on this site: theme patterns (PHP files in the theme), user patterns (reusable blocks in the database), and the ones a plugin registers, with their names, titles, categories, placement headers and synced status. A plugin pattern is read-only — it lives in the block pattern registry and there is no file or row behind it, so update-pattern refuses one; read it to compose in its style, or copy it from the Plugin tab to get one of your own. A site with a pattern plugin can have hundreds of them, so narrow with `source` when you only want what you can edit. Content is omitted; use get-pattern for one pattern\'s markup. Also returns the pattern categories registered here, which are the only ones the inserter files a pattern under — a category slug nothing registered lands the pattern in Uncategorized.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
 					'properties'           => array(
 						'source' => array(
 							'type'        => 'string',
-							'enum'        => array( 'theme', 'user', 'all' ),
-							'description' => 'Which patterns to return. Defaults to all.',
+							'enum'        => array( 'theme', 'user', 'plugin', 'all' ),
+							'description' => 'Which patterns to return: the theme\'s files, the database\'s user patterns, the read-only ones a plugin registered, or all three. Defaults to all.',
 						),
 					),
 					'additionalProperties' => false,
@@ -447,11 +448,18 @@ class Pattern_Builder_Abilities {
 		$store  = new Pattern_File_Store();
 		$found  = array();
 
-		if ( 'user' !== $source ) {
+		$wants = static function ( $which ) use ( $source ) {
+			return 'all' === $source || $which === $source;
+		};
+
+		if ( $wants( 'theme' ) ) {
 			$found = array_merge( $found, $store->get_theme_patterns() );
 		}
-		if ( 'theme' !== $source ) {
+		if ( $wants( 'user' ) ) {
 			$found = array_merge( $found, $store->get_user_patterns() );
+		}
+		if ( $wants( 'plugin' ) ) {
+			$found = array_merge( $found, $store->get_plugin_patterns() );
 		}
 
 		$patterns = array();
@@ -1751,6 +1759,116 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
+	 * Copy a pattern a plugin registered into the theme.
+	 */
+	private function register_copy_plugin_pattern() {
+		wp_register_ability(
+			'pattern-builder/copy-plugin-pattern',
+			array(
+				'label'               => __( 'Copy a plugin pattern', 'pattern-builder' ),
+				'description'         => __( 'Copies a pattern a plugin registered into the active theme, together with every pattern it places, and points the copy\'s references at the copies. The plugin keeps its own; the copy is yours to edit with update-pattern and to upload. Use this rather than reading a plugin pattern and storing its markup with create-pattern: that would leave a page pattern pointing at the plugin\'s sections, which cannot be uploaded, and would record nothing about where it came from. Copying the same pattern twice answers with the copy already in the theme rather than making a second, so two pages that place the same section end up sharing one copy of it. The markup is the plugin\'s and is copied as it stands, so the checks create-pattern runs over markup you wrote are not run here.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'name'  => array(
+							'type'        => 'string',
+							'description' => 'The registered name of the pattern to copy, as list-patterns reports it for a plugin pattern (e.g. "twentig/hero").',
+							'minLength'   => 1,
+						),
+						'title' => array(
+							'type'        => 'string',
+							'description' => 'A title for the copy. Defaults to the one the plugin registered. The patterns it places keep theirs.',
+						),
+					),
+					'required'             => array( 'name' ),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'pattern'    => array( 'type' => 'object' ),
+						'created'    => array(
+							'type'        => 'boolean',
+							'description' => 'False when the theme already carried a copy, which is the one returned.',
+						),
+						'copied'     => array(
+							'type'        => 'array',
+							'description' => 'The patterns written, leaves first: the copy and any it places that were not already here.',
+							'items'       => array( 'type' => 'string' ),
+						),
+						'unresolved' => array(
+							'type'        => 'array',
+							'description' => 'References nothing on this site answers to, left as they are. The plugin\'s own pattern renders them no better.',
+							'items'       => array( 'type' => 'string' ),
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_copy_plugin_pattern' ),
+				'permission_callback' => array( $this, 'can_write' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						// Copying the same pattern again answers with the copy already there.
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Copy a plugin pattern, and everything it places, into the theme.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_copy_plugin_pattern( $input ) {
+		$name  = isset( $input['name'] ) ? (string) $input['name'] : '';
+		$store = new Pattern_File_Store();
+
+		$plugin_pattern = $store->find_plugin_pattern( $name );
+
+		if ( null === $plugin_pattern ) {
+			return new \WP_Error(
+				'pb_plugin_pattern_not_found',
+				sprintf(
+					/* translators: %s: pattern identifier. */
+					__( 'No plugin on this site registers a pattern named %s. list-patterns with source "plugin" reports the ones it does.', 'pattern-builder' ),
+					$name
+				),
+				array( 'status' => 404 )
+			);
+		}
+
+		$overrides = array();
+		if ( isset( $input['title'] ) && '' !== trim( (string) $input['title'] ) ) {
+			$overrides['title'] = (string) $input['title'];
+		}
+
+		$copied = $store->copy_plugin_pattern( $plugin_pattern, $overrides );
+
+		if ( is_wp_error( $copied ) ) {
+			return $copied;
+		}
+
+		$summary = $this->summarize( $copied['pattern'] );
+
+		return $this->with_category_note(
+			array(
+				'pattern'    => $summary,
+				'created'    => $copied['created'],
+				'copied'     => $copied['copied'],
+				'unresolved' => $copied['unresolved'],
+			),
+			$summary
+		);
+	}
+
+	/**
 	 * The input both writes accept.
 	 *
 	 * @param bool $creating Whether this is the create schema.
@@ -1913,6 +2031,18 @@ class Pattern_Builder_Abilities {
 		$existing = $this->find( (string) $input['id'] );
 		if ( is_wp_error( $existing ) ) {
 			return $existing;
+		}
+
+		if ( 'plugin' === $existing->source ) {
+			return new \WP_Error(
+				'pb_pattern_is_read_only',
+				sprintf(
+					/* translators: %s: pattern identifier. */
+					__( '%s is registered by a plugin, which owns it: it lives in the block pattern registry, with no file or row here to write. Copy it from the Plugin tab in Appearance → Pattern Builder — that brings it, and the patterns it places, into the theme as patterns of your own — and update that copy instead.', 'pattern-builder' ),
+					(string) $existing->name
+				),
+				array( 'status' => 409 )
+			);
 		}
 
 		$checked = Pattern_Builder_Markup_Checks::check(
@@ -3063,6 +3193,12 @@ class Pattern_Builder_Abilities {
 			if ( $namespaced !== $id ) {
 				$pattern = $store->find_theme_pattern( $namespaced );
 			}
+		}
+
+		// A pattern a plugin registered is found last and is read-only: every caller that
+		// writes checks the source it gets back.
+		if ( ! $pattern ) {
+			$pattern = $store->find_plugin_pattern( $id );
 		}
 
 		if ( ! $pattern ) {
