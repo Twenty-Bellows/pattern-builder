@@ -2,10 +2,12 @@
 /.distignore
 /.editorconfig
 /.git
+/.githooks
 /.github
 /.gitignore
 /.phpunit.result.cache
 /.prettierrc
+/.stylelintignore
 /.vscode
 /.wordpress-org
 /.wp-env.json
