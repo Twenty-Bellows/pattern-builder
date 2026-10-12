@@ -3,7 +3,7 @@ Contributors:      twentybellows, pbking
 Tags:              block-patterns, patterns, block-editor, gutenberg, design
 Requires at least: 6.8
 Tested up to:      7.1
-Stable tag:        2.1.1
+Stable tag:        2.2.0
 Requires PHP:      7.4
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -122,6 +122,11 @@ Yes. Anything registered as post meta with show_in_rest is offered automatically
 = 2.2.0 =
 * A Plugin tab in Appearance → Pattern Builder browses the patterns your plugins register, with the same previews, search and categories as your own
 * Copy any of them into your theme — images and all, and with every pattern it is built from — and it is yours to edit, to build on, and to upload to a cloud collection
+* Copying is repeatable: a pattern you have already copied is the one you get back, so two pages built from the same section share one copy of it
+* A pattern whose blocks are stored in an older form can be rewritten in place from its details, instead of being opened in the editor and saved
+* Fixed: a pattern carrying images imported into the theme was read as a file containing PHP, which showed a notice saying it could not be saved and then refused to save it
+* Fixed: saving a theme pattern answered with the markup it had just replaced, so the editor and the details sidebar could show a save as having not taken
+* Agents can list, read and render the patterns a plugin registers, and copy one into the theme with everything it places
 
 = 2.1.1 =
 * Editing a theme pattern no longer discards the rest of its file header: the @package block a theme carries, or a note written beside it, is kept exactly as it was and can be edited in the Pattern Metadata panel
