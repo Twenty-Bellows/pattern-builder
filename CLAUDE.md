@@ -179,9 +179,12 @@ correctly absent.
 - **PHP:** WordPress Coding Standards (WPCS 3.x) via PHPCS, config
   `phpcs.xml.dist`, namespace `TwentyBellows\PatternBuilder`.
 - **JavaScript:** ESLint via `@wordpress/scripts`, extended by
-  `eslint.config.cjs` for one thing only — `src/runtime/` is vendored, so two
-  rules that disagree with how that upstream is written are turned off *there*
-  and nowhere else.
+  `eslint.config.cjs` for two things — `src/runtime/` is vendored, so two rules
+  that disagree with how that upstream is written are turned off *there* and
+  nowhere else; and `svn/`, `dev-assets/` and `.claude/` are ignored, being
+  gitignored directories in the working folder that hold core's code and this
+  plugin's own shipped history rather than anything written here. `.stylelintignore`
+  and `phpcs.xml.dist` carry that same list for the other two linters.
 - **Jest:** `jest-unit.config.js` extends the `@wordpress/scripts` config to
   compile `node_modules` and `.mjs`. Much of the WordPress dependency tree now
   ships ESM only and Jest cannot `require()` an ES module before Node 24.9;

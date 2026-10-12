@@ -24,6 +24,11 @@
 	<exclude-pattern>*/release/*</exclude-pattern>
 	<exclude-pattern>*/tests/*</exclude-pattern>
 	<exclude-pattern>*/dev-assets/*</exclude-pattern>
+	<!-- In the working folder but not in the tree: the wp.org working copy the ship
+	     scripts check out, and an agent's worktree. Both hold old copies of this
+	     plugin, so linting them reports this repository's own history back at it. -->
+	<exclude-pattern>*/svn/*</exclude-pattern>
+	<exclude-pattern>*/.claude/*</exclude-pattern>
 	<exclude-pattern>*.min.js</exclude-pattern>
 	<exclude-pattern>*.min.css</exclude-pattern>
 

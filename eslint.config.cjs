@@ -1,8 +1,17 @@
 /**
  * ESLint configuration.
  *
- * Everything comes from @wordpress/scripts; this file exists to carve out the
- * vendored runtime.
+ * Everything comes from @wordpress/scripts; this file carves out what that
+ * configuration has no way to know about.
+ *
+ * It also carves out the three directories that sit in the working folder
+ * without being part of the tree, all of them gitignored and none of them this
+ * repository's code: `svn/`, the wp.org working copy the ship scripts check out;
+ * `dev-assets/themes/`, the WordPress themes wp-env is pointed at; and
+ * `.claude/worktrees/`, where an agent's worktree lands. Linting them reports
+ * core's code and this plugin's own shipped history back at it, and fails the
+ * pre-push check for anyone who has run wp-env or shipped a release. PHPCS
+ * already excludes the first two; this is the same list for JavaScript.
  *
  * `src/runtime/` is copied from synced-patterns-for-themes and has to stay
  * logic-identical to it, so that deactivating this plugin hands rendering back
@@ -16,6 +25,7 @@
 const defaultConfig = require( '@wordpress/scripts/config/eslint.config.cjs' );
 
 module.exports = [
+	{ ignores: [ 'svn/**', 'dev-assets/**', '.claude/**' ] },
 	...defaultConfig,
 	{
 		/*

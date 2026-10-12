@@ -69,6 +69,9 @@ const ALLOW = new Set( [
 	'DB_FILE',
 	'includes/patterns/class-safe-css.php',
 	'docs/decisions.md',
+	// The wp.org working copy the ship scripts check out: in the working folder,
+	// gitignored, so nothing tracked is ever under it.
+	'svn/',
 	// Illustrative, and one service nobody should be pointing a pattern at.
 	'patterns/studio-a/heroes/hero.php',
 	'my-theme/hero',
