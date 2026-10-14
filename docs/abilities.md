@@ -32,7 +32,7 @@ sets it).
 | `get-authoring-guide` | The pattern-authoring documentation as Markdown, and the two skills it makes up, as files to install. |
 | `get-design-system` | The merged presets, the `styles` a pattern inherits, and the `blockStyles` registered here — each marked `portable`. |
 | `list-block-types` | What is registered *on this site*; naming blocks also returns each one's `supports`. |
-| `list-patterns` | Every pattern's summary with its placement headers, any `origin` or `cloud` reference, and the registered pattern categories. `source` narrows it to the theme's files, the database's user patterns, or the read-only ones a plugin registered. |
+| `list-patterns` | Every pattern's summary with its placement headers, any `origin` or `cloud` reference, and the registered pattern categories. `source` narrows it to the theme's files, the database's user patterns, or the read-only ones a plugin registered; `search`, `categories` and `keywords` narrow it further, and `page` with `perPage` pages it. |
 | `get-pattern` | One pattern, whichever of the three sources it comes from. |
 | `list-pattern-usage` | Every place that places a pattern, directly or through another pattern. |
 | `render-pattern` | The rendered HTML plus preview URLs — `standalone`, `page`, and `themes` against each lab theme. |
@@ -51,6 +51,15 @@ button on each button, none of which then follows the destination. Each block
 style is marked `portable`: true for one declared in a block's own `block.json`,
 which ships with WordPress, false for one this site registered, whose
 definition has to be carried.
+
+**`list-patterns` is how an agent finds a pattern before writing one**, and a
+pattern nobody can find gets written again. `search` matches title, name,
+description and keywords, ignoring case; `categories` and `keywords` keep only
+patterns carrying every one asked for. Paging is opt-in: with neither `page`
+nor `perPage` every match comes back, as it always did, and `total` counts the
+matches either way. `keywordsInUse` is every keyword the source carries,
+lowercased and counted before search and the filters, so an agent filters by
+words that exist and tags its own pattern with them rather than a synonym.
 
 **`list-pattern-usage` walks references upward.** `references_of()` in
 `Pattern_File_Store` answers what a pattern places; this answers what places

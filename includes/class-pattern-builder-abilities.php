@@ -403,15 +403,40 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/list-patterns',
 			array(
 				'label'               => __( 'List patterns', 'pattern-builder' ),
-				'description'         => __( 'Returns the patterns on this site: theme patterns (PHP files in the theme), user patterns (reusable blocks in the database), and the ones a plugin registers, with their names, titles, categories, placement headers and synced status. A plugin pattern is read-only — it lives in the block pattern registry and there is no file or row behind it, so update-pattern refuses one; read it to compose in its style, or copy it from the Plugin tab to get one of your own. A site with a pattern plugin can have hundreds of them, so narrow with `source` when you only want what you can edit. Content is omitted; use get-pattern for one pattern\'s markup. Also returns the pattern categories registered here, which are the only ones the inserter files a pattern under — a category slug nothing registered lands the pattern in Uncategorized.', 'pattern-builder' ),
+				'description'         => __( 'Returns the patterns on this site: theme patterns (PHP files in the theme), user patterns (reusable blocks in the database), and the ones a plugin registers, with their names, titles, categories, placement headers and synced status. A plugin pattern is read-only — it lives in the block pattern registry and there is no file or row behind it, so update-pattern refuses one; read it to compose in its style, or copy it from the Plugin tab to get one of your own. A site with a pattern plugin can have hundreds of them, so narrow with `source` when you only want what you can edit, and with search, categories and keywords when you are looking for one: search before writing a pattern, since one nobody can find gets written again. Content is omitted; use get-pattern for one pattern\'s markup. Also returns the pattern categories registered here, which are the only ones the inserter files a pattern under (a category slug nothing registered lands the pattern in Uncategorized), and keywordsInUse, every keyword the listed source carries with how many patterns carry it: filter by those words, and reuse them when you tag a pattern of your own.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
 					'properties'           => array(
-						'source' => array(
+						'source'     => array(
 							'type'        => 'string',
 							'enum'        => array( 'theme', 'user', 'plugin', 'all' ),
 							'description' => 'Which patterns to return: the theme\'s files, the database\'s user patterns, the read-only ones a plugin registered, or all three. Defaults to all.',
+						),
+						'search'     => array(
+							'type'        => 'string',
+							'description' => 'Words to find in a pattern\'s title, name, description or keywords, ignoring case.',
+						),
+						'categories' => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'description' => 'Category slugs a pattern must carry, every one of them.',
+						),
+						'keywords'   => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'description' => 'Keywords a pattern must carry, every one of them, ignoring case. keywordsInUse lists the ones that exist.',
+						),
+						'page'       => array(
+							'type'        => 'integer',
+							'minimum'     => 1,
+							'description' => 'Which page of results, from 1. Giving page or perPage turns paging on; without either, every match comes back.',
+						),
+						'perPage'    => array(
+							'type'        => 'integer',
+							'minimum'     => 1,
+							'maximum'     => 100,
+							'description' => 'Patterns per page, 20 when paging and not given.',
 						),
 					),
 					'additionalProperties' => false,
@@ -420,13 +445,22 @@ class Pattern_Builder_Abilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'patterns'   => array(
+						'patterns'      => array(
 							'type'  => 'array',
 							'items' => array( 'type' => 'object' ),
 						),
-						'categories' => array(
+						'total'         => array(
+							'type'        => 'integer',
+							'description' => 'How many patterns match, across every page.',
+						),
+						'categories'    => array(
 							'type'        => 'array',
 							'description' => 'The pattern categories registered on this site: name (the slug a Categories header or a categories input uses) and label. Use one of these, or the pattern is filed under Uncategorized.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'keywordsInUse' => array(
+							'type'        => 'array',
+							'description' => 'Every keyword the patterns in this source carry, lowercased, with how many carry it, most used first. Counted before search and the filters, so it is the whole vocabulary.',
 							'items'       => array( 'type' => 'object' ),
 						),
 					),
@@ -463,15 +497,106 @@ class Pattern_Builder_Abilities {
 			$found = array_merge( $found, $store->get_plugin_patterns() );
 		}
 
+		$vocabulary = $this->keywords_in_use( $found );
+
+		$found = array_values(
+			array_filter(
+				$found,
+				function ( $pattern ) use ( $input ) {
+					return $this->listing_matches( $pattern, $input );
+				}
+			)
+		);
+		$total = count( $found );
+
+		$answer = array();
+		if ( isset( $input['page'] ) || isset( $input['perPage'] ) ) {
+			$per_page          = isset( $input['perPage'] ) ? max( 1, min( 100, (int) $input['perPage'] ) ) : 20;
+			$page              = isset( $input['page'] ) ? max( 1, (int) $input['page'] ) : 1;
+			$found             = array_slice( $found, ( $page - 1 ) * $per_page, $per_page );
+			$answer['page']    = $page;
+			$answer['perPage'] = $per_page;
+		}
+
 		$patterns = array();
 		foreach ( $found as $pattern ) {
 			$patterns[] = $this->summarize( $pattern );
 		}
 
 		return array(
-			'patterns'   => $patterns,
-			'categories' => $this->registered_categories(),
+			'patterns'      => $patterns,
+			'total'         => $total,
+			'categories'    => $this->registered_categories(),
+			'keywordsInUse' => $vocabulary,
+		) + $answer;
+	}
+
+	/**
+	 * Whether a pattern answers a listing's search and filters.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern.
+	 * @param array            $input Ability input.
+	 * @return bool
+	 */
+	private function listing_matches( $pattern, $input ) {
+		$keywords = array_map( 'strtolower', array_map( 'trim', is_array( $pattern->keywords ) ? $pattern->keywords : array() ) );
+
+		if ( isset( $input['search'] ) && '' !== trim( (string) $input['search'] ) ) {
+			$haystack = implode( ' ', array( $pattern->title, $pattern->name, $pattern->description, implode( ' ', $keywords ) ) );
+			if ( false === stripos( $haystack, trim( (string) $input['search'] ) ) ) {
+				return false;
+			}
+		}
+
+		if ( ! empty( $input['categories'] ) ) {
+			$categories = is_array( $pattern->categories ) ? $pattern->categories : array();
+			if ( array_diff( array_map( 'strval', (array) $input['categories'] ), $categories ) ) {
+				return false;
+			}
+		}
+
+		if ( ! empty( $input['keywords'] ) ) {
+			$wanted = array_map( 'strtolower', array_map( 'trim', array_map( 'strval', (array) $input['keywords'] ) ) );
+			if ( array_diff( $wanted, $keywords ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Every keyword these patterns carry, with how many carry it, most used first.
+	 *
+	 * @param Abstract_Pattern[] $patterns The patterns.
+	 * @return array List of { keyword, count }.
+	 */
+	private function keywords_in_use( $patterns ) {
+		$counts = array();
+		foreach ( $patterns as $pattern ) {
+			$keywords = is_array( $pattern->keywords ) ? $pattern->keywords : array();
+			foreach ( array_unique( array_filter( array_map( 'strtolower', array_map( 'trim', array_map( 'strval', $keywords ) ) ) ) ) as $keyword ) {
+				$counts[ $keyword ] = isset( $counts[ $keyword ] ) ? $counts[ $keyword ] + 1 : 1;
+			}
+		}
+
+		uksort(
+			$counts,
+			static function ( $a, $b ) use ( $counts ) {
+				$by_count = $counts[ $b ] <=> $counts[ $a ];
+				return 0 !== $by_count ? $by_count : strcmp( $a, $b );
+			}
 		);
+
+		$vocabulary = array();
+		foreach ( $counts as $keyword => $count ) {
+			$vocabulary[] = array(
+				'keyword' => (string) $keyword,
+				'count'   => $count,
+			);
+		}
+
+		return $vocabulary;
 	}
 
 	/**
