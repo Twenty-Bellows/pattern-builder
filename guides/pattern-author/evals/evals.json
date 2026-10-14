@@ -21,6 +21,13 @@
 			"prompt": "Make me a full-width call-to-action band pattern for the patternbuilderwp theme at /home/user/patternbuilderwp.com/wp-content/themes/patternbuilderwp. Dark background, centered white heading, and a button below it. Generous vertical padding. Save it to OUTPUT_DIR.",
 			"expected_output": "Valid markup where every color/spacing/font attribute is paired with its matching class and preset variable spelling.",
 			"files": []
+		},
+		{
+			"id": 3,
+			"name": "card-without-the-photo",
+			"prompt": "Write the theme described below into OUTPUT_DIR/theme, then do what the person asks. patterns/testimonial-card.php (Title: Testimonial Card, Slug: my-theme/testimonial-card, Synced: yes) is a core/group holding a core/image with a Pattern Overrides slot named photo, a core/paragraph slot named quote and a core/paragraph slot named author. patterns/page-home.php places my-theme/testimonial-card twice, filling quote and author each time. The person asks: \"On the about page I want the same testimonial card, but without the photo.\" Save every pattern file you write or change into OUTPUT_DIR/theme/patterns.",
+			"expected_output": "Does not remove the image from testimonial-card.php, since the home page places it and a block cannot be an option of one pattern. Writes a second pattern copied from the first without the image, keeping the slot names quote and author so content moves between the two, and sharing the look rather than restating it. Leaves page-home.php untouched and says that the home page keeps the card with the photo.",
+			"files": []
 		}
 	]
 }

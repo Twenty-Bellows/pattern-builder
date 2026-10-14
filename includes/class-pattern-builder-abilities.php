@@ -22,7 +22,8 @@ class Pattern_Builder_Abilities {
 	 */
 	const GUIDES = array(
 		'pattern-builder/create-pattern'            => array( 'authoring', 'block-markup' ),
-		'pattern-builder/update-pattern'            => array( 'authoring', 'block-markup' ),
+		'pattern-builder/update-pattern'            => array( 'changing-patterns', 'block-markup' ),
+		'pattern-builder/list-pattern-usage'        => array( 'changing-patterns' ),
 		'pattern-builder/copy-plugin-pattern'       => array( 'composition' ),
 		'pattern-builder/add-design-tokens'         => array( 'design-system' ),
 		'pattern-builder/set-global-styles'         => array( 'design-system' ),
@@ -1067,6 +1068,7 @@ class Pattern_Builder_Abilities {
 			'design-system'        => 'pattern-author/references/design-system.md',
 			'composition'          => 'pattern-author/references/composition.md',
 			'design-content-split' => 'pattern-author/references/design-content-split.md',
+			'changing-patterns'    => 'pattern-author/references/changing-patterns.md',
 			'assets'               => 'pattern-author/references/assets.md',
 			'keeping-current'      => 'pattern-author/references/keeping-current.md',
 			'abilities'            => 'pattern-author/references/abilities.md',

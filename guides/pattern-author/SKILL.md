@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.7.0
+  version: 1.8.0
 ---
 
 # Authoring block patterns
@@ -77,6 +77,13 @@ colour, the `small`…`xx-large` ladder for type, and spacing steps `40`–`60`.
 Check anything else before using it. It also says the thing hardest to see from
 markup: what the site already styles is what the pattern inherits, so restating
 it is how a pattern stops adapting.
+
+**Then look for the pattern before you write it.** On a site that already has
+patterns, what you are asked for is often close to one that exists. Search
+`list-patterns` (`search`, `keywords`), read what comes back, and decide
+whether to reuse it, add a slot or a variation to it, copy it, or write a new
+one. Before changing one that pages use, `list-pattern-usage` says what the
+change reaches. `references/changing-patterns.md` has the order and the cost.
 
 ### 2. Establish the vocabulary
 
@@ -416,6 +423,7 @@ said to extend the system, add it with `pattern-builder/add-design-tokens`
 - `references/block-markup.md` — the attribute-to-markup contract per block, for hand-writing and for debugging
 - `references/composition.md` — factoring into elements, sections and pages
 - `references/design-content-split.md` — Pattern Overrides slots and their silent failures
+- `references/changing-patterns.md`: reusing, extending or copying a pattern that already exists, and what a change to one costs
 - `references/assets.md` — images and fonts
 - `references/abilities.md` — asking a running site for what it has
 - `references/keeping-current.md` — bringing these guides to a new WordPress release
