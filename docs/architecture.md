@@ -463,6 +463,16 @@ a different capability, which a multisite site administrator does not have.
 styles: `standalone` on its own, `page` inside the resolved page template, and
 either one against a bundled lab theme through the route's `theme` parameter.
 
+The route asks for `edit_posts`, which the agent calling `render-pattern` has
+and the browser it opens the URL in usually does not. So `render-pattern` also
+hands back signed URLs from `signed_url_for()`: an `expires` timestamp an hour
+out and a `token` that signs the pattern id, context, theme and expiry with a
+key derived from the site's salts. `can_preview()` accepts that token in place
+of the capability for exactly those parameters; carried to another pattern or
+context, altered or expired, it grants nothing, and changing the salts revokes
+every link handed out. The `noindex` and frame-ancestors headers apply the same
+either way.
+
 `find()` resolves what to render in the order the site owns them — a numeric id
 as a `wp_block` post, then the theme's own files, then the registry — which is
 what lets the browse grid draw a tile for a plugin pattern the same way it

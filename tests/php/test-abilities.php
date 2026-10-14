@@ -2369,4 +2369,27 @@ class Test_Abilities extends WP_UnitTestCase {
 
 		$this->assertStringNotContainsString( 'Guide: get-authoring-guide', wp_get_ability( 'pattern-builder/list-block-types' )->get_description() );
 	}
+
+	/**
+	 * render-pattern hands back URLs a browser with no credentials can open, and says for how
+	 * long.
+	 */
+	public function test_rendering_offers_signed_urls() {
+		$id = (string) self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_block',
+				'post_status'  => 'publish',
+				'post_title'   => 'Signed Probe',
+				'post_content' => '<!-- wp:paragraph --><p>Signed.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$rendered = $this->abilities->execute_render_pattern( array( 'id' => $id ) );
+		$signed   = $rendered['preview']['signed'];
+
+		$this->assertStringContainsString( 'token=', $signed['standalone'] );
+		$this->assertStringContainsString( 'context=page', $signed['page'] );
+		$this->assertArrayHasKey( 'blank-theme', $signed['themes'] );
+		$this->assertSame( TwentyBellows\PatternBuilder\Pattern_Builder_Preview::SIGNED_TTL, $signed['expiresIn'] );
+	}
 }

@@ -859,7 +859,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/render-pattern',
 			array(
 				'label'               => __( 'Render a pattern', 'pattern-builder' ),
-				'description'         => __( 'Returns the front-end HTML a stored pattern produces, with blocks resolved; which design tokens it references and whether this site defines them, since a preset missing here ships no value and arrives missing everywhere; and two URLs that render it as a whole page with this site\'s stylesheets — one standalone, one inside the page template. Open those in a browser to see what the pattern looks like; the HTML alone only shows which classes landed where, not what the CSS then does with them. Note that rendering correctly says nothing about whether the block markup is valid in the editor, which only a JavaScript block validator can decide.', 'pattern-builder' ),
+				'description'         => __( 'Returns the front-end HTML a stored pattern produces, with blocks resolved; which design tokens it references and whether this site defines them, since a preset missing here ships no value and arrives missing everywhere; and two URLs that render it as a whole page with this site\'s stylesheets — one standalone, one inside the page template, each also signed so a browser with no credentials can open it for an hour. Open those in a browser to see what the pattern looks like; the HTML alone only shows which classes landed where, not what the CSS then does with them. Note that rendering correctly says nothing about whether the block markup is valid in the editor, which only a JavaScript block validator can decide.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -936,9 +936,12 @@ class Pattern_Builder_Abilities {
 			$tokens['note'] = __( 'This pattern references presets this site does not define. They render as no styling at all here, and an upload carries no value for them, so they will render as nothing wherever the pattern is installed too. Add them with add-design-tokens, or reference presets that exist.', 'pattern-builder' );
 		}
 
-		$themes = array();
+		$expires = time() + Pattern_Builder_Preview::SIGNED_TTL;
+		$themes  = array();
+		$signed  = array();
 		foreach ( array_keys( Pattern_Builder_Preview::bundled_themes() ) as $slug ) {
 			$themes[ $slug ] = Pattern_Builder_Preview::url_for( $pattern->id, 'page', $slug );
+			$signed[ $slug ] = Pattern_Builder_Preview::signed_url_for( $pattern->id, 'page', $slug, $expires );
 		}
 
 		return array(
@@ -948,7 +951,13 @@ class Pattern_Builder_Abilities {
 				'standalone' => Pattern_Builder_Preview::url_for( $pattern->id, 'standalone' ),
 				'page'       => Pattern_Builder_Preview::url_for( $pattern->id, 'page' ),
 				'themes'     => $themes,
-				'note'       => __( 'Open any URL in a browser, authenticated as you are here. "page" renders the pattern inside this site\'s page template, which is where an alignfull band either escapes the content width or does not. "themes" renders it the same way against a theme that defines nothing (what the pattern itself brings) and against one with a design system of its own (whether the pattern adapts); nothing on this site is changed by either.', 'pattern-builder' ),
+				'signed'     => array(
+					'standalone' => Pattern_Builder_Preview::signed_url_for( $pattern->id, 'standalone', '', $expires ),
+					'page'       => Pattern_Builder_Preview::signed_url_for( $pattern->id, 'page', '', $expires ),
+					'themes'     => $signed,
+					'expiresIn'  => Pattern_Builder_Preview::SIGNED_TTL,
+				),
+				'note'       => __( 'Open the URLs under signed in any browser, with no credentials: each opens this pattern, in that context, for whoever holds it, until expiresIn seconds from now, and nothing else. The others need you to be authenticated as you are here. "page" renders the pattern inside this site\'s page template, which is where an alignfull band either escapes the content width or does not. "themes" renders it the same way against a theme that defines nothing (what the pattern itself brings) and against one with a design system of its own (whether the pattern adapts); nothing on this site is changed by either.', 'pattern-builder' ),
 			),
 		);
 	}

@@ -28,6 +28,11 @@ class Pattern_Builder_Preview {
 	const TILE_QUERY_VAR = 'pattern_builder_tile';
 
 	/**
+	 * How long a signed preview URL opens without signing in, in seconds.
+	 */
+	const SIGNED_TTL = 3600;
+
+	/**
 	 * The document to serve, held between the route callback and the filter that writes it,
 	 * because a REST response would otherwise be JSON.
 	 *
@@ -91,6 +96,14 @@ class Pattern_Builder_Preview {
 						'default'     => '',
 						'description' => __( 'Render against this theme instead of the active one — "blank-theme" for a design system of nothing, "opinionated-theme" for one that is not yours, or any installed theme\'s slug. The site\'s active theme is not changed; the swap lasts for this request only.', 'pattern-builder' ),
 					),
+					'expires' => array(
+						'type'        => 'integer',
+						'description' => __( 'When a signed URL stops opening, as a Unix timestamp. Part of what the token signs.', 'pattern-builder' ),
+					),
+					'token'   => array(
+						'type'        => 'string',
+						'description' => __( 'The signature that lets this URL open without signing in, for this pattern, context and theme only, until it expires.', 'pattern-builder' ),
+					),
 				),
 			)
 		);
@@ -98,12 +111,79 @@ class Pattern_Builder_Preview {
 
 	/**
 	 * Previewing shows the site's own content, so it takes the same capability as reading a
-	 * pattern does.
+	 * pattern does, or a signed URL minted by someone who has it.
 	 *
+	 * @param \WP_REST_Request|null $request The preview request, when there is one.
 	 * @return bool
 	 */
-	public function can_preview() {
-		return current_user_can( 'edit_posts' );
+	public function can_preview( $request = null ) {
+		if ( current_user_can( 'edit_posts' ) ) {
+			return true;
+		}
+
+		return $request instanceof \WP_REST_Request && self::signature_holds( $request );
+	}
+
+	/**
+	 * Whether a request carries a signature, unexpired, for exactly the pattern, context and
+	 * theme it asks for. The same token on any other pattern grants nothing.
+	 *
+	 * @param \WP_REST_Request $request The preview request.
+	 * @return bool
+	 */
+	private static function signature_holds( $request ) {
+		$token   = (string) $request->get_param( 'token' );
+		$expires = (int) $request->get_param( 'expires' );
+
+		if ( '' === $token || $expires < time() ) {
+			return false;
+		}
+
+		$context = (string) $request->get_param( 'context' );
+		$signed  = self::sign(
+			(string) $request->get_param( 'pattern' ),
+			'' === $context ? 'standalone' : $context,
+			(string) $request->get_param( 'theme' ),
+			$expires
+		);
+
+		return hash_equals( $signed, $token );
+	}
+
+	/**
+	 * The signature over one preview URL's parameters. Keyed with the site's own salts, so
+	 * changing them revokes every link handed out.
+	 *
+	 * @param string $id Pattern id.
+	 * @param string $context 'standalone' or 'page'.
+	 * @param string $theme Theme slug, or ''.
+	 * @param int    $expires Unix timestamp.
+	 * @return string
+	 */
+	private static function sign( $id, $context, $theme, $expires ) {
+		return hash_hmac( 'sha256', implode( "\n", array( (string) $id, (string) $context, (string) $theme, (string) $expires ) ), wp_salt( 'auth' ) . 'pattern-builder-preview' );
+	}
+
+	/**
+	 * A URL that renders a pattern for whoever opens it, until it expires: what an agent's
+	 * browser can open without the credentials the agent itself signed in with.
+	 *
+	 * @param string   $id Pattern id.
+	 * @param string   $context 'standalone' or 'page'.
+	 * @param string   $theme Optional theme slug to render against instead of the active one.
+	 * @param int|null $expires Unix timestamp; an hour from now when not given.
+	 * @return string
+	 */
+	public static function signed_url_for( $id, $context = 'standalone', $theme = '', $expires = null ) {
+		$expires = null === $expires ? time() + self::SIGNED_TTL : (int) $expires;
+
+		return add_query_arg(
+			array(
+				'expires' => $expires,
+				'token'   => self::sign( (string) $id, $context, $theme, $expires ),
+			),
+			self::url_for( $id, $context, $theme )
+		);
 	}
 
 	/**

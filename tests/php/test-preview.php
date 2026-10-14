@@ -525,4 +525,57 @@ class Test_Preview extends WP_UnitTestCase {
 
 		$this->assertNotSame( $before, Pattern_Builder_Preview::design_version() );
 	}
+
+	/**
+	 * Open a preview URL through the REST server, as whoever is signed in now.
+	 *
+	 * @param string $url A URL url_for() or signed_url_for() made.
+	 * @return int The response status.
+	 */
+	private function open( $url ) {
+		do_action( 'rest_api_init' );
+
+		$query = array();
+		wp_parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
+		unset( $query['rest_route'] );
+
+		$request = new WP_REST_Request( 'GET', '/pattern-builder/v1/preview' );
+		$request->set_query_params( $query );
+
+		return rest_do_request( $request )->get_status();
+	}
+
+	/**
+	 * A signed URL is what a browser with no credentials can open: the agent's own browser
+	 * tool, a screenshot script.
+	 */
+	public function test_a_signed_url_opens_without_signing_in() {
+		$id  = (string) $this->a_user_pattern();
+		$url = Pattern_Builder_Preview::signed_url_for( $id, 'page' );
+		wp_set_current_user( 0 );
+
+		$this->assertSame( 401, $this->open( Pattern_Builder_Preview::url_for( $id, 'page' ) ) );
+		$this->assertSame( 200, $this->open( $url ) );
+	}
+
+	/**
+	 * Expired, altered, or carried to another pattern or context, a token grants nothing.
+	 */
+	public function test_a_signature_holds_only_for_what_it_signed() {
+		$id    = (string) $this->a_user_pattern();
+		$other = (string) $this->a_user_pattern();
+
+		$expired = Pattern_Builder_Preview::signed_url_for( $id, 'standalone', '', time() - 1 );
+		$good    = Pattern_Builder_Preview::signed_url_for( $id, 'standalone' );
+		$altered = add_query_arg( 'token', str_repeat( 'a', 64 ), $good );
+		$moved   = str_replace( 'pattern=' . $id, 'pattern=' . $other, $good );
+		$context = str_replace( 'context=standalone', 'context=page', $good );
+		wp_set_current_user( 0 );
+
+		$this->assertSame( 401, $this->open( $expired ) );
+		$this->assertSame( 401, $this->open( $altered ) );
+		$this->assertSame( 401, $this->open( $moved ) );
+		$this->assertSame( 401, $this->open( $context ) );
+		$this->assertSame( 200, $this->open( $good ) );
+	}
 }

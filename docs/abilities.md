@@ -35,7 +35,7 @@ sets it).
 | `list-patterns` | Every pattern's summary with its placement headers, any `origin` or `cloud` reference, and the registered pattern categories. `source` narrows it to the theme's files, the database's user patterns, or the read-only ones a plugin registered; `search`, `categories` and `keywords` narrow it further, and `page` with `perPage` pages it. |
 | `get-pattern` | One pattern, whichever of the three sources it comes from. |
 | `list-pattern-usage` | Every place that places a pattern, directly or through another pattern. |
-| `render-pattern` | The rendered HTML plus preview URLs — `standalone`, `page`, and `themes` against each lab theme. |
+| `render-pattern` | The rendered HTML plus preview URLs (`standalone`, `page`, and `themes` against each lab theme), each also `signed` so a browser with no credentials can open it for an hour. |
 | `find-media` | The images a pattern can point at, plus how to upload one. |
 | `list-fonts` | The font collection; naming a `family` describes that one, including whether it has a variable face. |
 | `get-validator` | The validator script itself. |
