@@ -2392,4 +2392,17 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'blank-theme', $signed['themes'] );
 		$this->assertSame( TwentyBellows\PatternBuilder\Pattern_Builder_Preview::SIGNED_TTL, $signed['expiresIn'] );
 	}
+
+	/**
+	 * An agent reading over HTTP chooses what to read from the index, so every guide this
+	 * plugin ships says when it is worth reading.
+	 */
+	public function test_every_shipped_guide_says_when_to_read_it() {
+		$index = $this->abilities->execute_authoring_guide();
+
+		foreach ( $index['guides'] as $guide ) {
+			$this->assertArrayHasKey( 'when', $guide, $guide['name'] . ' does not say when to read it.' );
+			$this->assertNotSame( '', trim( $guide['when'] ), $guide['name'] . ' says nothing about when to read it.' );
+		}
+	}
 }

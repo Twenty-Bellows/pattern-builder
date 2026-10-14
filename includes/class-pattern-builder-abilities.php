@@ -1055,6 +1055,32 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
+	 * When each shipped guide is worth reading, one line apiece, so an agent choosing over
+	 * HTTP can read what its task needs rather than everything. A guide a theme adds through
+	 * the filter has none.
+	 *
+	 * @return array name => sentence.
+	 */
+	private function guide_when() {
+		return array(
+			'authoring'            => __( 'Writing any pattern. Read it either way: it owns the steps, and says which of the others each step needs.', 'pattern-builder' ),
+			'pattern-kinds'        => __( 'Choosing a kind other than a plain design pattern, or writing the headers, the Description and the Keywords.', 'pattern-builder' ),
+			'block-vocabulary'     => __( 'Using a block beyond paragraph, heading, image, button, group and columns, or writing for somewhere other than this site.', 'pattern-builder' ),
+			'block-markup'         => __( 'Writing markup by hand because Node is not available, or working out what the validator reported.', 'pattern-builder' ),
+			'design-system'        => __( 'Setting colour, type, spacing or layout beyond the presets every theme shares, or installing a design system.', 'pattern-builder' ),
+			'composition'          => __( 'Building anything bigger than one section, or rebuilding a page that already exists.', 'pattern-builder' ),
+			'design-content-split' => __( 'Writing a synced pattern with slots, or the page that fills them.', 'pattern-builder' ),
+			'changing-patterns'    => __( 'The site already has patterns, or you are changing one that pages use.', 'pattern-builder' ),
+			'assets'               => __( 'The pattern needs an image or a typeface.', 'pattern-builder' ),
+			'keeping-current'      => __( 'Bringing these guides to a new WordPress release, or checking an installed copy against the site.', 'pattern-builder' ),
+			'abilities'            => __( 'Reaching the site over HTTP rather than through tools already loaded.', 'pattern-builder' ),
+			'reproduction'         => __( 'The design already exists somewhere else: a site, a Figma file, a screenshot, a PDF.', 'pattern-builder' ),
+			'reading-a-source'     => __( 'Taking the values and the structure out of a design that already exists.', 'pattern-builder' ),
+			'verifying'            => __( 'Checking what you built before calling it done, and comparing a rebuild against its source.', 'pattern-builder' ),
+		);
+	}
+
+	/**
 	 * The guides this plugin ships, by name.
 	 *
 	 * @return array name => relative path.
@@ -1187,8 +1213,9 @@ class Pattern_Builder_Abilities {
 
 		if ( '' === $wanted ) {
 			$index = array();
+			$when  = $this->guide_when();
 			foreach ( $guides as $name => $guide ) {
-				$index[] = array(
+				$entry = array(
 					'name'     => $name,
 					'title'    => $guide['title'],
 					'words'    => str_word_count( wp_strip_all_tags( $guide['content'] ) ),
@@ -1196,6 +1223,10 @@ class Pattern_Builder_Abilities {
 					'path'     => $guide['path'],
 					'checksum' => $guide['checksum'],
 				);
+				if ( isset( $when[ $name ] ) ) {
+					$entry['when'] = $when[ $name ];
+				}
+				$index[] = $entry;
 			}
 
 			return array(

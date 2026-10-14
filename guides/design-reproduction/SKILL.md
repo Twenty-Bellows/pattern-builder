@@ -2,7 +2,7 @@
 name: design-reproduction
 description: Rebuild an existing design as WordPress block patterns — a live website, a Figma file, a screenshot, a PDF or a mockup — page by page, pulling the reusable parts out rather than transcribing the pixels. Use this whenever the source of the design already exists somewhere else and the job is to reproduce it: "recreate this site", "build this in WordPress", "match this design", "here's a screenshot of what we want". Reproduction fails quietly in two specific ways this covers — values approximated instead of read, and repeated parts copied instead of factored — and both look like a finished page. Load the pattern-author skill alongside it; this one decides what to build and how faithfully, that one is how a pattern gets written.
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # Reproducing an existing design
@@ -29,6 +29,22 @@ than patterns.
 what you decided and keep building.
 
 ## Workflow
+
+### What to read, step by step
+
+Read what a step requires before it, and the rest only in the case named. This
+table only points; each fact lives where it names.
+
+| Step | Read before it | Only when |
+|---|---|---|
+| 1. Classify | nothing more | |
+| 2. Extract | `references/reading-a-source.md`, the part for your source's class | |
+| 3. Write down | nothing more | |
+| 4. Install | | whole page or site: `pattern-author`'s `references/design-system.md` |
+| 5. Factor, then build | `pattern-author`'s `SKILL.md` | a whole page or site: `pattern-author`'s `references/composition.md` |
+| 6. Place | `pattern-author`'s step 7 | |
+| 7. Check | nothing more | a readable source and a whole rebuild: `references/verifying.md` |
+| 8. Say what you left | nothing more | |
 
 ### 1. Classify the source
 

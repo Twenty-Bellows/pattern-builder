@@ -267,6 +267,13 @@ They are **two skills, split by posture rather than by subject**:
   variations), and verifies it numerically before comparing a rendered page. It
   loads `pattern-author` alongside rather than restating it.
 
+The references are long and one pattern needs few of them, so each `SKILL.md`
+opens its workflow with a table of what to read before each step and what only
+in a named case, pointing rather than restating so every fact keeps one home.
+The index gives the same choice to an agent reading over HTTP: each shipped
+guide's entry carries a one-line `when` beside its word count, and a guide a
+theme adds through the filter carries none.
+
 The set is filtered before it is served (`pattern_builder_authoring_guides`), so
 a theme can amend a shipped guide or add house rules. The filter deals in text
 rather than file paths, so a supplied guide needs no filesystem access and no
