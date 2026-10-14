@@ -463,6 +463,16 @@ a different capability, which a multisite site administrator does not have.
 styles: `standalone` on its own, `page` inside the resolved page template, and
 either one against a bundled lab theme through the route's `theme` parameter.
 
+The route asks for `edit_posts`, which the agent calling `render-pattern` has
+and the browser it opens the URL in usually does not. So `render-pattern` also
+hands back signed URLs from `signed_url_for()`: an `expires` timestamp an hour
+out and a `token` that signs the pattern id, context, theme and expiry with a
+key derived from the site's salts. `can_preview()` accepts that token in place
+of the capability for exactly those parameters; carried to another pattern or
+context, altered or expired, it grants nothing, and changing the salts revokes
+every link handed out. The `noindex` and frame-ancestors headers apply the same
+either way.
+
 `find()` resolves what to render in the order the site owns them — a numeric id
 as a `wp_block` post, then the theme's own files, then the registry — which is
 what lets the browse grid draw a tile for a plugin pattern the same way it
@@ -536,6 +546,7 @@ map*, then deletes the rows and the old capabilities.
 | `Pattern_Builder_Block_Style_Variations` | The theme's `styles/*.json` partials. |
 | `Safe_Css` | The safe subset of literal CSS a variation may carry. See [`cloud.md`](cloud.md). |
 | `Pattern_Builder_Markup_Checks` | The failures PHP can see and every one of them silent at render. |
+| `Pattern_Builder_Usage` | Where a pattern is used: the patterns, templates, template parts and posts that place it, directly or through another pattern. See [`abilities.md`](abilities.md). |
 | `Pattern_Builder_Migration` | The one-time 1.x upgrade. |
 | `Pattern_Builder_Security` / `Pattern_Builder_Localization` | Path-validated filesystem helpers; pattern localization. |
 | Vendored runtime | `Pattern_Block`, `Pattern_Resolver`, `Block_Markup`, `Inner_HTML_Processor`, `Synced_Patterns`, `Editor_Support`. |

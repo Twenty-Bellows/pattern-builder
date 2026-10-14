@@ -16,7 +16,9 @@ band was right.
 where a real ground truth exists and the comparison is worth its time. Against
 an inferred source there is nothing to diff, and `SKILL.md` step 7 says what to
 do instead. For a single pattern, generation and the validator already give you
-what a browser would.
+the structure a browser would. Behaviour is the exception, for any source and
+any size of job: *What no comparison can see*, at the end, applies to all of
+them.
 
 ## Diff, do not look
 
@@ -97,3 +99,22 @@ a claim somebody can check; "it matches" is not.
 - **The blocks that read this site's state.** `core/site-title`,
   `core/navigation` with no inner blocks, `core/query` — they render *your*
   site's content while looking like they work.
+
+## What no comparison can see
+
+A diff of computed values compares what the two pages look like. It cannot see
+what they do, and a rebuild can match its source on every number while its
+navigation overlay will not open. So, whatever the source, open the rebuild
+(the `signed` URLs `render-pattern` returns open in any browser) and:
+
+- click what moves: the navigation overlay open and closed, details, search,
+  anything with a toggle;
+- Tab through it: focus visible on every link and button, a sensible order,
+  and Escape closing an open overlay;
+- read the console, where an error is a defect;
+- check text contrast against the nearest painted background, AA at least, on
+  every band. A source that failed contrast is not a reason to ship a page that
+  does; say what you changed;
+- at about 390px, 768px and 1440px wide, plus just above the width where the
+  navigation collapses, which is where it most often overflows.
+

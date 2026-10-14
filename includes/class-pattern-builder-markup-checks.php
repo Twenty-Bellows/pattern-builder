@@ -316,6 +316,16 @@ class Pattern_Builder_Markup_Checks {
 	}
 
 	/**
+	 * The slot names a pattern's markup declares.
+	 *
+	 * @param string $markup Block markup.
+	 * @return string[]
+	 */
+	public static function slot_names( $markup ) {
+		return self::slots_in( parse_blocks( (string) $markup ) );
+	}
+
+	/**
 	 * The slot names a pattern declares.
 	 *
 	 * @param array $blocks Parsed blocks.

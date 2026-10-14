@@ -2,7 +2,7 @@
 name: design-reproduction
 description: Rebuild an existing design as WordPress block patterns — a live website, a Figma file, a screenshot, a PDF or a mockup — page by page, pulling the reusable parts out rather than transcribing the pixels. Use this whenever the source of the design already exists somewhere else and the job is to reproduce it: "recreate this site", "build this in WordPress", "match this design", "here's a screenshot of what we want". Reproduction fails quietly in two specific ways this covers — values approximated instead of read, and repeated parts copied instead of factored — and both look like a finished page. Load the pattern-author skill alongside it; this one decides what to build and how faithfully, that one is how a pattern gets written.
 metadata:
-  version: 1.0.0
+  version: 1.3.0
 ---
 
 # Reproducing an existing design
@@ -29,6 +29,22 @@ than patterns.
 what you decided and keep building.
 
 ## Workflow
+
+### What to read, step by step
+
+Read what a step requires before it, and the rest only in the case named. This
+table only points; each fact lives where it names.
+
+| Step | Read before it | Only when |
+|---|---|---|
+| 1. Classify | nothing more | |
+| 2. Extract | `references/reading-a-source.md`, the part for your source's class | |
+| 3. Write down | nothing more | |
+| 4. Install | | whole page or site: `pattern-author`'s `references/design-system.md` |
+| 5. Factor, then build | `pattern-author`'s `SKILL.md` | a whole page or site: `pattern-author`'s `references/composition.md` |
+| 6. Place | `pattern-author`'s step 7 | |
+| 7. Check | the last section of `references/verifying.md`, *What no comparison can see* | a readable source and a whole rebuild: the rest of `references/verifying.md` |
+| 8. Say what you left | nothing more | |
 
 ### 1. Classify the source
 
@@ -135,7 +151,10 @@ own: `core/site-title` prints this site's name, `core/navigation` with no inner
 blocks fabricates a menu from this site's pages, `core/query` lists this site's
 posts. In a reproduction those show the wrong thing while looking like they
 work. Supply the content explicitly, or use ordinary blocks and say what you
-substituted.
+substituted. That warning is about showing the source's content on a site that does not
+have it. Where the content really is records on the destination, such as
+products, posts or events it already holds, a query over them is the right
+block; `pattern-author`'s `references/composition.md` says how to tell.
 
 ### 7. Check what can be checked
 
@@ -151,6 +170,11 @@ structural row whose measurement was ambiguous (a `verticalAlignment` where the
 columns were equal height, a `mediaPosition` on an already-stacked source) —
 and **do not call it a match**. The true sentence is *"consistent with the
 design at 1400px, with the font identified as X and these values inferred."*
+
+**Any source.** Behaviour has no ground truth to diff either way, and it is the
+one thing every rebuild still needs a browser for: click what moves, Tab
+through it, read the console and check contrast, as the last section of
+`references/verifying.md` describes.
 
 **Readable source, whole rebuild.** Here a real check exists and is worth the
 time: diff computed values rather than looking. `references/verifying.md` has
