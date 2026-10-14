@@ -278,6 +278,15 @@ the three writes to run the check before (`create-pattern`, `update-pattern`,
 the one step it cannot afford to skip sits where anyone asking what to read
 sees it first. A test asserts the abilities it names are registered.
 
+That block only reaches an agent that opened the index, though, and the one
+text every MCP client puts in front of a model when it picks a tool is that
+tool's description. So every ability with rules ends its description with the
+same line naming the guide to read first, built in one place:
+`Pattern_Builder_Abilities::GUIDES` maps each ability to its guides, and the
+private `register()` every registration goes through appends
+`guide_line()`. Reads that need no rules carry no line, and a test asserts
+that every guide the map names is one the index can serve.
+
 `copy-plugin-pattern` is a write and is deliberately not among them. The markup
 it stores is the plugin's, copied as it stands, and the checks exist to stop an
 agent persisting markup *it* composed — refusing a faithful copy over a fault in

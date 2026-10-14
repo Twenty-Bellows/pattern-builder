@@ -2336,4 +2336,37 @@ class Test_Abilities extends WP_UnitTestCase {
 		file_put_contents( $this->theme_json, wp_json_encode( array( 'version' => 3 ) ) );
 		wp_clean_theme_json_cache();
 	}
+
+	/**
+	 * A description that sends an agent to a guide the site cannot serve is worse than none:
+	 * every guide an ability names has to be in the index.
+	 */
+	public function test_every_guide_an_ability_names_can_be_served() {
+		$index = $this->abilities->execute_authoring_guide();
+		$names = wp_list_pluck( $index['guides'], 'name' );
+
+		foreach ( Pattern_Builder_Abilities::GUIDES as $ability => $guides ) {
+			foreach ( $guides as $guide ) {
+				$this->assertContains( $guide, $names, $ability . ' names a guide the index does not have: ' . $guide );
+			}
+		}
+	}
+
+	/**
+	 * The line is on the registered description, worded the one way, and every ability the
+	 * map names exists.
+	 */
+	public function test_an_ability_with_rules_names_its_guide_in_its_description() {
+		$this->require_abilities_api();
+
+		foreach ( Pattern_Builder_Abilities::GUIDES as $ability => $guides ) {
+			$this->assertTrue( wp_has_ability( $ability ), $ability . ' is in the guide map but did not register.' );
+			$this->assertStringEndsWith(
+				Pattern_Builder_Abilities::guide_line( $guides ),
+				wp_get_ability( $ability )->get_description()
+			);
+		}
+
+		$this->assertStringNotContainsString( 'Guide: get-authoring-guide', wp_get_ability( 'pattern-builder/list-block-types' )->get_description() );
+	}
 }

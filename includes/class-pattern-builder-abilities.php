@@ -16,6 +16,26 @@ class Pattern_Builder_Abilities {
 	const SKILL_ENTRY = 'SKILL.md';
 
 	/**
+	 * The guide each ability's rules live in. Every one of these descriptions ends with the
+	 * same line naming them, because an agent that goes straight to a write reads no index:
+	 * the description is the one text every client shows a model when it picks a tool.
+	 */
+	const GUIDES = array(
+		'pattern-builder/create-pattern'            => array( 'authoring', 'block-markup' ),
+		'pattern-builder/update-pattern'            => array( 'authoring', 'block-markup' ),
+		'pattern-builder/copy-plugin-pattern'       => array( 'composition' ),
+		'pattern-builder/add-design-tokens'         => array( 'design-system' ),
+		'pattern-builder/set-global-styles'         => array( 'design-system' ),
+		'pattern-builder/add-block-style-variation' => array( 'design-system' ),
+		'pattern-builder/set-layout'                => array( 'design-system' ),
+		'pattern-builder/find-media'                => array( 'assets' ),
+		'pattern-builder/add-asset'                 => array( 'assets' ),
+		'pattern-builder/add-placeholder-image'     => array( 'assets' ),
+		'pattern-builder/add-font'                  => array( 'assets' ),
+		'pattern-builder/render-pattern'            => array( 'verifying' ),
+	);
+
+	/**
 	 * Words that are true of every pattern, and so tell nobody which one this is.
 	 */
 	const EMPTY_WORDS = array( 'modern', 'clean', 'beautiful', 'responsive', 'stunning', 'sleek', 'elegant', 'engaging', 'seamless', 'versatile' );
@@ -78,6 +98,41 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
+	 * Register one ability, its description ending with the guide to read before the first
+	 * call when it has one.
+	 *
+	 * @param string $name Ability name.
+	 * @param array  $args Ability arguments.
+	 */
+	private function register( $name, $args ) {
+		if ( isset( self::GUIDES[ $name ] ) ) {
+			$args['description'] .= ' ' . self::guide_line( self::GUIDES[ $name ] );
+		}
+
+		wp_register_ability( $name, $args );
+	}
+
+	/**
+	 * The line naming an ability's guides, worded the same everywhere so an agent learns it
+	 * once.
+	 *
+	 * @param string[] $guides Guide names, as get-authoring-guide takes them.
+	 * @return string
+	 */
+	public static function guide_line( $guides ) {
+		$asks = array();
+		foreach ( (array) $guides as $guide ) {
+			$asks[] = '{"guide":"' . $guide . '"}';
+		}
+
+		return sprintf(
+			/* translators: %s: get-authoring-guide inputs, e.g. {"guide":"authoring"}. */
+			_n( 'Guide: get-authoring-guide %s. Read it before the first call.', 'Guide: get-authoring-guide %s. Read them before the first call.', count( $asks ), 'pattern-builder' ),
+			implode( ', then ', $asks )
+		);
+	}
+
+	/**
 	 * Anyone who may look at patterns in the editor may read these.
 	 *
 	 * @return bool
@@ -116,7 +171,7 @@ class Pattern_Builder_Abilities {
 	 * The design system as this site actually resolves it.
 	 */
 	private function register_design_system() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/get-design-system',
 			array(
 				'label'               => __( 'Get the design system', 'pattern-builder' ),
@@ -307,7 +362,7 @@ class Pattern_Builder_Abilities {
 	 * The block types this site actually has.
 	 */
 	private function register_block_types() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/list-block-types',
 			array(
 				'label'               => __( 'List available block types', 'pattern-builder' ),
@@ -409,7 +464,7 @@ class Pattern_Builder_Abilities {
 	 * Every pattern on this site, both kinds.
 	 */
 	private function register_list_patterns() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/list-patterns',
 			array(
 				'label'               => __( 'List patterns', 'pattern-builder' ),
@@ -676,7 +731,7 @@ class Pattern_Builder_Abilities {
 	 * One pattern, with its markup.
 	 */
 	private function register_get_pattern() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/get-pattern',
 			array(
 				'label'               => __( 'Get a pattern', 'pattern-builder' ),
@@ -731,7 +786,7 @@ class Pattern_Builder_Abilities {
 	 * Where a pattern is used, which is the cost of changing it.
 	 */
 	private function register_list_pattern_usage() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/list-pattern-usage',
 			array(
 				'label'               => __( 'List where a pattern is used', 'pattern-builder' ),
@@ -800,7 +855,7 @@ class Pattern_Builder_Abilities {
 	 * What a stored pattern renders as on the front end.
 	 */
 	private function register_render_pattern() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/render-pattern',
 			array(
 				'label'               => __( 'Render a pattern', 'pattern-builder' ),
@@ -902,7 +957,7 @@ class Pattern_Builder_Abilities {
 	 * Hand an agent the knowledge, not just the mechanism.
 	 */
 	private function register_authoring_guide() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/get-authoring-guide',
 			array(
 				'label'               => __( 'Get the pattern authoring guide', 'pattern-builder' ),
@@ -1717,7 +1772,7 @@ class Pattern_Builder_Abilities {
 	 * Hand over the validator itself.
 	 */
 	private function register_validator() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/get-validator',
 			array(
 				'label'               => __( 'Get the pattern validator', 'pattern-builder' ),
@@ -1804,7 +1859,7 @@ class Pattern_Builder_Abilities {
 	 * Where this site's own editor scripts are, in the order they load.
 	 */
 	private function register_editor_scripts() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/get-editor-scripts',
 			array(
 				'label'               => __( 'Get this site\'s editor script URLs', 'pattern-builder' ),
@@ -1904,7 +1959,7 @@ class Pattern_Builder_Abilities {
 	 * Store a new pattern.
 	 */
 	private function register_create_pattern() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/create-pattern',
 			array(
 				'label'               => __( 'Create a pattern', 'pattern-builder' ),
@@ -1938,7 +1993,7 @@ class Pattern_Builder_Abilities {
 	 * Update an existing pattern.
 	 */
 	private function register_update_pattern() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/update-pattern',
 			array(
 				'label'               => __( 'Update a pattern', 'pattern-builder' ),
@@ -1974,7 +2029,7 @@ class Pattern_Builder_Abilities {
 	 * Copy a pattern a plugin registered into the theme.
 	 */
 	private function register_copy_plugin_pattern() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/copy-plugin-pattern',
 			array(
 				'label'               => __( 'Copy a plugin pattern', 'pattern-builder' ),
@@ -2730,7 +2785,7 @@ class Pattern_Builder_Abilities {
 	 * hard-coded into its markup.
 	 */
 	private function register_add_design_tokens() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/add-design-tokens',
 			array(
 				'label'               => __( 'Add design tokens', 'pattern-builder' ),
@@ -2926,7 +2981,7 @@ class Pattern_Builder_Abilities {
 	 * Set the styles a pattern inherits.
 	 */
 	private function register_set_global_styles() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/set-global-styles',
 			array(
 				'label'               => __( 'Set global styles', 'pattern-builder' ),
@@ -3081,7 +3136,7 @@ class Pattern_Builder_Abilities {
 	 * Register the ability that sets the widths a constrained layout measures against.
 	 */
 	private function register_set_layout() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/set-layout',
 			array(
 				'label'               => __( 'Set the layout widths', 'pattern-builder' ),
@@ -3144,7 +3199,7 @@ class Pattern_Builder_Abilities {
 	 * Add a named look a pattern applies with a class.
 	 */
 	private function register_add_block_style_variation() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/add-block-style-variation',
 			array(
 				'label'               => __( 'Add a block style variation', 'pattern-builder' ),
@@ -3247,7 +3302,7 @@ class Pattern_Builder_Abilities {
 	 * What this site already has to illustrate a pattern with.
 	 */
 	private function register_find_media() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/find-media',
 			array(
 				'label'               => __( 'Find media', 'pattern-builder' ),
@@ -3328,7 +3383,7 @@ class Pattern_Builder_Abilities {
 	 * Add an image a pattern needs, in the two forms that fit in JSON.
 	 */
 	private function register_add_asset() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/add-asset',
 			array(
 				'label'               => __( 'Add an asset', 'pattern-builder' ),
@@ -3451,7 +3506,7 @@ class Pattern_Builder_Abilities {
 	 * Draw a placeholder rather than shipping a pattern with no image.
 	 */
 	private function register_add_placeholder_image() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/add-placeholder-image',
 			array(
 				'label'               => __( 'Add a placeholder image', 'pattern-builder' ),
@@ -3537,7 +3592,7 @@ class Pattern_Builder_Abilities {
 	 * What typefaces can be installed, so `add-font` is not a guess.
 	 */
 	private function register_list_fonts() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/list-fonts',
 			array(
 				'label'               => __( 'List installable fonts', 'pattern-builder' ),
@@ -3616,7 +3671,7 @@ class Pattern_Builder_Abilities {
 	 * Install a typeface and register it as a preset.
 	 */
 	private function register_add_font() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/add-font',
 			array(
 				'label'               => __( 'Add a font', 'pattern-builder' ),
