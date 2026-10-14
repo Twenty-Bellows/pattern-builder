@@ -544,7 +544,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/get-pattern',
 			array(
 				'label'               => __( 'Get a pattern', 'pattern-builder' ),
-				'description'         => __( 'Returns one pattern including its raw block markup. Identify a theme pattern by its namespaced name (e.g. "my-theme/hero") and a user pattern by its numeric post ID. Useful for reading an existing pattern before composing something in the same style.', 'pattern-builder' ),
+				'description'         => __( 'Returns one pattern including its raw block markup. Identify a theme pattern by its namespaced name (e.g. "my-theme/hero") and a user pattern by its numeric post ID. Useful for reading an existing pattern before composing something in the same style. The pattern carries a hash of everything update-pattern replaces: send it back as update-pattern\'s expectedHash, and the update is refused if the pattern changed after you read it.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -586,6 +586,7 @@ class Pattern_Builder_Abilities {
 
 		$summary            = $this->summarize( $pattern );
 		$summary['content'] = $pattern->content;
+		$summary['hash']    = $this->pattern_hash( $pattern );
 
 		return array( 'pattern' => $summary );
 	}
@@ -1735,13 +1736,17 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/update-pattern',
 			array(
 				'label'               => __( 'Update a pattern', 'pattern-builder' ),
-				'description'         => __( 'Replaces an existing pattern’s markup and metadata. Overwrites whatever is there, so read the pattern first if you mean to preserve part of it. As with create-pattern, validate the markup before sending it; the same checks as create-pattern refuse what PHP can see (malformed attribute JSON, contradictions, unregistered blocks, unresolved references, unfillable slots).', 'pattern-builder' ),
+				'description'         => __( 'Replaces an existing pattern’s markup and metadata. Overwrites whatever is there, so read the pattern first if you mean to preserve part of it, and send the hash get-pattern gave you as expectedHash: if the pattern changed after you read it, because someone saved it in the editor or another agent updated it, nothing is written and the answer carries the current hash to read again from. As with create-pattern, validate the markup before sending it; the same checks as create-pattern refuse what PHP can see (malformed attribute JSON, contradictions, unregistered blocks, unresolved references, unfillable slots). The answer says whether the write changed anything.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => $this->write_schema( false ),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
 						'pattern' => array( 'type' => 'object' ),
+						'changed' => array(
+							'type'        => 'boolean',
+							'description' => 'False when the stored pattern is exactly what it was before this write, which usually means the change you meant did not happen.',
+						),
 					),
 				),
 				'execute_callback'    => array( $this, 'execute_update_pattern' ),
@@ -1950,10 +1955,14 @@ class Pattern_Builder_Abilities {
 			);
 		}
 
-		$properties['id'] = array(
+		$properties['id']           = array(
 			'type'        => 'string',
 			'description' => 'Namespaced pattern name, or a user pattern\'s post ID.',
 			'minLength'   => 1,
+		);
+		$properties['expectedHash'] = array(
+			'type'        => 'string',
+			'description' => 'The hash get-pattern returned for the version you read. When the pattern no longer matches it, nothing is written. Optional, but without it a change made after your read is overwritten without a word.',
 		);
 
 		return array(
@@ -2003,7 +2012,9 @@ class Pattern_Builder_Abilities {
 
 			$this->write_user_pattern_meta( $post_id, $input );
 
-			$summary = $this->summarize( Abstract_Pattern::from_post( get_post( $post_id ) ) );
+			$stored          = Abstract_Pattern::from_post( get_post( $post_id ) );
+			$summary         = $this->summarize( $stored );
+			$summary['hash'] = $this->pattern_hash( $stored );
 
 			return $this->with_category_note( array( 'pattern' => $summary ), $summary );
 		}
@@ -2016,7 +2027,8 @@ class Pattern_Builder_Abilities {
 			return $result;
 		}
 
-		$summary = $this->summarize( $pattern );
+		$summary         = $this->summarize( $result );
+		$summary['hash'] = $this->pattern_hash( $result );
 
 		return $this->with_category_note( array( 'pattern' => $summary ), $summary );
 	}
@@ -2045,6 +2057,18 @@ class Pattern_Builder_Abilities {
 			);
 		}
 
+		$before = $this->pattern_hash( $existing );
+		if ( isset( $input['expectedHash'] ) && '' !== (string) $input['expectedHash'] && ! hash_equals( $before, (string) $input['expectedHash'] ) ) {
+			return new \WP_Error(
+				'pb_pattern_changed',
+				__( 'This pattern has changed since the version you read, so nothing was written. Read it again with get-pattern, make your change on what is there now, and send that hash as expectedHash.', 'pattern-builder' ),
+				array(
+					'status'      => 409,
+					'currentHash' => $before,
+				)
+			);
+		}
+
 		$checked = Pattern_Builder_Markup_Checks::check(
 			(string) $input['content'],
 			'theme' === $existing->source ? (string) $existing->name : ''
@@ -2070,9 +2094,7 @@ class Pattern_Builder_Abilities {
 
 			$this->write_user_pattern_meta( $post_id, $input, $existing );
 
-			$summary = $this->summarize( Abstract_Pattern::from_post( get_post( $post_id ) ) );
-
-			return $this->with_category_note( array( 'pattern' => $summary ), $summary );
+			return $this->updated( Abstract_Pattern::from_post( get_post( $post_id ) ), $before );
 		}
 
 		$args         = $this->pattern_args( $input, $existing );
@@ -2086,9 +2108,43 @@ class Pattern_Builder_Abilities {
 			return $result;
 		}
 
-		$summary = $this->summarize( $pattern );
+		return $this->updated( $result, $before );
+	}
 
-		return $this->with_category_note( array( 'pattern' => $summary ), $summary );
+	/**
+	 * The answer to an update: the pattern as it is now stored, its new hash, and whether the
+	 * write changed anything at all.
+	 *
+	 * @param Abstract_Pattern $stored The pattern as re-read after the write.
+	 * @param string           $before The hash it had before the write.
+	 * @return array
+	 */
+	private function updated( $stored, $before ) {
+		$summary         = $this->summarize( $stored );
+		$summary['hash'] = $this->pattern_hash( $stored );
+
+		return $this->with_category_note(
+			array(
+				'pattern' => $summary,
+				'changed' => $before !== $summary['hash'],
+			),
+			$summary
+		);
+	}
+
+	/**
+	 * A fingerprint of everything update-pattern replaces: the markup and every header or
+	 * field it writes. A caller pins an update to the version it read with this, so a change
+	 * someone else made in between is refused rather than silently overwritten.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern as stored.
+	 * @return string
+	 */
+	private function pattern_hash( $pattern ) {
+		$fields            = $this->summarize( $pattern );
+		$fields['content'] = (string) $pattern->content;
+
+		return hash( 'sha256', (string) wp_json_encode( $fields ) );
 	}
 
 	/**

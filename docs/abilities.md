@@ -123,6 +123,26 @@ enforces the bottom-up order the guides prescribe.
 Both writes report a category nothing on the site registered under
 `unregisteredCategories`.
 
+## Pinning an update to what was read
+
+`update-pattern` replaces a pattern whole, and the pattern can change between an
+agent's read and its write: a person saves it in the editor, another agent
+updates it, or the read is simply old. So `get-pattern`, and the answer to
+either write, carry a `hash` taken over everything an update replaces (the
+summary `summarize()` builds plus the markup), and `update-pattern` takes it
+back as `expectedHash`. When the stored pattern no longer matches, nothing is
+written and the error, `pb_pattern_changed` with a 409, carries `currentHash`
+so the caller can read again and redo its change on what is there now.
+
+The hash is taken from the pattern as re-read after the write, because the
+file store formats markup on the way to disk: hashing what was sent would hand
+back a value the next read never matches. `expectedHash` is optional, so an
+older caller keeps working, and the guides tell agents to send it.
+
+An update also answers `changed`, false when the stored pattern is exactly
+what it was. That stays a success, since the ability is annotated idempotent,
+but it is usually the sign of an edit that did not say what it meant.
+
 ## Two things deliberately absent
 
 **Nothing takes a prompt.** An `execute_callback` that turned a description
