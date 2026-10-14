@@ -16,6 +16,16 @@ class Pattern_Builder_Abilities {
 	const SKILL_ENTRY = 'SKILL.md';
 
 	/**
+	 * Words that are true of every pattern, and so tell nobody which one this is.
+	 */
+	const EMPTY_WORDS = array( 'modern', 'clean', 'beautiful', 'responsive', 'stunning', 'sleek', 'elegant', 'engaging', 'seamless', 'versatile' );
+
+	/**
+	 * Fewer words than this rarely tell two patterns apart.
+	 */
+	const DESCRIPTION_MIN_WORDS = 12;
+
+	/**
 	 * Hook the component into WordPress.
 	 */
 	public function __construct() {
@@ -1898,13 +1908,14 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/create-pattern',
 			array(
 				'label'               => __( 'Create a pattern', 'pattern-builder' ),
-				'description'         => __( 'Stores finished block markup as a new pattern — either a PHP file in the active theme, or a reusable block in the database. This does not generate anything: supply markup you have already written and validated with a JavaScript block validator, because invalid markup renders correctly on the front end and only fails once an editor opens it, and no server can run a block\'s save(). What the site does refuse, by name, is what PHP can see: attribute JSON that does not parse, a heading or list contradicting its attributes, a block this site has not registered, a core/pattern reference that resolves to nothing or to the pattern itself, and a Pattern Overrides slot nothing can fill — a content key naming no slot, a binding with no metadata.name, or a binding on a block core cannot bind. Store the patterns a pattern references before it.', 'pattern-builder' ),
+				'description'         => __( 'Stores finished block markup as a new pattern — either a PHP file in the active theme, or a reusable block in the database. This does not generate anything: supply markup you have already written and validated with a JavaScript block validator, because invalid markup renders correctly on the front end and only fails once an editor opens it, and no server can run a block\'s save(). What the site does refuse, by name, is what PHP can see: attribute JSON that does not parse, a heading or list contradicting its attributes, a block this site has not registered, a core/pattern reference that resolves to nothing or to the pattern itself, and a Pattern Overrides slot nothing can fill — a content key naming no slot, a binding with no metadata.name, or a binding on a block core cannot bind. Store the patterns a pattern references before it. Give it a description someone can choose it by: what it is and where it is used, what is in it and how it is arranged, any behaviour, and what it depends on. The answer carries warnings when the description is missing, too short to tell two patterns apart, or made of words that describe every pattern.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => $this->write_schema( true ),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'pattern' => array( 'type' => 'object' ),
+						'pattern'  => array( 'type' => 'object' ),
+						'warnings' => $this->warnings_schema(),
 					),
 				),
 				'execute_callback'    => array( $this, 'execute_create_pattern' ),
@@ -1937,11 +1948,12 @@ class Pattern_Builder_Abilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'pattern' => array( 'type' => 'object' ),
-						'changed' => array(
+						'pattern'  => array( 'type' => 'object' ),
+						'changed'  => array(
 							'type'        => 'boolean',
 							'description' => 'False when the stored pattern is exactly what it was before this write, which usually means the change you meant did not happen.',
 						),
+						'warnings' => $this->warnings_schema(),
 					),
 				),
 				'execute_callback'    => array( $this, 'execute_update_pattern' ),
@@ -2097,7 +2109,7 @@ class Pattern_Builder_Abilities {
 			),
 			'description'        => array(
 				'type'        => 'string',
-				'description' => 'Short description shown in the inserter.',
+				'description' => 'What the pattern is and where it is used; what is in it and how it is arranged, including what repeats and how it stacks on a narrow screen; any behaviour; and what it depends on, or that it depends on nothing. Shown in the inserter and searched by list-patterns. Leave out colours and fonts, which belong to the site, and words that describe every pattern.',
 			),
 			'categories'         => array(
 				'type'        => 'array',
@@ -2235,7 +2247,7 @@ class Pattern_Builder_Abilities {
 			$summary         = $this->summarize( $stored );
 			$summary['hash'] = $this->pattern_hash( $stored );
 
-			return $this->with_category_note( array( 'pattern' => $summary ), $summary );
+			return $this->with_category_note( $this->with_warnings( array( 'pattern' => $summary ), $this->description_warnings( $stored->description ) ), $summary );
 		}
 
 		$pattern = new Abstract_Pattern( $this->pattern_args( $input ) );
@@ -2249,7 +2261,7 @@ class Pattern_Builder_Abilities {
 		$summary         = $this->summarize( $result );
 		$summary['hash'] = $this->pattern_hash( $result );
 
-		return $this->with_category_note( array( 'pattern' => $summary ), $summary );
+		return $this->with_category_note( $this->with_warnings( array( 'pattern' => $summary ), $this->description_warnings( $result->description ) ), $summary );
 	}
 
 	/**
@@ -2324,7 +2336,7 @@ class Pattern_Builder_Abilities {
 
 			$this->write_user_pattern_meta( $post_id, $input, $existing );
 
-			return $this->updated( Abstract_Pattern::from_post( get_post( $post_id ) ), $before, $reverted );
+			return $this->updated( Abstract_Pattern::from_post( get_post( $post_id ) ), $existing, $input, $before, $reverted );
 		}
 
 		$args         = $this->pattern_args( $input, $existing );
@@ -2338,7 +2350,7 @@ class Pattern_Builder_Abilities {
 			return $result;
 		}
 
-		return $this->updated( $result, $before, $reverted );
+		return $this->updated( $result, $existing, $input, $before, $reverted );
 	}
 
 	/**
@@ -2585,11 +2597,13 @@ class Pattern_Builder_Abilities {
 	 * changed anything at all, and the places whose slots it sent back to placeholder copy.
 	 *
 	 * @param Abstract_Pattern $stored The pattern as re-read after the write.
+	 * @param Abstract_Pattern $existing The pattern as it was before the write.
+	 * @param array            $input Ability input.
 	 * @param string           $before The hash it had before the write.
 	 * @param array            $reverted Places that filled a slot dropSlots let go.
 	 * @return array
 	 */
-	private function updated( $stored, $before, $reverted = array() ) {
+	private function updated( $stored, $existing, $input, $before, $reverted = array() ) {
 		$summary         = $this->summarize( $stored );
 		$summary['hash'] = $this->pattern_hash( $stored );
 
@@ -2601,7 +2615,99 @@ class Pattern_Builder_Abilities {
 			$answer['reverted'] = $reverted;
 		}
 
-		return $this->with_category_note( $answer, $summary );
+		// Only a description this write set is judged: an edit is no occasion to re-judge
+		// prose its author never wrote. Markup that moved under an unchanged description is
+		// worth a look either way.
+		$warnings = isset( $input['description'] ) ? $this->description_warnings( $stored->description ) : array();
+		if ( (string) $stored->content !== (string) $existing->content && '' !== trim( (string) $stored->description ) && (string) $stored->description === (string) $existing->description ) {
+			$warnings[] = array(
+				'code'    => 'description_unchanged',
+				'message' => __( 'The markup changed and the description did not. Check it still says what the pattern is, what is in it and what it depends on.', 'pattern-builder' ),
+			);
+		}
+
+		return $this->with_category_note( $this->with_warnings( $answer, $warnings ), $summary );
+	}
+
+	/**
+	 * What is wrong with a description as something to choose a pattern by. Warnings, never
+	 * refusals: a quick pattern still saves.
+	 *
+	 * @param string $description The stored description.
+	 * @return array List of { code, message }.
+	 */
+	private function description_warnings( $description ) {
+		$description = trim( (string) $description );
+		$shape       = __( 'Say what it is and where it is used, what is in it and how it is arranged, any behaviour, and what it depends on.', 'pattern-builder' );
+
+		if ( '' === $description ) {
+			return array(
+				array(
+					'code'    => 'description_missing',
+					'message' => __( 'No description: an agent reading a list, or a person searching the inserter, has only the title to go on.', 'pattern-builder' ) . ' ' . $shape,
+				),
+			);
+		}
+
+		$warnings = array();
+		$words    = count( preg_split( '/\s+/u', $description, -1, PREG_SPLIT_NO_EMPTY ) );
+		if ( $words < self::DESCRIPTION_MIN_WORDS ) {
+			$warnings[] = array(
+				'code'    => 'description_short',
+				'message' => sprintf(
+					/* translators: %d: word count. */
+					__( 'The description is %d words, which is rarely enough to tell two patterns apart.', 'pattern-builder' ),
+					$words
+				) . ' ' . $shape,
+			);
+		}
+
+		$empty = array();
+		foreach ( self::EMPTY_WORDS as $word ) {
+			if ( preg_match( '/\b' . preg_quote( $word, '/' ) . '\b/i', $description ) ) {
+				$empty[] = $word;
+			}
+		}
+		if ( $empty ) {
+			$warnings[] = array(
+				'code'    => 'description_says_nothing',
+				'message' => sprintf(
+					/* translators: %s: the words, comma separated. */
+					__( 'The description uses words that describe every pattern (%s), so they help nobody choose this one. Say what is actually in it instead.', 'pattern-builder' ),
+					implode( ', ', $empty )
+				),
+			);
+		}
+
+		return $warnings;
+	}
+
+	/**
+	 * Add warnings to a write's answer, when there are any.
+	 *
+	 * @param array $answer The answer.
+	 * @param array $warnings List of { code, message }.
+	 * @return array
+	 */
+	private function with_warnings( $answer, $warnings ) {
+		if ( $warnings ) {
+			$answer['warnings'] = $warnings;
+		}
+
+		return $answer;
+	}
+
+	/**
+	 * The output schema both writes share for warnings.
+	 *
+	 * @return array
+	 */
+	private function warnings_schema() {
+		return array(
+			'type'        => 'array',
+			'description' => 'Things worth fixing that did not stop the write, each with a code and a message: a description missing, too short, made of words that describe every pattern, or left unchanged while the markup moved.',
+			'items'       => array( 'type' => 'object' ),
+		);
 	}
 
 	/**

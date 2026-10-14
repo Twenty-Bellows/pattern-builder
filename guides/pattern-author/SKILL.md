@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.5.0
+  version: 1.6.0
 ---
 
 # Authoring block patterns
@@ -321,7 +321,8 @@ A theme pattern is a PHP file in `patterns/` with a header comment:
 ```
 
 `Title` and `Slug` are required and the slug must be namespaced.
-`references/pattern-kinds.md` lists which other headers each kind needs.
+`references/pattern-kinds.md` lists which other headers each kind needs, and
+how to write a `Description` and `Keywords` someone can find the pattern by.
 `Categories` names slugs the site has **registered** — core's own, or the
 theme's through `register_block_pattern_category()`; an unregistered slug files
 the pattern under Uncategorized, where nobody looks.

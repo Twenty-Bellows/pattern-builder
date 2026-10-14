@@ -144,6 +144,16 @@ enforces the bottom-up order the guides prescribe.
 Both writes report a category nothing on the site registered under
 `unregisteredCategories`.
 
+Both also return `warnings`, never refusals, about the description: missing,
+too short to tell two patterns apart (`DESCRIPTION_MIN_WORDS`), or using words
+that describe every pattern (`EMPTY_WORDS`). The description is what an agent
+choosing from `list-patterns`, or a person searching the inserter, has to go
+on, and a pattern nobody can find gets written again. Only a description the
+write sets is judged, since an edit is no occasion to re-judge prose its author
+never wrote; an update that moves the markup under an unchanged description
+gets `description_unchanged` instead, as something worth a look. The guidance
+on writing one is in `pattern-kinds.md`.
+
 The reference check above runs when the *referencing* markup is written. The
 same failure can arrive from the other side: an update that removes or renames
 a slot sends every reference that filled it back to the pattern's own words.

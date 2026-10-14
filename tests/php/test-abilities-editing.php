@@ -471,6 +471,91 @@ class Test_Abilities_Editing extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The warning codes a write's answer carries.
+	 *
+	 * @param array $answer The answer.
+	 * @return string[]
+	 */
+	private function warning_codes( $answer ) {
+		return isset( $answer['warnings'] ) ? wp_list_pluck( $answer['warnings'], 'code' ) : array();
+	}
+
+	/**
+	 * Create a user pattern with a given description.
+	 *
+	 * @param string $description Description.
+	 * @return array The answer.
+	 */
+	private function described( $description ) {
+		return $this->abilities->execute_create_pattern(
+			array(
+				'title'       => 'Described',
+				'description' => $description,
+				'content'     => '<!-- wp:paragraph --><p>First.</p><!-- /wp:paragraph -->',
+				'source'      => 'user',
+			)
+		);
+	}
+
+	/**
+	 * What a description is missing comes back as a warning, and the pattern is stored anyway.
+	 */
+	public function test_a_weak_description_is_warned_about_but_stored() {
+		$this->assertSame( array( 'description_missing' ), $this->warning_codes( $this->described( '' ) ) );
+		$this->assertSame( array( 'description_short' ), $this->warning_codes( $this->described( 'A pricing table.' ) ) );
+
+		$answer = $this->described( 'A modern, clean pricing section for a landing page with two plans side by side and a button under each.' );
+		$this->assertSame( array( 'description_says_nothing' ), $this->warning_codes( $answer ) );
+		$this->assertStringContainsString( 'modern, clean', $answer['warnings'][0]['message'] );
+		$this->assertNotEmpty( $answer['pattern']['id'] );
+	}
+
+	/**
+	 * A description someone can choose the pattern by earns no warning at all.
+	 */
+	public function test_a_good_description_earns_no_warning() {
+		$answer = $this->described( 'Pricing section for a landing page: two plans side by side, each with a name, a price, what is included and a button. They stack on a narrow screen. Depends on nothing.' );
+
+		$this->assertArrayNotHasKey( 'warnings', $answer );
+	}
+
+	/**
+	 * An update that moves the markup under an unchanged description is told to check it; the
+	 * old description's own shortcomings are not its business.
+	 */
+	public function test_markup_moving_under_an_unchanged_description_is_noted() {
+		$created = $this->described( 'A pricing table.' );
+		$id      = (string) $created['pattern']['id'];
+
+		$updated = $this->abilities->execute_update_pattern(
+			array(
+				'id'      => $id,
+				'content' => '<!-- wp:paragraph --><p>Second.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$this->assertSame( array( 'description_unchanged' ), $this->warning_codes( $updated ) );
+	}
+
+	/**
+	 * A description an update sets is judged like one a create sets.
+	 */
+	public function test_a_description_an_update_sets_is_judged() {
+		$created = $this->described( 'Pricing section for a landing page: two plans side by side, each with a name, a price, what is included and a button.' );
+		$id      = (string) $created['pattern']['id'];
+
+		$updated = $this->abilities->execute_update_pattern(
+			array(
+				'id'          => $id,
+				'content'     => '<!-- wp:paragraph --><p>First.</p><!-- /wp:paragraph -->',
+				'description' => 'Pricing.',
+			)
+		);
+
+		$this->assertSame( array( 'description_short' ), $this->warning_codes( $updated ) );
+	}
+
+	/**
 	 * A paragraph that is a Pattern Overrides slot.
 	 *
 	 * @param string $name Slot name.
