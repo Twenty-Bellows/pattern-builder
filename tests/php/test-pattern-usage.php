@@ -229,6 +229,22 @@ class Test_Pattern_Usage extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A direct place says which of the pattern's slots it fills, which is what a change to
+	 * those slots would undo.
+	 */
+	public function test_a_direct_place_says_which_slots_it_fills() {
+		$card    = $this->theme_pattern(
+			'usage-card',
+			'<!-- wp:paragraph {"metadata":{"name":"headline","bindings":{"__default":{"source":"core/pattern-overrides"}}}} --><p>A headline</p><!-- /wp:paragraph -->'
+		);
+		$post_id = self::factory()->post->create( array( 'post_content' => '<!-- wp:pattern {"slug":"' . $card . '","content":{"headline":{"content":"Hello"}}} /-->' ) );
+
+		$usage = $this->usage( $card );
+
+		$this->assertSame( array( 'headline' ), $usage['places'][ (string) $post_id ]['fills'] );
+	}
+
+	/**
 	 * A pattern nothing places has no uses.
 	 */
 	public function test_an_unused_pattern_has_no_places() {

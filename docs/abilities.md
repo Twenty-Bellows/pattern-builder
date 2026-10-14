@@ -135,6 +135,18 @@ enforces the bottom-up order the guides prescribe.
 Both writes report a category nothing on the site registered under
 `unregisteredCategories`.
 
+The reference check above runs when the *referencing* markup is written. The
+same failure can arrive from the other side: an update that removes or renames
+a slot sends every reference that filled it back to the pattern's own words.
+So `update-pattern` compares the slot names before and after
+(`Pattern_Builder_Markup_Checks::slot_names()`), asks `Pattern_Builder_Usage`
+which places fill a removed one (every post, not just the ten a listing
+names), and refuses with `pb_slots_still_filled`, naming each place and key. A
+rename is reported as what it is, a removal plus an addition. A caller that
+means it lists the slots in `dropSlots`; the write goes through and the answer
+carries `reverted`, the places that now show placeholder copy. Saves from the
+editor are not checked.
+
 ## Pinning an update to what was read
 
 `update-pattern` replaces a pattern whole, and the pattern can change between an

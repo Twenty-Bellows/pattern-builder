@@ -55,9 +55,10 @@ class Pattern_Builder_Usage {
 	 * Every place that uses a pattern.
 	 *
 	 * @param Abstract_Pattern $pattern The pattern.
+	 * @param int              $named_posts How many posts to name before only counting.
 	 * @return array { places: array, total: int, hasMore: bool }
 	 */
-	public static function of( Abstract_Pattern $pattern ) {
+	public static function of( Abstract_Pattern $pattern, $named_posts = self::NAMED_POSTS ) {
 		$target = self::token_of( $pattern );
 
 		$carriers = self::carriers( $pattern, $target );
@@ -70,7 +71,8 @@ class Pattern_Builder_Usage {
 		);
 		foreach ( $template_kinds as $type => $kind ) {
 			foreach ( get_block_templates( array(), $type ) as $template ) {
-				$through = self::through( self::references_in( (string) $template->content ), $target, $names );
+				$found   = self::scan( (string) $template->content );
+				$through = self::through( $found, $target, $names );
 				if ( null === $through ) {
 					continue;
 				}
@@ -80,6 +82,7 @@ class Pattern_Builder_Usage {
 						'id'    => (string) $template->id,
 						'title' => (string) $template->title,
 					),
+					$found,
 					$through,
 					$target,
 					$names
@@ -88,7 +91,7 @@ class Pattern_Builder_Usage {
 		}
 
 		$posts = self::posts( $target, $names );
-		$named = array_slice( $posts, 0, self::NAMED_POSTS );
+		$named = array_slice( $posts, 0, max( 0, (int) $named_posts ) );
 
 		return array(
 			'places'  => array_merge( $places, $named ),
@@ -128,9 +131,9 @@ class Pattern_Builder_Usage {
 					continue;
 				}
 				if ( ! isset( $refs[ $token ] ) ) {
-					$refs[ $token ] = self::references_in( (string) $candidate->content );
+					$refs[ $token ] = self::scan( (string) $candidate->content );
 				}
-				if ( ! in_array( $carrier, $refs[ $token ], true ) ) {
+				if ( ! isset( $refs[ $token ][ $carrier ] ) ) {
 					continue;
 				}
 
@@ -143,6 +146,7 @@ class Pattern_Builder_Usage {
 						'id'     => 'user' === $candidate->source ? (int) $candidate->id : (string) $candidate->name,
 						'title'  => (string) $candidate->title,
 					),
+					$refs[ $token ],
 					self::through( $refs[ $token ], $target, $names ),
 					$target,
 					$names
@@ -197,7 +201,8 @@ class Pattern_Builder_Usage {
 
 			foreach ( $rows as $row ) {
 				$last_id = (int) $row->ID;
-				$through = self::through( self::references_in( (string) $row->post_content ), $target, $names );
+				$scanned = self::scan( (string) $row->post_content );
+				$through = self::through( $scanned, $target, $names );
 				if ( null === $through || ! current_user_can( 'read_post', $last_id ) ) {
 					continue;
 				}
@@ -209,6 +214,7 @@ class Pattern_Builder_Usage {
 						'postType' => (string) $row->post_type,
 						'status'   => (string) $row->post_status,
 					),
+					$scanned,
 					$through,
 					$target,
 					$names
@@ -241,18 +247,22 @@ class Pattern_Builder_Usage {
 	}
 
 	/**
-	 * A place, saying whether it uses the target directly or through another pattern.
+	 * A place, saying whether it uses the target directly or through another pattern, and
+	 * which of the target's slots a direct one fills.
 	 *
 	 * @param array  $place The place's own fields.
+	 * @param array  $found What its markup places: token => slot keys.
 	 * @param string $through The token it reaches the target through.
 	 * @param string $target The target's token.
 	 * @param array  $names Carrier token => name.
 	 * @return array
 	 */
-	private static function place( $place, $through, $target, $names ) {
+	private static function place( $place, $found, $through, $target, $names ) {
 		$place['direct'] = $through === $target;
 		if ( ! $place['direct'] ) {
 			$place['via'] = $names[ $through ];
+		} elseif ( ! empty( $found[ $target ] ) ) {
+			$place['fills'] = $found[ $target ];
 		}
 
 		return $place;
@@ -262,17 +272,17 @@ class Pattern_Builder_Usage {
 	 * Which carrier a piece of markup reaches the target through: the target itself when it
 	 * places it directly, otherwise the first carrier it places, or null when it places none.
 	 *
-	 * @param string[] $references Tokens the markup places.
-	 * @param string   $target The target's token.
-	 * @param array    $names Carrier token => name.
+	 * @param array  $found What the markup places: token => slot keys.
+	 * @param string $target The target's token.
+	 * @param array  $names Carrier token => name.
 	 * @return string|null
 	 */
-	private static function through( $references, $target, $names ) {
-		if ( in_array( $target, $references, true ) ) {
+	private static function through( $found, $target, $names ) {
+		if ( isset( $found[ $target ] ) ) {
 			return $target;
 		}
 
-		foreach ( $references as $reference ) {
+		foreach ( array_keys( $found ) as $reference ) {
 			if ( isset( $names[ $reference ] ) ) {
 				return $reference;
 			}
@@ -289,33 +299,53 @@ class Pattern_Builder_Usage {
 	 * @return string[]
 	 */
 	public static function references_in( $content ) {
+		return array_keys( self::scan( $content ) );
+	}
+
+	/**
+	 * Every pattern a piece of markup places, each with the slot keys its references fill
+	 * through `content` (the same attribute on a `core/pattern` and a `core/block`).
+	 *
+	 * @param string $content Block markup.
+	 * @return array token => string[] slot keys.
+	 */
+	private static function scan( $content ) {
 		if ( false === strpos( $content, 'wp:pattern' ) && false === strpos( $content, 'wp:block' ) ) {
 			return array();
 		}
 
-		$tokens = array();
-		foreach ( Pattern_File_Store::references_of( $content ) as $slug ) {
-			$tokens[] = 'slug:' . $slug;
-		}
-
-		return array_values( array_unique( array_merge( $tokens, self::block_refs( parse_blocks( $content ) ) ) ) );
+		return self::scan_blocks( parse_blocks( $content ) );
 	}
 
 	/**
-	 * Walk a parsed tree collecting `core/block` refs as tokens.
+	 * Walk a parsed tree for references and the keys they fill.
 	 *
 	 * @param array $blocks Parsed blocks.
-	 * @return string[]
+	 * @return array token => string[] slot keys.
 	 */
-	private static function block_refs( $blocks ) {
+	private static function scan_blocks( $blocks ) {
 		$found = array();
 
 		foreach ( (array) $blocks as $block ) {
-			if ( isset( $block['blockName'], $block['attrs']['ref'] ) && 'core/block' === $block['blockName'] ) {
-				$found[] = 'ref:' . (int) $block['attrs']['ref'];
+			$name  = isset( $block['blockName'] ) ? $block['blockName'] : '';
+			$attrs = isset( $block['attrs'] ) && is_array( $block['attrs'] ) ? $block['attrs'] : array();
+			$token = '';
+
+			if ( 'core/pattern' === $name && isset( $attrs['slug'] ) && '' !== trim( (string) $attrs['slug'] ) ) {
+				$token = 'slug:' . trim( (string) $attrs['slug'] );
+			} elseif ( 'core/block' === $name && ! empty( $attrs['ref'] ) ) {
+				$token = 'ref:' . (int) $attrs['ref'];
 			}
+
+			if ( '' !== $token ) {
+				$keys            = isset( $attrs['content'] ) && is_array( $attrs['content'] ) ? array_map( 'strval', array_keys( $attrs['content'] ) ) : array();
+				$found[ $token ] = array_values( array_unique( array_merge( isset( $found[ $token ] ) ? $found[ $token ] : array(), $keys ) ) );
+			}
+
 			if ( ! empty( $block['innerBlocks'] ) ) {
-				$found = array_merge( $found, self::block_refs( $block['innerBlocks'] ) );
+				foreach ( self::scan_blocks( $block['innerBlocks'] ) as $inner => $keys ) {
+					$found[ $inner ] = array_values( array_unique( array_merge( isset( $found[ $inner ] ) ? $found[ $inner ] : array(), $keys ) ) );
+				}
 			}
 		}
 

@@ -620,7 +620,7 @@ class Pattern_Builder_Abilities {
 					'properties' => array(
 						'usedBy'  => array(
 							'type'        => 'array',
-							'description' => 'Each place: kind (pattern, template, template-part or post), id, title, direct, and via when it is not direct. Patterns also carry source; posts carry postType and status.',
+							'description' => 'Each place: kind (pattern, template, template-part or post), id, title, direct, and via when it is not direct. A direct place that fills slots through content names them in fills. Patterns also carry source; posts carry postType and status.',
 							'items'       => array( 'type' => 'object' ),
 						),
 						'total'   => array(
@@ -1806,7 +1806,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/update-pattern',
 			array(
 				'label'               => __( 'Update a pattern', 'pattern-builder' ),
-				'description'         => __( 'Replaces an existing pattern’s markup and metadata. Overwrites whatever is there, so read the pattern first if you mean to preserve part of it, and send the hash get-pattern gave you as expectedHash: if the pattern changed after you read it, because someone saved it in the editor or another agent updated it, nothing is written and the answer carries the current hash to read again from. To change part of a pattern, send edits instead of content: fragments of the markup get-pattern returned, each replaced in place, all or none. As with create-pattern, validate the markup before sending it, and with edits validate the result; the same checks as create-pattern refuse what PHP can see (malformed attribute JSON, contradictions, unregistered blocks, unresolved references, unfillable slots). The answer says whether the write changed anything.', 'pattern-builder' ),
+				'description'         => __( 'Replaces an existing pattern’s markup and metadata. Overwrites whatever is there, so read the pattern first if you mean to preserve part of it, and send the hash get-pattern gave you as expectedHash: if the pattern changed after you read it, because someone saved it in the editor or another agent updated it, nothing is written and the answer carries the current hash to read again from. To change part of a pattern, send edits instead of content: fragments of the markup get-pattern returned, each replaced in place, all or none. As with create-pattern, validate the markup before sending it, and with edits validate the result; the same checks as create-pattern refuse what PHP can see (malformed attribute JSON, contradictions, unregistered blocks, unresolved references, unfillable slots). Removing or renaming a slot that another pattern or a page still fills is refused, since each of them would go back to placeholder copy, unless dropSlots names it. The answer says whether the write changed anything.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => $this->write_schema( false ),
 				'output_schema'       => array(
@@ -2052,6 +2052,12 @@ class Pattern_Builder_Abilities {
 			),
 		);
 
+		$properties['dropSlots'] = array(
+			'type'        => 'array',
+			'items'       => array( 'type' => 'string' ),
+			'description' => 'Slots this update removes even though other places fill them. Without this, removing or renaming a slot a page fills is refused, since every such page would go back to the placeholder copy; list-pattern-usage shows who fills what. The answer reports the places that revert.',
+		);
+
 		// Content or edits, never both: the ability checks which, since the schema cannot say it.
 		return array(
 			'type'                 => 'object',
@@ -2171,6 +2177,11 @@ class Pattern_Builder_Abilities {
 			return $checked;
 		}
 
+		$reverted = $this->slots_still_filled( $existing, (string) $input['content'], $input );
+		if ( is_wp_error( $reverted ) ) {
+			return $reverted;
+		}
+
 		if ( 'user' === $existing->source ) {
 			$post_id = wp_update_post(
 				array(
@@ -2188,7 +2199,7 @@ class Pattern_Builder_Abilities {
 
 			$this->write_user_pattern_meta( $post_id, $input, $existing );
 
-			return $this->updated( Abstract_Pattern::from_post( get_post( $post_id ) ), $before );
+			return $this->updated( Abstract_Pattern::from_post( get_post( $post_id ) ), $before, $reverted );
 		}
 
 		$args         = $this->pattern_args( $input, $existing );
@@ -2202,7 +2213,89 @@ class Pattern_Builder_Abilities {
 			return $result;
 		}
 
-		return $this->updated( $result, $before );
+		return $this->updated( $result, $before, $reverted );
+	}
+
+	/**
+	 * The places that fill a slot this update removes.
+	 *
+	 * A page fills a pattern's slots by name, so a slot removed or renamed here sends every
+	 * reference that filled it back to the pattern's own words, with no error anywhere. The
+	 * check on a reference's content keys only runs when the referencing markup is written, so
+	 * this is the same check from the other side. A caller that means it lists the slots in
+	 * dropSlots, and the answer reports what reverts.
+	 *
+	 * @param Abstract_Pattern $existing The pattern being updated.
+	 * @param string           $content The markup about to be stored.
+	 * @param array            $input Ability input.
+	 * @return array|\WP_Error The places that will revert, or the refusal.
+	 */
+	private function slots_still_filled( $existing, $content, $input ) {
+		$before  = Pattern_Builder_Markup_Checks::slot_names( (string) $existing->content );
+		$after   = Pattern_Builder_Markup_Checks::slot_names( $content );
+		$removed = array_values( array_diff( $before, $after ) );
+		if ( ! $removed ) {
+			return array();
+		}
+
+		$usage  = Pattern_Builder_Usage::of( $existing, PHP_INT_MAX );
+		$filled = array();
+		foreach ( $usage['places'] as $place ) {
+			$keys = empty( $place['fills'] ) ? array() : array_values( array_intersect( $place['fills'], $removed ) );
+			if ( $keys ) {
+				$filled[] = array(
+					'kind'  => $place['kind'],
+					'id'    => $place['id'],
+					'title' => $place['title'],
+					'keys'  => $keys,
+				);
+			}
+		}
+		if ( ! $filled ) {
+			return array();
+		}
+
+		$allowed    = isset( $input['dropSlots'] ) ? array_map( 'strval', (array) $input['dropSlots'] ) : array();
+		$keys       = array_values( array_unique( array_merge( ...array_column( $filled, 'keys' ) ) ) );
+		$unapproved = array_values( array_diff( $keys, $allowed ) );
+		if ( ! $unapproved ) {
+			return $filled;
+		}
+
+		$where = array();
+		foreach ( array_slice( $filled, 0, 5 ) as $place ) {
+			$where[] = sprintf( '%s (%s %s: %s)', $place['title'], $place['kind'], $place['id'], implode( ', ', $place['keys'] ) );
+		}
+		if ( count( $filled ) > 5 ) {
+			/* translators: %d: how many more places. */
+			$where[] = sprintf( __( 'and %d more', 'pattern-builder' ), count( $filled ) - 5 );
+		}
+
+		$added   = array_values( array_diff( $after, $before ) );
+		$message = sprintf(
+			/* translators: 1: slot names, 2: the places that fill them. */
+			__( 'This change removes slots that other places still fill: %1$s. Each of these would go back to this pattern\'s own words, with no error anywhere: %2$s. Nothing was written. Keep the slot names, or change the keys where they are filled first, or list the slots in dropSlots to go ahead anyway.', 'pattern-builder' ),
+			implode( ', ', $unapproved ),
+			implode( '; ', $where )
+		);
+		if ( $added ) {
+			$message .= ' ' . sprintf(
+				/* translators: %s: slot names. */
+				__( 'This change also adds %s: if a slot was renamed, that is a removal plus an addition, and the places that fill the old name will not fill the new one.', 'pattern-builder' ),
+				implode( ', ', $added )
+			);
+		}
+
+		return new \WP_Error(
+			'pb_slots_still_filled',
+			$message,
+			array(
+				'status'  => 409,
+				'removed' => $unapproved,
+				'added'   => $added,
+				'places'  => $filled,
+			)
+		);
 	}
 
 	/**
@@ -2363,24 +2456,27 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
-	 * The answer to an update: the pattern as it is now stored, its new hash, and whether the
-	 * write changed anything at all.
+	 * The answer to an update: the pattern as it is now stored, its new hash, whether the write
+	 * changed anything at all, and the places whose slots it sent back to placeholder copy.
 	 *
 	 * @param Abstract_Pattern $stored The pattern as re-read after the write.
 	 * @param string           $before The hash it had before the write.
+	 * @param array            $reverted Places that filled a slot dropSlots let go.
 	 * @return array
 	 */
-	private function updated( $stored, $before ) {
+	private function updated( $stored, $before, $reverted = array() ) {
 		$summary         = $this->summarize( $stored );
 		$summary['hash'] = $this->pattern_hash( $stored );
 
-		return $this->with_category_note(
-			array(
-				'pattern' => $summary,
-				'changed' => $before !== $summary['hash'],
-			),
-			$summary
+		$answer = array(
+			'pattern' => $summary,
+			'changed' => $before !== $summary['hash'],
 		);
+		if ( $reverted ) {
+			$answer['reverted'] = $reverted;
+		}
+
+		return $this->with_category_note( $answer, $summary );
 	}
 
 	/**

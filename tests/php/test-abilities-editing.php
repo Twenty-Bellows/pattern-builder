@@ -469,4 +469,166 @@ class Test_Abilities_Editing extends WP_UnitTestCase {
 		$this->assertWPError( $result );
 		$this->assertSame( 'pb_markup_refused', $result->get_error_code() );
 	}
+
+	/**
+	 * A paragraph that is a Pattern Overrides slot.
+	 *
+	 * @param string $name Slot name.
+	 * @param string $text Placeholder copy.
+	 * @return string
+	 */
+	private function slot( $name, $text ) {
+		return '<!-- wp:paragraph {"metadata":{"name":"' . $name . '","bindings":{"__default":{"source":"core/pattern-overrides"}}}} --><p>' . $text . '</p><!-- /wp:paragraph -->';
+	}
+
+	/**
+	 * A synced card with a headline slot, and a section that fills it.
+	 *
+	 * @return array { card: string, section: string }
+	 */
+	private function a_card_and_a_section_that_fills_it() {
+		$this->use_a_writable_theme();
+
+		$card = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Slot card',
+				'name'    => 'slot-card',
+				'content' => $this->slot( 'headline', 'A headline' ) . $this->slot( 'body', 'Some words' ),
+				'source'  => 'theme',
+				'synced'  => true,
+			)
+		);
+		$name = $card['pattern']['name'];
+
+		$section = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Slot section',
+				'name'    => 'slot-section',
+				'content' => '<!-- wp:pattern {"slug":"' . $name . '","content":{"headline":{"content":"Filled in"}}} /-->',
+				'source'  => 'theme',
+			)
+		);
+		$this->assertNotWPError( $section );
+
+		return array(
+			'card'    => $name,
+			'section' => $section['pattern']['name'],
+		);
+	}
+
+	/**
+	 * Removing a slot a section fills would send the section back to placeholder copy, so the
+	 * update is refused, names the place and the key, and writes nothing.
+	 */
+	public function test_removing_a_slot_a_reference_fills_is_refused() {
+		$names = $this->a_card_and_a_section_that_fills_it();
+
+		$result = $this->abilities->execute_update_pattern(
+			array(
+				'id'      => $names['card'],
+				'content' => $this->slot( 'body', 'Some words' ),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_slots_still_filled', $result->get_error_code() );
+		$data = $result->get_error_data();
+		$this->assertSame( 409, $data['status'] );
+		$this->assertSame( array( 'headline' ), $data['removed'] );
+		$this->assertSame( $names['section'], $data['places'][0]['id'] );
+		$this->assertSame( array( 'headline' ), $data['places'][0]['keys'] );
+
+		$after = $this->abilities->execute_get_pattern( array( 'id' => $names['card'] ) );
+		$this->assertStringContainsString( '"name":"headline"', $after['pattern']['content'] );
+	}
+
+	/**
+	 * A rename is the usual way this happens, and the refusal says it is a removal plus an
+	 * addition.
+	 */
+	public function test_a_renamed_slot_is_named_as_removed_and_added() {
+		$names = $this->a_card_and_a_section_that_fills_it();
+
+		$result = $this->abilities->execute_update_pattern(
+			array(
+				'id'      => $names['card'],
+				'content' => $this->slot( 'title', 'A headline' ) . $this->slot( 'body', 'Some words' ),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( array( 'title' ), $result->get_error_data()['added'] );
+		$this->assertStringContainsString( 'removal plus an addition', $result->get_error_message() );
+	}
+
+	/**
+	 * Listing the slot in dropSlots is how a caller says it means it; the write goes through
+	 * and the answer says what reverts.
+	 */
+	public function test_drop_slots_lets_the_update_through_and_reports_what_reverts() {
+		$names = $this->a_card_and_a_section_that_fills_it();
+
+		$updated = $this->abilities->execute_update_pattern(
+			array(
+				'id'        => $names['card'],
+				'content'   => $this->slot( 'body', 'Some words' ),
+				'dropSlots' => array( 'headline' ),
+			)
+		);
+
+		$this->assertNotWPError( $updated );
+		$this->assertSame( $names['section'], $updated['reverted'][0]['id'] );
+		$this->assertSame( array( 'headline' ), $updated['reverted'][0]['keys'] );
+	}
+
+	/**
+	 * A slot nothing fills can go without ceremony.
+	 */
+	public function test_removing_a_slot_nothing_fills_goes_through() {
+		$names = $this->a_card_and_a_section_that_fills_it();
+
+		$updated = $this->abilities->execute_update_pattern(
+			array(
+				'id'      => $names['card'],
+				'content' => $this->slot( 'headline', 'A headline' ),
+			)
+		);
+
+		$this->assertNotWPError( $updated );
+		$this->assertArrayNotHasKey( 'reverted', $updated );
+	}
+
+	/**
+	 * A page filling the slot counts as much as a pattern does.
+	 */
+	public function test_a_post_that_fills_the_slot_is_counted() {
+		$this->use_a_writable_theme();
+		$card    = $this->abilities->execute_create_pattern(
+			array(
+				'title'   => 'Slot card',
+				'name'    => 'slot-card',
+				'content' => $this->slot( 'headline', 'A headline' ),
+				'source'  => 'theme',
+				'synced'  => true,
+			)
+		);
+		$post_id = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_title'   => 'Landing',
+				'post_content' => '<!-- wp:pattern {"slug":"' . $card['pattern']['name'] . '","content":{"headline":{"content":"Welcome"}}} /-->',
+			)
+		);
+
+		$result = $this->abilities->execute_update_pattern(
+			array(
+				'id'      => $card['pattern']['name'],
+				'content' => '<!-- wp:paragraph --><p>No slots now.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( $post_id, $result->get_error_data()['places'][0]['id'] );
+		$this->assertStringContainsString( 'Landing', $result->get_error_message() );
+	}
 }
