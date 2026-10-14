@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.10.0
+  version: 1.11.0
 ---
 
 # Authoring block patterns
@@ -328,6 +328,24 @@ wp eval-file <skill>/scripts/check-slots.php path/to/page-pattern.php
 It reports which slots took their value and which still show placeholder copy.
 Also check the rules in `references/design-content-split.md` — malformed
 attributes there leave a *valid* block behind.
+
+**Then use it, not only look at it.** Everything above is about structure and
+values. None of it notices a navigation overlay that will not open, a details
+block that will not toggle, a focus outline the design took away, or text that
+fails contrast on its band, and every one of those passes. Open the `signed`
+page URL `render-pattern` hands back, which opens in any browser, and:
+
+- click what moves: the navigation overlay open and closed, details, search;
+- Tab through it: focus visible on every link and button, a sensible order,
+  and Escape closing an open overlay;
+- read the console, where an error is a defect;
+- check text contrast against the nearest painted background, AA at least, on
+  every band rather than only the first;
+- do it at about 390px, 768px and 1440px wide, and just above the width where
+  the navigation collapses, which is where it most often overflows.
+
+A pattern with nothing that moves has less to click, but focus and contrast
+apply to every one.
 
 ### 7. Place it
 
