@@ -1,7 +1,7 @@
 # Abilities — the agent interface
 
-Pattern Builder registers **27 abilities** with WordPress core's Abilities API:
-nineteen in `Pattern_Builder_Abilities` and seven more for the cloud in
+Pattern Builder registers **28 abilities** with WordPress core's Abilities API:
+twenty-one in `Pattern_Builder_Abilities` and seven more for the cloud in
 `Pattern_Builder_Cloud_Abilities` (see [`cloud.md`](cloud.md)). Core exposes the
 registry over REST at `wp-abilities/v1`, and an MCP bridge over that surface
 gets these for free — which is why there is no bespoke agent API here.
@@ -34,6 +34,7 @@ sets it).
 | `list-block-types` | What is registered *on this site*; naming blocks also returns each one's `supports`. |
 | `list-patterns` | Every pattern's summary with its placement headers, any `origin` or `cloud` reference, and the registered pattern categories. `source` narrows it to the theme's files, the database's user patterns, or the read-only ones a plugin registered. |
 | `get-pattern` | One pattern, whichever of the three sources it comes from. |
+| `list-pattern-usage` | Every place that places a pattern, directly or through another pattern. |
 | `render-pattern` | The rendered HTML plus preview URLs — `standalone`, `page`, and `themes` against each lab theme. |
 | `find-media` | The images a pattern can point at, plus how to upload one. |
 | `list-fonts` | The font collection; naming a `family` describes that one, including whether it has a variable face. |
@@ -50,6 +51,17 @@ button on each button, none of which then follows the destination. Each block
 style is marked `portable`: true for one declared in a block's own `block.json`,
 which ships with WordPress, false for one this site registered, whose
 definition has to be carried.
+
+**`list-pattern-usage` walks references upward.** `references_of()` in
+`Pattern_File_Store` answers what a pattern places; this answers what places
+it, which is the cost of changing a synced pattern. `Pattern_Builder_Usage`
+first finds the patterns that carry it at any depth (theme, user and plugin
+patterns alike), then the templates and template parts that place any of
+them, then the posts. A place reached through another pattern is marked
+indirect, with that pattern as `via`. Posts are found with a LIKE on each
+carrier's name and confirmed by parsing, so a name mentioned in prose is not a
+use, and only posts the caller may read are counted. Templates and patterns
+come back in full; posts are named up to ten and counted beyond that.
 
 **`list-block-types` reports supports because no validator can.** The classes a
 block's saved markup must carry come from filters that only run inside an

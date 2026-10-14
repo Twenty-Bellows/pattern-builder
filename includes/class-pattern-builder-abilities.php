@@ -48,6 +48,7 @@ class Pattern_Builder_Abilities {
 		$this->register_block_types();
 		$this->register_list_patterns();
 		$this->register_get_pattern();
+		$this->register_list_pattern_usage();
 		$this->register_render_pattern();
 		$this->register_authoring_guide();
 		$this->register_validator();
@@ -589,6 +590,75 @@ class Pattern_Builder_Abilities {
 		$summary['hash']    = $this->pattern_hash( $pattern );
 
 		return array( 'pattern' => $summary );
+	}
+
+	/**
+	 * Where a pattern is used, which is the cost of changing it.
+	 */
+	private function register_list_pattern_usage() {
+		wp_register_ability(
+			'pattern-builder/list-pattern-usage',
+			array(
+				'label'               => __( 'List where a pattern is used', 'pattern-builder' ),
+				'description'         => __( 'Returns every place that places a pattern: other patterns, the theme\'s templates and template parts, and posts and pages, drafts included. A place that uses it through another pattern (a page placing a section that places this card) is marked indirect, with the pattern it goes through as via. Read this before changing a synced pattern: a change reaches every place listed, so the list is the cost of the change, and worth telling a person about when it is long. Templates and patterns are listed in full; posts are named up to ten and counted beyond that.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'id' => array(
+							'type'        => 'string',
+							'description' => 'Namespaced pattern name, or a user pattern\'s post ID.',
+							'minLength'   => 1,
+						),
+					),
+					'required'             => array( 'id' ),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'usedBy'  => array(
+							'type'        => 'array',
+							'description' => 'Each place: kind (pattern, template, template-part or post), id, title, direct, and via when it is not direct. Patterns also carry source; posts carry postType and status.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'total'   => array(
+							'type'        => 'integer',
+							'description' => 'Every place found, including posts beyond the ones named.',
+						),
+						'hasMore' => array(
+							'type'        => 'boolean',
+							'description' => 'True when more posts use it than usedBy names.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_list_pattern_usage' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * Every place that uses one pattern.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_list_pattern_usage( $input ) {
+		$pattern = $this->find( isset( $input['id'] ) ? (string) $input['id'] : '' );
+		if ( is_wp_error( $pattern ) ) {
+			return $pattern;
+		}
+
+		$usage = Pattern_Builder_Usage::of( $pattern );
+
+		return array(
+			'usedBy'  => $usage['places'],
+			'total'   => $usage['total'],
+			'hasMore' => $usage['hasMore'],
+		);
 	}
 
 	/**

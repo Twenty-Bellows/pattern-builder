@@ -129,6 +129,7 @@ class Test_Abilities extends WP_UnitTestCase {
 			'pattern-builder/list-block-types',
 			'pattern-builder/list-patterns',
 			'pattern-builder/get-pattern',
+			'pattern-builder/list-pattern-usage',
 			'pattern-builder/render-pattern',
 			'pattern-builder/get-authoring-guide',
 			'pattern-builder/get-validator',
@@ -165,7 +166,7 @@ class Test_Abilities extends WP_UnitTestCase {
 	public function test_annotations_map_to_the_methods_we_intend() {
 		$this->require_abilities_api();
 
-		foreach ( array( 'get-design-system', 'list-block-types', 'list-patterns', 'get-pattern', 'render-pattern', 'get-authoring-guide', 'get-validator', 'get-editor-scripts', 'find-media', 'list-fonts' ) as $read ) {
+		foreach ( array( 'get-design-system', 'list-block-types', 'list-patterns', 'get-pattern', 'list-pattern-usage', 'render-pattern', 'get-authoring-guide', 'get-validator', 'get-editor-scripts', 'find-media', 'list-fonts' ) as $read ) {
 			$meta = wp_get_ability( 'pattern-builder/' . $read )->get_meta();
 			$this->assertTrue( $meta['annotations']['readonly'], $read . ' should be readonly (GET).' );
 			$this->assertTrue( $meta['show_in_rest'], $read . ' must be reachable over REST.' );

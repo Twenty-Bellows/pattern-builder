@@ -536,6 +536,7 @@ map*, then deletes the rows and the old capabilities.
 | `Pattern_Builder_Block_Style_Variations` | The theme's `styles/*.json` partials. |
 | `Safe_Css` | The safe subset of literal CSS a variation may carry. See [`cloud.md`](cloud.md). |
 | `Pattern_Builder_Markup_Checks` | The failures PHP can see and every one of them silent at render. |
+| `Pattern_Builder_Usage` | Where a pattern is used: the patterns, templates, template parts and posts that place it, directly or through another pattern. See [`abilities.md`](abilities.md). |
 | `Pattern_Builder_Migration` | The one-time 1.x upgrade. |
 | `Pattern_Builder_Security` / `Pattern_Builder_Localization` | Path-validated filesystem helpers; pattern localization. |
 | Vendored runtime | `Pattern_Block`, `Pattern_Resolver`, `Block_Markup`, `Inner_HTML_Processor`, `Synced_Patterns`, `Editor_Support`. |
