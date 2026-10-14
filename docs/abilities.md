@@ -143,6 +143,29 @@ An update also answers `changed`, false when the stored pattern is exactly
 what it was. That stays a success, since the ability is annotated idempotent,
 but it is usually the sign of an edit that did not say what it meant.
 
+## Changing part of a pattern
+
+Sending a long page pattern back whole to change one class costs tokens and
+invites changes nobody asked for: an attribute reserialised differently, a
+slot name retyped wrong. So `update-pattern` takes `edits` as an alternative
+to `content`, a list of `{ old, new, replaceAll }` applied in order to one copy
+of the stored markup by `Pattern_Builder_Abilities::apply_edits()`.
+
+- Each `old` must match exactly once unless `replaceAll` is set. An exact
+  match is tried first, then one that lets any run of whitespace stand for any
+  other, since an agent copying a fragment out of formatted markup rarely
+  keeps its indentation.
+- A fragment that matches nothing or more than once refuses every edit, with
+  `pb_edit_refused` naming the edit and, for an ambiguous one, the lines it
+  matched. One failure writes nothing.
+- `edits` requires `expectedHash`: a fragment only means something against the
+  version it was cut from.
+- The edited result goes through the same markup checks as content sent
+  whole. Block validity is still the caller's to check, on the result.
+
+Content and edits together are refused, and so is an update with neither. The
+input schema cannot say "one of", so the ability does.
+
 ## Two things deliberately absent
 
 **Nothing takes a prompt.** An `execute_callback` that turned a description

@@ -237,4 +237,236 @@ class Test_Abilities_Editing extends WP_UnitTestCase {
 		$this->assertFalse( $updated['changed'] );
 		$this->assertSame( $read['pattern']['hash'], $updated['pattern']['hash'] );
 	}
+
+	/**
+	 * Edit a pattern by fragment, pinned to the version read.
+	 *
+	 * @param string $id Pattern id.
+	 * @param array  $edits The edits.
+	 * @return array|WP_Error
+	 */
+	private function edit( $id, $edits ) {
+		$read = $this->abilities->execute_get_pattern( array( 'id' => $id ) );
+
+		return $this->abilities->execute_update_pattern(
+			array(
+				'id'           => $id,
+				'edits'        => $edits,
+				'expectedHash' => $read['pattern']['hash'],
+			)
+		);
+	}
+
+	/**
+	 * A fragment changes in place and the rest of the pattern is left as it was.
+	 *
+	 * @dataProvider sources
+	 *
+	 * @param string $source Store.
+	 */
+	public function test_an_edit_changes_one_fragment_in_place( $source ) {
+		$id = $this->a_pattern( $source, 'Keep this. Change this.' );
+
+		$updated = $this->edit(
+			$id,
+			array(
+				array(
+					'old' => 'Change this.',
+					'new' => 'Changed.',
+				),
+			)
+		);
+
+		$this->assertNotWPError( $updated );
+		$this->assertTrue( $updated['changed'] );
+		$after = $this->abilities->execute_get_pattern( array( 'id' => $id ) );
+		$this->assertStringContainsString( 'Keep this. Changed.', $after['pattern']['content'] );
+	}
+
+	/**
+	 * Edits apply in order to one copy, so a later one sees what an earlier one wrote.
+	 */
+	public function test_edits_apply_in_order() {
+		$edited = Pattern_Builder_Abilities::apply_edits(
+			'<p>one</p>',
+			array(
+				array(
+					'old' => 'one',
+					'new' => 'two',
+				),
+				array(
+					'old' => 'two',
+					'new' => 'three',
+				),
+			)
+		);
+
+		$this->assertSame( '<p>three</p>', $edited );
+	}
+
+	/**
+	 * replaceAll is the one way a fragment may match more than once.
+	 */
+	public function test_replace_all_changes_every_occurrence() {
+		$edited = Pattern_Builder_Abilities::apply_edits(
+			'<p>a</p><p>a</p>',
+			array(
+				array(
+					'old'        => 'a',
+					'new'        => 'b',
+					'replaceAll' => true,
+				),
+			)
+		);
+
+		$this->assertSame( '<p>b</p><p>b</p>', $edited );
+	}
+
+	/**
+	 * Indentation copied imperfectly out of formatted markup still finds its one match.
+	 */
+	public function test_a_fragment_matches_despite_different_whitespace() {
+		$edited = Pattern_Builder_Abilities::apply_edits(
+			"<div>\n\t<p>Hello</p>\n</div>",
+			array(
+				array(
+					'old' => '<div> <p>Hello</p>',
+					'new' => '<div><p>Goodbye</p>',
+				),
+			)
+		);
+
+		$this->assertSame( "<div><p>Goodbye</p>\n</div>", $edited );
+	}
+
+	/**
+	 * A fragment that matches more than once is ambiguous, so nothing is written and the error
+	 * says where the matches are.
+	 */
+	public function test_an_ambiguous_fragment_refuses_every_edit() {
+		$result = Pattern_Builder_Abilities::apply_edits(
+			"<p>a</p>\n<p>a</p>",
+			array(
+				array(
+					'old' => 'a',
+					'new' => 'b',
+				),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_edit_refused', $result->get_error_code() );
+		$data = $result->get_error_data();
+		$this->assertSame( 0, $data['edit'] );
+		$this->assertSame( array( 1, 2 ), $data['lines'] );
+	}
+
+	/**
+	 * One edit that matches nothing stops all of them, including the ones before it.
+	 *
+	 * @dataProvider sources
+	 *
+	 * @param string $source Store.
+	 */
+	public function test_one_failed_edit_writes_nothing( $source ) {
+		$id = $this->a_pattern( $source, 'Untouched.' );
+
+		$result = $this->edit(
+			$id,
+			array(
+				array(
+					'old' => 'Untouched.',
+					'new' => 'Touched.',
+				),
+				array(
+					'old' => 'Not there.',
+					'new' => 'Anything.',
+				),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 1, $result->get_error_data()['edit'] );
+		$after = $this->abilities->execute_get_pattern( array( 'id' => $id ) );
+		$this->assertStringContainsString( 'Untouched.', $after['pattern']['content'] );
+	}
+
+	/**
+	 * Content and edits together are two answers to one question.
+	 */
+	public function test_content_and_edits_together_are_refused() {
+		$id   = $this->a_pattern( 'user' );
+		$read = $this->abilities->execute_get_pattern( array( 'id' => $id ) );
+
+		$result = $this->abilities->execute_update_pattern(
+			array(
+				'id'           => $id,
+				'content'      => '<!-- wp:paragraph --><p>Whole.</p><!-- /wp:paragraph -->',
+				'edits'        => array(
+					array(
+						'old' => 'First.',
+						'new' => 'Part.',
+					),
+				),
+				'expectedHash' => $read['pattern']['hash'],
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_content_and_edits', $result->get_error_code() );
+	}
+
+	/**
+	 * A fragment only means something against the version it was cut from.
+	 */
+	public function test_edits_without_a_hash_are_refused() {
+		$id = $this->a_pattern( 'user' );
+
+		$result = $this->abilities->execute_update_pattern(
+			array(
+				'id'    => $id,
+				'edits' => array(
+					array(
+						'old' => 'First.',
+						'new' => 'Second.',
+					),
+				),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_edits_need_a_hash', $result->get_error_code() );
+	}
+
+	/**
+	 * An update with neither content nor edits has nothing to store.
+	 */
+	public function test_an_update_with_nothing_to_write_is_refused() {
+		$id = $this->a_pattern( 'user' );
+
+		$result = $this->abilities->execute_update_pattern( array( 'id' => $id ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_nothing_to_write', $result->get_error_code() );
+	}
+
+	/**
+	 * The edited result is held to the same checks as markup sent whole.
+	 */
+	public function test_the_edited_result_goes_through_the_markup_checks() {
+		$id = $this->a_pattern( 'user' );
+
+		$result = $this->edit(
+			$id,
+			array(
+				array(
+					'old' => '<!-- wp:paragraph -->',
+					'new' => '<!-- wp:paragraph {"fontSize":"large" -->',
+				),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_markup_refused', $result->get_error_code() );
+	}
 }

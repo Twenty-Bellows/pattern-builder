@@ -1736,7 +1736,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/update-pattern',
 			array(
 				'label'               => __( 'Update a pattern', 'pattern-builder' ),
-				'description'         => __( 'Replaces an existing pattern’s markup and metadata. Overwrites whatever is there, so read the pattern first if you mean to preserve part of it, and send the hash get-pattern gave you as expectedHash: if the pattern changed after you read it, because someone saved it in the editor or another agent updated it, nothing is written and the answer carries the current hash to read again from. As with create-pattern, validate the markup before sending it; the same checks as create-pattern refuse what PHP can see (malformed attribute JSON, contradictions, unregistered blocks, unresolved references, unfillable slots). The answer says whether the write changed anything.', 'pattern-builder' ),
+				'description'         => __( 'Replaces an existing pattern’s markup and metadata. Overwrites whatever is there, so read the pattern first if you mean to preserve part of it, and send the hash get-pattern gave you as expectedHash: if the pattern changed after you read it, because someone saved it in the editor or another agent updated it, nothing is written and the answer carries the current hash to read again from. To change part of a pattern, send edits instead of content: fragments of the markup get-pattern returned, each replaced in place, all or none. As with create-pattern, validate the markup before sending it, and with edits validate the result; the same checks as create-pattern refuse what PHP can see (malformed attribute JSON, contradictions, unregistered blocks, unresolved references, unfillable slots). The answer says whether the write changed anything.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => $this->write_schema( false ),
 				'output_schema'       => array(
@@ -1962,13 +1962,31 @@ class Pattern_Builder_Abilities {
 		);
 		$properties['expectedHash'] = array(
 			'type'        => 'string',
-			'description' => 'The hash get-pattern returned for the version you read. When the pattern no longer matches it, nothing is written. Optional, but without it a change made after your read is overwritten without a word.',
+			'description' => 'The hash get-pattern returned for the version you read. When the pattern no longer matches it, nothing is written. Optional with content, required with edits; without it a change made after your read is overwritten without a word.',
+		);
+		$properties['edits']        = array(
+			'type'        => 'array',
+			'description' => 'Change part of the stored markup instead of sending all of it as content: each edit replaces old with new, in order, on one copy of the markup get-pattern returned. Each old must match exactly once unless replaceAll is set; a fragment that matches nothing, or more than once, refuses the whole write and nothing is stored. Send content or edits, never both, and send expectedHash with edits, since a fragment only means something against the version it was cut from.',
+			'items'       => array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'old'        => array(
+						'type'      => 'string',
+						'minLength' => 1,
+					),
+					'new'        => array( 'type' => 'string' ),
+					'replaceAll' => array( 'type' => 'boolean' ),
+				),
+				'required'             => array( 'old', 'new' ),
+				'additionalProperties' => false,
+			),
 		);
 
+		// Content or edits, never both: the ability checks which, since the schema cannot say it.
 		return array(
 			'type'                 => 'object',
 			'properties'           => $properties,
-			'required'             => array( 'id', 'content' ),
+			'required'             => array( 'id' ),
 			'additionalProperties' => false,
 			'default'              => array(),
 		);
@@ -2069,6 +2087,12 @@ class Pattern_Builder_Abilities {
 			);
 		}
 
+		$content = $this->content_to_write( $input, $existing );
+		if ( is_wp_error( $content ) ) {
+			return $content;
+		}
+		$input['content'] = $content;
+
 		$checked = Pattern_Builder_Markup_Checks::check(
 			(string) $input['content'],
 			'theme' === $existing->source ? (string) $existing->name : ''
@@ -2109,6 +2133,163 @@ class Pattern_Builder_Abilities {
 		}
 
 		return $this->updated( $result, $before );
+	}
+
+	/**
+	 * The markup an update stores: the content it was sent, or the stored markup with its edits
+	 * applied.
+	 *
+	 * @param array            $input Ability input.
+	 * @param Abstract_Pattern $existing The pattern being updated.
+	 * @return string|\WP_Error
+	 */
+	private function content_to_write( $input, $existing ) {
+		$has_content = isset( $input['content'] ) && '' !== (string) $input['content'];
+		$has_edits   = ! empty( $input['edits'] );
+
+		if ( $has_content && $has_edits ) {
+			return new \WP_Error(
+				'pb_content_and_edits',
+				__( 'Send the whole markup as content or change part of it with edits, not both: nothing was written.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( ! $has_content && ! $has_edits ) {
+			return new \WP_Error(
+				'pb_nothing_to_write',
+				__( 'An update needs the markup to store: the whole of it as content, or edits to the markup get-pattern returned.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( $has_content ) {
+			return (string) $input['content'];
+		}
+
+		if ( ! isset( $input['expectedHash'] ) || '' === (string) $input['expectedHash'] ) {
+			return new \WP_Error(
+				'pb_edits_need_a_hash',
+				__( 'Edits need expectedHash, the hash get-pattern returned with the markup they were cut from: a fragment only means something against that version. Nothing was written.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return self::apply_edits( (string) $existing->content, (array) $input['edits'] );
+	}
+
+	/**
+	 * Apply fragment edits to markup, in order and all or none.
+	 *
+	 * Each `old` must match exactly once unless `replaceAll` is set. An exact match is tried
+	 * first; failing that, one that ignores differences in whitespace, since an agent copying a
+	 * fragment out of formatted markup rarely keeps its indentation. A fragment that matches
+	 * nothing, or more than once, refuses every edit, and the error says which one and where.
+	 *
+	 * @param string $markup The stored markup.
+	 * @param array  $edits List of { old, new, replaceAll }.
+	 * @return string|\WP_Error The edited markup.
+	 */
+	public static function apply_edits( $markup, $edits ) {
+		foreach ( array_values( $edits ) as $index => $edit ) {
+			$old = isset( $edit['old'] ) ? (string) $edit['old'] : '';
+			$new = isset( $edit['new'] ) ? (string) $edit['new'] : '';
+			$all = ! empty( $edit['replaceAll'] );
+
+			if ( '' === $old ) {
+				return self::edit_error(
+					$index,
+					/* translators: %d: the edit's position in the list, counting from 0. */
+					sprintf( __( 'Edit %d has no old fragment to find, so nothing was written.', 'pattern-builder' ), $index )
+				);
+			}
+
+			$matches = self::fragment_matches( $markup, $old );
+
+			if ( ! $matches ) {
+				return self::edit_error(
+					$index,
+					/* translators: %d: the edit's position in the list, counting from 0. */
+					sprintf( __( 'Edit %d matches nothing in the stored markup, even ignoring whitespace, so nothing was written. Copy the fragment from what get-pattern returns now.', 'pattern-builder' ), $index )
+				);
+			}
+
+			if ( count( $matches ) > 1 && ! $all ) {
+				$lines = array();
+				foreach ( $matches as $match ) {
+					$lines[] = substr_count( substr( $markup, 0, $match[0] ), "\n" ) + 1;
+				}
+
+				return self::edit_error(
+					$index,
+					/* translators: 1: the edit's position, counting from 0, 2: line numbers. */
+					sprintf( __( 'Edit %1$d matches more than once (lines %2$s), so nothing was written. Make the fragment long enough to match one place, or set replaceAll.', 'pattern-builder' ), $index, implode( ', ', array_unique( $lines ) ) ),
+					array_values( array_unique( $lines ) )
+				);
+			}
+
+			// Replace from the end, so the earlier offsets stay true.
+			foreach ( array_reverse( $matches ) as $match ) {
+				$markup = substr_replace( $markup, $new, $match[0], $match[1] );
+			}
+		}
+
+		return $markup;
+	}
+
+	/**
+	 * Where a fragment occurs: exactly, or failing that with any run of whitespace standing for
+	 * any other.
+	 *
+	 * @param string $markup Markup to search.
+	 * @param string $fragment What to find.
+	 * @return array List of [ offset, length ].
+	 */
+	private static function fragment_matches( $markup, $fragment ) {
+		$matches = array();
+		$offset  = strpos( $markup, $fragment );
+		while ( false !== $offset ) {
+			$matches[] = array( $offset, strlen( $fragment ) );
+			$offset    = strpos( $markup, $fragment, $offset + strlen( $fragment ) );
+		}
+		if ( $matches ) {
+			return $matches;
+		}
+
+		$words = preg_split( '/\s+/', trim( $fragment ) );
+		if ( ! $words || array( '' ) === $words ) {
+			return array();
+		}
+		$pattern = '/' . implode( '\s+', array_map( 'preg_quote', $words, array_fill( 0, count( $words ), '/' ) ) ) . '/';
+
+		if ( ! preg_match_all( $pattern, $markup, $found, PREG_OFFSET_CAPTURE ) ) {
+			return array();
+		}
+		foreach ( $found[0] as $match ) {
+			$matches[] = array( $match[1], strlen( $match[0] ) );
+		}
+
+		return $matches;
+	}
+
+	/**
+	 * A refused edit, naming which one.
+	 *
+	 * @param int    $index The edit's position in the list.
+	 * @param string $message What went wrong, already naming the edit.
+	 * @param int[]  $lines Line numbers the fragment matched, when it matched more than once.
+	 * @return \WP_Error
+	 */
+	private static function edit_error( $index, $message, $lines = array() ) {
+		$data = array(
+			'status' => 400,
+			'edit'   => $index,
+		);
+		if ( $lines ) {
+			$data['lines'] = $lines;
+		}
+
+		return new \WP_Error( 'pb_edit_refused', $message, $data );
 	}
 
 	/**
