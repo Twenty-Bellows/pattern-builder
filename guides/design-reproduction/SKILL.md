@@ -2,7 +2,7 @@
 name: design-reproduction
 description: Rebuild an existing design as WordPress block patterns — a live website, a Figma file, a screenshot, a PDF or a mockup — page by page, pulling the reusable parts out rather than transcribing the pixels. Use this whenever the source of the design already exists somewhere else and the job is to reproduce it: "recreate this site", "build this in WordPress", "match this design", "here's a screenshot of what we want". Reproduction fails quietly in two specific ways this covers — values approximated instead of read, and repeated parts copied instead of factored — and both look like a finished page. Load the pattern-author skill alongside it; this one decides what to build and how faithfully, that one is how a pattern gets written.
 metadata:
-  version: 1.1.0
+  version: 1.2.0
 ---
 
 # Reproducing an existing design
@@ -151,7 +151,10 @@ own: `core/site-title` prints this site's name, `core/navigation` with no inner
 blocks fabricates a menu from this site's pages, `core/query` lists this site's
 posts. In a reproduction those show the wrong thing while looking like they
 work. Supply the content explicitly, or use ordinary blocks and say what you
-substituted.
+substituted. That warning is about showing the source's content on a site that does not
+have it. Where the content really is records on the destination, such as
+products, posts or events it already holds, a query over them is the right
+block; `pattern-author`'s `references/composition.md` says how to tell.
 
 ### 7. Check what can be checked
 

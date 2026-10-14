@@ -31,6 +31,12 @@ What it should have been is three patterns: a `menu-item` with four slots, a
 Two hundred lines instead of 343KB, and every one of the three worth installing
 on its own.
 
+And on a site that sells those dishes, even the three patterns are the second
+answer. The dishes are records, products with a price and a page each, and the
+menu section is a query over them with the menu item's design applied to every
+row. The restaurant can then change a price without opening a pattern. *When
+the thing that repeats is a record*, below, says how to tell.
+
 The mistake was not sloppiness. The source page was rendering a WooCommerce
 loop, so there *was* no repeated markup to notice — there was a template, and
 what came down the wire was 146 expansions of it. Copying the expansions felt
@@ -174,6 +180,32 @@ synced reference *stays* a reference: the editor expands a reference to an
 unsynced pattern into a copy the moment it opens the page, and from then on a
 change to the element no longer reaches it. Synced is what makes "one file per
 component" true.
+
+## When the thing that repeats is a record
+
+The inventory finds what repeats and makes it a pattern. Before it turns a
+collection into references, ask what the repeated thing is, because some
+collections are not section content at all.
+
+It is a **record** when each item has a page of its own, carries a date, a
+price, an author or a category, the design shows a filter, paging or "see
+all", the same set appears in more than one place, or the list will obviously
+grow. Menu items, products, team members, projects, events, articles. Then the
+words do not belong in a pattern, where only someone editing patterns can
+change them. They belong in posts, or a post type of their own, and the section
+is a Query Loop over them, or the block a commerce or events plugin ships for
+its own records. What gets factored is the card's design, the post template
+inside the query. Slots fill from a reference's `content`, not from a post, so
+the card's look travels best as a block style variation that the query's card
+and any element pattern both apply.
+
+It is **section content** when it is a small, fixed set written as part of the
+section: features, steps, pricing tiers, stats, a logo strip. Then it is
+references to an element pattern, exactly as above.
+
+Creating a post type is the person's call, not yours: it shapes the whole site.
+Propose it and say why, keep building with references in the meantime so the
+page works today, and put the proposal in the handoff.
 
 ## When not to factor
 
