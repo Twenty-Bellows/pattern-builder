@@ -89,7 +89,8 @@ class Pattern_Builder_Cloud_Abilities {
 	}
 
 	/**
-	 * Meta for a read: GET, reachable over REST.
+	 * Meta for a read: GET, reachable over REST and MCP, and open-world because it calls the
+	 * service.
 	 *
 	 * @return array
 	 */
@@ -97,15 +98,18 @@ class Pattern_Builder_Cloud_Abilities {
 		return array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'readonly'    => true,
-				'destructive' => false,
-				'idempotent'  => true,
+				'readonly'      => true,
+				'destructive'   => false,
+				'idempotent'    => true,
+				'openWorldHint' => true,
 			),
+			'mcp'          => array( 'public' => true ),
 		);
 	}
 
 	/**
-	 * Meta for a write: POST, reachable over REST.
+	 * Meta for a write: POST, reachable over REST and MCP, and open-world because it calls
+	 * the service.
 	 *
 	 * @param bool $idempotent Whether the same call twice leaves the same state.
 	 * @return array
@@ -114,10 +118,12 @@ class Pattern_Builder_Cloud_Abilities {
 		return array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'readonly'    => false,
-				'destructive' => false,
-				'idempotent'  => $idempotent,
+				'readonly'      => false,
+				'destructive'   => false,
+				'idempotent'    => $idempotent,
+				'openWorldHint' => true,
 			),
+			'mcp'          => array( 'public' => true ),
 		);
 	}
 

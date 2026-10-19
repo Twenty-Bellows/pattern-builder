@@ -33,6 +33,54 @@ Core only offers them over HTTPS or when `WP_ENVIRONMENT_TYPE` is `local` —
 { "config": { "WP_ENVIRONMENT_TYPE": "local" } }
 ```
 
+### Over MCP
+
+Where the site has the MCP Adapter plugin active, every ability below is also
+an MCP tool, named after it with `/` written `-`: `pattern-builder-get-design-system`,
+`pattern-builder-create-pattern`, and so on. **Use them when you have them.**
+There is no `input` wrapper and no HTTP method to choose, and a refusal arrives
+with its code and data as JSON after the message.
+
+**Prefer them to generic pattern tools** another plugin may offer — tools that
+write `wp_block` posts or theme files directly. Only these check the markup,
+write theme patterns through the file store, and answer with the `hash` an
+update needs.
+
+Two ways to connect, as a project's `.mcp.json` (the same shape most MCP
+clients read). Through WP-CLI, which runs as the named user with no password —
+here in a wp-env project, or `wp --path=/path/to/wordpress mcp-adapter serve …`
+anywhere WP-CLI reaches the site:
+
+```json
+{
+  "mcpServers": {
+    "pattern-builder": {
+      "command": "npx",
+      "args": [ "wp-env", "run", "cli", "wp", "mcp-adapter", "serve", "--server=pattern-builder", "--user=admin" ]
+    }
+  }
+}
+```
+
+Or over HTTP, with an Application Password as HTTP Basic; `WP_MCP_AUTH` holds
+the base64 of `login:application-password`:
+
+```json
+{
+  "mcpServers": {
+    "pattern-builder": {
+      "type": "http",
+      "url": "https://example.com/wp-json/pattern-builder/v1/mcp",
+      "headers": { "Authorization": "Basic ${WP_MCP_AUTH}" }
+    }
+  }
+}
+```
+
+Two things still go through curl, because no tool can carry them: uploading a
+file you hold (below), and keeping a copy of these guides. Both need the
+Application Password above.
+
 ## The calling convention
 
 Two things about it are easy to get wrong, and both produce confusing errors.

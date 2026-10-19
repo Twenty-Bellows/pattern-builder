@@ -78,7 +78,10 @@ vendor/bin/phpunit
 ```
 
 Everything passes there except `test_convert_theme_image_pattern_exports_assets`,
-which needs a media pipeline the sandbox lacks.
+which needs a media pipeline the sandbox lacks. `Test_Mcp` skips unless the MCP
+Adapter plugin is in that WordPress's plugins directory; wp-env installs a
+pinned release, and so must a `.wp-env.override.json` that lists its own
+`plugins`, since that list replaces the base one.
 
 **The cloud round trip** is manual, because it needs a second WordPress:
 `wp eval-file tests/e2e/cloud-roundtrip.php <token> [pattern-id] [tree-pattern]`

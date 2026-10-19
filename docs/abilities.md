@@ -3,8 +3,11 @@
 Pattern Builder registers **28 abilities** with WordPress core's Abilities API:
 twenty-one in `Pattern_Builder_Abilities` and seven more for the cloud in
 `Pattern_Builder_Cloud_Abilities` (see [`cloud.md`](cloud.md)). Core exposes the
-registry over REST at `wp-abilities/v1`, and an MCP bridge over that surface
-gets these for free — which is why there is no bespoke agent API here.
+registry over REST at `wp-abilities/v1`, and `Pattern_Builder_Mcp` serves the
+same abilities as MCP tools through the WordPress MCP Adapter plugin
+([below](#over-mcp)) — which is why there is no bespoke agent API here. An MCP
+bridge reaches them only if it really bridges the Abilities API; a plugin that
+ships its own fixed tool set does not.
 
 Registration is conditional on `function_exists( 'wp_register_ability' )`: the
 API postdates the plugin's 6.8 floor and nothing depends on it, so the REST
@@ -24,6 +27,48 @@ controller remains the baseline.
 Agents authenticate with an Application Password, which core only offers over
 HTTPS or when `WP_ENVIRONMENT_TYPE` is `local` (which is why `.wp-env.json`
 sets it).
+
+## Over MCP
+
+The WordPress MCP Adapter plugin is the transport; this plugin only says what it
+serves. `Pattern_Builder_Mcp` hooks `mcp_adapter_init`, which fires only where
+the adapter is active, so without it nothing here runs and nothing else changes.
+The adapter is never bundled: 0.7.0 deprecated that in favour of the plugin.
+
+- **Its own server, `pattern-builder`**, at `/wp-json/pattern-builder/v1/mcp`
+  and under WP-CLI as `wp mcp-adapter serve --server=pattern-builder`. It lists
+  every ability in the `pattern-builder` category, read from the registry, and
+  each becomes a tool named after it with `/` written `-`
+  (`pattern-builder-create-pattern`). The adapter's default server serves them
+  too, since every ability sets `meta.mcp.public`, but behind three generic
+  tools — discover, get info, execute — which fold every annotation into one
+  tool that is never read-only. A client can then neither allow the reads nor
+  ask before a write. Here each ability's annotations arrive as that tool's
+  hints, so it can.
+- **`openWorldHint` marks what reaches past the site**: the seven cloud
+  abilities, through their meta helpers, and the two in
+  `Pattern_Builder_Abilities::OPEN_WORLD` — `add-asset`, which can fetch a URL,
+  and `add-font`.
+- **A refusal keeps its data.** The adapter hands a client an error's message
+  and nothing else, and the data is half of what most refusals here say: the
+  `currentHash` to read again from, the places a slot still fills, the
+  problems. `keep_error_data()` filters `mcp_adapter_tool_call_result` for this
+  server alone and appends the error's code and data, as JSON after a blank
+  line.
+- **The calling convention above stops mattering.** The adapter picks the
+  method and supplies the `input` wrapper.
+
+What MCP does not carry is what no ability carries: a file, which goes to the
+assets route as a request body, and the validator, which runs where the agent
+runs. An agent with a shell reaches both with curl and an Application Password,
+as before.
+
+`tests/php/test-mcp.php` talks to the server over its REST route, as a client
+does, so it runs where the adapter plugin is installed — wp-env installs a
+pinned release — and skips elsewhere. One test calls every read that needs no
+input and checks the answer against the `outputSchema` its tool declares,
+because a client may check `structuredContent` that way and an empty PHP array
+encodes as a list.
 
 ## The reads
 
