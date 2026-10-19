@@ -7,12 +7,13 @@
  * snapshot of one run, so saving it would put the snapshot where the program was, losing
  * every branch that run did not take, freezing every rendered block as HTML and every
  * translated string in one language. These tests pin down that such a file is recognised
- * and never written.
+ * and never written, and that no write ever makes one.
  *
  * @package PatternBuilder
  */
 
 use TwentyBellows\PatternBuilder\Abstract_Pattern;
+use TwentyBellows\PatternBuilder\Pattern_Builder_Assets;
 use TwentyBellows\PatternBuilder\Pattern_File_Store;
 
 class Test_Dynamic_Patterns extends WP_UnitTestCase {
@@ -361,5 +362,154 @@ class Test_Dynamic_Patterns extends WP_UnitTestCase {
 
 		$this->assertWPError( $result );
 		$this->assertSame( $before, $this->file_for( 'single-qa-replay' ) );
+	}
+
+	/**
+	 * Writes a new pattern through the store, as an administrator.
+	 *
+	 * @param array $args    Pattern arguments, over a plain paragraph named `written`.
+	 * @param array $options Options for update_theme_pattern().
+	 * @return Abstract_Pattern|WP_Error
+	 */
+	private function write( $args, $options = array() ) {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+
+		return $this->store->update_theme_pattern(
+			new Abstract_Pattern(
+				array_merge(
+					array(
+						'title'   => 'Written',
+						'name'    => 'simple-theme/written',
+						'content' => '<!-- wp:paragraph --><p>Hi</p><!-- /wp:paragraph -->',
+					),
+					$args
+				)
+			),
+			$options
+		);
+	}
+
+	/**
+	 * Markup is the one input a write puts into the file whole, so PHP in it would run on
+	 * every render. Nothing reaches the disk, and the refusal says what it found.
+	 */
+	public function test_php_in_the_markup_is_refused_and_nothing_is_written() {
+		$result = $this->write( array( 'content' => "<!-- wp:html -->\n<?php echo chr( 88 ); ?>\n<!-- /wp:html -->" ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pattern_has_custom_php', $result->get_error_code() );
+		$this->assertSame( 400, $result->get_error_data()['status'] );
+		$this->assertStringContainsString( 'echo chr( 88 );', $result->get_error_message() );
+		$this->assertFalse( file_exists( $this->theme_dir . '/patterns/written.php' ) );
+	}
+
+	public function test_the_short_echo_tag_is_refused_too() {
+		$result = $this->write( array( 'content' => "<!-- wp:paragraph -->\n<p><?= get_bloginfo( 'name' ) ?></p>\n<!-- /wp:paragraph -->" ) );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pattern_has_custom_php', $result->get_error_code() );
+	}
+
+	/**
+	 * A call the plugin writes earns no pass for whatever follows it in the same block.
+	 */
+	public function test_php_after_one_of_the_plugins_own_calls_is_refused() {
+		$result = $this->write( array( 'content' => "<!-- wp:paragraph -->\n<p><?php echo wp_kses_post( 'Hi', 'simple-theme' ); echo chr( 88 ); ?></p>\n<!-- /wp:paragraph -->" ) );
+
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'chr( 88 )', $result->get_error_message() );
+	}
+
+	/**
+	 * The guard has to agree with the code that writes PHP, or the plugin would refuse its
+	 * own saves: a localized write and an image the theme carries both go through.
+	 */
+	public function test_the_plugins_own_php_still_writes() {
+		$reference = Pattern_Builder_Assets::theme_reference( '/assets/images/square-1.svg' );
+
+		$result = $this->write(
+			array(
+				'content' => "<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">A heading</h2>\n<!-- /wp:heading -->\n" .
+					"<!-- wp:image -->\n<figure class=\"wp-block-image\"><img src=\"" . $reference . "\" alt=\"A picture\"/></figure>\n<!-- /wp:image -->",
+			),
+			array(
+				'localize'      => true,
+				'import_images' => false,
+			)
+		);
+
+		$this->assertNotWPError( $result );
+		$file = $this->file_for( 'written' );
+		$this->assertStringContainsString( "wp_kses_post( 'A heading', 'simple-theme' )", $file );
+		$this->assertStringContainsString( "esc_attr__( 'A picture', 'simple-theme' )", $file );
+		$this->assertStringContainsString( $reference, $file );
+	}
+
+	/**
+	 * The title is written inside the header comment, where a closing marker would end the
+	 * comment and make the rest of the title code. It stays text instead.
+	 */
+	public function test_a_comment_closer_in_the_title_stays_inside_the_header() {
+		$result = $this->write( array( 'title' => "Hero */ echo chr( 88 ); /*" ) );
+
+		$this->assertNotWPError( $result );
+		$this->assertFalse( Abstract_Pattern::file_has_custom_php( $this->theme_dir . '/patterns/written.php' ) );
+		$this->assertStringNotContainsString( '*/ echo', $this->file_for( 'written' ) );
+	}
+
+	public function test_a_comment_closer_in_the_description_stays_inside_the_header() {
+		$result = $this->write( array( 'description' => "A hero band */ echo chr( 88 ); /*" ) );
+
+		$this->assertNotWPError( $result );
+		$this->assertFalse( Abstract_Pattern::file_has_custom_php( $this->theme_dir . '/patterns/written.php' ) );
+	}
+
+	/**
+	 * Each header is one line, so a newline in a value would start a header of its own.
+	 */
+	public function test_a_newline_in_the_title_cannot_forge_a_header() {
+		$result = $this->write( array( 'title' => "Hero\n * Inserter: no" ) );
+
+		$this->assertNotWPError( $result );
+		$this->assertTrue( Abstract_Pattern::from_file( $this->theme_dir . '/patterns/written.php' )->inserter );
+	}
+
+	/**
+	 * Localizing puts text inside a PHP string, so the text has to stay there: a backslash
+	 * before a quote used to end the string early and run what followed.
+	 */
+	public function test_localized_text_cannot_end_its_string_early() {
+		$text   = "\\'); echo chr( 88 ); //";
+		$result = $this->write(
+			array( 'content' => "<!-- wp:paragraph -->\n<p>" . $text . "</p>\n<!-- /wp:paragraph -->" ),
+			array( 'localize' => true )
+		);
+
+		$this->assertNotWPError( $result );
+		$path = $this->theme_dir . '/patterns/written.php';
+		$this->assertFalse( Abstract_Pattern::file_has_custom_php( $path ) );
+		$this->assertStringContainsString( $text, Abstract_Pattern::from_file( $path )->content );
+	}
+
+	public function test_an_asset_path_cannot_end_its_string_early() {
+		$reference = Pattern_Builder_Assets::theme_reference( "/assets/images/x'.chr( 88 ).'.png" );
+
+		$this->assertNull( Abstract_Pattern::find_custom_php( $reference ) );
+	}
+
+	public function test_an_agent_writing_php_is_told_why() {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+
+		$result = wp_get_ability( 'pattern-builder/create-pattern' )->execute(
+			array(
+				'title'   => 'Agent PHP',
+				'name'    => 'agent-php',
+				'content' => "<!-- wp:html -->\n<?php echo chr( 88 ); ?>\n<!-- /wp:html -->",
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pattern_has_custom_php', $result->get_error_code() );
+		$this->assertFalse( file_exists( $this->theme_dir . '/patterns/agent-php.php' ) );
 	}
 }

@@ -136,6 +136,14 @@ list contradicting its attributes, a block this site has not registered, a
 Pattern Overrides slot nothing can fill. Each is named under the error's
 `problems`.
 
+A theme pattern meets one more refusal, in the file store rather than here
+because it applies to every caller: markup carrying PHP beyond the calls the
+plugin generates for localized text and the theme's own images is refused as
+`pattern_has_custom_php`, quoting what was found (see
+[`architecture.md`](architecture.md#pattern-files-that-are-programs)). The
+`reference` that `find-media` and `add-asset` hand out is one of those calls, so
+it passes.
+
 A reference resolves through the registry *or* the theme's files, because a
 pattern written a request ago is registered only on the next `init` — which is
 what lets a page be stored in the same session as its sections, and what

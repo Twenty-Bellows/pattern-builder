@@ -879,6 +879,21 @@ class Pattern_File_Store {
 		$formatted_content = $this->format_block_markup( $pattern->content );
 		$file_content      = $this->build_pattern_file_metadata( $pattern ) . $formatted_content . "\n";
 
+		// Checked on the bytes about to be written, so every field and every caller is
+		// covered at once, this plugin's own writers of PHP included.
+		$custom_php = Abstract_Pattern::find_custom_php( $file_content );
+		if ( null !== $custom_php ) {
+			return new WP_Error(
+				'pattern_has_custom_php',
+				sprintf(
+					/* translators: %s: the PHP found, e.g. "echo get_bloginfo( 'name' );". */
+					__( 'The pattern was not stored, because it would put PHP into the theme’s file: %s. Pattern Builder writes only the PHP it generates itself, for localized text and the theme’s own images. Write any other PHP in the theme’s pattern file directly.', 'pattern-builder' ),
+					$custom_php
+				),
+				array( 'status' => 400 )
+			);
+		}
+
 		$allowed_dirs = array(
 			get_stylesheet_directory() . '/patterns',
 			get_template_directory() . '/patterns',
@@ -982,26 +997,46 @@ class Pattern_File_Store {
 	 * @return string PHP header comment string.
 	 */
 	private function build_pattern_file_metadata( Abstract_Pattern $pattern ): string {
-		$categories    = $pattern->categories ? "\n * Categories: " . implode( ', ', $pattern->categories ) : '';
-		$keywords      = $pattern->keywords ? "\n * Keywords: " . implode( ', ', $pattern->keywords ) : '';
-		$blockTypes    = $pattern->blockTypes ? "\n * Block Types: " . implode( ', ', $pattern->blockTypes ) : '';
-		$postTypes     = $pattern->postTypes ? "\n * Post Types: " . implode( ', ', $pattern->postTypes ) : '';
-		$templateTypes = $pattern->templateTypes ? "\n * Template Types: " . implode( ', ', $pattern->templateTypes ) : '';
+		$list = static function ( $values ) {
+			return implode( ', ', array_map( array( self::class, 'header_value' ), (array) $values ) );
+		};
+
+		$title         = self::header_value( $pattern->title );
+		$name          = self::header_value( $pattern->name );
+		$description   = self::header_value( $pattern->description );
+		$categories    = $pattern->categories ? "\n * Categories: " . $list( $pattern->categories ) : '';
+		$keywords      = $pattern->keywords ? "\n * Keywords: " . $list( $pattern->keywords ) : '';
+		$blockTypes    = $pattern->blockTypes ? "\n * Block Types: " . $list( $pattern->blockTypes ) : '';
+		$postTypes     = $pattern->postTypes ? "\n * Post Types: " . $list( $pattern->postTypes ) : '';
+		$templateTypes = $pattern->templateTypes ? "\n * Template Types: " . $list( $pattern->templateTypes ) : '';
 		$viewportWidth = $pattern->viewportWidth ? "\n * Viewport Width: " . (int) $pattern->viewportWidth : '';
 		$inserter      = $pattern->inserter ? '' : "\n * Inserter: no";
 		$synced        = $pattern->synced ? "\n * Synced: yes" : '';
-		$origin        = $pattern->origin ? "\n * Origin: " . $pattern->origin : '';
-		$cloud         = $pattern->cloud ? "\n * Cloud: " . $pattern->cloud : '';
+		$origin        = $pattern->origin ? "\n * Origin: " . self::header_value( $pattern->origin ) : '';
+		$cloud         = $pattern->cloud ? "\n * Cloud: " . self::header_value( $pattern->cloud ) : '';
 
 		$metadata  = "<?php\n";
 		$metadata .= "/**\n";
-		$metadata .= " * Title: $pattern->title\n";
-		$metadata .= " * Slug: $pattern->name\n";
-		$metadata .= " * Description: $pattern->description$categories$keywords$blockTypes$postTypes$templateTypes$viewportWidth$inserter$synced$origin$cloud\n";
+		$metadata .= " * Title: $title\n";
+		$metadata .= " * Slug: $name\n";
+		$metadata .= " * Description: $description$categories$keywords$blockTypes$postTypes$templateTypes$viewportWidth$inserter$synced$origin$cloud\n";
 		$metadata .= $this->build_additional_metadata( $pattern->additionalMetadata ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 		$metadata .= " */\n";
 		$metadata .= "?>\n";
 		return $metadata;
+	}
+
+	/**
+	 * One header's value as it can sit in the file's comment block: on one line, because a
+	 * newline would start a header of its own, and with `*` and `/` kept apart, because
+	 * together they close the comment and make the rest of the value code. Newlines go
+	 * first, or a `*` and `/` either side of one would meet.
+	 *
+	 * @param mixed $value The value.
+	 * @return string
+	 */
+	private static function header_value( $value ) {
+		return str_replace( '*/', '* /', (string) preg_replace( '/[\r\n]+/', ' ', (string) $value ) );
 	}
 
 	/**

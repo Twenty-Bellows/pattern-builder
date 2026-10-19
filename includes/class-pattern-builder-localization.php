@@ -360,8 +360,8 @@ class Pattern_Builder_Localization {
 	 * @return string Localized string in PHP format.
 	 */
 	private static function create_localized_string( $text, $escape_function = 'wp_kses_post' ) {
-		$escaped_text = str_replace( "'", "\\'", $text );
-		$text_domain  = get_stylesheet();
+		$escaped_text = addcslashes( $text, "\\'" );
+		$text_domain  = addcslashes( get_stylesheet(), "\\'" );
 		return "<?php echo {$escape_function}( '{$escaped_text}', '{$text_domain}' ); ?>";
 	}
 }

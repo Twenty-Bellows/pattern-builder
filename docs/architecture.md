@@ -387,7 +387,10 @@ the cloud, where a tag naming this theme would be wrong in anybody else's.
 
 The value is free text from the editor written into a PHP comment, so the
 writer breaks apart the one sequence that escapes one rather than refusing the
-save. `tests/php/test-pattern-metadata.php` asserts that what lands on disk
+save. Every other header is free text too — a title, a description, a keyword
+arriving from an agent — so `header_value()` breaks the same sequence in each,
+and also puts each on one line, since a newline would start a header of its own.
+`tests/php/test-pattern-metadata.php` asserts that what lands on disk
 tokenizes to an opening tag, a doc comment, a closing tag and literal markup,
 and nothing else.
 
@@ -405,8 +408,9 @@ every `do_blocks()` call frozen as rendered HTML, every translated string frozen
 in one language, every generated URL resolved for this site. Rebuilding the file
 from that would put the snapshot where the program was.
 
-`Abstract_Pattern::file_has_custom_php()` decides, with the tokenizer rather
-than a search for an opening tag. A file that is an opening tag, a doc comment,
+`Abstract_Pattern::find_custom_php()` decides, with the tokenizer rather
+than a search for an opening tag, and `file_has_custom_php()` asks it about a
+file on disk. A file that is an opening tag, a doc comment,
 a closing tag and literal markup is one this plugin wrote and can rewrite;
 anything else is not. An ordinary comment counts as well — it runs nothing, but
 it sits outside the header comment and would be dropped just the same, so the
@@ -431,9 +435,11 @@ reaching for a directory that is not the theme's: the string would survive the
 round trip but the call around it would not.
 
 Getting this list wrong is not a quiet failure. A pattern the plugin wrote
-itself, read back and misjudged, becomes a pattern the plugin refuses to save —
-so the shapes here and the strings the two writers produce have to be changed
-together.
+itself, read back and misjudged, becomes a pattern the plugin refuses to save,
+and since the same shapes check every write (below), a writer whose output
+drifts from them has its writes refused at once — so the shapes here and the
+strings the two writers produce have to be changed together.
+`test_the_plugins_own_php_still_writes()` holds them to each other.
 
 **A write is followed by a read, so the file has to be forgotten first.** A save
 answers with the pattern as it now is, which means running the file that was
@@ -456,6 +462,31 @@ What this does not do is let anyone edit such a pattern. The file is the place
 to edit it, and a source editor inside the plugin would have to be gated on
 `edit_themes` rather than the `edit_theme_options` every other write here uses —
 a different capability, which a multisite site administrator does not have.
+
+**No write makes one, either.** The guard above keeps the plugin from
+overwriting a program; this keeps it from writing one. Markup goes into the file
+whole, after the header closes, so PHP in it would run on every render, and
+`edit_theme_options` would become the power to run code, which WordPress keeps
+behind `edit_themes` and a site can switch off entirely with
+`DISALLOW_FILE_EDIT`. So `update_theme_pattern_file()` runs `find_custom_php()`
+over the bytes it is about to write and refuses with `pattern_has_custom_php`,
+a 400 quoting what it found.
+
+It checks the finished file rather than any one field, so every input and every
+caller is covered at once, and so are the plugin's own writers.
+`create_localized_string()` and `theme_reference()` put text inside
+single-quoted PHP strings and escape the backslash as well as the quote; a
+string that ended early would leave code behind it that fails the shapes like
+any other. The tokenizer is the same one the later `include` uses, so short
+tags and the echo tag are judged as PHP will judge them.
+
+Raw PHP in markup is refused, not rewritten. Legitimate block markup never
+carries an opening tag — a code block stores PHP HTML-escaped — so one is either
+the plugin's own call or someone writing PHP, and a refusal tells them which.
+No capability lifts it: on a single site every administrator holds
+`edit_themes`, so an exception there would reopen the hole for any agent working
+as one. A pattern that needs a value computed at render belongs in a block or a
+binding, or in a new shape added to `written_call_shapes()` in code.
 
 ## Previews
 
