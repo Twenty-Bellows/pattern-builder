@@ -1878,16 +1878,6 @@ class Pattern_Builder_Abilities {
 				'validate-pattern.mjs',
 				'check-composition.mjs',
 				'wp-core.mjs',
-
-				/*
-				 * Runs under WP-CLI rather than Node, which is why
-				 * get-validator does not carry it: that ability hands over one
-				 * tool that runs anywhere, and this one runs only where
-				 * WordPress does. design-content-split.md names it all the
-				 * same, so a skill that travelled without it would send an
-				 * agent after a file nothing here would hand over.
-				 */
-				'check-slots.php',
 			),
 		);
 	}

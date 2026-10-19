@@ -1272,9 +1272,9 @@ class Test_Abilities extends WP_UnitTestCase {
 		}
 
 		$this->assertSame(
-			15,
+			14,
 			$skills['pattern-author']['files'],
-			"The pattern-author skill's four scripts travel with its eleven documents."
+			"The pattern-author skill's three scripts travel with its eleven documents."
 		);
 		$this->assertSame( 3, $skills['design-reproduction']['files'] );
 	}
@@ -1361,16 +1361,12 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertSame( 'SKILL.md', $skill['entry'] );
 		$this->assertNotEmpty( $skill['description'] );
 		$this->assertNotEmpty( $skill['version'] );
-		$this->assertCount( 15, $skill['files'] );
+		$this->assertCount( 14, $skill['files'] );
 
 		$paths = wp_list_pluck( $skill['files'], 'path' );
 		$this->assertSame( 'SKILL.md', $paths[0], 'The entry is not the first thing an installer writes.' );
 		$this->assertContains( 'references/block-markup.md', $paths );
-		$this->assertContains(
-			'scripts/check-slots.php',
-			$paths,
-			'design-content-split.md names check-slots.php, so a skill that travels without it sends an agent after a file nothing hands over.'
-		);
+		$this->assertContains( 'scripts/validate-pattern.mjs', $paths );
 
 		foreach ( $skill['files'] as $file ) {
 			$this->assertGreaterThan( 0, $file['bytes'], $file['path'] . ' is empty.' );
@@ -1378,6 +1374,21 @@ class Test_Abilities extends WP_UnitTestCase {
 		}
 
 		$this->assertStringContainsString( 'overwrites', $skill['install'], 'The install says nothing about what happens to a copy already there.' );
+	}
+
+	/**
+	 * A skill carries the checks no server can make, which run with Node where the agent is.
+	 * Nothing in one needs PHP beside the agent, and no download link ends in `.php`, which
+	 * some hosts answer themselves rather than hand to WordPress.
+	 */
+	public function test_no_skill_carries_php() {
+		foreach ( array( 'pattern-author', 'design-reproduction' ) as $name ) {
+			$skill = $this->abilities->execute_authoring_guide( array( 'skill' => $name ) );
+
+			foreach ( wp_list_pluck( $skill['files'], 'path' ) as $path ) {
+				$this->assertStringEndsNotWith( '.php', $path, $name . ' carries ' . $path . '.' );
+			}
+		}
 	}
 
 	/**

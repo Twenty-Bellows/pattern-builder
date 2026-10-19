@@ -408,11 +408,15 @@ plus the site it came from and the skill's checksum. That is why the recipe's
 check is against what was served, not against the manifest's per-file
 checksums, which cover the prose alone.
 
-A skill's **scripts travel with it**, `check-slots.php` included. That one runs
-under WP-CLI rather than Node, which is why `get-validator` does not carry it —
-that ability hands over one tool that runs anywhere — but `design-content-split.md`
-names it, so a skill without it would send an agent after a file nothing would
-hand over.
+A skill's **scripts travel with it**, and they are only the checks no server
+can make: the validator, its loader and the composition check, all run with
+Node where the agent is. A check the site already makes on every write does
+not travel. Slot errors are refused by `create-pattern` and `update-pattern`,
+so the skill carries no script for them, and the guides tell an agent writing
+theme files directly to compare slot names by hand and look at the rendered
+page. That also keeps every skill free of PHP, which would need WordPress and
+WP-CLI beside the agent, and of any link ending in `.php`, which some hosts
+answer themselves instead of handing to WordPress. A test holds it there.
 
 **Staleness is a checksum, not a version.** Each guide's checksum is taken over
 the text the site serves, *after* `pattern_builder_authoring_guides` runs, and

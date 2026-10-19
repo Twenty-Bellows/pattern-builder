@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.13.0
+  version: 1.14.0
 ---
 
 # Authoring block patterns
@@ -322,17 +322,17 @@ vertically. That markup is entirely valid, every token resolves, and no other
 check in this workflow reports a thing. Static and immediate; it needs no
 browser and no rendering.
 
-**If the pattern uses Pattern Overrides slots, render it too.** Slot problems
-are invisible to block validation in both directions, and both ship the wrong
-words with no error anywhere:
-
-```bash
-wp eval-file <skill>/scripts/check-slots.php path/to/page-pattern.php
-```
-
-It reports which slots took their value and which still show placeholder copy.
-Also check the rules in `references/design-content-split.md` — malformed
-attributes there leave a *valid* block behind.
+**If the pattern uses Pattern Overrides slots, check that every value lands.**
+Slot problems are invisible to block validation in both directions, and both
+ship the wrong words with no error anywhere. Storing through `create-pattern`
+or `update-pattern` refuses them: a `content` key that names no slot in the
+referenced pattern, a binding with no `metadata.name`, a binding on a block
+core cannot bind. Writing theme files directly, nothing checks them for you:
+match every `content` key to a `metadata.name` yourself, copying the names
+rather than retyping them, then open the page in `render-pattern`'s `page`
+preview and look for placeholder copy where a value should be. The rules are in
+`references/design-content-split.md` — malformed attributes there leave a
+*valid* block behind.
 
 **Then use it, not only look at it.** Everything above is about structure and
 values. None of it notices a navigation overlay that will not open, a details
