@@ -2,7 +2,7 @@
 	"port": 8498,
 	"testsEnvironment": true,
 	"testsPort": 8499,
-	"plugins": [ "." ],
+	"plugins": [ ".", "https://downloads.wordpress.org/plugin/mcp-adapter.0.7.1.zip" ],
 	"themes": [ "./dev-assets/themes/simple-theme" ],
 	"mappings": {
 		"wp-content/themes/": "./dev-assets/themes"

@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.11.0
+  version: 1.12.0
 ---
 
 # Authoring block patterns
@@ -53,7 +53,7 @@ else. Each fact lives in one of them; this table only points.
 
 | Step | Read before it | Only when |
 |---|---|---|
-| 1. Orient | nothing more | `references/abilities.md` if you reach the site over HTTP; `references/changing-patterns.md` if the site already has patterns; `references/design-system.md` if you set colour, type, spacing or layout beyond the shared presets, or install a design system |
+| 1. Orient | nothing more | `references/abilities.md` if you reach the site over HTTP or through its `pattern-builder-*` MCP tools; `references/changing-patterns.md` if the site already has patterns; `references/design-system.md` if you set colour, type, spacing or layout beyond the shared presets, or install a design system |
 | 2. Vocabulary | nothing more | `references/block-vocabulary.md` for a block beyond paragraph, heading, image, button, group and columns, or a destination other than this site |
 | 3. Kind | nothing more | `references/pattern-kinds.md` for any kind but a plain design pattern; `references/design-content-split.md` for a synced pattern with slots or the page that fills it |
 | 4. Factor | `references/composition.md` for anything bigger than one section | |
@@ -71,7 +71,11 @@ site lacks, which fails just as quietly (an unresolved slug renders as no
 styling at all).
 
 On a running site, ask it. This resolves core, parent theme, child theme and
-the active style variation:
+the active style variation. If you have the site's `pattern-builder-*` MCP
+tools, call `pattern-builder-get-design-system` and use those tools for every
+call this skill shows as curl — they need no credentials, wrapper or method,
+and they are the only pattern tools on the site that check what you write.
+Otherwise:
 
 ```bash
 curl -u "$WP_USER:$WP_APP_PASSWORD" \
@@ -81,9 +85,10 @@ curl -u "$WP_USER:$WP_APP_PASSWORD" \
 Worth two more calls: `list-block-types` before using anything non-core (markup
 for a block the site lacks parses to `core/missing`), and
 `get-authoring-guide` for house rules a theme has added — which blocks this
-build has settled on, how its copy reads. Input goes under an `input` key:
-`input[key]=value` on a GET, `{"input":{…}}` in a POST body.
-`references/abilities.md` has the full set.
+build has settled on, how its copy reads. Over HTTP, input goes under an
+`input` key: `input[key]=value` on a GET, `{"input":{…}}` in a POST body.
+`references/abilities.md` has the full set, and what still needs curl when
+you have the tools.
 
 Otherwise read `theme.json` (`settings.color.palette`,
 `settings.spacing.spacingSizes`, `settings.typography.fontSizes`,

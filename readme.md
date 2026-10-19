@@ -7,7 +7,9 @@ optionally shared through [patternbuilderwp.com](https://patternbuilderwp.com).
 Patterns a plugin registers are browsable beside them; copying one into the
 theme, with the patterns it places, makes it yours to edit.
 
-Agents can drive the same operations through WordPress core's Abilities API.
+Agents can drive the same operations through WordPress core's Abilities API,
+and as MCP tools where the [MCP Adapter](https://github.com/WordPress/mcp-adapter)
+plugin is active.
 
 ## Requirements
 

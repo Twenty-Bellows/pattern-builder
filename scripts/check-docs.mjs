@@ -58,6 +58,7 @@ const ALLOW = new Set( [
 	'MainDashboardButton',
 	'render_block_core_pattern()',
 	'edit_themes',
+	'DISALLOW_FILE_EDIT',
 	'get_the_content()',
 	'NON_CONTEXTUAL_POST_TYPES',
 	// The host environment and other repositories.

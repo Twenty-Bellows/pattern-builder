@@ -304,8 +304,20 @@ class Abstract_Pattern {
 			return false;
 		}
 
+		return null !== self::find_custom_php( $contents );
+	}
+
+	/**
+	 * The first PHP in a pattern file's contents that is not one of the calls this plugin
+	 * writes itself. Contents with no opening tag are read as markup, as a file is after its
+	 * header closes.
+	 *
+	 * @param string $contents A pattern file's contents, or markup bound for one.
+	 * @return string|null An excerpt of that PHP, or null when there is none.
+	 */
+	public static function find_custom_php( $contents ) {
 		$markup_only = array( T_OPEN_TAG, T_CLOSE_TAG, T_DOC_COMMENT, T_INLINE_HTML, T_WHITESPACE );
-		$tokens      = token_get_all( $contents );
+		$tokens      = token_get_all( (string) $contents );
 		$count       = count( $tokens );
 
 		for ( $index = 0; $index < $count; $index++ ) {
@@ -318,13 +330,41 @@ class Abstract_Pattern {
 			$ends_at = self::written_call_ends_at( $tokens, $index );
 
 			if ( null === $ends_at ) {
-				return true;
+				return self::excerpt_from( $tokens, $index );
 			}
 
 			$index = $ends_at;
 		}
 
-		return false;
+		return null;
+	}
+
+	/**
+	 * The code from one token up to the end of its PHP block, kept short enough to quote.
+	 *
+	 * @param array $tokens The file's tokens, from `token_get_all()`.
+	 * @param int   $start  Index of the first token to quote.
+	 * @return string
+	 */
+	private static function excerpt_from( array $tokens, $start ) {
+		$excerpt = '';
+		$count   = count( $tokens );
+
+		for ( $index = $start; $index < $count; $index++ ) {
+			$token = $tokens[ $index ];
+
+			if ( is_array( $token ) && T_CLOSE_TAG === $token[0] ) {
+				break;
+			}
+
+			$excerpt .= is_array( $token ) ? $token[1] : $token;
+
+			if ( strlen( $excerpt ) >= 80 ) {
+				break;
+			}
+		}
+
+		return trim( (string) preg_replace( '/\s+/', ' ', $excerpt ) );
 	}
 
 	/**

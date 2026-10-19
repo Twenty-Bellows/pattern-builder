@@ -37,6 +37,12 @@ class Pattern_Builder_Abilities {
 	);
 
 	/**
+	 * The abilities that reach past this site: add-asset can fetch a URL, and add-font
+	 * downloads from the font collection's host.
+	 */
+	const OPEN_WORLD = array( 'pattern-builder/add-asset', 'pattern-builder/add-font' );
+
+	/**
 	 * Words that are true of every pattern, and so tell nobody which one this is.
 	 */
 	const EMPTY_WORDS = array( 'modern', 'clean', 'beautiful', 'responsive', 'stunning', 'sleek', 'elegant', 'engaging', 'seamless', 'versatile' );
@@ -109,6 +115,11 @@ class Pattern_Builder_Abilities {
 		if ( isset( self::GUIDES[ $name ] ) ) {
 			$args['description'] .= ' ' . self::guide_line( self::GUIDES[ $name ] );
 		}
+
+		// Public is what puts an ability on the MCP Adapter's default server; this plugin's
+		// own server lists them all regardless.
+		$args['meta']['mcp']['public']                = true;
+		$args['meta']['annotations']['openWorldHint'] = in_array( $name, self::OPEN_WORLD, true );
 
 		wp_register_ability( $name, $args );
 	}
@@ -2979,7 +2990,9 @@ class Pattern_Builder_Abilities {
 		}
 
 		return array(
-			'written'     => $written,
+			// Nothing written is an empty map, which would encode as a list and break the
+			// object the output schema promises a client.
+			'written'     => $written ? $written : new \stdClass(),
 			'skipped'     => $skipped,
 			'destination' => $destination,
 		);
