@@ -213,6 +213,7 @@ class Pattern_Builder_Admin {
 						'wordPressVersion' => Pattern_Builder_Cloud_Porter::wordpress_version(),
 						'tileBase'         => $pattern ? '' : Pattern_Builder_Preview::tile_base(),
 						'designVersion'    => $pattern ? '' : Pattern_Builder_Preview::design_version(),
+						'agents'           => $pattern ? null : Pattern_Builder_Mcp::client_state(),
 					)
 				)
 			),
