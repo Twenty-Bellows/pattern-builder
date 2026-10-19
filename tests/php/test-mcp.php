@@ -30,6 +30,13 @@ class Test_Mcp extends WP_UnitTestCase {
 	 */
 	private $id = 1;
 
+	/**
+	 * The served tools, by name, once a test has asked for them.
+	 *
+	 * @var stdClass[]|null
+	 */
+	private $tools;
+
 	public function set_up() {
 		parent::set_up();
 
@@ -55,6 +62,11 @@ class Test_Mcp extends WP_UnitTestCase {
 
 		$this->assertSame( 200, $response->get_status() );
 		$this->session = $response->get_headers()['Mcp-Session-Id'];
+	}
+
+	public function tear_down() {
+		wp_clean_theme_json_cache();
+		parent::tear_down();
 	}
 
 	/**
@@ -198,11 +210,34 @@ class Test_Mcp extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A client may check `structuredContent` against `outputSchema`, and an empty PHP array
-	 * encodes as a list. Every read that needs no input is called as a client would call it
-	 * and its answer checked against the schema the tool declared.
+	 * Calls a tool as a client would, and checks that it succeeded and that its answer has
+	 * the shape the tool's `outputSchema` declares: a client may check `structuredContent`
+	 * against it, and an empty PHP array encodes as a list.
+	 *
+	 * @param string $name      The tool.
+	 * @param array  $arguments Its arguments.
+	 * @return stdClass The answer's structured content.
 	 */
-	public function test_each_read_answers_in_the_shape_its_schema_declares() {
+	private function call( $name, $arguments = array() ) {
+		if ( null === $this->tools ) {
+			$this->tools = $this->tools();
+		}
+
+		$result = $this->result(
+			'tools/call',
+			array(
+				'name'      => $name,
+				'arguments' => (object) $arguments,
+			)
+		);
+
+		$this->assertFalse( $result->isError, $name . ': ' . ( $result->content[0]->text ?? '' ) );
+		$this->assertMatchesShape( $this->tools[ $name ]->outputSchema, $result->structuredContent, $name );
+
+		return $result->structuredContent;
+	}
+
+	public function test_each_read_that_needs_no_input_answers_in_its_declared_shape() {
 		$reads = array(
 			'pattern-builder-get-design-system',
 			'pattern-builder-list-block-types',
@@ -213,20 +248,108 @@ class Test_Mcp extends WP_UnitTestCase {
 			'pattern-builder-find-media',
 			'pattern-builder-list-fonts',
 		);
-		$tools = $this->tools();
 
 		foreach ( $reads as $name ) {
-			$result = $this->result(
-				'tools/call',
-				array(
-					'name'      => $name,
-					'arguments' => new stdClass(),
-				)
-			);
-
-			$this->assertFalse( $result->isError, $name . ': ' . ( $result->content[0]->text ?? '' ) );
-			$this->assertMatchesShape( $tools[ $name ]->outputSchema, $result->structuredContent, $name );
+			$this->call( $name );
 		}
+	}
+
+	/**
+	 * Everything an agent does to one pattern, on a user pattern so that nothing is written
+	 * into a theme: create it, read it, render it, ask where it is used, find it, and update
+	 * it both whole and by edits.
+	 */
+	public function test_each_answer_about_a_pattern_has_its_declared_shape() {
+		$created = $this->call(
+			'pattern-builder-create-pattern',
+			array(
+				'title'       => 'Schema fixture',
+				'source'      => 'user',
+				'description' => 'A single paragraph used to check that every answer about a pattern arrives in the shape its tool declares.',
+				'content'     => "<!-- wp:paragraph -->\n<p>First.</p>\n<!-- /wp:paragraph -->",
+			)
+		);
+		$id = (string) $created->pattern->id;
+
+		$read = $this->call( 'pattern-builder-get-pattern', array( 'id' => $id ) );
+		$this->call( 'pattern-builder-render-pattern', array( 'id' => $id ) );
+		$this->call( 'pattern-builder-list-pattern-usage', array( 'id' => $id ) );
+		$this->call(
+			'pattern-builder-list-patterns',
+			array(
+				'source' => 'user',
+				'search' => 'Schema fixture',
+			)
+		);
+
+		$whole = $this->call(
+			'pattern-builder-update-pattern',
+			array(
+				'id'           => $id,
+				'expectedHash' => $read->pattern->hash,
+				'content'      => "<!-- wp:paragraph -->\n<p>Second.</p>\n<!-- /wp:paragraph -->",
+			)
+		);
+		$this->assertTrue( $whole->changed );
+
+		$edited = $this->call(
+			'pattern-builder-update-pattern',
+			array(
+				'id'           => $id,
+				'expectedHash' => $whole->pattern->hash,
+				'edits'        => array(
+					array(
+						'old' => 'Second.',
+						'new' => 'Third.',
+					),
+				),
+			)
+		);
+		$this->assertTrue( $edited->changed );
+	}
+
+	/**
+	 * The design-system writers, to Global Styles so that nothing is written into a theme.
+	 * The same token twice is skipped the second time, which is the answer with nothing in
+	 * it, and the one most likely to arrive as a list.
+	 */
+	public function test_each_design_system_write_answers_in_its_declared_shape() {
+		$token = array(
+			'type'  => 'color',
+			'slug'  => 'schema-ink',
+			'name'  => 'Schema ink',
+			'value' => '#123456',
+		);
+
+		$this->call(
+			'pattern-builder-add-design-tokens',
+			array(
+				'destination' => 'user',
+				'tokens'      => array( $token ),
+			)
+		);
+		$this->call(
+			'pattern-builder-add-design-tokens',
+			array(
+				'destination' => 'user',
+				'tokens'      => array( $token ),
+			)
+		);
+		$this->call(
+			'pattern-builder-set-global-styles',
+			array(
+				'destination' => 'user',
+				'styles'      => array( 'elements' => array( 'link' => array( 'color' => array( 'text' => '#123456' ) ) ) ),
+			)
+		);
+		$this->call(
+			'pattern-builder-set-layout',
+			array(
+				'destination' => 'user',
+				'contentSize' => '640px',
+				'wideSize'    => '1200px',
+			)
+		);
 	}
 
 	/**
@@ -237,17 +360,24 @@ class Test_Mcp extends WP_UnitTestCase {
 	 * @param string   $path   Where in the answer this is, for the failure message.
 	 */
 	private function assertMatchesShape( $schema, $value, $path ) {
-		$type = isset( $schema->type ) ? $schema->type : null;
+		$types = isset( $schema->type ) ? (array) $schema->type : array();
 
-		if ( 'object' === $type ) {
+		if ( null === $value && in_array( 'null', $types, true ) ) {
+			return;
+		}
+
+		if ( in_array( 'object', $types, true ) && ! in_array( 'array', $types, true ) ) {
 			$this->assertIsObject( $value, $path . ' should be an object' );
 
-			foreach ( (array) ( $schema->properties ?? array() ) as $key => $property ) {
-				if ( property_exists( $value, $key ) ) {
-					$this->assertMatchesShape( $property, $value->$key, $path . '.' . $key );
+			$properties = (array) ( $schema->properties ?? array() );
+			foreach ( get_object_vars( $value ) as $key => $item ) {
+				if ( isset( $properties[ $key ] ) ) {
+					$this->assertMatchesShape( $properties[ $key ], $item, $path . '.' . $key );
+				} elseif ( isset( $schema->additionalProperties ) && is_object( $schema->additionalProperties ) ) {
+					$this->assertMatchesShape( $schema->additionalProperties, $item, $path . '.' . $key );
 				}
 			}
-		} elseif ( 'array' === $type ) {
+		} elseif ( in_array( 'array', $types, true ) && ! in_array( 'object', $types, true ) ) {
 			$this->assertIsArray( $value, $path . ' should be a list' );
 
 			if ( isset( $schema->items ) && is_object( $schema->items ) ) {

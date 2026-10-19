@@ -65,10 +65,15 @@ as before.
 
 `tests/php/test-mcp.php` talks to the server over its REST route, as a client
 does, so it runs where the adapter plugin is installed — wp-env installs a
-pinned release — and skips elsewhere. One test calls every read that needs no
-input and checks the answer against the `outputSchema` its tool declares,
-because a client may check `structuredContent` that way and an empty PHP array
-encodes as a list.
+pinned release — and skips elsewhere. Every tool call it makes checks the
+answer against the `outputSchema` its tool declares, because a client may
+check `structuredContent` that way and an empty PHP array encodes as a list —
+which is how `add-design-tokens` came to answer an all-skipped call with a
+`written` list where its schema promised an object. The calls cover every read
+that needs no input, everything an agent does to one pattern (on a user
+pattern, so nothing lands in a theme), and the design-system writers to Global
+Styles. The writers of theme files and the abilities that reach the network
+are not called.
 
 ## The reads
 

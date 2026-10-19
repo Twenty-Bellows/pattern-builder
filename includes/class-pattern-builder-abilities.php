@@ -2990,7 +2990,9 @@ class Pattern_Builder_Abilities {
 		}
 
 		return array(
-			'written'     => $written,
+			// Nothing written is an empty map, which would encode as a list and break the
+			// object the output schema promises a client.
+			'written'     => $written ? $written : new \stdClass(),
 			'skipped'     => $skipped,
 			'destination' => $destination,
 		);
