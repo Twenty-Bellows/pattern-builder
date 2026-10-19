@@ -33,6 +33,7 @@ require_once __DIR__ . '/class-pattern-builder-assets.php';
 require_once __DIR__ . '/class-pattern-builder-preview.php';
 require_once __DIR__ . '/class-pattern-builder-fonts.php';
 require_once __DIR__ . '/class-pattern-builder-telemetry.php';
+require_once __DIR__ . '/class-pattern-builder-usage.php';
 require_once __DIR__ . '/class-pattern-builder-abilities.php';
 
 /**

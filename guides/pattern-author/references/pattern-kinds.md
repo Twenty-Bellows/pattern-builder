@@ -135,9 +135,9 @@ Written by `Pattern_File_Store`, and readable in any theme's `patterns/`:
 /**
  * Title: Pricing Plans
  * Slug: my-theme/pricing-plans
- * Description: Two plans side by side.
+ * Description: Pricing section for a landing page: two plans side by side, each with a name, a price, what is included and a button. They stack on a narrow screen. Depends on nothing.
  * Categories: my-theme_sections, call-to-action
- * Keywords: pricing, plans
+ * Keywords: pricing, card, grid
  * Block Types: core/post-content
  * Post Types: page
  * Template Types: index, archive
@@ -160,3 +160,47 @@ kinds cannot be database patterns.
 A **Template Part Pattern is a Block Starter Pattern underneath**: the area
 chosen decides both the block type that offers it
 (`core/template-part/header`) and the category it files under (`header`).
+
+## Describing a pattern so it can be found
+
+An agent choosing from `list-patterns`, a person searching the inserter, a
+search on patternbuilderwp.com: each of them has the title and the description
+to go on, and nothing else until they open the pattern. A pattern nobody can
+find gets written again, so the description is part of the pattern's job, not
+a label stuck on afterwards.
+
+A description holds, in this order:
+
+- **What it is and where it is used**, in a first sentence that stands on its
+  own, since it is the one read when twenty patterns come back at once.
+  "Pricing section for a landing page", not "a pricing block".
+- **What is in it and how it is arranged**: what sits where, how many of what,
+  what repeats, how it stacks on a narrow screen. Someone should be able to
+  sketch it from this.
+- **Its behaviour**, only when it has some: an accordion, a navigation overlay,
+  a query that lists posts. Leave it out rather than invent motion.
+- **What it depends on**: a menu, a form, a post type, an image it expects, a
+  pattern it places. Or say it depends on nothing, so the reader knows that
+  was checked rather than forgotten.
+
+Write what stays true on another theme. Colours, fonts and radii come from the
+design system, so "a dark band with rounded cards" describes the site it was
+built on, not the pattern. Leave out the words that are true of every pattern
+("modern", "clean", "responsive", "beautiful"): they help nobody choose this
+one. And write it from the markup you stored, not from what you set out to
+build.
+
+**Keywords** are the filter. Lead with the kind of section, from a short list
+the whole site shares: hero, features, services, pricing, faq, testimonials,
+team, logos, stats, steps, gallery, contact, form, cta, newsletter, header,
+footer, content. Then the mechanics, only for what the markup does (accordion,
+query, navigation, video), then the composition (card, grid, split,
+full-width). `list-patterns` answers with `keywordsInUse`: reuse those words,
+so the same shape does not arrive as `card` from one pattern and `cards` from
+the next.
+
+`create-pattern` and `update-pattern` return `warnings` when a description is
+missing, too short to tell two patterns apart, or made of words that describe
+everything, and when an update moves the markup under a description it did not
+touch. They never refuse the write.
+

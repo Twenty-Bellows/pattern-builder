@@ -16,6 +16,37 @@ class Pattern_Builder_Abilities {
 	const SKILL_ENTRY = 'SKILL.md';
 
 	/**
+	 * The guide each ability's rules live in. Every one of these descriptions ends with the
+	 * same line naming them, because an agent that goes straight to a write reads no index:
+	 * the description is the one text every client shows a model when it picks a tool.
+	 */
+	const GUIDES = array(
+		'pattern-builder/create-pattern'            => array( 'authoring', 'block-markup' ),
+		'pattern-builder/update-pattern'            => array( 'changing-patterns', 'block-markup' ),
+		'pattern-builder/list-pattern-usage'        => array( 'changing-patterns' ),
+		'pattern-builder/copy-plugin-pattern'       => array( 'composition' ),
+		'pattern-builder/add-design-tokens'         => array( 'design-system' ),
+		'pattern-builder/set-global-styles'         => array( 'design-system' ),
+		'pattern-builder/add-block-style-variation' => array( 'design-system' ),
+		'pattern-builder/set-layout'                => array( 'design-system' ),
+		'pattern-builder/find-media'                => array( 'assets' ),
+		'pattern-builder/add-asset'                 => array( 'assets' ),
+		'pattern-builder/add-placeholder-image'     => array( 'assets' ),
+		'pattern-builder/add-font'                  => array( 'assets' ),
+		'pattern-builder/render-pattern'            => array( 'verifying' ),
+	);
+
+	/**
+	 * Words that are true of every pattern, and so tell nobody which one this is.
+	 */
+	const EMPTY_WORDS = array( 'modern', 'clean', 'beautiful', 'responsive', 'stunning', 'sleek', 'elegant', 'engaging', 'seamless', 'versatile' );
+
+	/**
+	 * Fewer words than this rarely tell two patterns apart.
+	 */
+	const DESCRIPTION_MIN_WORDS = 12;
+
+	/**
 	 * Hook the component into WordPress.
 	 */
 	public function __construct() {
@@ -48,6 +79,7 @@ class Pattern_Builder_Abilities {
 		$this->register_block_types();
 		$this->register_list_patterns();
 		$this->register_get_pattern();
+		$this->register_list_pattern_usage();
 		$this->register_render_pattern();
 		$this->register_authoring_guide();
 		$this->register_validator();
@@ -64,6 +96,41 @@ class Pattern_Builder_Abilities {
 		$this->register_add_placeholder_image();
 		$this->register_list_fonts();
 		$this->register_add_font();
+	}
+
+	/**
+	 * Register one ability, its description ending with the guide to read before the first
+	 * call when it has one.
+	 *
+	 * @param string $name Ability name.
+	 * @param array  $args Ability arguments.
+	 */
+	private function register( $name, $args ) {
+		if ( isset( self::GUIDES[ $name ] ) ) {
+			$args['description'] .= ' ' . self::guide_line( self::GUIDES[ $name ] );
+		}
+
+		wp_register_ability( $name, $args );
+	}
+
+	/**
+	 * The line naming an ability's guides, worded the same everywhere so an agent learns it
+	 * once.
+	 *
+	 * @param string[] $guides Guide names, as get-authoring-guide takes them.
+	 * @return string
+	 */
+	public static function guide_line( $guides ) {
+		$asks = array();
+		foreach ( (array) $guides as $guide ) {
+			$asks[] = '{"guide":"' . $guide . '"}';
+		}
+
+		return sprintf(
+			/* translators: %s: get-authoring-guide inputs, e.g. {"guide":"authoring"}. */
+			_n( 'Guide: get-authoring-guide %s. Read it before the first call.', 'Guide: get-authoring-guide %s. Read them before the first call.', count( $asks ), 'pattern-builder' ),
+			implode( ', then ', $asks )
+		);
 	}
 
 	/**
@@ -105,7 +172,7 @@ class Pattern_Builder_Abilities {
 	 * The design system as this site actually resolves it.
 	 */
 	private function register_design_system() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/get-design-system',
 			array(
 				'label'               => __( 'Get the design system', 'pattern-builder' ),
@@ -296,7 +363,7 @@ class Pattern_Builder_Abilities {
 	 * The block types this site actually has.
 	 */
 	private function register_block_types() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/list-block-types',
 			array(
 				'label'               => __( 'List available block types', 'pattern-builder' ),
@@ -398,19 +465,44 @@ class Pattern_Builder_Abilities {
 	 * Every pattern on this site, both kinds.
 	 */
 	private function register_list_patterns() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/list-patterns',
 			array(
 				'label'               => __( 'List patterns', 'pattern-builder' ),
-				'description'         => __( 'Returns the patterns on this site: theme patterns (PHP files in the theme), user patterns (reusable blocks in the database), and the ones a plugin registers, with their names, titles, categories, placement headers and synced status. A plugin pattern is read-only — it lives in the block pattern registry and there is no file or row behind it, so update-pattern refuses one; read it to compose in its style, or copy it from the Plugin tab to get one of your own. A site with a pattern plugin can have hundreds of them, so narrow with `source` when you only want what you can edit. Content is omitted; use get-pattern for one pattern\'s markup. Also returns the pattern categories registered here, which are the only ones the inserter files a pattern under — a category slug nothing registered lands the pattern in Uncategorized.', 'pattern-builder' ),
+				'description'         => __( 'Returns the patterns on this site: theme patterns (PHP files in the theme), user patterns (reusable blocks in the database), and the ones a plugin registers, with their names, titles, categories, placement headers and synced status. A plugin pattern is read-only — it lives in the block pattern registry and there is no file or row behind it, so update-pattern refuses one; read it to compose in its style, or copy it from the Plugin tab to get one of your own. A site with a pattern plugin can have hundreds of them, so narrow with `source` when you only want what you can edit, and with search, categories and keywords when you are looking for one: search before writing a pattern, since one nobody can find gets written again. Content is omitted; use get-pattern for one pattern\'s markup. Also returns the pattern categories registered here, which are the only ones the inserter files a pattern under (a category slug nothing registered lands the pattern in Uncategorized), and keywordsInUse, every keyword the listed source carries with how many patterns carry it: filter by those words, and reuse them when you tag a pattern of your own.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
 					'properties'           => array(
-						'source' => array(
+						'source'     => array(
 							'type'        => 'string',
 							'enum'        => array( 'theme', 'user', 'plugin', 'all' ),
 							'description' => 'Which patterns to return: the theme\'s files, the database\'s user patterns, the read-only ones a plugin registered, or all three. Defaults to all.',
+						),
+						'search'     => array(
+							'type'        => 'string',
+							'description' => 'Words to find in a pattern\'s title, name, description or keywords, ignoring case.',
+						),
+						'categories' => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'description' => 'Category slugs a pattern must carry, every one of them.',
+						),
+						'keywords'   => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'description' => 'Keywords a pattern must carry, every one of them, ignoring case. keywordsInUse lists the ones that exist.',
+						),
+						'page'       => array(
+							'type'        => 'integer',
+							'minimum'     => 1,
+							'description' => 'Which page of results, from 1. Giving page or perPage turns paging on; without either, every match comes back.',
+						),
+						'perPage'    => array(
+							'type'        => 'integer',
+							'minimum'     => 1,
+							'maximum'     => 100,
+							'description' => 'Patterns per page, 20 when paging and not given.',
 						),
 					),
 					'additionalProperties' => false,
@@ -419,13 +511,22 @@ class Pattern_Builder_Abilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'patterns'   => array(
+						'patterns'      => array(
 							'type'  => 'array',
 							'items' => array( 'type' => 'object' ),
 						),
-						'categories' => array(
+						'total'         => array(
+							'type'        => 'integer',
+							'description' => 'How many patterns match, across every page.',
+						),
+						'categories'    => array(
 							'type'        => 'array',
 							'description' => 'The pattern categories registered on this site: name (the slug a Categories header or a categories input uses) and label. Use one of these, or the pattern is filed under Uncategorized.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'keywordsInUse' => array(
+							'type'        => 'array',
+							'description' => 'Every keyword the patterns in this source carry, lowercased, with how many carry it, most used first. Counted before search and the filters, so it is the whole vocabulary.',
 							'items'       => array( 'type' => 'object' ),
 						),
 					),
@@ -462,15 +563,106 @@ class Pattern_Builder_Abilities {
 			$found = array_merge( $found, $store->get_plugin_patterns() );
 		}
 
+		$vocabulary = $this->keywords_in_use( $found );
+
+		$found = array_values(
+			array_filter(
+				$found,
+				function ( $pattern ) use ( $input ) {
+					return $this->listing_matches( $pattern, $input );
+				}
+			)
+		);
+		$total = count( $found );
+
+		$answer = array();
+		if ( isset( $input['page'] ) || isset( $input['perPage'] ) ) {
+			$per_page          = isset( $input['perPage'] ) ? max( 1, min( 100, (int) $input['perPage'] ) ) : 20;
+			$page              = isset( $input['page'] ) ? max( 1, (int) $input['page'] ) : 1;
+			$found             = array_slice( $found, ( $page - 1 ) * $per_page, $per_page );
+			$answer['page']    = $page;
+			$answer['perPage'] = $per_page;
+		}
+
 		$patterns = array();
 		foreach ( $found as $pattern ) {
 			$patterns[] = $this->summarize( $pattern );
 		}
 
 		return array(
-			'patterns'   => $patterns,
-			'categories' => $this->registered_categories(),
+			'patterns'      => $patterns,
+			'total'         => $total,
+			'categories'    => $this->registered_categories(),
+			'keywordsInUse' => $vocabulary,
+		) + $answer;
+	}
+
+	/**
+	 * Whether a pattern answers a listing's search and filters.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern.
+	 * @param array            $input Ability input.
+	 * @return bool
+	 */
+	private function listing_matches( $pattern, $input ) {
+		$keywords = array_map( 'strtolower', array_map( 'trim', is_array( $pattern->keywords ) ? $pattern->keywords : array() ) );
+
+		if ( isset( $input['search'] ) && '' !== trim( (string) $input['search'] ) ) {
+			$haystack = implode( ' ', array( $pattern->title, $pattern->name, $pattern->description, implode( ' ', $keywords ) ) );
+			if ( false === stripos( $haystack, trim( (string) $input['search'] ) ) ) {
+				return false;
+			}
+		}
+
+		if ( ! empty( $input['categories'] ) ) {
+			$categories = is_array( $pattern->categories ) ? $pattern->categories : array();
+			if ( array_diff( array_map( 'strval', (array) $input['categories'] ), $categories ) ) {
+				return false;
+			}
+		}
+
+		if ( ! empty( $input['keywords'] ) ) {
+			$wanted = array_map( 'strtolower', array_map( 'trim', array_map( 'strval', (array) $input['keywords'] ) ) );
+			if ( array_diff( $wanted, $keywords ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Every keyword these patterns carry, with how many carry it, most used first.
+	 *
+	 * @param Abstract_Pattern[] $patterns The patterns.
+	 * @return array List of { keyword, count }.
+	 */
+	private function keywords_in_use( $patterns ) {
+		$counts = array();
+		foreach ( $patterns as $pattern ) {
+			$keywords = is_array( $pattern->keywords ) ? $pattern->keywords : array();
+			foreach ( array_unique( array_filter( array_map( 'strtolower', array_map( 'trim', array_map( 'strval', $keywords ) ) ) ) ) as $keyword ) {
+				$counts[ $keyword ] = isset( $counts[ $keyword ] ) ? $counts[ $keyword ] + 1 : 1;
+			}
+		}
+
+		uksort(
+			$counts,
+			static function ( $a, $b ) use ( $counts ) {
+				$by_count = $counts[ $b ] <=> $counts[ $a ];
+				return 0 !== $by_count ? $by_count : strcmp( $a, $b );
+			}
 		);
+
+		$vocabulary = array();
+		foreach ( $counts as $keyword => $count ) {
+			$vocabulary[] = array(
+				'keyword' => (string) $keyword,
+				'count'   => $count,
+			);
+		}
+
+		return $vocabulary;
 	}
 
 	/**
@@ -540,11 +732,11 @@ class Pattern_Builder_Abilities {
 	 * One pattern, with its markup.
 	 */
 	private function register_get_pattern() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/get-pattern',
 			array(
 				'label'               => __( 'Get a pattern', 'pattern-builder' ),
-				'description'         => __( 'Returns one pattern including its raw block markup. Identify a theme pattern by its namespaced name (e.g. "my-theme/hero") and a user pattern by its numeric post ID. Useful for reading an existing pattern before composing something in the same style.', 'pattern-builder' ),
+				'description'         => __( 'Returns one pattern including its raw block markup. Identify a theme pattern by its namespaced name (e.g. "my-theme/hero") and a user pattern by its numeric post ID. Useful for reading an existing pattern before composing something in the same style. The pattern carries a hash of everything update-pattern replaces: send it back as update-pattern\'s expectedHash, and the update is refused if the pattern changed after you read it.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -586,19 +778,89 @@ class Pattern_Builder_Abilities {
 
 		$summary            = $this->summarize( $pattern );
 		$summary['content'] = $pattern->content;
+		$summary['hash']    = $this->pattern_hash( $pattern );
 
 		return array( 'pattern' => $summary );
+	}
+
+	/**
+	 * Where a pattern is used, which is the cost of changing it.
+	 */
+	private function register_list_pattern_usage() {
+		$this->register(
+			'pattern-builder/list-pattern-usage',
+			array(
+				'label'               => __( 'List where a pattern is used', 'pattern-builder' ),
+				'description'         => __( 'Returns every place that places a pattern: other patterns, the theme\'s templates and template parts, and posts and pages, drafts included. A place that uses it through another pattern (a page placing a section that places this card) is marked indirect, with the pattern it goes through as via. Read this before changing a synced pattern: a change reaches every place listed, so the list is the cost of the change, and worth telling a person about when it is long. Templates and patterns are listed in full; posts are named up to ten and counted beyond that.', 'pattern-builder' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'id' => array(
+							'type'        => 'string',
+							'description' => 'Namespaced pattern name, or a user pattern\'s post ID.',
+							'minLength'   => 1,
+						),
+					),
+					'required'             => array( 'id' ),
+					'additionalProperties' => false,
+					'default'              => array(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'usedBy'  => array(
+							'type'        => 'array',
+							'description' => 'Each place: kind (pattern, template, template-part or post), id, title, direct, and via when it is not direct. A direct place that fills slots through content names them in fills. Patterns also carry source; posts carry postType and status.',
+							'items'       => array( 'type' => 'object' ),
+						),
+						'total'   => array(
+							'type'        => 'integer',
+							'description' => 'Every place found, including posts beyond the ones named.',
+						),
+						'hasMore' => array(
+							'type'        => 'boolean',
+							'description' => 'True when more posts use it than usedBy names.',
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_list_pattern_usage' ),
+				'permission_callback' => array( $this, 'can_read' ),
+				'meta'                => $this->read_annotations(),
+			)
+		);
+	}
+
+	/**
+	 * Every place that uses one pattern.
+	 *
+	 * @param array $input Ability input.
+	 * @return array|\WP_Error
+	 */
+	public function execute_list_pattern_usage( $input ) {
+		$pattern = $this->find( isset( $input['id'] ) ? (string) $input['id'] : '' );
+		if ( is_wp_error( $pattern ) ) {
+			return $pattern;
+		}
+
+		$usage = Pattern_Builder_Usage::of( $pattern );
+
+		return array(
+			'usedBy'  => $usage['places'],
+			'total'   => $usage['total'],
+			'hasMore' => $usage['hasMore'],
+		);
 	}
 
 	/**
 	 * What a stored pattern renders as on the front end.
 	 */
 	private function register_render_pattern() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/render-pattern',
 			array(
 				'label'               => __( 'Render a pattern', 'pattern-builder' ),
-				'description'         => __( 'Returns the front-end HTML a stored pattern produces, with blocks resolved; which design tokens it references and whether this site defines them, since a preset missing here ships no value and arrives missing everywhere; and two URLs that render it as a whole page with this site\'s stylesheets — one standalone, one inside the page template. Open those in a browser to see what the pattern looks like; the HTML alone only shows which classes landed where, not what the CSS then does with them. Note that rendering correctly says nothing about whether the block markup is valid in the editor, which only a JavaScript block validator can decide.', 'pattern-builder' ),
+				'description'         => __( 'Returns the front-end HTML a stored pattern produces, with blocks resolved; which design tokens it references and whether this site defines them, since a preset missing here ships no value and arrives missing everywhere; and two URLs that render it as a whole page with this site\'s stylesheets — one standalone, one inside the page template, each also signed so a browser with no credentials can open it for an hour. Open those in a browser to see what the pattern looks like; the HTML alone only shows which classes landed where, not what the CSS then does with them. Note that rendering correctly says nothing about whether the block markup is valid in the editor, which only a JavaScript block validator can decide.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -675,9 +937,12 @@ class Pattern_Builder_Abilities {
 			$tokens['note'] = __( 'This pattern references presets this site does not define. They render as no styling at all here, and an upload carries no value for them, so they will render as nothing wherever the pattern is installed too. Add them with add-design-tokens, or reference presets that exist.', 'pattern-builder' );
 		}
 
-		$themes = array();
+		$expires = time() + Pattern_Builder_Preview::SIGNED_TTL;
+		$themes  = array();
+		$signed  = array();
 		foreach ( array_keys( Pattern_Builder_Preview::bundled_themes() ) as $slug ) {
 			$themes[ $slug ] = Pattern_Builder_Preview::url_for( $pattern->id, 'page', $slug );
+			$signed[ $slug ] = Pattern_Builder_Preview::signed_url_for( $pattern->id, 'page', $slug, $expires );
 		}
 
 		return array(
@@ -687,7 +952,13 @@ class Pattern_Builder_Abilities {
 				'standalone' => Pattern_Builder_Preview::url_for( $pattern->id, 'standalone' ),
 				'page'       => Pattern_Builder_Preview::url_for( $pattern->id, 'page' ),
 				'themes'     => $themes,
-				'note'       => __( 'Open any URL in a browser, authenticated as you are here. "page" renders the pattern inside this site\'s page template, which is where an alignfull band either escapes the content width or does not. "themes" renders it the same way against a theme that defines nothing (what the pattern itself brings) and against one with a design system of its own (whether the pattern adapts); nothing on this site is changed by either.', 'pattern-builder' ),
+				'signed'     => array(
+					'standalone' => Pattern_Builder_Preview::signed_url_for( $pattern->id, 'standalone', '', $expires ),
+					'page'       => Pattern_Builder_Preview::signed_url_for( $pattern->id, 'page', '', $expires ),
+					'themes'     => $signed,
+					'expiresIn'  => Pattern_Builder_Preview::SIGNED_TTL,
+				),
+				'note'       => __( 'Open the URLs under signed in any browser, with no credentials: each opens this pattern, in that context, for whoever holds it, until expiresIn seconds from now, and nothing else. The others need you to be authenticated as you are here. "page" renders the pattern inside this site\'s page template, which is where an alignfull band either escapes the content width or does not. "themes" renders it the same way against a theme that defines nothing (what the pattern itself brings) and against one with a design system of its own (whether the pattern adapts); nothing on this site is changed by either.', 'pattern-builder' ),
 			),
 		);
 	}
@@ -696,7 +967,7 @@ class Pattern_Builder_Abilities {
 	 * Hand an agent the knowledge, not just the mechanism.
 	 */
 	private function register_authoring_guide() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/get-authoring-guide',
 			array(
 				'label'               => __( 'Get the pattern authoring guide', 'pattern-builder' ),
@@ -784,6 +1055,32 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
+	 * When each shipped guide is worth reading, one line apiece, so an agent choosing over
+	 * HTTP can read what its task needs rather than everything. A guide a theme adds through
+	 * the filter has none.
+	 *
+	 * @return array name => sentence.
+	 */
+	private function guide_when() {
+		return array(
+			'authoring'            => __( 'Writing any pattern. Read it either way: it owns the steps, and says which of the others each step needs.', 'pattern-builder' ),
+			'pattern-kinds'        => __( 'Choosing a kind other than a plain design pattern, or writing the headers, the Description and the Keywords.', 'pattern-builder' ),
+			'block-vocabulary'     => __( 'Using a block beyond paragraph, heading, image, button, group and columns, or writing for somewhere other than this site.', 'pattern-builder' ),
+			'block-markup'         => __( 'Writing markup by hand because Node is not available, or working out what the validator reported.', 'pattern-builder' ),
+			'design-system'        => __( 'Setting colour, type, spacing or layout beyond the presets every theme shares, or installing a design system.', 'pattern-builder' ),
+			'composition'          => __( 'Building anything bigger than one section, or rebuilding a page that already exists.', 'pattern-builder' ),
+			'design-content-split' => __( 'Writing a synced pattern with slots, or the page that fills them.', 'pattern-builder' ),
+			'changing-patterns'    => __( 'The site already has patterns, or you are changing one that pages use.', 'pattern-builder' ),
+			'assets'               => __( 'The pattern needs an image or a typeface.', 'pattern-builder' ),
+			'keeping-current'      => __( 'Bringing these guides to a new WordPress release, or checking an installed copy against the site.', 'pattern-builder' ),
+			'abilities'            => __( 'Reaching the site over HTTP rather than through tools already loaded.', 'pattern-builder' ),
+			'reproduction'         => __( 'The design already exists somewhere else: a site, a Figma file, a screenshot, a PDF.', 'pattern-builder' ),
+			'reading-a-source'     => __( 'Taking the values and the structure out of a design that already exists.', 'pattern-builder' ),
+			'verifying'            => __( 'Checking what you built before calling it done, and comparing a rebuild against its source.', 'pattern-builder' ),
+		);
+	}
+
+	/**
 	 * The guides this plugin ships, by name.
 	 *
 	 * @return array name => relative path.
@@ -797,6 +1094,7 @@ class Pattern_Builder_Abilities {
 			'design-system'        => 'pattern-author/references/design-system.md',
 			'composition'          => 'pattern-author/references/composition.md',
 			'design-content-split' => 'pattern-author/references/design-content-split.md',
+			'changing-patterns'    => 'pattern-author/references/changing-patterns.md',
 			'assets'               => 'pattern-author/references/assets.md',
 			'keeping-current'      => 'pattern-author/references/keeping-current.md',
 			'abilities'            => 'pattern-author/references/abilities.md',
@@ -915,8 +1213,9 @@ class Pattern_Builder_Abilities {
 
 		if ( '' === $wanted ) {
 			$index = array();
+			$when  = $this->guide_when();
 			foreach ( $guides as $name => $guide ) {
-				$index[] = array(
+				$entry = array(
 					'name'     => $name,
 					'title'    => $guide['title'],
 					'words'    => str_word_count( wp_strip_all_tags( $guide['content'] ) ),
@@ -924,6 +1223,10 @@ class Pattern_Builder_Abilities {
 					'path'     => $guide['path'],
 					'checksum' => $guide['checksum'],
 				);
+				if ( isset( $when[ $name ] ) ) {
+					$entry['when'] = $when[ $name ];
+				}
+				$index[] = $entry;
 			}
 
 			return array(
@@ -1511,7 +1814,7 @@ class Pattern_Builder_Abilities {
 	 * Hand over the validator itself.
 	 */
 	private function register_validator() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/get-validator',
 			array(
 				'label'               => __( 'Get the pattern validator', 'pattern-builder' ),
@@ -1598,7 +1901,7 @@ class Pattern_Builder_Abilities {
 	 * Where this site's own editor scripts are, in the order they load.
 	 */
 	private function register_editor_scripts() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/get-editor-scripts',
 			array(
 				'label'               => __( 'Get this site\'s editor script URLs', 'pattern-builder' ),
@@ -1698,17 +2001,18 @@ class Pattern_Builder_Abilities {
 	 * Store a new pattern.
 	 */
 	private function register_create_pattern() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/create-pattern',
 			array(
 				'label'               => __( 'Create a pattern', 'pattern-builder' ),
-				'description'         => __( 'Stores finished block markup as a new pattern — either a PHP file in the active theme, or a reusable block in the database. This does not generate anything: supply markup you have already written and validated with a JavaScript block validator, because invalid markup renders correctly on the front end and only fails once an editor opens it, and no server can run a block\'s save(). What the site does refuse, by name, is what PHP can see: attribute JSON that does not parse, a heading or list contradicting its attributes, a block this site has not registered, a core/pattern reference that resolves to nothing or to the pattern itself, and a Pattern Overrides slot nothing can fill — a content key naming no slot, a binding with no metadata.name, or a binding on a block core cannot bind. Store the patterns a pattern references before it.', 'pattern-builder' ),
+				'description'         => __( 'Stores finished block markup as a new pattern — either a PHP file in the active theme, or a reusable block in the database. This does not generate anything: supply markup you have already written and validated with a JavaScript block validator, because invalid markup renders correctly on the front end and only fails once an editor opens it, and no server can run a block\'s save(). What the site does refuse, by name, is what PHP can see: attribute JSON that does not parse, a heading or list contradicting its attributes, a block this site has not registered, a core/pattern reference that resolves to nothing or to the pattern itself, and a Pattern Overrides slot nothing can fill — a content key naming no slot, a binding with no metadata.name, or a binding on a block core cannot bind. Store the patterns a pattern references before it. Give it a description someone can choose it by: what it is and where it is used, what is in it and how it is arranged, any behaviour, and what it depends on. The answer carries warnings when the description is missing, too short to tell two patterns apart, or made of words that describe every pattern.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => $this->write_schema( true ),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'pattern' => array( 'type' => 'object' ),
+						'pattern'  => array( 'type' => 'object' ),
+						'warnings' => $this->warnings_schema(),
 					),
 				),
 				'execute_callback'    => array( $this, 'execute_create_pattern' ),
@@ -1731,17 +2035,22 @@ class Pattern_Builder_Abilities {
 	 * Update an existing pattern.
 	 */
 	private function register_update_pattern() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/update-pattern',
 			array(
 				'label'               => __( 'Update a pattern', 'pattern-builder' ),
-				'description'         => __( 'Replaces an existing pattern’s markup and metadata. Overwrites whatever is there, so read the pattern first if you mean to preserve part of it. As with create-pattern, validate the markup before sending it; the same checks as create-pattern refuse what PHP can see (malformed attribute JSON, contradictions, unregistered blocks, unresolved references, unfillable slots).', 'pattern-builder' ),
+				'description'         => __( 'Replaces an existing pattern’s markup and metadata. Overwrites whatever is there, so read the pattern first if you mean to preserve part of it, and send the hash get-pattern gave you as expectedHash: if the pattern changed after you read it, because someone saved it in the editor or another agent updated it, nothing is written and the answer carries the current hash to read again from. To change part of a pattern, send edits instead of content: fragments of the markup get-pattern returned, each replaced in place, all or none. As with create-pattern, validate the markup before sending it, and with edits validate the result; the same checks as create-pattern refuse what PHP can see (malformed attribute JSON, contradictions, unregistered blocks, unresolved references, unfillable slots). Removing or renaming a slot that another pattern or a page still fills is refused, since each of them would go back to placeholder copy, unless dropSlots names it. The answer says whether the write changed anything.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => $this->write_schema( false ),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'pattern' => array( 'type' => 'object' ),
+						'pattern'  => array( 'type' => 'object' ),
+						'changed'  => array(
+							'type'        => 'boolean',
+							'description' => 'False when the stored pattern is exactly what it was before this write, which usually means the change you meant did not happen.',
+						),
+						'warnings' => $this->warnings_schema(),
 					),
 				),
 				'execute_callback'    => array( $this, 'execute_update_pattern' ),
@@ -1762,7 +2071,7 @@ class Pattern_Builder_Abilities {
 	 * Copy a pattern a plugin registered into the theme.
 	 */
 	private function register_copy_plugin_pattern() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/copy-plugin-pattern',
 			array(
 				'label'               => __( 'Copy a plugin pattern', 'pattern-builder' ),
@@ -1897,7 +2206,7 @@ class Pattern_Builder_Abilities {
 			),
 			'description'        => array(
 				'type'        => 'string',
-				'description' => 'Short description shown in the inserter.',
+				'description' => 'What the pattern is and where it is used; what is in it and how it is arranged, including what repeats and how it stacks on a narrow screen; any behaviour; and what it depends on, or that it depends on nothing. Shown in the inserter and searched by list-patterns. Leave out colours and fonts, which belong to the site, and words that describe every pattern.',
 			),
 			'categories'         => array(
 				'type'        => 'array',
@@ -1950,16 +2259,44 @@ class Pattern_Builder_Abilities {
 			);
 		}
 
-		$properties['id'] = array(
+		$properties['id']           = array(
 			'type'        => 'string',
 			'description' => 'Namespaced pattern name, or a user pattern\'s post ID.',
 			'minLength'   => 1,
 		);
+		$properties['expectedHash'] = array(
+			'type'        => 'string',
+			'description' => 'The hash get-pattern returned for the version you read. When the pattern no longer matches it, nothing is written. Optional with content, required with edits; without it a change made after your read is overwritten without a word.',
+		);
+		$properties['edits']        = array(
+			'type'        => 'array',
+			'description' => 'Change part of the stored markup instead of sending all of it as content: each edit replaces old with new, in order, on one copy of the markup get-pattern returned. Each old must match exactly once unless replaceAll is set; a fragment that matches nothing, or more than once, refuses the whole write and nothing is stored. Send content or edits, never both, and send expectedHash with edits, since a fragment only means something against the version it was cut from.',
+			'items'       => array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'old'        => array(
+						'type'      => 'string',
+						'minLength' => 1,
+					),
+					'new'        => array( 'type' => 'string' ),
+					'replaceAll' => array( 'type' => 'boolean' ),
+				),
+				'required'             => array( 'old', 'new' ),
+				'additionalProperties' => false,
+			),
+		);
 
+		$properties['dropSlots'] = array(
+			'type'        => 'array',
+			'items'       => array( 'type' => 'string' ),
+			'description' => 'Slots this update removes even though other places fill them. Without this, removing or renaming a slot a page fills is refused, since every such page would go back to the placeholder copy; list-pattern-usage shows who fills what. The answer reports the places that revert.',
+		);
+
+		// Content or edits, never both: the ability checks which, since the schema cannot say it.
 		return array(
 			'type'                 => 'object',
 			'properties'           => $properties,
-			'required'             => array( 'id', 'content' ),
+			'required'             => array( 'id' ),
 			'additionalProperties' => false,
 			'default'              => array(),
 		);
@@ -2003,9 +2340,11 @@ class Pattern_Builder_Abilities {
 
 			$this->write_user_pattern_meta( $post_id, $input );
 
-			$summary = $this->summarize( Abstract_Pattern::from_post( get_post( $post_id ) ) );
+			$stored          = Abstract_Pattern::from_post( get_post( $post_id ) );
+			$summary         = $this->summarize( $stored );
+			$summary['hash'] = $this->pattern_hash( $stored );
 
-			return $this->with_category_note( array( 'pattern' => $summary ), $summary );
+			return $this->with_category_note( $this->with_warnings( array( 'pattern' => $summary ), $this->description_warnings( $stored->description ) ), $summary );
 		}
 
 		$pattern = new Abstract_Pattern( $this->pattern_args( $input ) );
@@ -2016,9 +2355,10 @@ class Pattern_Builder_Abilities {
 			return $result;
 		}
 
-		$summary = $this->summarize( $pattern );
+		$summary         = $this->summarize( $result );
+		$summary['hash'] = $this->pattern_hash( $result );
 
-		return $this->with_category_note( array( 'pattern' => $summary ), $summary );
+		return $this->with_category_note( $this->with_warnings( array( 'pattern' => $summary ), $this->description_warnings( $result->description ) ), $summary );
 	}
 
 	/**
@@ -2045,12 +2385,35 @@ class Pattern_Builder_Abilities {
 			);
 		}
 
+		$before = $this->pattern_hash( $existing );
+		if ( isset( $input['expectedHash'] ) && '' !== (string) $input['expectedHash'] && ! hash_equals( $before, (string) $input['expectedHash'] ) ) {
+			return new \WP_Error(
+				'pb_pattern_changed',
+				__( 'This pattern has changed since the version you read, so nothing was written. Read it again with get-pattern, make your change on what is there now, and send that hash as expectedHash.', 'pattern-builder' ),
+				array(
+					'status'      => 409,
+					'currentHash' => $before,
+				)
+			);
+		}
+
+		$content = $this->content_to_write( $input, $existing );
+		if ( is_wp_error( $content ) ) {
+			return $content;
+		}
+		$input['content'] = $content;
+
 		$checked = Pattern_Builder_Markup_Checks::check(
 			(string) $input['content'],
 			'theme' === $existing->source ? (string) $existing->name : ''
 		);
 		if ( is_wp_error( $checked ) ) {
 			return $checked;
+		}
+
+		$reverted = $this->slots_still_filled( $existing, (string) $input['content'], $input );
+		if ( is_wp_error( $reverted ) ) {
+			return $reverted;
 		}
 
 		if ( 'user' === $existing->source ) {
@@ -2070,9 +2433,7 @@ class Pattern_Builder_Abilities {
 
 			$this->write_user_pattern_meta( $post_id, $input, $existing );
 
-			$summary = $this->summarize( Abstract_Pattern::from_post( get_post( $post_id ) ) );
-
-			return $this->with_category_note( array( 'pattern' => $summary ), $summary );
+			return $this->updated( Abstract_Pattern::from_post( get_post( $post_id ) ), $existing, $input, $before, $reverted );
 		}
 
 		$args         = $this->pattern_args( $input, $existing );
@@ -2086,9 +2447,379 @@ class Pattern_Builder_Abilities {
 			return $result;
 		}
 
-		$summary = $this->summarize( $pattern );
+		return $this->updated( $result, $existing, $input, $before, $reverted );
+	}
 
-		return $this->with_category_note( array( 'pattern' => $summary ), $summary );
+	/**
+	 * The places that fill a slot this update removes.
+	 *
+	 * A page fills a pattern's slots by name, so a slot removed or renamed here sends every
+	 * reference that filled it back to the pattern's own words, with no error anywhere. The
+	 * check on a reference's content keys only runs when the referencing markup is written, so
+	 * this is the same check from the other side. A caller that means it lists the slots in
+	 * dropSlots, and the answer reports what reverts.
+	 *
+	 * @param Abstract_Pattern $existing The pattern being updated.
+	 * @param string           $content The markup about to be stored.
+	 * @param array            $input Ability input.
+	 * @return array|\WP_Error The places that will revert, or the refusal.
+	 */
+	private function slots_still_filled( $existing, $content, $input ) {
+		$before  = Pattern_Builder_Markup_Checks::slot_names( (string) $existing->content );
+		$after   = Pattern_Builder_Markup_Checks::slot_names( $content );
+		$removed = array_values( array_diff( $before, $after ) );
+		if ( ! $removed ) {
+			return array();
+		}
+
+		$usage  = Pattern_Builder_Usage::of( $existing, PHP_INT_MAX );
+		$filled = array();
+		foreach ( $usage['places'] as $place ) {
+			$keys = empty( $place['fills'] ) ? array() : array_values( array_intersect( $place['fills'], $removed ) );
+			if ( $keys ) {
+				$filled[] = array(
+					'kind'  => $place['kind'],
+					'id'    => $place['id'],
+					'title' => $place['title'],
+					'keys'  => $keys,
+				);
+			}
+		}
+		if ( ! $filled ) {
+			return array();
+		}
+
+		$allowed    = isset( $input['dropSlots'] ) ? array_map( 'strval', (array) $input['dropSlots'] ) : array();
+		$keys       = array_values( array_unique( array_merge( ...array_column( $filled, 'keys' ) ) ) );
+		$unapproved = array_values( array_diff( $keys, $allowed ) );
+		if ( ! $unapproved ) {
+			return $filled;
+		}
+
+		$where = array();
+		foreach ( array_slice( $filled, 0, 5 ) as $place ) {
+			$where[] = sprintf( '%s (%s %s: %s)', $place['title'], $place['kind'], $place['id'], implode( ', ', $place['keys'] ) );
+		}
+		if ( count( $filled ) > 5 ) {
+			/* translators: %d: how many more places. */
+			$where[] = sprintf( __( 'and %d more', 'pattern-builder' ), count( $filled ) - 5 );
+		}
+
+		$added   = array_values( array_diff( $after, $before ) );
+		$message = sprintf(
+			/* translators: 1: slot names, 2: the places that fill them. */
+			__( 'This change removes slots that other places still fill: %1$s. Each of these would go back to this pattern\'s own words, with no error anywhere: %2$s. Nothing was written. Keep the slot names, or change the keys where they are filled first, or list the slots in dropSlots to go ahead anyway.', 'pattern-builder' ),
+			implode( ', ', $unapproved ),
+			implode( '; ', $where )
+		);
+		if ( $added ) {
+			$message .= ' ' . sprintf(
+				/* translators: %s: slot names. */
+				__( 'This change also adds %s: if a slot was renamed, that is a removal plus an addition, and the places that fill the old name will not fill the new one.', 'pattern-builder' ),
+				implode( ', ', $added )
+			);
+		}
+
+		return new \WP_Error(
+			'pb_slots_still_filled',
+			$message,
+			array(
+				'status'  => 409,
+				'removed' => $unapproved,
+				'added'   => $added,
+				'places'  => $filled,
+			)
+		);
+	}
+
+	/**
+	 * The markup an update stores: the content it was sent, or the stored markup with its edits
+	 * applied.
+	 *
+	 * @param array            $input Ability input.
+	 * @param Abstract_Pattern $existing The pattern being updated.
+	 * @return string|\WP_Error
+	 */
+	private function content_to_write( $input, $existing ) {
+		$has_content = isset( $input['content'] ) && '' !== (string) $input['content'];
+		$has_edits   = ! empty( $input['edits'] );
+
+		if ( $has_content && $has_edits ) {
+			return new \WP_Error(
+				'pb_content_and_edits',
+				__( 'Send the whole markup as content or change part of it with edits, not both: nothing was written.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( ! $has_content && ! $has_edits ) {
+			return new \WP_Error(
+				'pb_nothing_to_write',
+				__( 'An update needs the markup to store: the whole of it as content, or edits to the markup get-pattern returned.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( $has_content ) {
+			return (string) $input['content'];
+		}
+
+		if ( ! isset( $input['expectedHash'] ) || '' === (string) $input['expectedHash'] ) {
+			return new \WP_Error(
+				'pb_edits_need_a_hash',
+				__( 'Edits need expectedHash, the hash get-pattern returned with the markup they were cut from: a fragment only means something against that version. Nothing was written.', 'pattern-builder' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return self::apply_edits( (string) $existing->content, (array) $input['edits'] );
+	}
+
+	/**
+	 * Apply fragment edits to markup, in order and all or none.
+	 *
+	 * Each `old` must match exactly once unless `replaceAll` is set. An exact match is tried
+	 * first; failing that, one that ignores differences in whitespace, since an agent copying a
+	 * fragment out of formatted markup rarely keeps its indentation. A fragment that matches
+	 * nothing, or more than once, refuses every edit, and the error says which one and where.
+	 *
+	 * @param string $markup The stored markup.
+	 * @param array  $edits List of { old, new, replaceAll }.
+	 * @return string|\WP_Error The edited markup.
+	 */
+	public static function apply_edits( $markup, $edits ) {
+		foreach ( array_values( $edits ) as $index => $edit ) {
+			$old = isset( $edit['old'] ) ? (string) $edit['old'] : '';
+			$new = isset( $edit['new'] ) ? (string) $edit['new'] : '';
+			$all = ! empty( $edit['replaceAll'] );
+
+			if ( '' === $old ) {
+				return self::edit_error(
+					$index,
+					/* translators: %d: the edit's position in the list, counting from 0. */
+					sprintf( __( 'Edit %d has no old fragment to find, so nothing was written.', 'pattern-builder' ), $index )
+				);
+			}
+
+			$matches = self::fragment_matches( $markup, $old );
+
+			if ( ! $matches ) {
+				return self::edit_error(
+					$index,
+					/* translators: %d: the edit's position in the list, counting from 0. */
+					sprintf( __( 'Edit %d matches nothing in the stored markup, even ignoring whitespace, so nothing was written. Copy the fragment from what get-pattern returns now.', 'pattern-builder' ), $index )
+				);
+			}
+
+			if ( count( $matches ) > 1 && ! $all ) {
+				$lines = array();
+				foreach ( $matches as $match ) {
+					$lines[] = substr_count( substr( $markup, 0, $match[0] ), "\n" ) + 1;
+				}
+
+				return self::edit_error(
+					$index,
+					/* translators: 1: the edit's position, counting from 0, 2: line numbers. */
+					sprintf( __( 'Edit %1$d matches more than once (lines %2$s), so nothing was written. Make the fragment long enough to match one place, or set replaceAll.', 'pattern-builder' ), $index, implode( ', ', array_unique( $lines ) ) ),
+					array_values( array_unique( $lines ) )
+				);
+			}
+
+			// Replace from the end, so the earlier offsets stay true.
+			foreach ( array_reverse( $matches ) as $match ) {
+				$markup = substr_replace( $markup, $new, $match[0], $match[1] );
+			}
+		}
+
+		return $markup;
+	}
+
+	/**
+	 * Where a fragment occurs: exactly, or failing that with any run of whitespace standing for
+	 * any other.
+	 *
+	 * @param string $markup Markup to search.
+	 * @param string $fragment What to find.
+	 * @return array List of [ offset, length ].
+	 */
+	private static function fragment_matches( $markup, $fragment ) {
+		$matches = array();
+		$offset  = strpos( $markup, $fragment );
+		while ( false !== $offset ) {
+			$matches[] = array( $offset, strlen( $fragment ) );
+			$offset    = strpos( $markup, $fragment, $offset + strlen( $fragment ) );
+		}
+		if ( $matches ) {
+			return $matches;
+		}
+
+		$words = preg_split( '/\s+/', trim( $fragment ) );
+		if ( ! $words || array( '' ) === $words ) {
+			return array();
+		}
+		$pattern = '/' . implode( '\s+', array_map( 'preg_quote', $words, array_fill( 0, count( $words ), '/' ) ) ) . '/';
+
+		if ( ! preg_match_all( $pattern, $markup, $found, PREG_OFFSET_CAPTURE ) ) {
+			return array();
+		}
+		foreach ( $found[0] as $match ) {
+			$matches[] = array( $match[1], strlen( $match[0] ) );
+		}
+
+		return $matches;
+	}
+
+	/**
+	 * A refused edit, naming which one.
+	 *
+	 * @param int    $index The edit's position in the list.
+	 * @param string $message What went wrong, already naming the edit.
+	 * @param int[]  $lines Line numbers the fragment matched, when it matched more than once.
+	 * @return \WP_Error
+	 */
+	private static function edit_error( $index, $message, $lines = array() ) {
+		$data = array(
+			'status' => 400,
+			'edit'   => $index,
+		);
+		if ( $lines ) {
+			$data['lines'] = $lines;
+		}
+
+		return new \WP_Error( 'pb_edit_refused', $message, $data );
+	}
+
+	/**
+	 * The answer to an update: the pattern as it is now stored, its new hash, whether the write
+	 * changed anything at all, and the places whose slots it sent back to placeholder copy.
+	 *
+	 * @param Abstract_Pattern $stored The pattern as re-read after the write.
+	 * @param Abstract_Pattern $existing The pattern as it was before the write.
+	 * @param array            $input Ability input.
+	 * @param string           $before The hash it had before the write.
+	 * @param array            $reverted Places that filled a slot dropSlots let go.
+	 * @return array
+	 */
+	private function updated( $stored, $existing, $input, $before, $reverted = array() ) {
+		$summary         = $this->summarize( $stored );
+		$summary['hash'] = $this->pattern_hash( $stored );
+
+		$answer = array(
+			'pattern' => $summary,
+			'changed' => $before !== $summary['hash'],
+		);
+		if ( $reverted ) {
+			$answer['reverted'] = $reverted;
+		}
+
+		// Only a description this write set is judged: an edit is no occasion to re-judge
+		// prose its author never wrote. Markup that moved under an unchanged description is
+		// worth a look either way.
+		$warnings = isset( $input['description'] ) ? $this->description_warnings( $stored->description ) : array();
+		if ( (string) $stored->content !== (string) $existing->content && '' !== trim( (string) $stored->description ) && (string) $stored->description === (string) $existing->description ) {
+			$warnings[] = array(
+				'code'    => 'description_unchanged',
+				'message' => __( 'The markup changed and the description did not. Check it still says what the pattern is, what is in it and what it depends on.', 'pattern-builder' ),
+			);
+		}
+
+		return $this->with_category_note( $this->with_warnings( $answer, $warnings ), $summary );
+	}
+
+	/**
+	 * What is wrong with a description as something to choose a pattern by. Warnings, never
+	 * refusals: a quick pattern still saves.
+	 *
+	 * @param string $description The stored description.
+	 * @return array List of { code, message }.
+	 */
+	private function description_warnings( $description ) {
+		$description = trim( (string) $description );
+		$shape       = __( 'Say what it is and where it is used, what is in it and how it is arranged, any behaviour, and what it depends on.', 'pattern-builder' );
+
+		if ( '' === $description ) {
+			return array(
+				array(
+					'code'    => 'description_missing',
+					'message' => __( 'No description: an agent reading a list, or a person searching the inserter, has only the title to go on.', 'pattern-builder' ) . ' ' . $shape,
+				),
+			);
+		}
+
+		$warnings = array();
+		$words    = count( preg_split( '/\s+/u', $description, -1, PREG_SPLIT_NO_EMPTY ) );
+		if ( $words < self::DESCRIPTION_MIN_WORDS ) {
+			$warnings[] = array(
+				'code'    => 'description_short',
+				'message' => sprintf(
+					/* translators: %d: word count. */
+					__( 'The description is %d words, which is rarely enough to tell two patterns apart.', 'pattern-builder' ),
+					$words
+				) . ' ' . $shape,
+			);
+		}
+
+		$empty = array();
+		foreach ( self::EMPTY_WORDS as $word ) {
+			if ( preg_match( '/\b' . preg_quote( $word, '/' ) . '\b/i', $description ) ) {
+				$empty[] = $word;
+			}
+		}
+		if ( $empty ) {
+			$warnings[] = array(
+				'code'    => 'description_says_nothing',
+				'message' => sprintf(
+					/* translators: %s: the words, comma separated. */
+					__( 'The description uses words that describe every pattern (%s), so they help nobody choose this one. Say what is actually in it instead.', 'pattern-builder' ),
+					implode( ', ', $empty )
+				),
+			);
+		}
+
+		return $warnings;
+	}
+
+	/**
+	 * Add warnings to a write's answer, when there are any.
+	 *
+	 * @param array $answer The answer.
+	 * @param array $warnings List of { code, message }.
+	 * @return array
+	 */
+	private function with_warnings( $answer, $warnings ) {
+		if ( $warnings ) {
+			$answer['warnings'] = $warnings;
+		}
+
+		return $answer;
+	}
+
+	/**
+	 * The output schema both writes share for warnings.
+	 *
+	 * @return array
+	 */
+	private function warnings_schema() {
+		return array(
+			'type'        => 'array',
+			'description' => 'Things worth fixing that did not stop the write, each with a code and a message: a description missing, too short, made of words that describe every pattern, or left unchanged while the markup moved.',
+			'items'       => array( 'type' => 'object' ),
+		);
+	}
+
+	/**
+	 * A fingerprint of everything update-pattern replaces: the markup and every header or
+	 * field it writes. A caller pins an update to the version it read with this, so a change
+	 * someone else made in between is refused rather than silently overwritten.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern as stored.
+	 * @return string
+	 */
+	private function pattern_hash( $pattern ) {
+		$fields            = $this->summarize( $pattern );
+		$fields['content'] = (string) $pattern->content;
+
+		return hash( 'sha256', (string) wp_json_encode( $fields ) );
 	}
 
 	/**
@@ -2096,7 +2827,7 @@ class Pattern_Builder_Abilities {
 	 * hard-coded into its markup.
 	 */
 	private function register_add_design_tokens() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/add-design-tokens',
 			array(
 				'label'               => __( 'Add design tokens', 'pattern-builder' ),
@@ -2292,7 +3023,7 @@ class Pattern_Builder_Abilities {
 	 * Set the styles a pattern inherits.
 	 */
 	private function register_set_global_styles() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/set-global-styles',
 			array(
 				'label'               => __( 'Set global styles', 'pattern-builder' ),
@@ -2447,7 +3178,7 @@ class Pattern_Builder_Abilities {
 	 * Register the ability that sets the widths a constrained layout measures against.
 	 */
 	private function register_set_layout() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/set-layout',
 			array(
 				'label'               => __( 'Set the layout widths', 'pattern-builder' ),
@@ -2510,7 +3241,7 @@ class Pattern_Builder_Abilities {
 	 * Add a named look a pattern applies with a class.
 	 */
 	private function register_add_block_style_variation() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/add-block-style-variation',
 			array(
 				'label'               => __( 'Add a block style variation', 'pattern-builder' ),
@@ -2613,7 +3344,7 @@ class Pattern_Builder_Abilities {
 	 * What this site already has to illustrate a pattern with.
 	 */
 	private function register_find_media() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/find-media',
 			array(
 				'label'               => __( 'Find media', 'pattern-builder' ),
@@ -2694,7 +3425,7 @@ class Pattern_Builder_Abilities {
 	 * Add an image a pattern needs, in the two forms that fit in JSON.
 	 */
 	private function register_add_asset() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/add-asset',
 			array(
 				'label'               => __( 'Add an asset', 'pattern-builder' ),
@@ -2817,7 +3548,7 @@ class Pattern_Builder_Abilities {
 	 * Draw a placeholder rather than shipping a pattern with no image.
 	 */
 	private function register_add_placeholder_image() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/add-placeholder-image',
 			array(
 				'label'               => __( 'Add a placeholder image', 'pattern-builder' ),
@@ -2903,7 +3634,7 @@ class Pattern_Builder_Abilities {
 	 * What typefaces can be installed, so `add-font` is not a guess.
 	 */
 	private function register_list_fonts() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/list-fonts',
 			array(
 				'label'               => __( 'List installable fonts', 'pattern-builder' ),
@@ -2982,7 +3713,7 @@ class Pattern_Builder_Abilities {
 	 * Install a typeface and register it as a preset.
 	 */
 	private function register_add_font() {
-		wp_register_ability(
+		$this->register(
 			'pattern-builder/add-font',
 			array(
 				'label'               => __( 'Add a font', 'pattern-builder' ),

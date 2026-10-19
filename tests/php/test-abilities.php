@@ -129,6 +129,7 @@ class Test_Abilities extends WP_UnitTestCase {
 			'pattern-builder/list-block-types',
 			'pattern-builder/list-patterns',
 			'pattern-builder/get-pattern',
+			'pattern-builder/list-pattern-usage',
 			'pattern-builder/render-pattern',
 			'pattern-builder/get-authoring-guide',
 			'pattern-builder/get-validator',
@@ -165,7 +166,7 @@ class Test_Abilities extends WP_UnitTestCase {
 	public function test_annotations_map_to_the_methods_we_intend() {
 		$this->require_abilities_api();
 
-		foreach ( array( 'get-design-system', 'list-block-types', 'list-patterns', 'get-pattern', 'render-pattern', 'get-authoring-guide', 'get-validator', 'get-editor-scripts', 'find-media', 'list-fonts' ) as $read ) {
+		foreach ( array( 'get-design-system', 'list-block-types', 'list-patterns', 'get-pattern', 'list-pattern-usage', 'render-pattern', 'get-authoring-guide', 'get-validator', 'get-editor-scripts', 'find-media', 'list-fonts' ) as $read ) {
 			$meta = wp_get_ability( 'pattern-builder/' . $read )->get_meta();
 			$this->assertTrue( $meta['annotations']['readonly'], $read . ' should be readonly (GET).' );
 			$this->assertTrue( $meta['show_in_rest'], $read . ' must be reachable over REST.' );
@@ -1271,9 +1272,9 @@ class Test_Abilities extends WP_UnitTestCase {
 		}
 
 		$this->assertSame(
-			14,
+			15,
 			$skills['pattern-author']['files'],
-			"The pattern-author skill's four scripts travel with its ten documents."
+			"The pattern-author skill's four scripts travel with its eleven documents."
 		);
 		$this->assertSame( 3, $skills['design-reproduction']['files'] );
 	}
@@ -1360,7 +1361,7 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertSame( 'SKILL.md', $skill['entry'] );
 		$this->assertNotEmpty( $skill['description'] );
 		$this->assertNotEmpty( $skill['version'] );
-		$this->assertCount( 14, $skill['files'] );
+		$this->assertCount( 15, $skill['files'] );
 
 		$paths = wp_list_pluck( $skill['files'], 'path' );
 		$this->assertSame( 'SKILL.md', $paths[0], 'The entry is not the first thing an installer writes.' );
@@ -2334,5 +2335,74 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->theme_json = get_stylesheet_directory() . '/theme.json';
 		file_put_contents( $this->theme_json, wp_json_encode( array( 'version' => 3 ) ) );
 		wp_clean_theme_json_cache();
+	}
+
+	/**
+	 * A description that sends an agent to a guide the site cannot serve is worse than none:
+	 * every guide an ability names has to be in the index.
+	 */
+	public function test_every_guide_an_ability_names_can_be_served() {
+		$index = $this->abilities->execute_authoring_guide();
+		$names = wp_list_pluck( $index['guides'], 'name' );
+
+		foreach ( Pattern_Builder_Abilities::GUIDES as $ability => $guides ) {
+			foreach ( $guides as $guide ) {
+				$this->assertContains( $guide, $names, $ability . ' names a guide the index does not have: ' . $guide );
+			}
+		}
+	}
+
+	/**
+	 * The line is on the registered description, worded the one way, and every ability the
+	 * map names exists.
+	 */
+	public function test_an_ability_with_rules_names_its_guide_in_its_description() {
+		$this->require_abilities_api();
+
+		foreach ( Pattern_Builder_Abilities::GUIDES as $ability => $guides ) {
+			$this->assertTrue( wp_has_ability( $ability ), $ability . ' is in the guide map but did not register.' );
+			$this->assertStringEndsWith(
+				Pattern_Builder_Abilities::guide_line( $guides ),
+				wp_get_ability( $ability )->get_description()
+			);
+		}
+
+		$this->assertStringNotContainsString( 'Guide: get-authoring-guide', wp_get_ability( 'pattern-builder/list-block-types' )->get_description() );
+	}
+
+	/**
+	 * render-pattern hands back URLs a browser with no credentials can open, and says for how
+	 * long.
+	 */
+	public function test_rendering_offers_signed_urls() {
+		$id = (string) self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_block',
+				'post_status'  => 'publish',
+				'post_title'   => 'Signed Probe',
+				'post_content' => '<!-- wp:paragraph --><p>Signed.</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$rendered = $this->abilities->execute_render_pattern( array( 'id' => $id ) );
+		$signed   = $rendered['preview']['signed'];
+
+		$this->assertStringContainsString( 'token=', $signed['standalone'] );
+		$this->assertStringContainsString( 'context=page', $signed['page'] );
+		$this->assertArrayHasKey( 'blank-theme', $signed['themes'] );
+		$this->assertSame( TwentyBellows\PatternBuilder\Pattern_Builder_Preview::SIGNED_TTL, $signed['expiresIn'] );
+	}
+
+	/**
+	 * An agent reading over HTTP chooses what to read from the index, so every guide this
+	 * plugin ships says when it is worth reading.
+	 */
+	public function test_every_shipped_guide_says_when_to_read_it() {
+		$index = $this->abilities->execute_authoring_guide();
+
+		foreach ( $index['guides'] as $guide ) {
+			$this->assertArrayHasKey( 'when', $guide, $guide['name'] . ' does not say when to read it.' );
+			$this->assertNotSame( '', trim( $guide['when'] ), $guide['name'] . ' says nothing about when to read it.' );
+		}
 	}
 }

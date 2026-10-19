@@ -1,7 +1,7 @@
 # Abilities — the agent interface
 
-Pattern Builder registers **27 abilities** with WordPress core's Abilities API:
-nineteen in `Pattern_Builder_Abilities` and seven more for the cloud in
+Pattern Builder registers **28 abilities** with WordPress core's Abilities API:
+twenty-one in `Pattern_Builder_Abilities` and seven more for the cloud in
 `Pattern_Builder_Cloud_Abilities` (see [`cloud.md`](cloud.md)). Core exposes the
 registry over REST at `wp-abilities/v1`, and an MCP bridge over that surface
 gets these for free — which is why there is no bespoke agent API here.
@@ -32,9 +32,10 @@ sets it).
 | `get-authoring-guide` | The pattern-authoring documentation as Markdown, and the two skills it makes up, as files to install. |
 | `get-design-system` | The merged presets, the `styles` a pattern inherits, and the `blockStyles` registered here — each marked `portable`. |
 | `list-block-types` | What is registered *on this site*; naming blocks also returns each one's `supports`. |
-| `list-patterns` | Every pattern's summary with its placement headers, any `origin` or `cloud` reference, and the registered pattern categories. `source` narrows it to the theme's files, the database's user patterns, or the read-only ones a plugin registered. |
+| `list-patterns` | Every pattern's summary with its placement headers, any `origin` or `cloud` reference, and the registered pattern categories. `source` narrows it to the theme's files, the database's user patterns, or the read-only ones a plugin registered; `search`, `categories` and `keywords` narrow it further, and `page` with `perPage` pages it. |
 | `get-pattern` | One pattern, whichever of the three sources it comes from. |
-| `render-pattern` | The rendered HTML plus preview URLs — `standalone`, `page`, and `themes` against each lab theme. |
+| `list-pattern-usage` | Every place that places a pattern, directly or through another pattern. |
+| `render-pattern` | The rendered HTML plus preview URLs (`standalone`, `page`, and `themes` against each lab theme), each also `signed` so a browser with no credentials can open it for an hour. |
 | `find-media` | The images a pattern can point at, plus how to upload one. |
 | `list-fonts` | The font collection; naming a `family` describes that one, including whether it has a variable face. |
 | `get-validator` | The validator script itself. |
@@ -50,6 +51,26 @@ button on each button, none of which then follows the destination. Each block
 style is marked `portable`: true for one declared in a block's own `block.json`,
 which ships with WordPress, false for one this site registered, whose
 definition has to be carried.
+
+**`list-patterns` is how an agent finds a pattern before writing one**, and a
+pattern nobody can find gets written again. `search` matches title, name,
+description and keywords, ignoring case; `categories` and `keywords` keep only
+patterns carrying every one asked for. Paging is opt-in: with neither `page`
+nor `perPage` every match comes back, as it always did, and `total` counts the
+matches either way. `keywordsInUse` is every keyword the source carries,
+lowercased and counted before search and the filters, so an agent filters by
+words that exist and tags its own pattern with them rather than a synonym.
+
+**`list-pattern-usage` walks references upward.** `references_of()` in
+`Pattern_File_Store` answers what a pattern places; this answers what places
+it, which is the cost of changing a synced pattern. `Pattern_Builder_Usage`
+first finds the patterns that carry it at any depth (theme, user and plugin
+patterns alike), then the templates and template parts that place any of
+them, then the posts. A place reached through another pattern is marked
+indirect, with that pattern as `via`. Posts are found with a LIKE on each
+carrier's name and confirmed by parsing, so a name mentioned in prose is not a
+use, and only posts the caller may read are counted. Templates and patterns
+come back in full; posts are named up to ten and counted beyond that.
 
 **`list-block-types` reports supports because no validator can.** The classes a
 block's saved markup must carry come from filters that only run inside an
@@ -123,6 +144,71 @@ enforces the bottom-up order the guides prescribe.
 Both writes report a category nothing on the site registered under
 `unregisteredCategories`.
 
+Both also return `warnings`, never refusals, about the description: missing,
+too short to tell two patterns apart (`DESCRIPTION_MIN_WORDS`), or using words
+that describe every pattern (`EMPTY_WORDS`). The description is what an agent
+choosing from `list-patterns`, or a person searching the inserter, has to go
+on, and a pattern nobody can find gets written again. Only a description the
+write sets is judged, since an edit is no occasion to re-judge prose its author
+never wrote; an update that moves the markup under an unchanged description
+gets `description_unchanged` instead, as something worth a look. The guidance
+on writing one is in `pattern-kinds.md`.
+
+The reference check above runs when the *referencing* markup is written. The
+same failure can arrive from the other side: an update that removes or renames
+a slot sends every reference that filled it back to the pattern's own words.
+So `update-pattern` compares the slot names before and after
+(`Pattern_Builder_Markup_Checks::slot_names()`), asks `Pattern_Builder_Usage`
+which places fill a removed one (every post, not just the ten a listing
+names), and refuses with `pb_slots_still_filled`, naming each place and key. A
+rename is reported as what it is, a removal plus an addition. A caller that
+means it lists the slots in `dropSlots`; the write goes through and the answer
+carries `reverted`, the places that now show placeholder copy. Saves from the
+editor are not checked.
+
+## Pinning an update to what was read
+
+`update-pattern` replaces a pattern whole, and the pattern can change between an
+agent's read and its write: a person saves it in the editor, another agent
+updates it, or the read is simply old. So `get-pattern`, and the answer to
+either write, carry a `hash` taken over everything an update replaces (the
+summary `summarize()` builds plus the markup), and `update-pattern` takes it
+back as `expectedHash`. When the stored pattern no longer matches, nothing is
+written and the error, `pb_pattern_changed` with a 409, carries `currentHash`
+so the caller can read again and redo its change on what is there now.
+
+The hash is taken from the pattern as re-read after the write, because the
+file store formats markup on the way to disk: hashing what was sent would hand
+back a value the next read never matches. `expectedHash` is optional, so an
+older caller keeps working, and the guides tell agents to send it.
+
+An update also answers `changed`, false when the stored pattern is exactly
+what it was. That stays a success, since the ability is annotated idempotent,
+but it is usually the sign of an edit that did not say what it meant.
+
+## Changing part of a pattern
+
+Sending a long page pattern back whole to change one class costs tokens and
+invites changes nobody asked for: an attribute reserialised differently, a
+slot name retyped wrong. So `update-pattern` takes `edits` as an alternative
+to `content`, a list of `{ old, new, replaceAll }` applied in order to one copy
+of the stored markup by `Pattern_Builder_Abilities::apply_edits()`.
+
+- Each `old` must match exactly once unless `replaceAll` is set. An exact
+  match is tried first, then one that lets any run of whitespace stand for any
+  other, since an agent copying a fragment out of formatted markup rarely
+  keeps its indentation.
+- A fragment that matches nothing or more than once refuses every edit, with
+  `pb_edit_refused` naming the edit and, for an ambiguous one, the lines it
+  matched. One failure writes nothing.
+- `edits` requires `expectedHash`: a fragment only means something against the
+  version it was cut from.
+- The edited result goes through the same markup checks as content sent
+  whole. Block validity is still the caller's to check, on the result.
+
+Content and edits together are refused, and so is an update with neither. The
+input schema cannot say "one of", so the ability does.
+
 ## Two things deliberately absent
 
 **Nothing takes a prompt.** An `execute_callback` that turned a description
@@ -181,6 +267,13 @@ They are **two skills, split by posture rather than by subject**:
   variations), and verifies it numerically before comparing a rendered page. It
   loads `pattern-author` alongside rather than restating it.
 
+The references are long and one pattern needs few of them, so each `SKILL.md`
+opens its workflow with a table of what to read before each step and what only
+in a named case, pointing rather than restating so every fact keeps one home.
+The index gives the same choice to an agent reading over HTTP: each shipped
+guide's entry carries a one-line `when` beside its word count, and a guide a
+theme adds through the filter carries none.
+
 The set is filtered before it is served (`pattern_builder_authoring_guides`), so
 a theme can amend a shipped guide or add house rules. The filter deals in text
 rather than file paths, so a supplied guide needs no filesystem access and no
@@ -191,6 +284,15 @@ the three writes to run the check before (`create-pattern`, `update-pattern`,
 `upload-pattern`): an agent that goes straight to a write reads no guide, so
 the one step it cannot afford to skip sits where anyone asking what to read
 sees it first. A test asserts the abilities it names are registered.
+
+That block only reaches an agent that opened the index, though, and the one
+text every MCP client puts in front of a model when it picks a tool is that
+tool's description. So every ability with rules ends its description with the
+same line naming the guide to read first, built in one place:
+`Pattern_Builder_Abilities::GUIDES` maps each ability to its guides, and the
+private `register()` every registration goes through appends
+`guide_line()`. Reads that need no rules carry no line, and a test asserts
+that every guide the map names is one the index can serve.
 
 `copy-plugin-pattern` is a write and is deliberately not among them. The markup
 it stores is the plugin's, copied as it stands, and the checks exist to stop an

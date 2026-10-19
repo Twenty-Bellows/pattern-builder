@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.0.0
+  version: 1.11.0
 ---
 
 # Authoring block patterns
@@ -45,6 +45,25 @@ styles because a style referencing an unresolvable slug renders as nothing.
 
 ## Workflow
 
+### What to read, step by step
+
+The references below are long, and a single pattern needs few of them. Read
+what a step requires before it, the rest only in the case named, and nothing
+else. Each fact lives in one of them; this table only points.
+
+| Step | Read before it | Only when |
+|---|---|---|
+| 1. Orient | nothing more | `references/abilities.md` if you reach the site over HTTP; `references/changing-patterns.md` if the site already has patterns; `references/design-system.md` if you set colour, type, spacing or layout beyond the shared presets, or install a design system |
+| 2. Vocabulary | nothing more | `references/block-vocabulary.md` for a block beyond paragraph, heading, image, button, group and columns, or a destination other than this site |
+| 3. Kind | nothing more | `references/pattern-kinds.md` for any kind but a plain design pattern; `references/design-content-split.md` for a synced pattern with slots or the page that fills it |
+| 4. Factor | `references/composition.md` for anything bigger than one section | |
+| 5. Generate | nothing more | `references/block-markup.md` if you cannot run Node; `references/assets.md` if the pattern needs an image or a typeface |
+| 6. Validate | `references/design-content-split.md` if the pattern has slots or fills them | |
+| 7. Place | nothing more | `references/pattern-kinds.md` for the headers, and how to write a description and keywords someone can find it by |
+
+`references/keeping-current.md` is for maintaining these guides, not for
+writing a pattern.
+
 ### 1. Orient
 
 Never invent colors, spacing, or font sizes — and never reference a preset the
@@ -77,6 +96,13 @@ colour, the `small`…`xx-large` ladder for type, and spacing steps `40`–`60`.
 Check anything else before using it. It also says the thing hardest to see from
 markup: what the site already styles is what the pattern inherits, so restating
 it is how a pattern stops adapting.
+
+**Then look for the pattern before you write it.** On a site that already has
+patterns, what you are asked for is often close to one that exists. Search
+`list-patterns` (`search`, `keywords`), read what comes back, and decide
+whether to reuse it, add a slot or a variation to it, copy it, or write a new
+one. Before changing one that pages use, `list-pattern-usage` says what the
+change reaches. `references/changing-patterns.md` has the order and the cost.
 
 ### 2. Establish the vocabulary
 
@@ -303,6 +329,24 @@ It reports which slots took their value and which still show placeholder copy.
 Also check the rules in `references/design-content-split.md` — malformed
 attributes there leave a *valid* block behind.
 
+**Then use it, not only look at it.** Everything above is about structure and
+values. None of it notices a navigation overlay that will not open, a details
+block that will not toggle, a focus outline the design took away, or text that
+fails contrast on its band, and every one of those passes. Open the `signed`
+page URL `render-pattern` hands back, which opens in any browser, and:
+
+- click what moves: the navigation overlay open and closed, details, search;
+- Tab through it: focus visible on every link and button, a sensible order,
+  and Escape closing an open overlay;
+- read the console, where an error is a defect;
+- check text contrast against the nearest painted background, AA at least, on
+  every band rather than only the first;
+- do it at about 390px, 768px and 1440px wide, and just above the width where
+  the navigation collapses, which is where it most often overflows.
+
+A pattern with nothing that moves has less to click, but focus and contrast
+apply to every one.
+
 ### 7. Place it
 
 A theme pattern is a PHP file in `patterns/` with a header comment:
@@ -321,7 +365,8 @@ A theme pattern is a PHP file in `patterns/` with a header comment:
 ```
 
 `Title` and `Slug` are required and the slug must be namespaced.
-`references/pattern-kinds.md` lists which other headers each kind needs.
+`references/pattern-kinds.md` lists which other headers each kind needs, and
+how to write a `Description` and `Keywords` someone can find the pattern by.
 `Categories` names slugs the site has **registered** — core's own, or the
 theme's through `register_block_pattern_category()`; an unregistered slug files
 the pattern under Uncategorized, where nobody looks.
@@ -415,6 +460,7 @@ said to extend the system, add it with `pattern-builder/add-design-tokens`
 - `references/block-markup.md` — the attribute-to-markup contract per block, for hand-writing and for debugging
 - `references/composition.md` — factoring into elements, sections and pages
 - `references/design-content-split.md` — Pattern Overrides slots and their silent failures
+- `references/changing-patterns.md`: reusing, extending or copying a pattern that already exists, and what a change to one costs
 - `references/assets.md` — images and fonts
 - `references/abilities.md` — asking a running site for what it has
 - `references/keeping-current.md` — bringing these guides to a new WordPress release
