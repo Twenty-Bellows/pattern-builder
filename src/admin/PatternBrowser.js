@@ -12,6 +12,7 @@ import { BlockEditorProvider } from '@wordpress/block-editor';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { store as coreStore } from '@wordpress/core-data';
 import { store as noticesStore } from '@wordpress/notices';
+import { getQueryArg } from '@wordpress/url';
 
 import { fetchAllPatterns, fetchPluginPatterns } from '../utils/resolvers';
 import { tileUrls } from '../utils/tileKey';
@@ -27,6 +28,7 @@ import {
 	CLOUD_LIBRARY,
 	CLOUD_DIRECTORY,
 } from '../cloud/CloudBrowser';
+import { AgentsTab } from './AgentsTab';
 
 const ALL = 'all';
 const UNCATEGORIZED = 'uncategorized';
@@ -51,20 +53,42 @@ const COLLECTIONS = [
 const CLOUD_COLLECTIONS = [ UPLOADED, COMMUNITY ];
 
 /**
- * The collection tabs: which library the grid is showing.
+ * The tab after the collections, which is about connecting an agent rather than a library.
+ */
+const AGENTS = 'agents';
+
+const TABS = [
+	...COLLECTIONS,
+	{ key: AGENTS, label: __( 'Agents', 'pattern-builder' ) },
+];
+
+/**
+ * The tab to open on: the one the URL's `tab` names, so a page that reloads itself (the
+ * Agents tab, after installing the adapter) comes back to it, or Theme.
+ *
+ * @return {string} A tab key.
+ */
+function initialTab() {
+	const requested = getQueryArg( window.location.href, 'tab' );
+
+	return TABS.some( ( item ) => item.key === requested ) ? requested : THEME;
+}
+
+/**
+ * The tabs: which library the grid is showing, or the Agents tab.
  *
  * @param {Object}   props          Component props.
- * @param {string}   props.active   Active collection key.
- * @param {Function} props.onSelect Called with a collection key.
+ * @param {string}   props.active   Active tab key.
+ * @param {Function} props.onSelect Called with a tab key.
  */
 function CollectionTabs( { active, onSelect } ) {
 	return (
 		<div
 			className="pattern-builder-browser__tabs"
 			role="tablist"
-			aria-label={ __( 'Pattern collections', 'pattern-builder' ) }
+			aria-label={ __( 'Pattern Builder sections', 'pattern-builder' ) }
 		>
-			{ COLLECTIONS.map( ( item ) => (
+			{ TABS.map( ( item ) => (
 				<button
 					key={ item.key }
 					type="button"
@@ -122,28 +146,31 @@ function CategoryRail( { categories, active, onSelect } ) {
 }
 
 /**
- * The browse screen: a header with the five collection tabs, a category rail scoped to the
- * active tab (none on Directory, whose landing is its collections), a grid, and a details
- * sidebar that is always present — read-only on Plugin, whose patterns belong to a plugin.
+ * The browse screen: a header with the five collection tabs and the Agents tab, a category
+ * rail scoped to the active tab (none on Directory, whose landing is its collections, or on
+ * Agents), a grid, and a details sidebar that is always present — read-only on Plugin, whose
+ * patterns belong to a plugin.
  *
  * @param {Object}   props                Component props.
  * @param {Function} props.onEdit         Called with the pattern to open its editor.
  * @param {Object}   props.editorSettings Block editor settings, for the details panels.
  * @param {string}   props.tileBase       Where the site draws the grid's tiles.
  * @param {string}   props.designVersion  What every tile's render depends on.
+ * @param {Object}   props.agents         What connecting an agent to this site needs.
  */
 export function PatternBrowser( {
 	onEdit,
 	editorSettings,
 	tileBase,
 	designVersion,
+	agents,
 } ) {
 	const [ patterns, setPatterns ] = useState( null );
 	// Null until the Plugin tab is first opened: a pattern plugin can register hundreds, and
 	// the other tabs never want them.
 	const [ pluginPatterns, setPluginPatterns ] = useState( null );
 	const [ search, setSearch ] = useState( '' );
-	const [ collection, setCollection ] = useState( THEME );
+	const [ collection, setCollection ] = useState( initialTab );
 	const [ category, setCategory ] = useState( ALL );
 	const [ cloudCollections, setCloudCollections ] = useState( [] );
 	const [ selectedId, setSelectedId ] = useState( null );
@@ -158,6 +185,7 @@ export function PatternBrowser( {
 
 	const isCloud = CLOUD_COLLECTIONS.includes( collection );
 	const isPlugin = collection === PLUGIN;
+	const isAgents = collection === AGENTS;
 
 	const refresh = useCallback( () => {
 		fetchAllPatterns()
@@ -363,13 +391,18 @@ export function PatternBrowser( {
 					/>
 
 					<div className="pattern-builder-browser__header-actions">
-						<SearchControl
-							__nextHasNoMarginBottom
-							className="pattern-builder-browser__search"
-							value={ search }
-							onChange={ setSearch }
-							label={ __( 'Search patterns', 'pattern-builder' ) }
-						/>
+						{ ! isAgents && (
+							<SearchControl
+								__nextHasNoMarginBottom
+								className="pattern-builder-browser__search"
+								value={ search }
+								onChange={ setSearch }
+								label={ __(
+									'Search patterns',
+									'pattern-builder'
+								) }
+							/>
+						) }
 						<Button
 							variant="primary"
 							icon={ addTemplate }
@@ -381,8 +414,7 @@ export function PatternBrowser( {
 				</header>
 
 				<div className="pattern-builder-browser__body">
-					{  }
-					{ collection !== COMMUNITY && (
+					{ collection !== COMMUNITY && ! isAgents && (
 						<aside className="pattern-builder-browser__sidebar">
 							<CategoryRail
 								categories={ categories }
@@ -410,7 +442,13 @@ export function PatternBrowser( {
 						/>
 					) }
 
-					{ ! isCloud && (
+					{ isAgents && (
+						<main className="pattern-builder-browser__main">
+							<AgentsTab agents={ agents } />
+						</main>
+					) }
+
+					{ ! isCloud && ! isAgents && (
 						<>
 							<main className="pattern-builder-browser__main">
 								{ isLoadingPlugins && <Spinner /> }

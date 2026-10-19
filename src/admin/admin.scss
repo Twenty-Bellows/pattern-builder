@@ -247,6 +247,118 @@ body.appearance_page_pattern-builder {
 	}
 }
 
+// ---- Agents tab: readiness, a connection to paste into Claude, and the
+// connections made so far. A reading column, not a grid. ----
+
+.pattern-builder-agents {
+	max-width: 760px;
+
+	h2 {
+		margin-top: 0;
+		font-size: 20px;
+	}
+
+	h3 {
+		margin: 32px 0 12px;
+		font-size: 14px;
+	}
+
+	&__checks {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+	}
+
+	&__check {
+		display: flex;
+		align-items: flex-start;
+		gap: 12px;
+		margin: 0;
+		padding: 12px 16px;
+
+		& + & {
+			border-top: 1px solid #ddd;
+		}
+
+		> svg {
+			flex: 0 0 auto;
+			fill: currentcolor;
+		}
+
+		&.is-ok > svg {
+			color: #00a32a;
+		}
+
+		&.is-blocked > svg {
+			color: #b26200;
+		}
+
+		p {
+			margin: 4px 0 8px;
+		}
+	}
+
+	&__check-detail {
+		color: #50575e;
+	}
+
+	&__create {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 12px;
+
+		.components-base-control {
+			width: 100%;
+			max-width: 360px;
+		}
+	}
+
+	&__created {
+		padding: 16px;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		background: #f8f8f8;
+
+		p:first-child {
+			margin-top: 0;
+		}
+	}
+
+	&__message {
+		width: 100%;
+		font-family: Menlo, Consolas, monospace;
+		font-size: 12px;
+	}
+
+	&__created-actions {
+		display: flex;
+		gap: 8px;
+		margin: 12px 0;
+	}
+
+	&__accepted {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin: 0;
+
+		&.is-ok svg {
+			fill: #00a32a;
+		}
+	}
+
+	&__connections {
+		max-width: 760px;
+	}
+
+	&__note {
+		color: #50575e;
+	}
+}
+
 // ---- Pattern cards: uniform 1:1 previews. ----
 
 .pattern-builder-card {

@@ -58,6 +58,11 @@ The adapter is never bundled: 0.7.0 deprecated that in favour of the plugin.
 - **The calling convention above stops mattering.** The adapter picks the
   method and supplies the `input` wrapper.
 
+The Agents tab on the browse page is how a person connects one: it checks the
+adapter and Application Passwords, creates the password, and hands over a
+message for Claude to set the connection up from
+([architecture](architecture.md#the-agents-tab)).
+
 What MCP does not carry is what no ability carries: a file, which goes to the
 assets route as a request body, and the validator, which runs where the agent
 runs. An agent with a shell reaches both with curl and an Application Password,

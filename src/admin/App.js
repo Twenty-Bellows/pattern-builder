@@ -20,6 +20,7 @@ export function PatternBuilderAdminApp( { settings } ) {
 			editorSettings={ settings.editorSettings || {} }
 			tileBase={ settings.tileBase || '' }
 			designVersion={ settings.designVersion || '' }
+			agents={ settings.agents }
 		/>
 	);
 }

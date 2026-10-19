@@ -202,7 +202,8 @@ this screen to users who can already edit the pattern.
 
 Appearance → Pattern Builder is a Site-Editor-style library: a header with five
 collection tabs (Theme, User, Plugin, Uploaded, Directory — the last two served
-by the cloud browser), each with its own search and category rail, over a grid
+by the cloud browser) and an Agents tab ([below](#the-agents-tab)), each
+collection with its own search and category rail, over a grid
 of fixed-size square tiles, plus an always-present details sidebar: an Edit
 action that opens the pattern's own editor, over the Source and Actions panels.
 Those two act on the pattern as they are used rather than staging an edit, so
@@ -316,6 +317,47 @@ colon cannot occur in a cloud name, every segment of which is a slug, so the
 rule is exact and states itself: **an origin carrying a scheme never leaves
 this site**. `Pattern_File_Store::is_cloud_origin()` is that rule, and the
 porter asks it before putting an origin in a package.
+
+## The Agents tab
+
+The last tab connects Claude to the site over MCP (see
+[`abilities.md`](abilities.md#over-mcp)) for someone who has never configured an
+MCP client and may never open a terminal. It adds no REST routes: everything it
+does goes through core's.
+
+- **Readiness** comes from `Pattern_Builder_Mcp::client_state()`, printed with
+  the page's settings: whether the Abilities API exists, whether the MCP
+  Adapter runs (its version, and the plugin bundling it when that is not the
+  adapter's own), and whether Application Passwords are offered — `insecure`
+  when the site is not on https and not local, `disabled` when filtered off. A
+  missing or inactive adapter is installed or activated through core's
+  `/wp/v2/plugins` route by someone who may, after which the page reloads with
+  `tab=agents` so it comes back to the tab rather than to Theme.
+- **A connection is an Application Password** created for the current user
+  through core's `/wp/v2/users/me/application-passwords`, carrying
+  `Pattern_Builder_Mcp::APP_ID`. That `app_id` is how the tab lists only its own
+  connections, with the created and last-used times core records, and revokes
+  them through the same route.
+- **The person never handles the key.** `src/admin/agentConnect.js` turns login
+  and password into the `Authorization` header and wraps it in a message to
+  paste into Claude, which sets the connection up itself with `claude mcp add`.
+  The server is named after the site's address
+  (`Pattern_Builder_Mcp::server_name()`), since one person connects many sites.
+  The password is shown once, as core only returns it once.
+- **It is saved for the folder only, outside it.** The message prescribes
+  Claude Code's local scope, which files the server under the folder's path in
+  Claude Code's own settings, and tells Claude to ask before putting the
+  password in any file in the folder. The key is an administrator's password
+  for the site, and a project folder is what gets committed, synced and shared,
+  while a user-wide server would put every site's tools in every session.
+  Because the person will not find it in the folder, Claude is asked to say
+  where it went and how to disconnect: the tab's own revoke, or removing the
+  server. The price is that renaming or moving the folder disconnects it.
+- **The key is tried before the person leaves.** Right after creating it, the
+  tab calls the endpoint with the new header and no cookies, because some hosts
+  strip `Authorization` before WordPress sees it, and that failure would
+  otherwise surface only in Claude. The call counts as a use, so the
+  connection's last-used time starts at its creation.
 
 ## Creating a pattern
 
