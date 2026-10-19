@@ -369,13 +369,14 @@ regardless.
 Reading a guide and keeping one are different jobs, and the ability answers
 both. Reading is by name (`input[guide]`). Keeping is by skill
 (`input[skill]`), which answers with a manifest — every file the skill is made
-of, each with the path to write it at, its size and its checksum — and an
-`install` recipe. Files are then fetched by path (`input[file]`), because an
+of, each with the path to write it at, its size, its checksum and a signed
+`url` — and an `install` recipe. Files are addressed by path, because an
 installer needs the layout: every one of these documents names the others by
 relative path, so a copy that flattened them would have a dangling link on
 every page. A path from a caller never reaches the filesystem; it is looked up
 in the skill's own inventory, so nothing can be named that the site was not
-already offering.
+already offering. One file can also be read through the ability
+(`input[file]`), but that is for looking, not installing.
 
 A theme's filtered guide may carry a `path` too, which puts it in a shipped
 skill's layout and makes it install alongside the rest — a house reference
@@ -384,12 +385,28 @@ installer chose: one that climbs out is dropped rather than corrected, leaving
 that guide where a guide with no place in a layout belongs, in the flat index
 and part of no skill.
 
-The recipe fetches each file straight to disk, so the bytes never pass through
-the agent's context — the same reason an image is uploaded as a request body
-rather than base64 inside JSON. The entry file also comes back with
-`frontmatter` to write above it: the name and description that make the skill
-trigger, which the prose alone does not carry, plus the site it came from and
-the skill's checksum.
+**The recipe is the commands themselves, and they need no credentials.** It
+downloads each file straight to disk, so the bytes never pass through the
+agent's context — the same reason an image is uploaded as a request body
+rather than base64 inside JSON — and ends by checking every file against the
+sha256 of what was served, with `sha256sum -c -` or `shasum -a 256 -c -`, the
+one form GNU, BSD and Perl's tools all read from stdin. The downloads are
+signed links to `/pattern-builder/v1/skills/{skill}/{path}`, signed as preview
+links are (an HMAC over the skill and an expiry an hour out, keyed from the
+site's salts) and good for that skill only. They have to be: an agent connected
+over MCP holds no password, because the Agents tab leaves it in the client's
+own settings, and an agent that went to read it from there would be stopped by
+its permissions, rightly. Before this, that left fetching every file through
+the ability, about 190 KB per skill passing through the model twice; the
+manifest an agent reads now is a few thousand tokens. The route answers with
+the file itself rather than JSON (`serve_skill_download()`), so `curl -o`
+writes exactly what the checksum covers.
+
+The entry file is served with `frontmatter` above its prose: the name and
+description that make the skill trigger, which the prose alone does not carry,
+plus the site it came from and the skill's checksum. That is why the recipe's
+check is against what was served, not against the manifest's per-file
+checksums, which cover the prose alone.
 
 A skill's **scripts travel with it**, `check-slots.php` included. That one runs
 under WP-CLI rather than Node, which is why `get-validator` does not carry it —

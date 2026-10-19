@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.12.0
+  version: 1.13.0
 ---
 
 # Authoring block patterns
@@ -483,18 +483,16 @@ theme amends them through the `pattern_builder_authoring_guides` filter, so
 what a site serves is its house rules as well as the plugin's documents, and
 those are the part general documentation cannot know.
 
-To see whether the copy still matches:
+To see whether the copy still matches, ask that site's `get-authoring-guide`
+for its index — the `pattern-builder-get-authoring-guide` tool when you are
+connected over MCP — and compare the `checksum` it lists under `skills` for
+`pattern-author` with the one recorded above.
 
-```bash
-curl -fsS -u "$WP_USER:$WP_APP_PASSWORD" \
-  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-authoring-guide/run" \
-  | jq -r '.skills[] | select(.name == "pattern-author") | .checksum'
-```
-
-Different from the one recorded above, ask the same ability for
-`input[skill]=pattern-author` and run the `install` recipe it answers with. It
-overwrites, which is the whole contract — there is nothing here to merge and
-no local edit to keep. A change worth keeping belongs in the theme, behind
+Different, ask the same ability for the skill, `{"skill": "pattern-author"}`,
+and run the commands its `install` answers with, as they stand. They download
+every file by signed link, straight to disk, and need no password: never read
+one out of your client's configuration for this. It overwrites, which is the
+whole contract — there is nothing here to merge and no local edit to keep. A change worth keeping belongs in the theme, behind
 that filter, where it reaches every agent that asks the site instead of this
 one checkout.
 

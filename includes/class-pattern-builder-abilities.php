@@ -53,6 +53,11 @@ class Pattern_Builder_Abilities {
 	const DESCRIPTION_MIN_WORDS = 12;
 
 	/**
+	 * How long a skill's download links open for, in seconds.
+	 */
+	const SKILL_LINK_TTL = 3600;
+
+	/**
 	 * Hook the component into WordPress.
 	 */
 	public function __construct() {
@@ -62,6 +67,147 @@ class Pattern_Builder_Abilities {
 
 		add_action( 'wp_abilities_api_categories_init', array( $this, 'register_category' ) );
 		add_action( 'wp_abilities_api_init', array( $this, 'register_abilities' ) );
+		add_action( 'rest_api_init', array( $this, 'register_skill_route' ) );
+		add_filter( 'rest_pre_serve_request', array( $this, 'serve_skill_download' ), 10, 3 );
+	}
+
+	/**
+	 * The route a skill's files download from, by signed link. An agent connected over MCP
+	 * keeps its password in its client's settings, out of its own reach, so the files of a
+	 * skill have to be fetchable without one — and fetched by a command rather than through
+	 * the agent, so they never pass through its context.
+	 */
+	public function register_skill_route() {
+		register_rest_route(
+			Pattern_Builder_Preview::REST_NAMESPACE,
+			'/skills/(?P<skill>[a-z0-9-]+)/(?P<file>[A-Za-z0-9._/-]+)',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'download_skill_file' ),
+				'permission_callback' => array( $this, 'skill_link_holds' ),
+				'args'                => array(
+					'expires' => array(
+						'type'        => 'integer',
+						'required'    => true,
+						'description' => __( 'When the link stops opening, as a Unix timestamp. Part of what the token signs.', 'pattern-builder' ),
+					),
+					'token'   => array(
+						'type'        => 'string',
+						'required'    => true,
+						'description' => __( 'The signature that lets this link open without signing in, for this skill only, until it expires.', 'pattern-builder' ),
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Whether a download carries a signature, unexpired, for the skill it asks for.
+	 *
+	 * @param \WP_REST_Request $request The download request.
+	 * @return bool
+	 */
+	public function skill_link_holds( $request ) {
+		$token   = (string) $request->get_param( 'token' );
+		$expires = (int) $request->get_param( 'expires' );
+
+		if ( '' === $token || $expires < time() ) {
+			return false;
+		}
+
+		return hash_equals( self::sign_skill_link( (string) $request->get_param( 'skill' ), $expires ), $token );
+	}
+
+	/**
+	 * The signature over one skill's links. Keyed with the site's own salts, as preview links
+	 * are, so changing them revokes every link handed out.
+	 *
+	 * @param string $skill   Skill name.
+	 * @param int    $expires Unix timestamp.
+	 * @return string
+	 */
+	private static function sign_skill_link( $skill, $expires ) {
+		return hash_hmac( 'sha256', $skill . "\n" . $expires, wp_salt( 'auth' ) . 'pattern-builder-skill' );
+	}
+
+	/**
+	 * A signed link to one file of a skill.
+	 *
+	 * @param string $skill   Skill name.
+	 * @param string $path    The file's path in the skill.
+	 * @param int    $expires Unix timestamp.
+	 * @return string
+	 */
+	private static function skill_file_url( $skill, $path, $expires ) {
+		$route = Pattern_Builder_Preview::REST_NAMESPACE . '/skills/' . $skill . '/' . implode( '/', array_map( 'rawurlencode', explode( '/', $path ) ) );
+
+		return add_query_arg(
+			array(
+				'expires' => $expires,
+				'token'   => self::sign_skill_link( $skill, $expires ),
+			),
+			rest_url( $route )
+		);
+	}
+
+	/**
+	 * One file of a skill, exactly as it lands on disk.
+	 *
+	 * @param \WP_REST_Request $request The download request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function download_skill_file( $request ) {
+		$served = $this->serve_skill(
+			sanitize_key( (string) $request->get_param( 'skill' ) ),
+			(string) $request->get_param( 'file' ),
+			$this->guides()
+		);
+
+		if ( is_wp_error( $served ) ) {
+			return $served;
+		}
+
+		$response = new \WP_REST_Response( self::bytes_on_disk( $served ), 200 );
+		$response->header( 'Content-Type', 'text/plain; charset=utf-8' );
+		$response->header( 'X-Robots-Tag', 'noindex' );
+		$response->header( 'Cache-Control', 'no-store' );
+
+		return $response;
+	}
+
+	/**
+	 * Send a skill download as the file itself rather than as JSON, so a plain `curl -o`
+	 * writes exactly what the checksum covers.
+	 *
+	 * @param bool              $served  Whether the request has already been served.
+	 * @param \WP_HTTP_Response $result  The response.
+	 * @param \WP_REST_Request  $request The request.
+	 * @return bool
+	 */
+	public function serve_skill_download( $served, $result, $request ) {
+		$route = '/' . Pattern_Builder_Preview::REST_NAMESPACE . '/skills/';
+
+		if ( $served || ! $request instanceof \WP_REST_Request || 0 !== strpos( $request->get_route(), $route ) ) {
+			return $served;
+		}
+
+		if ( ! $result instanceof \WP_HTTP_Response || 200 !== $result->get_status() || ! is_string( $result->get_data() ) ) {
+			return $served;
+		}
+
+		echo $result->get_data(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- A text file, sent as text/plain.
+
+		return true;
+	}
+
+	/**
+	 * What one file of a skill is on disk: its text, under the front matter the entry carries.
+	 *
+	 * @param array $served A file as serve_skill_file() hands it over.
+	 * @return string
+	 */
+	private static function bytes_on_disk( $served ) {
+		return ( isset( $served['frontmatter'] ) ? $served['frontmatter'] : '' ) . $served['content'];
 	}
 
 	/**
@@ -1028,12 +1174,12 @@ class Pattern_Builder_Abilities {
 						),
 						'files'       => array(
 							'type'        => 'array',
-							'description' => 'On a skill: every file it is made of, each with the path to write it at, its size and its checksum.',
+							'description' => 'On a skill: every file it is made of, each with the path to write it at, its size, its checksum and a signed url to download it from, which opens for an hour without credentials.',
 							'items'       => array( 'type' => 'object' ),
 						),
 						'install'     => array(
 							'type'        => 'string',
-							'description' => 'On a skill: where a copy belongs, the loop that writes one, and how to tell later that it has gone stale.',
+							'description' => 'On a skill: where a copy belongs, the commands that download it by signed link and check it, needing no credentials, and how to tell later that it has gone stale.',
 						),
 						'frontmatter' => array(
 							'type'        => 'string',
@@ -1334,15 +1480,28 @@ class Pattern_Builder_Abilities {
 			return $this->serve_skill_file( $skill, $file, $entry, $files, $guides );
 		}
 
+		$checksum = $this->skill_checksum( $files );
+		$expires  = time() + self::SKILL_LINK_TTL;
+		$on_disk  = array();
+
+		foreach ( $files as $index => $row ) {
+			$files[ $index ]['url'] = self::skill_file_url( $skill, $row['path'], $expires );
+
+			$served = $this->serve_skill_file( $skill, $row['path'], $entry, $files, $guides );
+			if ( ! is_wp_error( $served ) ) {
+				$on_disk[ $row['path'] ] = hash( 'sha256', self::bytes_on_disk( $served ) );
+			}
+		}
+
 		return array(
 			'name'        => $skill,
 			'title'       => $entry['title'],
 			'description' => $entry['description'],
 			'version'     => $entry['version'],
 			'entry'       => self::SKILL_ENTRY,
-			'checksum'    => $this->skill_checksum( $files ),
+			'checksum'    => $checksum,
 			'files'       => $files,
-			'install'     => $this->install_recipe( $skill ),
+			'install'     => $this->install_recipe( $skill, $files, $on_disk ),
 		);
 	}
 
@@ -1473,51 +1632,83 @@ class Pattern_Builder_Abilities {
 	}
 
 	/**
-	 * How to put a skill where a harness will find it.
+	 * How to put a skill where a harness will find it: the commands themselves, links and
+	 * checksums already in them, to run as they stand.
 	 *
 	 * Not translated, deliberately, as the validator's usage is not: this is a
-	 * command line recipe rather than interface copy. It fetches each file
+	 * command line recipe rather than interface copy. It downloads each file
 	 * straight to disk, so the bytes never pass through the agent's context —
 	 * the same reason an image is uploaded as a request body rather than as
-	 * base64 inside JSON.
+	 * base64 inside JSON. The links are signed, because an agent connected over
+	 * MCP holds no password to send, and the one it could find is in its
+	 * client's settings, which is not its to read.
 	 *
-	 * @param string $skill Skill name.
+	 * @param string $skill   Skill name.
+	 * @param array  $files   The skill's inventory, each with its signed `url`.
+	 * @param array  $on_disk sha256 of each file as written, by path.
 	 * @return string
 	 */
-	private function install_recipe( $skill ) {
-		$run = rest_url( 'wp-abilities/v1/abilities/pattern-builder/get-authoring-guide/run' );
+	private function install_recipe( $skill, $files, $on_disk ) {
+		$dest        = '.claude/skills/' . $skill;
+		$directories = array( '"$DEST"' );
+		$downloads   = array();
+		$sums        = array();
+
+		foreach ( $files as $file ) {
+			$directory = dirname( $file['path'] );
+			if ( '.' !== $directory ) {
+				$directories[] = '"$DEST/' . $directory . '"';
+			}
+			$downloads[] = 'curl -fsS -o "$DEST/' . $file['path'] . '" "' . $file['url'] . '"';
+
+			if ( isset( $on_disk[ $file['path'] ] ) ) {
+				$sums[] = $on_disk[ $file['path'] ] . '  ' . $file['path'];
+			}
+		}
 
 		return implode(
 			"\n",
-			array(
-				'Install this where your harness reads instructions from: .claude/skills/' . $skill . '/',
-				'for Claude Code, otherwise an AGENTS.md, a rules file or a system prompt. Worth',
-				'doing when pattern work on this project will recur. For a one-off, read the',
-				'guides and install nothing.',
-				'',
-				'Write every file at the path the manifest gives it. Each one names the others by',
-				'relative path, so a copy that flattens them has a dangling link on every page.',
-				'',
-				'  RUN="' . $run . '"',
-				'  DEST=.claude/skills/' . $skill,
-				'',
-				'  for f in $(curl -fsS -u "$WP_USER:$WP_APP_PASSWORD" -G \\',
-				'    --data-urlencode "input[skill]=' . $skill . '" "$RUN" | jq -r ".files[].path"); do',
-				'    mkdir -p "$DEST/$(dirname "$f")"',
-				'    curl -fsS -u "$WP_USER:$WP_APP_PASSWORD" -G \\',
-				'      --data-urlencode "input[skill]=' . $skill . '" \\',
-				'      --data-urlencode "input[file]=$f" "$RUN" \\',
-				'      | jq -r \'(.frontmatter // "") + .content\' > "$DEST/$f"',
-				'  done',
-				'',
-				'Staying current: SKILL.md records this site and the skill\'s checksum under',
-				'metadata. Ask this ability for the index, compare skills[].checksum against the',
-				'recorded one, and run the loop again when they differ. It overwrites, which is',
-				'the whole contract — there is no merge and no local edit to preserve. A change',
-				'worth keeping belongs in the theme, through the pattern_builder_authoring_guides',
-				'filter, where it reaches every agent that asks this site rather than one',
-				'checkout; the checksum covers what that filter returns, so a house rule added',
-				'there is itself a reason this reads as out of date.',
+			array_merge(
+				array(
+					'Install this where your harness reads instructions from: ' . $dest . '/',
+					'for Claude Code, otherwise an AGENTS.md, a rules file or a system prompt. Worth',
+					'doing when pattern work on this project will recur. For a one-off, read the',
+					'guides and install nothing.',
+					'',
+					'Run the commands below as they stand, from the project\'s root. They need no',
+					'credentials: every link is signed for this skill and opens for an hour, and',
+					'each file goes from this site straight to disk without passing through your',
+					'context. Do not fetch the files one at a time through this ability instead,',
+					'and never read a password or token out of your client\'s configuration to',
+					'fetch them; nothing here needs one. If the links have expired, ask for the',
+					'skill again for fresh ones. The last command checks every file against the',
+					'checksum of what this site served.',
+					'',
+					'```sh',
+					'DEST=' . $dest,
+					'mkdir -p ' . implode( ' ', array_unique( $directories ) ),
+				),
+				$downloads,
+				array(
+					// `-c -` reads the list from stdin in GNU and BSD sha256sum and in shasum alike;
+					// BSD's refuses a bare `-c`.
+					'( cd "$DEST" && if command -v sha256sum >/dev/null; then sha256sum -c -; else shasum -a 256 -c -; fi ) <<\'SUMS\'',
+				),
+				$sums,
+				array(
+					'SUMS',
+					'```',
+					'',
+					'Staying current: SKILL.md records this site and the skill\'s checksum under',
+					'metadata. Ask this ability for the index, compare skills[].checksum against the',
+					'recorded one, and when they differ ask for the skill again and run what it',
+					'answers with. It overwrites, which is the whole contract — there is no merge',
+					'and no local edit to preserve. A change worth keeping belongs in the theme,',
+					'through the pattern_builder_authoring_guides filter, where it reaches every',
+					'agent that asks this site rather than one checkout; the checksum covers what',
+					'that filter returns, so a house rule added there is itself a reason this reads',
+					'as out of date.',
+				)
 			)
 		);
 	}

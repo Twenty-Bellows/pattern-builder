@@ -77,9 +77,12 @@ the base64 of `login:application-password`:
 }
 ```
 
-Two things still go through curl, because no tool can carry them: uploading a
-file you hold (below), and keeping a copy of these guides. Both need the
-Application Password above.
+Two things still go through curl, because no tool should carry them. Keeping a
+copy of these guides needs no password: ask `get-authoring-guide` for the skill
+and run the commands its `install` answers with, which download by signed link.
+Uploading a file you hold (below) needs the Application Password above, so
+over MCP, where you do not hold it, add images by URL with `add-asset` instead.
+Never read a password out of your client's configuration to reach either.
 
 ## The calling convention
 

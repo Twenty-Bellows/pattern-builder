@@ -1377,9 +1377,35 @@ class Test_Abilities extends WP_UnitTestCase {
 			$this->assertMatchesRegularExpression( '/^[0-9a-f]{64}$/', $file['checksum'] );
 		}
 
-		$this->assertStringContainsString( 'input[skill]=pattern-author', $skill['install'] );
-		$this->assertStringContainsString( 'input[file]=', $skill['install'] );
 		$this->assertStringContainsString( 'overwrites', $skill['install'], 'The install says nothing about what happens to a copy already there.' );
+	}
+
+	/**
+	 * An agent connected over MCP holds no password: its client keeps it. So the install is
+	 * the commands themselves, every file downloaded by signed link straight to disk and
+	 * checked there, with no credential in them and none to go looking for.
+	 */
+	public function test_a_skill_installs_by_signed_link_without_credentials() {
+		$skill = $this->abilities->execute_authoring_guide( array( 'skill' => 'pattern-author' ) );
+
+		foreach ( $skill['files'] as $file ) {
+			$this->assertStringContainsString( 'token=', $file['url'] );
+			$this->assertStringContainsString( 'expires=', $file['url'] );
+			$this->assertStringContainsString(
+				'curl -fsS -o "$DEST/' . $file['path'] . '" "' . $file['url'] . '"',
+				$skill['install'],
+				$file['path'] . ' is not downloaded by the install.'
+			);
+			$this->assertMatchesRegularExpression(
+				'/^[0-9a-f]{64}  ' . preg_quote( $file['path'], '/' ) . '$/m',
+				$skill['install'],
+				$file['path'] . ' is not checked by the install.'
+			);
+		}
+
+		$this->assertStringNotContainsString( 'WP_APP_PASSWORD', $skill['install'] );
+		$this->assertStringNotContainsString( 'input[file]', $skill['install'] );
+		$this->assertStringContainsString( 'never read a password or token', $skill['install'] );
 	}
 
 	/**
@@ -1543,9 +1569,14 @@ class Test_Abilities extends WP_UnitTestCase {
 			$this->assertStringContainsString( '## Staying current', $entry, $name . ' never tells a copy of itself how to notice it is stale.' );
 			$this->assertStringContainsString( 'metadata.source', $entry, $name . ' does not say where a copy came from.' );
 			$this->assertStringContainsString(
-				'.skills[] | select(.name == "' . $name . '")',
+				'{"skill": "' . $name . '"}',
 				$entry,
 				$name . "'s check does not ask about " . $name . '.'
+			);
+			$this->assertStringContainsString(
+				'need no password',
+				$entry,
+				$name . ' does not say that refreshing it needs no password, so an agent over MCP goes looking for one.'
 			);
 			$this->assertStringContainsString(
 				'pattern_builder_authoring_guides',
