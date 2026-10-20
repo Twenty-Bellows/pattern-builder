@@ -58,6 +58,46 @@ class Pattern_Builder_Abilities {
 	const DESCRIPTION_MAX_WORDS = 30;
 
 	/**
+	 * The font sizes a design system defines here, smallest first, and no others.
+	 */
+	const FONT_SIZE_LADDER = array( 'x-small', 'small', 'medium', 'large', 'x-large' );
+
+	/**
+	 * The role a familiar color slug most likely meant.
+	 */
+	const COLOR_ROLE_SUGGESTIONS = array(
+		'background'      => 'base',
+		'page'            => 'base',
+		'white'           => 'base',
+		'foreground'      => 'contrast',
+		'text'            => 'contrast',
+		'ink'             => 'contrast',
+		'body'            => 'contrast',
+		'black'           => 'contrast',
+		'muted'           => 'text-muted',
+		'meta'            => 'text-muted',
+		'on-dark'         => 'text-inverse',
+		'inverse'         => 'text-inverse',
+		'surface-variant' => 'surface-muted',
+		'card'            => 'surface',
+		'panel'           => 'surface',
+		'link'            => 'primary',
+		'brand'           => 'primary',
+		'action'          => 'primary',
+		'button'          => 'primary',
+		'accent-deep'     => 'accent-strong',
+		'accent-dark'     => 'accent-strong',
+		'accent-light'    => 'accent-muted',
+		'border'          => 'hairline',
+		'rule'            => 'hairline',
+		'divider'         => 'hairline',
+		'danger'          => 'error',
+		'alert'           => 'warning',
+		'scrim'           => 'overlay',
+		'mark'            => 'highlight',
+	);
+
+	/**
 	 * How long a skill's download links open for, in seconds.
 	 */
 	const SKILL_LINK_TTL = 3600;
@@ -3062,7 +3102,12 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/add-design-tokens',
 			array(
 				'label'               => __( 'Add design tokens', 'pattern-builder' ),
-				'description'         => __( 'Adds colors, gradients, spacing sizes, font sizes and font families to this site\'s design system, so a pattern can reference them by slug instead of hard-coding values. Writes to the active theme\'s theme.json, or to the site\'s Global Styles. A slug this site already defines is left alone and reported as skipped — this never overwrites an existing token. Call get-design-system first to see what exists.', 'pattern-builder' ),
+				'description'         => sprintf(
+					/* translators: 1: the color roles, comma separated, 2: the font sizes, comma separated. */
+					__( 'Adds colors, gradients, spacing sizes, font sizes and font families to this site\'s design system, so a pattern can reference them by slug instead of hard-coding values. Writes to the active theme\'s theme.json, or to the site\'s Global Styles. A slug this site already defines is left alone and reported as skipped — this never overwrites an existing token. A color\'s slug names the job it does, never its hue, and must be one of these roles: %1$s. A font size is one of %2$s, and no others. Anything else is refused. A heading\'s size is not a font size: set it on styles.elements.h1 to h6 with set-global-styles. Call get-design-system first to see what exists.', 'pattern-builder' ),
+					implode( ', ', self::color_roles() ),
+					implode( ', ', self::FONT_SIZE_LADDER )
+				),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -3080,11 +3125,11 @@ class Pattern_Builder_Abilities {
 									),
 									'slug'  => array(
 										'type'        => 'string',
-										'description' => 'The slug a pattern references it by, e.g. "accent" for var:preset|color|accent.',
+										'description' => 'The slug a pattern references it by, e.g. "accent" for var:preset|color|accent. A color slug is a role and a font size slug one of x-small, small, medium, large, x-large.',
 									),
 									'name'  => array(
 										'type'        => 'string',
-										'description' => 'The human-readable label shown in the editor.',
+										'description' => 'The human-readable label shown in the editor. For a color, name the role ("Surface Muted"), not the hue, since a style variation can repaint it.',
 									),
 									'value' => array(
 										'type'        => 'string',
@@ -3118,6 +3163,11 @@ class Pattern_Builder_Abilities {
 							'items'       => array( 'type' => 'object' ),
 						),
 						'destination' => array( 'type' => 'string' ),
+						'warnings'    => array(
+							'type'        => 'array',
+							'description' => 'Tokens written that are worth a second look, each with a code and a message: a font size out of order with the sizes either side of it.',
+							'items'       => array( 'type' => 'object' ),
+						),
 					),
 				),
 				'execute_callback'    => array( $this, 'execute_add_design_tokens' ),
@@ -3180,6 +3230,11 @@ class Pattern_Builder_Abilities {
 				);
 			}
 
+			$off_vocabulary = $this->off_vocabulary( $type, $slug );
+			if ( $off_vocabulary ) {
+				return $off_vocabulary;
+			}
+
 			$normalized[] = array(
 				'type'  => $type,
 				'slug'  => $slug,
@@ -3204,18 +3259,172 @@ class Pattern_Builder_Abilities {
 			}
 		}
 
+		$adding = array();
+		foreach ( $normalized as $token ) {
+			if ( in_array( $token['type'] . '|' . $token['slug'], $missing_keys, true ) ) {
+				$adding[] = $token;
+			}
+		}
+		$warnings = $this->font_size_order_warnings( $adding );
+
 		$written = Pattern_Builder_Cloud_Tokens::apply( $normalized, $destination );
 		if ( is_wp_error( $written ) ) {
 			return $written;
 		}
 
-		return array(
-			// Nothing written is an empty map, which would encode as a list and break the
-			// object the output schema promises a client.
-			'written'     => $written ? $written : new \stdClass(),
-			'skipped'     => $skipped,
-			'destination' => $destination,
+		return $this->with_warnings(
+			array(
+				// Nothing written is an empty map, which would encode as a list and break the
+				// object the output schema promises a client.
+				'written'     => $written ? $written : new \stdClass(),
+				'skipped'     => $skipped,
+				'destination' => $destination,
+			),
+			$warnings
 		);
+	}
+
+	/**
+	 * The jobs a color can do, grouped by what they are for.
+	 *
+	 * @return array Group label => role slugs.
+	 */
+	private static function color_role_groups() {
+		return array(
+			__( 'Page and panels', 'pattern-builder' )   => array( 'base', 'surface', 'surface-muted', 'surface-strong', 'surface-inverse' ),
+			__( 'Text', 'pattern-builder' )              => array( 'contrast', 'text-muted', 'text-subtle', 'text-inverse' ),
+			__( 'On a filled color', 'pattern-builder' ) => array( 'on-primary', 'on-secondary', 'on-accent' ),
+			__( 'Action', 'pattern-builder' )            => array( 'primary', 'primary-hover', 'secondary', 'secondary-hover', 'tertiary' ),
+			__( 'Emphasis', 'pattern-builder' )          => array( 'accent', 'accent-strong', 'accent-muted' ),
+			__( 'Lines', 'pattern-builder' )             => array( 'hairline', 'hairline-strong' ),
+			__( 'Feedback', 'pattern-builder' )          => array( 'success', 'warning', 'error', 'info' ),
+			__( 'Effects', 'pattern-builder' )           => array( 'overlay', 'highlight' ),
+		);
+	}
+
+	/**
+	 * Every slug a color added here may have.
+	 *
+	 * @return string[]
+	 */
+	public static function color_roles() {
+		return array_merge( ...array_values( self::color_role_groups() ) );
+	}
+
+	/**
+	 * Why a color or font size slug is not one this design system uses, or null when it is.
+	 *
+	 * @param string $type Token type.
+	 * @param string $slug Normalized slug.
+	 * @return \WP_Error|null
+	 */
+	private function off_vocabulary( $type, $slug ) {
+		if ( 'fontSize' === $type && ! in_array( $slug, self::FONT_SIZE_LADDER, true ) ) {
+			$message = sprintf(
+				/* translators: 1: the slug given, 2: the font sizes, comma separated. */
+				__( '"%1$s" is not a font size this design system uses. There are five, and no others: %2$s. Use the one nearest the size you measured; if one of the five is missing and your size falls between its neighbors, add that one.', 'pattern-builder' ),
+				$slug,
+				implode( ', ', self::FONT_SIZE_LADDER )
+			);
+			if ( preg_match( '/(^|-)(h[1-6]|heading|headline|display|title)(-|$)/', $slug ) ) {
+				$message .= ' ' . __( 'A heading\'s size is not a font size: set it on styles.elements.h1 to h6 with set-global-styles, and leave the heading blocks without a fontSize so they take it from there.', 'pattern-builder' );
+			}
+
+			return new \WP_Error( 'pb_font_size_off_ladder', $message, array( 'status' => 400 ) );
+		}
+
+		if ( 'color' === $type && ! in_array( $slug, self::color_roles(), true ) ) {
+			$groups = array();
+			foreach ( self::color_role_groups() as $label => $roles ) {
+				$groups[] = $label . ': ' . implode( ', ', $roles );
+			}
+			$message = sprintf(
+				/* translators: 1: the slug given, 2: the roles, by group. */
+				__( '"%1$s" does not name a role. A color slug says what the color does on the page, never what hue it is, so a style variation can repaint it and a pattern means the same thing on every site. Map the color to the job it does and use that role: %2$s.', 'pattern-builder' ),
+				$slug,
+				implode( '; ', $groups )
+			);
+			if ( isset( self::COLOR_ROLE_SUGGESTIONS[ $slug ] ) ) {
+				$message .= ' ' . sprintf(
+					/* translators: 1: the slug given, 2: the role it most likely meant. */
+					__( '"%1$s" is most likely %2$s.', 'pattern-builder' ),
+					$slug,
+					self::COLOR_ROLE_SUGGESTIONS[ $slug ]
+				);
+			}
+
+			return new \WP_Error( 'pb_color_not_a_role', $message, array( 'status' => 400 ) );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Font sizes being added that are not larger than every smaller step and smaller than
+	 * every larger one.
+	 *
+	 * @param array $tokens The tokens being written.
+	 * @return array List of { code, message }.
+	 */
+	private function font_size_order_warnings( $tokens ) {
+		$sizes = array();
+		foreach ( self::FONT_SIZE_LADDER as $step ) {
+			$preset         = Pattern_Builder_Cloud_Tokens::find_preset( 'fontSize', $step );
+			$sizes[ $step ] = isset( $preset['size'] ) && is_string( $preset['size'] ) ? $preset['size'] : '';
+		}
+		$added = array();
+		foreach ( $tokens as $token ) {
+			if ( 'fontSize' === $token['type'] ) {
+				$sizes[ $token['slug'] ] = $token['value'];
+				$added[]                 = $token['slug'];
+			}
+		}
+
+		$warnings = array();
+		foreach ( $added as $step ) {
+			$rank = array_search( $step, self::FONT_SIZE_LADDER, true );
+			$px   = self::length_in_px( $sizes[ $step ] );
+
+			foreach ( self::FONT_SIZE_LADDER as $other_rank => $other ) {
+				$other_px = $other === $step ? null : self::length_in_px( $sizes[ $other ] );
+				if ( null === $px || null === $other_px ) {
+					continue;
+				}
+
+				if ( $other_rank < $rank && $other_px >= $px ) {
+					/* translators: 1: a font size, 2: its value, 3: another font size, 4: its value. */
+					$message = __( 'The %1$s font size is %2$s, which is not larger than %3$s (%4$s). The sizes run smallest to largest, so a pattern asking for the larger one gets the smaller. Check the value, or which size it belongs on.', 'pattern-builder' );
+				} elseif ( $other_rank > $rank && $other_px <= $px ) {
+					/* translators: 1: a font size, 2: its value, 3: another font size, 4: its value. */
+					$message = __( 'The %1$s font size is %2$s, which is not smaller than %3$s (%4$s). The sizes run smallest to largest, so a pattern asking for the smaller one gets the larger. Check the value, or which size it belongs on.', 'pattern-builder' );
+				} else {
+					continue;
+				}
+
+				$warnings[] = array(
+					'code'    => 'font_size_out_of_order',
+					'message' => sprintf( $message, $step, $sizes[ $step ], $other, $sizes[ $other ] ),
+				);
+				break;
+			}
+		}
+
+		return $warnings;
+	}
+
+	/**
+	 * A plain length in pixels, at the browser's default 16px root, or null for anything a
+	 * comparison cannot read, such as a clamp().
+	 *
+	 * @param string $value A CSS length.
+	 * @return float|null
+	 */
+	private static function length_in_px( $value ) {
+		if ( ! preg_match( '/^\s*(\d*\.?\d+)(px|rem|em)\s*$/', (string) $value, $match ) ) {
+			return null;
+		}
+
+		return 'px' === $match[2] ? (float) $match[1] : (float) $match[1] * 16;
 	}
 
 	/**

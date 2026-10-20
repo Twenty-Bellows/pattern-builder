@@ -127,7 +127,7 @@ input and output schema.
 | `pattern-builder/get-editor-scripts` | GET | this site's own block editor script URLs, in load order. The validator asks for these itself, from a route that needs no credentials |
 | `pattern-builder/create-pattern` | POST | store finished markup. `title` and `content` required; `source` is `theme` (default) or `user`; also `name`, `description`, `categories`, `keywords`, `synced`, `blockTypes`, `postTypes`, `templateTypes`, `inserter`, `viewportWidth`. Refuses what PHP can see (below); a category nothing registered comes back under `unregisteredCategories`, and `warnings` says when the description is missing, too short, longer than one sentence or made of words that describe every pattern (see `pattern-kinds.md`) |
 | `pattern-builder/update-pattern` | POST | replace an existing pattern: `id`, plus `content` for the whole markup or `edits` to change part of it. Send the `hash` you read as `expectedHash` (required with `edits`): if the pattern changed since, nothing is written and the error carries `currentHash` to read again from. `edits` is a list of `{ old, new, replaceAll }`, fragments of what `get-pattern` returned, applied in order, all or none; each `old` must match exactly once unless `replaceAll`. Validate the result as you would markup sent whole. Removing or renaming a slot that a pattern or page still fills is refused, naming each place and key, unless `dropSlots` lists it; the answer's `reverted` then says which places went back to placeholder copy. The answer's `changed` is false when the write left the pattern as it was, and `warnings` judges a description the update sets and notes markup that moved under an unchanged one |
-| `pattern-builder/add-design-tokens` | POST | add presets to the design system. `input[tokens]` is a list of `{type, slug, name, value}`; `input[destination]` is `theme` (default) or `user`. Only ever **adds** — a slug already here is skipped |
+| `pattern-builder/add-design-tokens` | POST | add presets to the design system. `input[tokens]` is a list of `{type, slug, name, value}`; `input[destination]` is `theme` (default) or `user`. Only ever **adds** — a slug already here is skipped. A color slug must be a role and a font size one of `x-small`…`x-large` |
 | `pattern-builder/set-global-styles` | POST | set what a block looks like before any pattern speaks: `input[styles]` is a theme.json `styles` subtree, `input[destination]` is `theme` (default) or `user`. **Replaces** at each property it names and changes the whole site, so read `get-design-system`'s `styles` first |
 | `pattern-builder/add-block-style-variation` | POST | register a named look a pattern applies with a class: `slug`, `blockTypes`, `styles`, optional `title` and `description`. Answers with the `class` to put on the block. A block state (`:hover`) cannot live in the partial it writes; the answer's `note` gives the `set-global-styles` call that sets one |
 | `pattern-builder/set-layout` | POST | set the widths every constrained band measures against: `contentSize`, `wideSize`, `useRootPaddingAwareAlignments`, `input[destination]` `theme` (default) or `user`. **Replaces** what it names |
@@ -164,7 +164,7 @@ discoverable from inside the abilities rather than something to remember.
 
 ### Adding to the design system
 
-`add-design-tokens` is the answer to "this pattern needs a colour the theme
+`add-design-tokens` is the answer to "this pattern needs a color the theme
 doesn't have". Inlining the value in the markup is the wrong answer: it opts
 the pattern out of the site's palette, its dark mode and every future
 restyle. Add the preset, then reference it by slug.
@@ -173,8 +173,8 @@ restyle. Add the preset, then reference it by slug.
 curl -u "$WP_USER:$WP_APP_PASSWORD" \
   -H 'Content-Type: application/json' \
   -d '{"input":{"destination":"theme","tokens":[
-        {"type":"color","slug":"kiln-red","name":"Kiln Red","value":"#b3391f"},
-        {"type":"spacing","slug":"band","name":"Band","value":"clamp(3rem, 8vw, 7rem)"}
+        {"type":"color","slug":"accent","name":"Accent","value":"#b3391f"},
+        {"type":"spacing","slug":"70","name":"Band","value":"clamp(3rem, 8vw, 7rem)"}
       ]}}' \
   "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/add-design-tokens/run"
 ```
@@ -183,10 +183,10 @@ Five types, each landing where the editor looks for it:
 
 | `type` | Referenced as | Value |
 |---|---|---|
-| `color` | `{"backgroundColor":"kiln-red"}` + `has-kiln-red-background-color has-background` | a hex, `rgb()`/`hsl()`, `transparent`, `currentColor` |
+| `color` | `{"backgroundColor":"accent"}` + `has-accent-background-color has-background` | a hex, `rgb()`/`hsl()`, `transparent`, `currentColor` |
 | `gradient` | `{"gradient":"dusk"}` + `has-dusk-gradient-background` | a `linear-`, `radial-` or `conic-gradient()` |
-| `spacing` | `var:preset\|spacing\|band` in a style attribute | a length, or `clamp()`/`calc()`/`min()`/`max()` of lengths |
-| `fontSize` | `{"fontSize":"display"}` + `has-display-font-size` | as above |
+| `spacing` | `var:preset\|spacing\|70` in a style attribute | a length, or `clamp()`/`calc()`/`min()`/`max()` of lengths |
+| `fontSize` | `{"fontSize":"x-small"}` + `has-x-small-font-size` | as above |
 | `fontFamily` | `{"fontFamily":"display-face"}` + `has-display-face-font-family` | a stack of family names |
 
 **Two destinations.** `theme` (the default) writes the active theme's
@@ -200,8 +200,17 @@ and comes back under `skipped`. That is the site telling you it already has an
 answer — reference that slug rather than inventing `accent-2` beside it, and
 call `get-design-system` first so you know what is there. `written` lists what
 actually landed, by type, with the slugs as they were stored: a slug is put
-through WordPress's own slug rules, so `Kiln Red!` becomes `kiln-red`, and
+through WordPress's own slug rules, so `Text Muted!` becomes `text-muted`, and
 that is the name your markup has to use.
+
+**Two kinds of slug are checked.** A color's slug must be one of the roles in
+`design-system.md` (`base`, `surface`, `contrast`, `primary`, `accent`,
+`hairline` and the rest), never a hue; a font size's must be one of `x-small`,
+`small`, `medium`, `large`, `x-large`. Anything else is refused, and the
+refusal lists what is allowed. A heading's size is not a font size at all: it
+goes on `styles.elements.h1` … `h6` through `set-global-styles`. A font size
+written out of order with the sizes either side of it comes back under
+`warnings`.
 
 **No font files.** A `fontFamily` is a stack of names. Installing a webfont is
 a different job, and this is not it — name families the site can already
@@ -214,7 +223,7 @@ cover the rest of the design system, and `references/design-system.md` is the
 long form.
 
 `set-global-styles` decides what a block looks like when the pattern says
-nothing — the root font size, the heading face, the link colour,
+nothing — the root font size, the heading face, the link color,
 `elements.button`. It is the opposite of the tokens in every way that matters:
 there is one `elements.link.color.text`, so setting it **replaces** what was
 there and repaints every page at once, including ones you have not seen. Right
@@ -383,7 +392,7 @@ without `content` is dropped rather than served empty.
 ## What they will not do for you
 
 **Nothing here generates a pattern.** No ability takes a prompt. The writes
-take markup you have already composed — the judgement of what to build is
+take markup you have already composed — the judgment of what to build is
 yours, and this is only somewhere to put the result.
 
 **Nothing here decides whether a block is valid.** That is decided by
@@ -401,7 +410,7 @@ of them silent at render, each named in the error's `problems`:
 |---|---|
 | attribute JSON that does not parse | WordPress reads it as *no* attributes; a slot that lost a brace is quietly no longer a slot |
 | a heading whose tag disagrees with `level`, a list whose element disagrees with `ordered` | valid nowhere; every editor reports it |
-| a block this site has not registered | it parses to `core/missing` and renders as a grey box |
+| a block this site has not registered | it parses to `core/missing` and renders as a gray box |
 | a `core/pattern` reference to nothing, or to the pattern itself | an unresolved reference renders as nothing at all; a self-reference is dropped as a loop |
 | a `content` key naming no slot in the referenced pattern | an unknown key is ignored and the placeholder copy ships |
 | a Pattern Overrides binding with no `metadata.name`, or on a block core cannot bind | the binding never fills |
