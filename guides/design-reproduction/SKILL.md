@@ -2,7 +2,7 @@
 name: design-reproduction
 description: Rebuild an existing design as WordPress block patterns — a live website, a Figma file, a screenshot, a PDF or a mockup — page by page, pulling the reusable parts out rather than transcribing the pixels. Use this whenever the source of the design already exists somewhere else and the job is to reproduce it: "recreate this site", "build this in WordPress", "match this design", "here's a screenshot of what we want". Reproduction fails quietly in two specific ways this covers — values approximated instead of read, and repeated parts copied instead of factored — and both look like a finished page. Load the pattern-author skill alongside it; this one decides what to build and how faithfully, that one is how a pattern gets written.
 metadata:
-  version: 1.4.0
+  version: 1.5.0
 ---
 
 # Reproducing an existing design
@@ -55,7 +55,7 @@ inferred?**
 |---|---|---|---|
 | A live web page, or theme files you can open | **readable** | parse the page's generated stylesheet; read block attributes | **exact**, and provable by diffing |
 | A Figma file you have **access** to | **readable** | variables and styles via the API or an export | exact for tokens; layout still inferred |
-| A screenshot, PDF, image, or Figma **export** | **inferred** | sample colours, measure at a stated viewport | *consistent*, never exact — and say so |
+| A screenshot, PDF, image, or Figma **export** | **inferred** | sample colors, measure at a stated viewport | *consistent*, never exact — and say so |
 
 Two cautions: **most "Figma" sources are screenshots of Figma** — a PNG of a
 frame is the third row, not the second. And **a live page you cannot fetch is
@@ -73,7 +73,7 @@ design system as the browser resolves it. Then read the *block attributes* for
 where the design overrode those defaults; a group may carry its own
 `contentSize` or `blockGap`.
 
-**Inferred.** Sample colours. Measure type and spacing at a stated viewport,
+**Inferred.** Sample colors. Measure type and spacing at a stated viewport,
 and write that width down — no measurement is true at any other. Expect to be
 wrong about font stacks, line-heights and any fluid scale.
 
@@ -90,16 +90,26 @@ carries the measurement that decides each.
 
 | Token | Value | Evidence |
 |---|---|---|
-| `ink` | `#17120E` | `--wp--preset--color--ink`, read |
-| `x-large` | `clamp(2.6rem, 1.6rem + 4.4vw, 5rem)` | read |
-| `chili` | `#B03A26` | sampled from hero heading at 1400px |
+| `contrast` | `#17120E` | `--wp--preset--color--ink`, read; the body text |
+| `large` | `clamp(1.25rem, 1rem + 1vw, 1.5rem)` | read; the lede |
+| `h1` | `clamp(2.6rem, 1.6rem + 4.4vw, 5rem)` | read; goes on `styles.elements.h1` |
+| `accent` | `#B03A26` | sampled from hero heading at 1400px |
+
+**The source's names are evidence, never names to keep.** Each color is named
+for the job it does on the page, from the roles in
+`pattern-author`'s `references/design-system.md`: the source's `ink` is
+`contrast` because it is the body text, and its `chili` is `accent`. `add-design-tokens` refuses
+anything that is not a role. Type maps by nearest size onto the five font sizes,
+`x-small` to `x-large`, and nothing else. The source's heading sizes are not
+font sizes at all but `h1`–`h6` in `styles.elements`, set with
+`set-global-styles`.
 
 **The structure**, one row per band or element, carrying the comparison you
 actually performed:
 
 | Element | Property | Value | Measurement |
 |---|---|---|---|
-| hero text block | text alignment | centred | subhead inset 180px left, 178px right; headline reaches both margins. The short line is symmetric, so centred |
+| hero text block | text alignment | centered | subhead inset 180px left, 178px right; headline reaches both margins. The short line is symmetric, so centered |
 | hero band | width | `align: full` | painted background reaches both viewport edges at 1400px |
 | hero band | content measure | 960px | longest body line 954px, against 1160px in the features band |
 | feature row | arrangement | 4 across, 1 row, equal | each card 311px in a 1305px row |
@@ -112,7 +122,7 @@ and no later step looks at it again.
 
 They are **deliverables, not a gate**: hand them over with the finished work
 and keep building. An ambiguous value gets a documented best guess —
-`accent-2, sampled #C4551F against the theme's #B84A1E, nearest match` is a row
+`accent-strong, sampled #C4551F against the theme's #B84A1E, nearest match` is a row
 somebody can reject at a glance, where "which orange did you want?" hands back
 the work you were given. The one thing worth front-loading is a design system a
 run of patterns will reference, because everything built after it inherits the
@@ -127,8 +137,11 @@ because a style referencing an unresolvable slug renders as nothing. Then
 
 **Prefer starting from a blank theme**, especially for an inferred source. With
 nothing to borrow, every value must be declared — which turns a silent
-approximation into a written one. Picking "the closest existing font size" is
-how a reproduction ends up close at every size and right at none.
+approximation into a written one. Type is the one deliberate approximation:
+set the five font sizes to the source's commonest text sizes, give the
+headings their exact sizes on `styles.elements`, and let every other text size
+take the nearest of the five, with each one that rounds written in the tokens
+table.
 
 ### 5. Factor, then build
 
@@ -171,7 +184,7 @@ columns were equal height, a `mediaPosition` on an already-stacked source) —
 and **do not call it a match**. The true sentence is *"consistent with the
 design at 1400px, with the font identified as X and these values inferred."*
 
-**Any source.** Behaviour has no ground truth to diff either way, and it is the
+**Any source.** Behavior has no ground truth to diff either way, and it is the
 one thing every rebuild still needs a browser for: click what moves, Tab
 through it, read the console and check contrast, as the last section of
 `references/verifying.md` describes.

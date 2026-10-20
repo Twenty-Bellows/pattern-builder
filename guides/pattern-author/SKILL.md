@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.17.0
+  version: 1.18.0
 ---
 
 # Authoring block patterns
@@ -53,7 +53,7 @@ else. Each fact lives in one of them; this table only points.
 
 | Step | Read before it | Only when |
 |---|---|---|
-| 1. Orient | nothing more | `references/abilities.md` if you reach the site over HTTP or through its `pattern-builder-*` MCP tools; `references/changing-patterns.md` if the site already has patterns; `references/design-system.md` if you set colour, type, spacing or layout beyond the shared presets, or install a design system |
+| 1. Orient | nothing more | `references/abilities.md` if you reach the site over HTTP or through its `pattern-builder-*` MCP tools; `references/changing-patterns.md` if the site already has patterns; `references/design-system.md` if you set color, type, spacing or layout beyond the shared presets, or install a design system |
 | 2. Vocabulary | nothing more | `references/block-vocabulary.md` for a block beyond paragraph, heading, image, button, group and columns, or a destination other than this site |
 | 3. Kind | nothing more | `references/pattern-kinds.md` for any kind but a plain design pattern; `references/design-content-split.md` for a synced pattern with slots or the page that fills it |
 | 4. Factor | `references/composition.md` for anything bigger than one section | |
@@ -96,8 +96,9 @@ Otherwise read `theme.json` (`settings.color.palette`,
 three existing patterns — they carry house style better than any description.
 
 `references/design-system.md` covers the three layers a pattern leans on and
-which slugs are actually safe: the short version is `base` and `contrast` for
-colour, the `small`…`xx-large` ladder for type, and spacing steps `40`–`60`.
+which slugs are actually safe: the short version is a role for every color
+(`base` and `contrast` first, never a hue), five font sizes from `x-small` to
+`x-large` with heading sizes on `styles.elements`, and spacing steps `40`–`60`.
 Check anything else before using it. It also says the thing hardest to see from
 markup: what the site already styles is what the pattern inherits, so restating
 it is how a pattern stops adapting.
@@ -170,7 +171,7 @@ artifact is a step you can see was skipped:
 | `group > columns > [image, group > [row > [p, p], p]]` | 146 | name, price, description, image | menu item | element |
 | `group > [rule, heading, p, group > columns…]` | 24 | heading, blurb | menu section | section |
 
-Three tests fill it in; only the middle needs judgement.
+Three tests fill it in; only the middle needs judgment.
 
 1. **What repeats?** Reduce the markup to a *shape* — block names and
    attributes, all text and URLs stripped. Any shape occurring twice is a
@@ -213,9 +214,9 @@ Block markup is HTML comments wrapping HTML, and the attributes and the HTML
 have to agree exactly:
 
 ```html
-<!-- wp:heading {"level":2,"fontSize":"x-large"} -->
-<h2 class="wp-block-heading has-x-large-font-size">Section title</h2>
-<!-- /wp:heading -->
+<!-- wp:paragraph {"fontSize":"large"} -->
+<p class="has-large-font-size">A lede that sets it up.</p>
+<!-- /wp:paragraph -->
 ```
 
 **Let the block library write it.** It runs the real `save()` with the real
@@ -234,7 +235,7 @@ const { createBlock, serialize } = core.window.wp.blocks;
 
 console.log( serialize( [
         createBlock( 'core/group', { align: 'full', backgroundColor: 'contrast' }, [
-                createBlock( 'core/heading', { level: 1, fontSize: 'xx-large' } ),
+                createBlock( 'core/heading', { level: 1, content: 'The headline' } ),
                 createBlock( 'core/paragraph', { content: 'A sentence that sets it up.' } ),
         ] ),
 ] ) );
@@ -416,7 +417,7 @@ Create a real page only when the page is the deliverable.
 <!-- wp:pattern {"slug":"my-theme/section-intro"} /-->
 ```
 
-This is the normal way to build above the smallest scale, not an optimisation.
+This is the normal way to build above the smallest scale, not an optimization.
 Step 4 works out what the parts are. The cost of a reference is one hop of
 indirection; the cost of avoiding one is a copy, and every copy is a place the
 design must be changed again.

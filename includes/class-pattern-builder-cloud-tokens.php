@@ -328,7 +328,7 @@ class Pattern_Builder_Cloud_Tokens {
 	 * @param string $slug Preset slug.
 	 * @return array|null Preset entry.
 	 */
-	private static function find_preset( $type, $slug ) {
+	public static function find_preset( $type, $slug ) {
 		$types = self::types();
 		if ( ! isset( $types[ $type ] ) ) {
 			return null;

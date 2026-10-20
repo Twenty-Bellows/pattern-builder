@@ -134,9 +134,9 @@ disk is missing what the block writes today — nearly always a supports class,
 so the styling silently does not apply on the front end.
 
 **DROPPED ATTRIBUTE** — the same migration, one step worse: it treats the
-*markup* as authoritative, so it throws away an attribute you wrote. A heading
-with `{"level":2,"fontSize":"xx-large"}` whose tag carries no
-`has-xx-large-font-size` comes back with no `fontSize` at all, perfectly
+*markup* as authoritative, so it throws away an attribute you wrote. A
+paragraph with `{"fontSize":"large"}` whose tag carries no
+`has-large-font-size` comes back with no `fontSize` at all, perfectly
 self-consistent, with nothing reporting it.
 
 Two things it stays deliberately quiet about, because the markup is fine and
@@ -212,8 +212,8 @@ have no closing comment — `core/pattern`, `core/post-content`,
 ```html
 <!-- wp:group {"align":"full","style":{"spacing":{"padding":{"top":"var:preset|spacing|60","bottom":"var:preset|spacing|60"}}},"backgroundColor":"contrast","textColor":"base","layout":{"type":"constrained"}} -->
 <div class="wp-block-group alignfull has-base-color has-contrast-background-color has-text-color has-background" style="padding-top:var(--wp--preset--spacing--60);padding-bottom:var(--wp--preset--spacing--60)">
-	<!-- wp:heading {"level":2,"style":{"typography":{"textAlign":"center"}},"fontSize":"xx-large"} -->
-	<h2 class="wp-block-heading has-text-align-center has-xx-large-font-size">What we do</h2>
+	<!-- wp:heading {"level":2,"style":{"typography":{"textAlign":"center"}}} -->
+	<h2 class="wp-block-heading has-text-align-center">What we do</h2>
 	<!-- /wp:heading -->
 
 	<!-- wp:paragraph {"style":{"typography":{"textAlign":"center"}}} -->
@@ -226,8 +226,9 @@ have no closing comment — `core/pattern`, `core/post-content`,
 Every attribute has its class; every preset appears in both spellings;
 `alignfull` accompanies `"align":"full"`; `layout.type` is one of the four. And
 every slug is one `design-system.md` says is safe to assume — `base`,
-`contrast`, the numeric spacing scale, the font-size ladder — which is what
-lets this band land on another theme and take that theme's colours.
+`contrast`, the numeric spacing scale — and the heading sets no size, so it
+takes the site's `h2`. That is what lets this band land on another theme and
+take that theme's colors and type.
 
 The example is checked, not just written: `keeping-current.md` runs the
 validator over every example in these documents at each release.

@@ -8,7 +8,7 @@ being precise about which is which:
 | | What it is | The question it answers |
 |---|---|---|
 | **Token** | A named value — `base`, `spacing\|40`, `large` | *What is the site's blue?* |
-| **Style** | What a block looks like before any pattern speaks — the root font size, the heading face, the link colour, `elements.button` | *What does an unstyled heading look like here?* |
+| **Style** | What a block looks like before any pattern speaks — the root font size, the heading face, the link color, `elements.button` | *What does an unstyled heading look like here?* |
 | **Variation** | A named look applied with a class — `is-style-outline` | *How do I ask for a second kind of button?* |
 
 A pattern **references** a token, **inherits** a style, and **applies** a
@@ -41,7 +41,7 @@ Three things follow, and they are the whole of the discipline:
    defines and renders unstyled there too. The failure is made here and
    discovered there. `render-pattern` reports it under `tokens.undefined`.
 2. **A name the destination already defines keeps the destination's value.**
-   Usually exactly right — the pattern adopts the site's colours and sizes,
+   Usually exactly right — the pattern adopts the site's colors and sizes,
    which is what a design system is for. Wrong only when the two sites mean
    different things by the same name.
 3. **Never restate a style.** What the site styles, the pattern inherits.
@@ -59,7 +59,7 @@ Comparing what core ships against the three most recent default themes:
 
 | | Core | Twenty Twenty-Three | Twenty Twenty-Four | Twenty Twenty-Five |
 |---|---|---|---|---|
-| **Colours** | `black`, `white`, `vivid-red`, … (12 named hues) | `base`, `contrast`, `primary`, `secondary`, `tertiary` | `base`, `base-2`, `contrast`, `contrast-2`, `contrast-3`, `accent`…`accent-5` | `base`, `contrast`, `accent-1`…`accent-6` |
+| **Colors** | `black`, `white`, `vivid-red`, … (12 named hues) | `base`, `contrast`, `primary`, `secondary`, `tertiary` | `base`, `base-2`, `contrast`, `contrast-2`, `contrast-3`, `accent`…`accent-5` | `base`, `contrast`, `accent-1`…`accent-6` |
 | **Font sizes** | `small`, `medium`, `large`, `x-large` | + `xx-large` | + `xx-large` | + `xx-large` |
 | **Spacing** | `20`–`80` (from `spacingScale`) | `30`–`80` | `10`–`60` | `20`–`80` |
 | **Font families** | none | typeface names | `body`, `heading` | typeface names |
@@ -70,42 +70,76 @@ its destination or arrives carrying its own value. It is not a list of what
 will break — for a pattern that travels, nothing here breaks — and the one case
 where it *is* a breakage map is called out at the end.
 
-### Colours: `base` and `contrast` are the common ground
+### Colors: a role, never a hue
 
-The only two slugs all three default themes agree on, and they mean what they
-say: `base` is the page, `contrast` is the text on it. A pattern using them
-lands on any theme and takes that theme's colours, which is the behaviour you
-want for anything carrying the site's identity.
+A color's slug says what the color does on the page, never what it looks like.
+`blush`, `forest` and `ink` describe one site's palette: a style variation that
+repaints them leaves the names lying, and a pattern written against them means
+nothing on a site whose palette is different. `surface`, `primary` and
+`hairline` name the same job everywhere.
 
-Everything else is theme-specific. `primary` is Twenty Twenty-Three's and
-neither theme that followed kept the name; `accent-1` is Twenty Twenty-Five's
-convention and Twenty Twenty-Four calls the same idea `accent`. None of those
-*fail* on a travelled pattern — the value ships and is installed — but none of
-them adapt either, so the pattern keeps its own colour on a site that had a
-perfectly good one.
+`base` and `contrast` are the only two slugs all three default themes agree on,
+and they mean what they say: `base` is the page, `contrast` is the text on it.
+A pattern using them lands on any theme and takes that theme's colors.
 
-Core's own twelve — `vivid-red`, `pale-pink` and the rest — are the wrong
-answer for a different reason: a fixed palette no theme designed, ignoring the
-site's own colours entirely, and a theme *can* switch them off.
+Every color is one of these roles, and `add-design-tokens` refuses any slug
+that is not:
 
-So: **`base` and `contrast` freely. Any other colour, check first** — ask
-`get-design-system` what this site has and use what is there. If nothing
-suitable exists, add it with `add-design-tokens` under a name that says what it
-is for. Never inline a hex.
+| Job | Roles |
+|---|---|
+| Page and panels | `base`, `surface`, `surface-muted`, `surface-strong`, `surface-inverse` |
+| Text | `contrast`, `text-muted`, `text-subtle`, `text-inverse` |
+| On a filled color | `on-primary`, `on-secondary`, `on-accent` |
+| Action | `primary`, `primary-hover`, `secondary`, `secondary-hover`, `tertiary` |
+| Emphasis | `accent`, `accent-strong`, `accent-muted` |
+| Lines | `hairline`, `hairline-strong` |
+| Feedback | `success`, `warning`, `error`, `info` |
+| Effects | `overlay`, `highlight` |
 
-### Font sizes: the five-step ladder, and know where core stops
+**Map each color to the job it does, then name it for that job.** The page
+background is `base` whatever its hue; the card sitting on it is `surface`; the
+rule between rows is `hairline`; the button is `primary` and its label
+`on-primary`; `overlay` is the scrim over an image and `highlight` marked text.
+When two colors want one role, the quieter is `-muted` and the louder
+`-strong`. The `name` says the role in words — "Surface Muted", not "Blush" —
+because it is what a person reads in the color picker, and it has to stay true
+after a restyle.
 
-`small`, `medium`, `large`, `x-large`, `xx-large` is unanimous among the
-default themes. **Core itself stops at `x-large`** — `xx-large` is a theme
-convention, so a site running a theme without a theme.json does not have it.
+Core's own twelve — `vivid-red`, `pale-pink` and the rest — are a fixed palette
+no theme designed, ignoring the site's own colors entirely, and a theme *can*
+switch them off. Don't reference them.
 
-Use the ladder. Do not invent `tiny`, `huge`, `hero` or `display`: a size that
-is not on the ladder is a size no theme will have defined.
+So: **ask `get-design-system` what this site has and use the role that is
+there.** If the role is missing, add it with `add-design-tokens`. Never inline
+a hex.
+
+### Font sizes: five, and no others
+
+`x-small`, `small`, `medium`, `large`, `x-large`. `add-design-tokens` refuses
+any other slug, so there is no `tiny`, `huge`, `display`, `xx-large` or
+`heading-2`. Core defines `small` through `x-large` on every site, which is what
+lets a pattern sized with them take its host's type scale; `x-small` is this
+design system's own, and travels with its value.
+
+Each is larger than the one before it. A size added out of that order —
+`x-small` larger than `small` — is written with a warning, because a pattern
+asking for the smaller one would get the larger.
 
 A coarse ladder is a real constraint and not one to route around. If a site's
-`medium` is 20px and its `large` is 36px, the 28px you wanted does not exist —
-pick the nearer rung rather than hard-coding, or add the missing rung
-deliberately if the design genuinely needs it.
+`medium` is 20px and its `large` is 36px, the 28px you measured does not exist:
+use the nearer of the two. Add a missing one of the five only when your size
+falls between its neighbors.
+
+**A heading's size is not a font size.** h1 to h6 take their sizes from
+`styles.elements.h1` … `h6` (`typography.fontSize`), set once with
+`set-global-styles`, and a heading block then sets no `fontSize` at all: it
+takes the size its level has. Those values can be whatever the design measured,
+fixed or fluid, because `h2` already says what it is for. Give one heading a
+`fontSize` only when it departs from its level, and then use one of the five.
+
+**Text that is not a heading never borrows a heading's size.** An eyebrow, a
+lede, a pull quote or a paragraph styled to look like a heading takes the
+nearest of the five.
 
 ### Spacing: numeric, and only the middle is safe
 
@@ -114,7 +148,7 @@ Every theme uses core's numeric scale, but not the same span: `40`, `50` and
 somewhere.
 
 Prefer `40`–`60` for the rhythm a pattern shares with its host. The outer steps
-still work — a travelled pattern installs the value it brought — they just stop
+still work — a traveled pattern installs the value it brought — they just stop
 adapting.
 
 ### Font families: there is no convention
@@ -171,40 +205,31 @@ that padding instead of reaching the edges of the window.
 
 ## Two tiers, and why a theme wants both
 
-The portable vocabulary above is small, and a real design system needs more
-than two colours. The way out is not to invent slugs in place of the standard
-ones — that is how a pattern stops travelling — but to define the standard ones
-**and** the roles nothing standard covers.
+The portable vocabulary is small, and a real design system needs more than two
+colors. The way out is not to invent slugs in place of the standard ones — that
+is how a pattern stops traveling — but to define the standard ones **and** the
+roles nothing standard covers.
 
 ### Tier 1 — the shared vocabulary. Slugs you *want* overridden.
 
 | | Slugs |
 |---|---|
-| Colour | `base`, `contrast` |
-| Font size | `small`, `medium`, `large`, `x-large`, `xx-large` |
+| Color | `base`, `contrast` |
+| Font size | `small`, `medium`, `large`, `x-large` |
 | Spacing | `20`, `30`, `40`, `50`, `60`, `70`, `80` |
 
 These carry the *site's* identity rather than the pattern's. Use them precisely
-because they collide: a heading at `x-large` should be the destination's
-`x-large`, and a band padded with `spacing|60` should breathe the way that site
+because they collide: a lede at `large` should be the destination's `large`,
+and a band padded with `spacing|60` should breathe the way that site
 breathes. Every theme with a `theme.json` has them, so they resolve everywhere
 even for a pattern that never went through the cloud.
 
-### Tier 2 — roles worth adding, because no convention covers them
+### Tier 2 — the rest of the roles, and `x-small`
 
-Every design needs these and neither core nor the default themes name them, so
-there is no portable answer to inherit — but there is a sensible one to agree
-on:
-
-| Slug | For |
-|---|---|
-| `surface` | A panel raised or inset against `base` — a card, a well |
-| `surface-variant` | A second step of the same |
-| `text-muted` | Secondary text: captions, meta, supporting copy |
-| `primary` | The action colour — buttons, links |
-| `primary-hover` | Its hover state |
-| `accent` | Emphasis, distinct from the action colour |
-| `hairline` | Borders, rules, separators |
+Every design needs more than `base` and `contrast`, and neither core nor the
+default themes agree on names for the rest. The role table under *Colors* is
+the answer this design system settles on — `surface`, `text-muted`, `primary`,
+`accent`, `hairline` and the others — with `x-small` beside them for type.
 
 These are the pattern's *own* design intent, and they survive a move intact — a
 destination that has never heard of `hairline` installs the value the pattern
@@ -215,10 +240,10 @@ that does not travel.
 
 **`primary` is a tier-2 name here, and Twenty Twenty-Three also uses it** for
 something similar. Twenty Twenty-Four and Twenty Twenty-Five do not, which is
-why it is tier 2 rather than tier 1: usable, worth standardising on, not safe
+why it is tier 2 rather than tier 1: usable, worth standardizing on, not safe
 to assume.
 
-### Put the semantics in the name, not the slug
+### Spacing: put the meaning in the name, not the slug
 
 The temptation is to name spacing steps `xs`, `sm`, `md`, `lg` because it reads
 better. It reads better and it costs portability: **not one of those slugs
@@ -232,8 +257,8 @@ the numeric scale; the name is what a person sees in the editor:
 { "slug": "40", "name": "Base", "size": "1.25rem" }
 ```
 
-The same applies to colour. A palette wanting a semantic name for its body text
-should call it `contrast` with `"name": "Text"`, not `text-default`.
+Color is the one exception, because there the slug is the role, and the role
+is what a pattern means by it.
 
 ---
 
@@ -275,7 +300,7 @@ document. A `css` at the root or on an element is scoped to nothing a pattern
 brought with it, so it stays refused even though a *block style variation* may
 carry one (below): there the selector is a class the pattern's own markup
 carries, and here it is the whole page. And what core's schema does not
-recognise comes back under `skipped` rather than vanishing, because an agent
+recognize comes back under `skipped` rather than vanishing, because an agent
 that believes it set a property will build the rest of the design on top of one
 that is not there.
 
@@ -292,7 +317,7 @@ steps too small — visible only in a rendered preview, never in the markup.
 A design usually wants more than one kind of button, and there are three ways
 to get one. They are not equal:
 
-- **Attributes on every button** fossilise the design into the markup. The
+- **Attributes on every button** fossilize the design into the markup. The
   radius a pattern states is the radius it keeps wherever it goes, long after
   the site's buttons have changed.
 - **`styles.elements.button`** is one rule for every button on the site, so it
@@ -330,7 +355,7 @@ So the discipline is the token discipline again: **the variation must exist on
 the site you author on**, and a name the destination already holds wins.
 
 A variation's own styles may reference presets, and those are collected too —
-the markup carries the class and no colour at all, so a token named only inside
+the markup carries the class and no color at all, so a token named only inside
 a variation still ships. So does its `css`, below.
 
 ## CSS, in a variation and nowhere else
@@ -379,7 +404,7 @@ fragment that broke it, so the fix is usually one edit away.
 
 A variation slug is a name in a shared namespace exactly as a preset slug is,
 so two designs that both call something `button-secondary` would collide at any
-site holding both — and unlike a colour, a wrong variation can restructure the
+site holding both — and unlike a color, a wrong variation can restructure the
 block entirely.
 
 An upload therefore stamps the collection onto the name:
@@ -414,11 +439,11 @@ In order of preference:
    kind core has no name for.
 4. **Set attributes** only when the pattern knows something the theme
    structurally cannot — chiefly what the button is sitting on. A secondary
-   button on a dark band needs its colours set or it vanishes; that is context,
+   button on a dark band needs its colors set or it vanishes; that is context,
    not taste.
 
 And a rule that falls out of the partial-override problem: **set background and
-text colour together or set neither.** Setting one leaves the other at the
+text color together or set neither.** Setting one leaves the other at the
 theme's value, and the contrast failure is invisible to a pattern that never
 read it.
 
@@ -455,10 +480,10 @@ The two facts most often guessed wrong, both confirmed there:
 ### What the schema cannot tell you
 
 Three things verified by testing rather than by reading, because the schema
-describes shape and not behaviour:
+describes shape and not behavior:
 
 - **A block style variation may carry `elements`.** `styles.blocks.{block}.variations.{name}.elements.link` is valid, which is
-  how a variation inverts link colours on a dark band — something no element
+  how a variation inverts link colors on a dark band — something no element
   style can do, because there is only one `elements.link` per site.
 - **There are no pseudo-*elements*.** Elements accept pseudo-*classes*
   (`:hover`, `:focus`, `:visited` and the rest), and nothing anywhere accepts
@@ -490,10 +515,13 @@ transforms and transitions.
 
 # The rules, in short
 
-1. **Colours** — `base` and `contrast` freely, the tier-2 roles by agreement;
-   check anything else with `get-design-system`; add what is missing with
-   `add-design-tokens`; never inline a hex.
-2. **Font sizes** — `small` … `xx-large`, and nothing invented.
+1. **Colors** — every slug is a role from the table, never a hue; `base` and
+   `contrast` freely; check the rest with `get-design-system`; add what is
+   missing with `add-design-tokens`; never inline a hex.
+2. **Font sizes** — `x-small`, `small`, `medium`, `large`, `x-large`, and
+   nothing else; the nearest of them when your size falls between two. Heading
+   sizes go on `styles.elements.h1` … `h6`, and heading blocks set no
+   `fontSize`.
 3. **Spacing** — numeric slugs, `40`–`60` for preference. Semantics go in
    `name`.
 4. **Font families** — set none unless the design needs one; `add-font` if it

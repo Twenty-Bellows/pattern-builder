@@ -13,7 +13,7 @@ Registration is conditional on `function_exists( 'wp_register_ability' )`: the
 API postdates the plugin's 6.8 floor and nothing depends on it, so the REST
 controller remains the baseline.
 
-## Three behaviours of core's that are load-bearing
+## Three behaviors of core's that are load-bearing
 
 - `meta.show_in_rest` must be true, or the ability registers but is
   unreachable over REST.
@@ -33,7 +33,7 @@ sets it).
 The WordPress MCP Adapter plugin is the transport; this plugin only says what it
 serves. `Pattern_Builder_Mcp` hooks `mcp_adapter_init`, which fires only where
 the adapter is active, so without it nothing here runs and nothing else changes.
-The adapter is never bundled: 0.7.0 deprecated that in favour of the plugin.
+The adapter is never bundled: 0.7.0 deprecated that in favor of the plugin.
 
 - **Its own server, `pattern-builder`**, at `/wp-json/pattern-builder/v1/mcp`
   and under WP-CLI as `wp mcp-adapter serve --server=pattern-builder`. It lists
@@ -99,7 +99,7 @@ are not called.
 Two of these need their shape explained.
 
 **`get-design-system` returns the whole system, not half of it.** Presets alone
-left an agent able to see that a site defines a colour called `ink` and not
+left an agent able to see that a site defines a color called `ink` and not
 that the theme paints every heading with it — and the safe move under that
 blindness is to over-specify, restating the font on each heading and the whole
 button on each button, none of which then follows the destination. Each block
@@ -130,7 +130,7 @@ come back in full; posts are named up to ten and counted beyond that.
 **`list-block-types` reports supports because no validator can.** The classes a
 block's saved markup must carry come from filters that only run inside an
 editor. Supports is about two and a half times the size of everything else in a
-listing, so naming blocks is what turns it on and a browse stays a catalogue; a
+listing, so naming blocks is what turns it on and a browse stays a catalog; a
 name this site does not have comes back under `unknown`.
 
 ## The writes
@@ -160,7 +160,23 @@ documented as never overwriting that always does.
   page at once, so `set-` replaces where `add-` never does.
 - A **variation** is a third thing: a named look applied with a class and
   scoped to the blocks carrying it, which is what lets it describe a second
-  kind of button without fossilising one into the markup.
+  kind of button without fossilizing one into the markup.
+
+**A preset's slug is checked against a vocabulary, for two of the five types.**
+A color's slug must be one of the roles `color_roles()` lists — the job the
+color does (`surface`, `text-muted`, `primary`, `hairline`…), never its hue —
+and a font size's one of `FONT_SIZE_LADDER`: `x-small`, `small`, `medium`,
+`large`, `x-large`. Anything else is refused before a byte is written, and the
+refusal lists what is allowed; a color slug in `COLOR_ROLE_SUGGESTIONS` also
+names the role it most likely meant, and a font size that looks like a heading
+is sent to `styles.elements`. A hue-named palette and font sizes named for
+headings are what an agent reproducing a site produced without this, copying the
+source's own names: a style variation leaves a hue name lying, and a heading
+size belongs on `styles.elements.h1` … `h6`. A font size that lands out of order
+with the sizes either side of it is written, with a `font_size_out_of_order`
+warning, when both values are plain lengths. The check is
+`execute_add_design_tokens()`'s alone: the cloud install writes through the same
+`Pattern_Builder_Cloud_Tokens::apply()` and installs whatever a pattern carries.
 
 **Registering a variation is a file rather than a theme.json key.**
 `styles.blocks.variations` only *styles* a variation something else registered:
@@ -294,7 +310,7 @@ input schema cannot say "one of", so the ability does.
 
 **Nothing takes a prompt.** An `execute_callback` that turned a description
 into a pattern would need a model behind it, which is the inference business
-this plugin is out of. The judgement lives in whatever agent is calling.
+this plugin is out of. The judgment lives in whatever agent is calling.
 
 **Block validity cannot be offered and is not.** `save()` is JavaScript, so the
 one check most worth having is the one no server can perform. The agent runs it

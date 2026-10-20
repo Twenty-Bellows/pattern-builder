@@ -316,8 +316,8 @@ class Test_Mcp extends WP_UnitTestCase {
 	public function test_each_design_system_write_answers_in_its_declared_shape() {
 		$token = array(
 			'type'  => 'color',
-			'slug'  => 'schema-ink',
-			'name'  => 'Schema ink',
+			'slug'  => 'highlight',
+			'name'  => 'Highlight',
 			'value' => '#123456',
 		);
 

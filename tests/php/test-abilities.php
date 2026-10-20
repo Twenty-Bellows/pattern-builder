@@ -2019,8 +2019,8 @@ class Test_Abilities extends WP_UnitTestCase {
 				'tokens'      => array(
 					array(
 						'type'  => 'color',
-						'slug'  => 'kiln-red',
-						'name'  => 'Kiln Red',
+						'slug'  => 'accent',
+						'name'  => 'Accent',
 						'value' => '#b3391f',
 					),
 					array(
@@ -2041,7 +2041,7 @@ class Test_Abilities extends WP_UnitTestCase {
 
 		$this->assertSame(
 			array(
-				'color'      => array( 'kiln-red' ),
+				'color'      => array( 'accent' ),
 				'spacing'    => array( 'band' ),
 				'fontFamily' => array( 'display-face' ),
 			),
@@ -2050,7 +2050,7 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertSame( array(), $result['skipped'] );
 		$this->assertSame( 'user', $result['destination'] );
 		$system = $this->abilities->execute_design_system();
-		$this->assertContains( 'kiln-red', wp_list_pluck( $system['palette'], 'slug' ) );
+		$this->assertContains( 'accent', wp_list_pluck( $system['palette'], 'slug' ) );
 		$this->assertContains( 'band', wp_list_pluck( $system['spacing'], 'slug' ) );
 		$this->assertContains( 'display-face', wp_list_pluck( $system['fontFamilies'], 'slug' ) );
 	}
@@ -2067,58 +2067,69 @@ class Test_Abilities extends WP_UnitTestCase {
 				'tokens' => array(
 					array(
 						'type'  => 'fontSize',
-						'slug'  => 'display',
-						'name'  => 'Display',
-						'value' => '3.5rem',
+						'slug'  => 'x-small',
+						'name'  => 'X-Small',
+						'value' => '0.75rem',
 					),
 				),
 			)
 		);
 
 		$this->assertSame( 'theme', $result['destination'] );
-		$this->assertSame( array( 'fontSize' => array( 'display' ) ), $result['written'] );
+		$this->assertSame( array( 'fontSize' => array( 'x-small' ) ), $result['written'] );
 
 		$config = json_decode( file_get_contents( $this->theme_json ), true );
-		$this->assertSame( 'display', $config['settings']['typography']['fontSizes'][0]['slug'] );
-		$this->assertSame( '3.5rem', $config['settings']['typography']['fontSizes'][0]['size'] );
+		$this->assertSame( 'x-small', $config['settings']['typography']['fontSizes'][0]['slug'] );
+		$this->assertSame( '0.75rem', $config['settings']['typography']['fontSizes'][0]['size'] );
 	}
 
 	/**
 	 * Never an overwrite.
 	 */
 	public function test_an_existing_slug_is_reported_not_overwritten() {
+		$this->abilities->execute_add_design_tokens(
+			array(
+				'destination' => 'user',
+				'tokens'      => array(
+					array(
+						'type'  => 'color',
+						'slug'  => 'surface',
+						'value' => '#f6f3ea',
+					),
+				),
+			)
+		);
+
 		$result = $this->abilities->execute_add_design_tokens(
 			array(
 				'destination' => 'user',
 				'tokens'      => array(
 					array(
 						'type'  => 'color',
-						'slug'  => 'black',
-						'name'  => 'Not Black',
+						'slug'  => 'surface',
 						'value' => '#ff0000',
 					),
 					array(
 						'type'  => 'color',
-						'slug'  => 'kiln-red',
-						'name'  => 'Kiln Red',
+						'slug'  => 'accent',
 						'value' => '#b3391f',
 					),
 				),
 			)
 		);
 
-		$this->assertSame( array( 'color' => array( 'kiln-red' ) ), $result['written'] );
+		$this->assertSame( array( 'color' => array( 'accent' ) ), $result['written'] );
 		$this->assertSame(
 			array(
 				array(
 					'type' => 'color',
-					'slug' => 'black',
+					'slug' => 'surface',
 				),
 			),
 			$result['skipped']
 		);
 		$palette = wp_list_pluck( $this->abilities->execute_design_system()['palette'], 'color', 'slug' );
-		$this->assertNotSame( '#ff0000', $palette['black'] );
+		$this->assertSame( '#f6f3ea', $palette['surface'] );
 	}
 
 	/**
@@ -2154,7 +2165,7 @@ class Test_Abilities extends WP_UnitTestCase {
 				'tokens'      => array(
 					array(
 						'type'  => 'color',
-						'slug'  => 'sneaky',
+						'slug'  => 'accent',
 						'value' => 'red; background:url(javascript:alert(1))',
 					),
 				),
@@ -2176,17 +2187,148 @@ class Test_Abilities extends WP_UnitTestCase {
 				'tokens'      => array(
 					array(
 						'type'  => 'color',
-						'slug'  => 'Kiln Red!',
-						'value' => '#b3391f',
+						'slug'  => 'Text Muted!',
+						'value' => '#81747b',
 					),
 				),
 			)
 		);
 
-		$this->assertSame( array( 'color' => array( 'kiln-red' ) ), $result['written'] );
+		$this->assertSame( array( 'color' => array( 'text-muted' ) ), $result['written'] );
 
 		$palette = wp_list_pluck( $this->abilities->execute_design_system()['palette'], 'name', 'slug' );
-		$this->assertSame( 'Kiln Red', $palette['kiln-red'] );
+		$this->assertSame( 'Text Muted', $palette['text-muted'] );
+	}
+
+	/**
+	 * Add one token to Global Styles.
+	 *
+	 * @param string $type  Token type.
+	 * @param string $slug  Slug.
+	 * @param string $value Value.
+	 * @return array|WP_Error
+	 */
+	private function add_token( $type, $slug, $value ) {
+		return $this->abilities->execute_add_design_tokens(
+			array(
+				'destination' => 'user',
+				'tokens'      => array(
+					array(
+						'type'  => $type,
+						'slug'  => $slug,
+						'value' => $value,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Five font sizes and no others, so a pattern sized with one means the same step on
+	 * every site that has them.
+	 */
+	public function test_a_font_size_off_the_ladder_is_refused() {
+		$result = $this->add_token( 'fontSize', 'huge', '4rem' );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_font_size_off_ladder', $result->get_error_code() );
+		$this->assertStringContainsString( 'x-small, small, medium, large, x-large', $result->get_error_message() );
+		$this->assertStringNotContainsString( 'styles.elements', $result->get_error_message() );
+		$this->assertNotContains( 'huge', wp_list_pluck( $this->abilities->execute_design_system()['fontSizes'], 'slug' ) );
+	}
+
+	/**
+	 * A heading's size is not a font size, and the refusal says where it goes instead.
+	 */
+	public function test_a_heading_size_is_sent_to_the_elements() {
+		foreach ( array( 'heading-2', 'h1', 'display' ) as $slug ) {
+			$result = $this->add_token( 'fontSize', $slug, '40px' );
+
+			$this->assertWPError( $result, $slug );
+			$this->assertStringContainsString( 'styles.elements.h1 to h6', $result->get_error_message(), $slug );
+		}
+	}
+
+	public function test_a_font_size_in_order_draws_no_warning() {
+		$result = $this->add_token( 'fontSize', 'x-small', '0.75rem' );
+
+		$this->assertSame( array( 'fontSize' => array( 'x-small' ) ), $result['written'] );
+		$this->assertArrayNotHasKey( 'warnings', $result );
+	}
+
+	/**
+	 * A size out of order is written, since only the author knows which value is wrong, but
+	 * it is worth saying: a pattern asking for the smaller size gets the larger.
+	 */
+	public function test_a_font_size_out_of_order_is_written_with_a_warning() {
+		$small = wp_list_pluck( $this->abilities->execute_design_system()['fontSizes'], 'size', 'slug' )['small'];
+
+		$result = $this->add_token( 'fontSize', 'x-small', '4rem' );
+
+		$this->assertSame( array( 'fontSize' => array( 'x-small' ) ), $result['written'] );
+		$this->assertSame( array( 'font_size_out_of_order' ), wp_list_pluck( $result['warnings'], 'code' ) );
+		$this->assertStringContainsString( 'not smaller than small (' . $small . ')', $result['warnings'][0]['message'] );
+	}
+
+	/**
+	 * A color is named for the job it does, so a style variation can repaint it without
+	 * leaving its name lying.
+	 */
+	public function test_a_color_named_for_its_hue_is_refused() {
+		$result = $this->add_token( 'color', 'blush', '#d6ebee' );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_color_not_a_role', $result->get_error_code() );
+		$this->assertStringContainsString( 'surface-muted', $result->get_error_message() );
+		$this->assertStringNotContainsString( 'most likely', $result->get_error_message() );
+		$this->assertNotContains( 'blush', wp_list_pluck( $this->abilities->execute_design_system()['palette'], 'slug' ) );
+	}
+
+	public function test_a_familiar_color_slug_is_pointed_at_its_role() {
+		$result = $this->add_token( 'color', 'on-dark', '#ffffff' );
+
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( '"on-dark" is most likely text-inverse.', $result->get_error_message() );
+	}
+
+	/**
+	 * One refused token refuses the call, so nothing is half written.
+	 */
+	public function test_a_refused_token_stops_the_whole_call() {
+		$result = $this->abilities->execute_add_design_tokens(
+			array(
+				'destination' => 'user',
+				'tokens'      => array(
+					array(
+						'type'  => 'color',
+						'slug'  => 'accent',
+						'value' => '#b3391f',
+					),
+					array(
+						'type'  => 'color',
+						'slug'  => 'forest',
+						'value' => '#2f3955',
+					),
+				),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertNotContains( 'accent', wp_list_pluck( $this->abilities->execute_design_system()['palette'], 'slug' ) );
+	}
+
+	/**
+	 * The guide's table is what an agent reads before it ever calls the ability, so it has
+	 * to be the list the ability enforces.
+	 */
+	public function test_the_guide_lists_exactly_the_color_roles() {
+		$guide = file_get_contents( dirname( __DIR__, 2 ) . '/guides/pattern-author/references/design-system.md' );
+		$start = strpos( $guide, '| Job | Roles |' );
+		$table = substr( $guide, $start, strpos( $guide, "\n\n", $start ) - $start );
+
+		preg_match_all( '/`([a-z-]+)`/', $table, $matches );
+
+		$this->assertEqualsCanonicalizing( Pattern_Builder_Abilities::color_roles(), $matches[1] );
 	}
 
 	public function test_nothing_to_add_is_an_error_not_a_silent_no_op() {
@@ -2206,7 +2348,7 @@ class Test_Abilities extends WP_UnitTestCase {
 				'tokens' => array(
 					array(
 						'type'  => 'color',
-						'slug'  => 'kiln-red',
+						'slug'  => 'accent',
 						'value' => '#b3391f',
 					),
 				),
