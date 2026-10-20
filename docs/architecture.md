@@ -400,8 +400,11 @@ A pattern installed from the cloud keeps its cloud name,
 `patterns/{handle}/{collection}/{slug}.php`. The theme scan is therefore
 recursive: core reads `patterns/` to unlimited depth, so a nested file is a
 pattern WordPress registers with no help from us, and two accounts' `hero`
-patterns stop overwriting each other. The theme's own patterns keep the flat
-layout every theme uses; `path_for_name()` is the one place that decides.
+patterns stop overwriting each other. `Synced_Patterns` finds the `Synced:`
+header in the same files the same way — any depth, through core's
+`theme_block_pattern_files` filter — because a registered pattern it misses is
+inserted as a copy whatever its header says. The theme's own patterns keep the
+flat layout every theme uses; `path_for_name()` is the one place that decides.
 
 A bare name is namespaced at the one door every theme-pattern write goes
 through (`Pattern_File_Store::update_theme_pattern()`, via `namespaced_name()`)
