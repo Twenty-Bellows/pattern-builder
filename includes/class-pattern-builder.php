@@ -25,6 +25,7 @@ require_once __DIR__ . '/class-safe-css.php';
 require_once __DIR__ . '/class-pattern-builder-theme-styles.php';
 require_once __DIR__ . '/class-pattern-builder-block-style-variations.php';
 require_once __DIR__ . '/class-pattern-builder-markup-checks.php';
+require_once __DIR__ . '/class-pattern-builder-composition-checks.php';
 require_once __DIR__ . '/class-pattern-builder-cloud-tokens.php';
 require_once __DIR__ . '/class-pattern-builder-cloud-porter.php';
 require_once __DIR__ . '/class-pattern-builder-cloud-controller.php';

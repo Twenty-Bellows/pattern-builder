@@ -1272,9 +1272,9 @@ class Test_Abilities extends WP_UnitTestCase {
 		}
 
 		$this->assertSame(
-			14,
+			13,
 			$skills['pattern-author']['files'],
-			"The pattern-author skill's three scripts travel with its eleven documents."
+			"The pattern-author skill's two scripts travel with its eleven documents."
 		);
 		$this->assertSame( 3, $skills['design-reproduction']['files'] );
 	}
@@ -1361,7 +1361,7 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertSame( 'SKILL.md', $skill['entry'] );
 		$this->assertNotEmpty( $skill['description'] );
 		$this->assertNotEmpty( $skill['version'] );
-		$this->assertCount( 14, $skill['files'] );
+		$this->assertCount( 13, $skill['files'] );
 
 		$paths = wp_list_pluck( $skill['files'], 'path' );
 		$this->assertSame( 'SKILL.md', $paths[0], 'The entry is not the first thing an installer writes.' );

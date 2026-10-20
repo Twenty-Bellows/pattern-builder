@@ -217,6 +217,21 @@ never wrote; an update that moves the markup under an unchanged description
 gets `description_unchanged` instead, as something worth a look. The guidance
 on writing one is in `pattern-kinds.md`.
 
+**And about whether the markup lays out.** `Pattern_Builder_Composition_Checks`
+looks at every flex or grid container and asks whether its children can size in
+their tracks, following a `core/pattern` reference to the root block of the
+pattern it places: a child whose root is a constrained group fills the whole
+track (`composition_children_fill_track`), three or more children of a flex row
+with no width will not hold a grid (`composition_flex_unsized`), and a
+reference with more than one root block leaves its sizing unknown
+(`composition_reference_unknown`). A grid that sets a column count or a minimum
+column width sizes its own tracks and is left alone. These are warnings because
+the markup is valid and renders; it just renders as a vertical stack, and
+nothing else reports that. It runs on the site rather than beside the agent
+because it needs only the parser and the patterns a reference points at, both
+of which are here — an agent connected over MCP has neither. Like the
+description, only markup the write changed is judged.
+
 The reference check above runs when the *referencing* markup is written. The
 same failure can arrive from the other side: an update that removes or renames
 a slot sends every reference that filled it back to the pattern's own words.
@@ -408,15 +423,16 @@ plus the site it came from and the skill's checksum. That is why the recipe's
 check is against what was served, not against the manifest's per-file
 checksums, which cover the prose alone.
 
-A skill's **scripts travel with it**, and they are only the checks no server
-can make: the validator, its loader and the composition check, all run with
-Node where the agent is. A check the site already makes on every write does
-not travel. Slot errors are refused by `create-pattern` and `update-pattern`,
-so the skill carries no script for them, and the guides tell an agent writing
-theme files directly to compare slot names by hand and look at the rendered
-page. That also keeps every skill free of PHP, which would need WordPress and
-WP-CLI beside the agent, and of any link ending in `.php`, which some hosts
-answer themselves instead of handing to WordPress. A test holds it there.
+A skill's **scripts travel with it**, and they are only the check no server can
+make: block validity, the validator and its loader, run with Node where the
+agent is. A check the site can make on every write does not travel. Slot errors
+are refused by `create-pattern` and `update-pattern`, and whether blocks lay out
+together is reported by them as warnings (below), so the skill carries no
+script for either, and the guides tell an agent writing theme files directly
+to compare slot names by hand and look at the rendered page. That also keeps
+every skill free of PHP, which would need WordPress and WP-CLI beside the
+agent, and of any link ending in `.php`, which some hosts answer themselves
+instead of handing to WordPress. A test holds it there.
 
 **Staleness is a checksum, not a version.** Each guide's checksum is taken over
 the text the site serves, *after* `pattern_builder_authoring_guides` runs, and

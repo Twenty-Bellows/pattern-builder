@@ -59,6 +59,7 @@ const ALLOW = new Set( [
 	'render_block_core_pattern()',
 	'edit_themes',
 	'DISALLOW_FILE_EDIT',
+	'wp-abilities/v1',
 	'get_the_content()',
 	'NON_CONTEXTUAL_POST_TYPES',
 	// The host environment and other repositories.

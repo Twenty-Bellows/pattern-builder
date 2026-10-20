@@ -299,28 +299,30 @@ working inside one. Otherwise:
 | Situation | How |
 |---|---|
 | WordPress elsewhere on disk | `--wp /path/to/wordpress`, or `WP_PATH=…` |
-| Only HTTP access to the site | `get-validator` for the script, `get-editor-scripts` > `scripts.json`, then `--scripts scripts.json` |
+| Only HTTP or MCP access to the site | `get-validator` for the script; the `get-editor-scripts` answer saved as `scripts.json`, fresh each session; then `--scripts scripts.json` |
 | No WordPress anywhere | `--npm`, using `node_modules` |
 
 It needs a DOM either way: `npm i --no-save jsdom`. It handles a theme
 pattern's PHP header and inline `<?php echo esc_url( … ); ?>`, and takes `-` to
 read from stdin. If the project has its own validator, prefer it.
 
+Ask for `scripts.json` again each session rather than keeping one. It names
+each script by a URL carrying its version, and the validator caches by URL, so
+a list kept from before the site updated WordPress checks against the old code
+and says nothing.
+
 **Then check that it lays out.** Validation answers a question about one
 block; a section is a relationship *between* blocks, and nothing above can see
-one:
-
-```bash
-node <skill>/scripts/check-composition.mjs patterns/
-```
-
-It resolves `core/pattern` references against the theme's own files and reports
-any flex or grid container whose children cannot size — most often a card
-pattern written with `{"layout":{"type":"constrained"}}` at its root, which
-fills the whole track, so six references render as six full-width cards stacked
-vertically. That markup is entirely valid, every token resolves, and no other
-check in this workflow reports a thing. Static and immediate; it needs no
-browser and no rendering.
+one. The site checks this when you store through `create-pattern` or
+`update-pattern`, following `core/pattern` references to the patterns they
+place, and reports it under `warnings` with a `composition_` code: a flex or
+grid container whose children cannot size — most often a card pattern written
+with `{"layout":{"type":"constrained"}}` at its root, which fills the whole
+track, so six references render as six full-width cards stacked vertically.
+That markup is entirely valid, every token resolves, and nothing else reports
+it, so read the warnings after every write and fix one before moving on. For
+theme files written directly, look at the page in `render-pattern`'s `page`
+preview instead.
 
 **If the pattern uses Pattern Overrides slots, check that every value lands.**
 Slot problems are invisible to block validation in both directions, and both
