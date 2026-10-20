@@ -208,10 +208,13 @@ Both writes report a category nothing on the site registered under
 `unregisteredCategories`.
 
 Both also return `warnings`, never refusals, about the description: missing,
-too short to tell two patterns apart (`DESCRIPTION_MIN_WORDS`), or using words
-that describe every pattern (`EMPTY_WORDS`). The description is what an agent
+too short to tell two patterns apart (`DESCRIPTION_MIN_WORDS`), longer than one
+sentence or `DESCRIPTION_MAX_WORDS` (`description_long`), or using words that
+describe every pattern (`EMPTY_WORDS`). The description is what an agent
 choosing from `list-patterns`, or a person searching the inserter, has to go
-on, and a pattern nobody can find gets written again. Only a description the
+on, and a pattern nobody can find gets written again. It is one sentence saying
+what the pattern is for and roughly what is in it; slot names, dependencies and
+how it stacks are left to the pattern, which says them for itself. Only a description the
 write sets is judged, since an edit is no occasion to re-judge prose its author
 never wrote; an update that moves the markup under an unchanged description
 gets `description_unchanged` instead, as something worth a look. The guidance

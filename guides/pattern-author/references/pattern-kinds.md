@@ -135,7 +135,7 @@ Written by `Pattern_File_Store`, and readable in any theme's `patterns/`:
 /**
  * Title: Pricing Plans
  * Slug: my-theme/pricing-plans
- * Description: Pricing section for a landing page: two plans side by side, each with a name, a price, what is included and a button. They stack on a narrow screen. Depends on nothing.
+ * Description: Pricing section for a landing page, with two plans side by side, each with a price and a button.
  * Categories: my-theme_sections, call-to-action
  * Keywords: pricing, card, grid
  * Block Types: core/post-content
@@ -169,19 +169,26 @@ to go on, and nothing else until they open the pattern. A pattern nobody can
 find gets written again, so the description is part of the pattern's job, not
 a label stuck on afterwards.
 
-A description holds, in this order:
+A description is **one sentence**: what the pattern is for, then roughly what
+is in it. It is read in a list beside twenty others, so its job is to say which
+pattern this is, not how it is built.
 
-- **What it is and where it is used**, in a first sentence that stands on its
-  own, since it is the one read when twenty patterns come back at once.
-  "Pricing section for a landing page", not "a pricing block".
-- **What is in it and how it is arranged**: what sits where, how many of what,
-  what repeats, how it stacks on a narrow screen. Someone should be able to
-  sketch it from this.
-- **Its behaviour**, only when it has some: an accordion, a navigation overlay,
-  a query that lists posts. Leave it out rather than invent motion.
-- **What it depends on**: a menu, a form, a post type, an image it expects, a
-  pattern it places. Or say it depends on nothing, so the reader knows that
-  was checked rather than forgotten.
+- "Site header with the logo and main menu, in light text for placing over a
+  photograph."
+- "Home page hero with the site header over a full-width photograph, a
+  headline, a short sentence and two buttons."
+- "The Farmhouse Flower Farm home page, assembled from the hero, shop, story,
+  course, journal, press and newsletter sections."
+
+Lead with the kind of thing and where it goes — "Pricing section for a landing
+page", not "a pricing block" — then name its parts in a word or two each. Aim
+for 12 to 30 words.
+
+Leave out what anyone who opens the pattern can see: the names of its slots,
+slugs, a list of what it depends on (or that it depends on nothing), how it
+stacks on a narrow screen, and what each section of a page holds. Mention
+behaviour only when it is what the pattern is for, such as an accordion or a
+list of posts.
 
 Write what stays true on another theme. Colours, fonts and radii come from the
 design system, so "a dark band with rounded cards" describes the site it was
@@ -200,7 +207,8 @@ so the same shape does not arrive as `card` from one pattern and `cards` from
 the next.
 
 `create-pattern` and `update-pattern` return `warnings` when a description is
-missing, too short to tell two patterns apart, or made of words that describe
-everything, and when an update moves the markup under a description it did not
-touch. They never refuse the write.
+missing, too short to tell two patterns apart, longer than one sentence of
+about 30 words, or made of words that describe everything, and when an update
+moves the markup under a description it did not touch. They never refuse the
+write.
 

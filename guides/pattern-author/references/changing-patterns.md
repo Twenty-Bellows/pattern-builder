@@ -82,7 +82,7 @@ overwritten; read it again and redo the change on what is there. Validate the
 result as you would any markup. `changed: false` in the answer means the write
 left the pattern exactly as it was, which is rarely what was meant. A
 `description_unchanged` warning means the markup moved and the description did
-not: check it still says what the pattern is.
+not: check it still says what the pattern is for and roughly what is in it.
 
 ## When to ask
 

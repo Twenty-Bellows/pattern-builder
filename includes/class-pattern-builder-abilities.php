@@ -53,6 +53,11 @@ class Pattern_Builder_Abilities {
 	const DESCRIPTION_MIN_WORDS = 12;
 
 	/**
+	 * More words than this are no longer one sentence someone choosing from a list can take in.
+	 */
+	const DESCRIPTION_MAX_WORDS = 30;
+
+	/**
 	 * How long a skill's download links open for, in seconds.
 	 */
 	const SKILL_LINK_TTL = 3600;
@@ -2413,7 +2418,7 @@ class Pattern_Builder_Abilities {
 			),
 			'description'        => array(
 				'type'        => 'string',
-				'description' => 'What the pattern is and where it is used; what is in it and how it is arranged, including what repeats and how it stacks on a narrow screen; any behaviour; and what it depends on, or that it depends on nothing. Shown in the inserter and searched by list-patterns. Leave out colours and fonts, which belong to the site, and words that describe every pattern.',
+				'description' => 'One sentence, about 12 to 30 words: what the pattern is for, then roughly what is in it, e.g. "Home page hero with the site header over a full-width photograph, a headline, a short sentence and two buttons." Name its parts in a word or two each. Shown in the inserter and searched by list-patterns. Leave out what opening the pattern shows: slot names, slugs, a list of what it depends on, how it stacks on a narrow screen, what each section of a page holds. Leave out colours and fonts, which belong to the site, and words that describe every pattern.',
 			),
 			'categories'         => array(
 				'type'        => 'array',
@@ -2926,7 +2931,7 @@ class Pattern_Builder_Abilities {
 		if ( (string) $stored->content !== (string) $existing->content && '' !== trim( (string) $stored->description ) && (string) $stored->description === (string) $existing->description ) {
 			$warnings[] = array(
 				'code'    => 'description_unchanged',
-				'message' => __( 'The markup changed and the description did not. Check it still says what the pattern is, what is in it and what it depends on.', 'pattern-builder' ),
+				'message' => __( 'The markup changed and the description did not. Check it still says what the pattern is for and roughly what is in it.', 'pattern-builder' ),
 			);
 		}
 
@@ -2947,7 +2952,7 @@ class Pattern_Builder_Abilities {
 	 */
 	private function description_warnings( $description ) {
 		$description = trim( (string) $description );
-		$shape       = __( 'Say what it is and where it is used, what is in it and how it is arranged, any behaviour, and what it depends on.', 'pattern-builder' );
+		$shape       = __( 'Write one sentence: what the pattern is for, then roughly what is in it, such as "Site header with the logo and main menu, in light text for placing over a photograph."', 'pattern-builder' );
 
 		if ( '' === $description ) {
 			return array(
@@ -2968,6 +2973,20 @@ class Pattern_Builder_Abilities {
 					__( 'The description is %d words, which is rarely enough to tell two patterns apart.', 'pattern-builder' ),
 					$words
 				) . ' ' . $shape,
+			);
+		}
+
+		// A full stop, question or exclamation mark with more text after it ends a sentence.
+		$sentences = 1 + preg_match_all( '/[.!?]["\x{201D}\x{2019})]*\s+\S/u', $description );
+		if ( $words > self::DESCRIPTION_MAX_WORDS || $sentences > 1 ) {
+			$warnings[] = array(
+				'code'    => 'description_long',
+				'message' => sprintf(
+					/* translators: 1: word count, 2: sentence count. */
+					_n( 'The description is %1$d words in %2$d sentence.', 'The description is %1$d words in %2$d sentences.', $sentences, 'pattern-builder' ),
+					$words,
+					$sentences
+				) . ' ' . __( 'Someone choosing from a list needs to know which pattern this is, not how it is built: leave slot names, slugs, dependencies and how it stacks to the pattern itself.', 'pattern-builder' ) . ' ' . $shape,
 			);
 		}
 

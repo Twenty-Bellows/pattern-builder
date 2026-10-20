@@ -53,7 +53,7 @@ with a `name` (the slot's key) and a `__default` binding:
 /**
  * Title: FAQ Entry
  * Slug: my-theme/faq-entry
- * Description: One question and its answer, above a hairline.
+ * Description: FAQ entry with one question and its answer above a hairline, repeated to build a list of questions.
  * Categories: my-theme_elements
  * Synced: yes
  */
