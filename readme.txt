@@ -3,7 +3,7 @@ Contributors:      twentybellows, pbking
 Tags:              block-patterns, patterns, block-editor, gutenberg, design
 Requires at least: 6.8
 Tested up to:      7.1
-Stable tag:        2.3.0
+Stable tag:        2.3.1
 Requires PHP:      7.4
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -119,6 +119,13 @@ Yes. Anything registered as post meta with show_in_rest is offered automatically
 
 == Changelog ==
 
+= 2.3.1 =
+* Agents give each color they add to your design system a name for the job it does (base, surface, primary, accent, hairline and so on) rather than its hue, so a restyle never leaves a color misnamed, and a name outside that list is refused
+* Font sizes added by agents are limited to x-small, small, medium, large and x-large; heading sizes are set on the headings themselves, and other text takes the nearest of the five
+* Reproducing an existing site maps its colors and type onto those names instead of copying the source's own
+* Agents describe a pattern in one sentence saying what it is for and roughly what is in it, and saving a pattern warns when a description runs longer
+* Fixed: synced patterns kept in folders inside the theme's patterns folder, as every pattern installed from the cloud is, were inserted into the editor as copies instead of staying linked
+
 = 2.3.0 =
 * Connect Claude to your site from the new Agents tab in Appearance → Pattern Builder: it checks what a connection needs, installs the MCP Adapter plugin for you when it is missing, and gives you a message to paste into Claude, which sets the connection up itself
 * Your connections are listed with when each was last used, and any of them can be revoked in one click
@@ -140,7 +147,7 @@ Yes. Anything registered as post meta with show_in_rest is offered automatically
 
 = 2.1.1 =
 * Editing a theme pattern no longer discards the rest of its file header: the @package block a theme carries, or a note written beside it, is kept exactly as it was and can be edited in the Pattern Metadata panel
-* A pattern file that runs PHP is now recognised and never written over. Reading one runs it, so saving would have replaced the code with the output of a single run; the pattern still lists, opens and previews, and the editor says why it cannot be saved
+* A pattern file that runs PHP is now recognized and never written over. Reading one runs it, so saving would have replaced the code with the output of a single run; the pattern still lists, opens and previews, and the editor says why it cannot be saved
 * Patterns built around the Content block now preview as themselves instead of drawing the site's home page inside the pattern, and open in the editor instead of reporting that the block cannot be rendered inside itself
 * The plugin's version constant is reported correctly again. It had fallen a release behind, which left the 2.1.0 upgrade step unrun and pattern previews serving what they had drawn before the update
 
