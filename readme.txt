@@ -3,7 +3,7 @@ Contributors:      twentybellows, pbking
 Tags:              block-patterns, patterns, block-editor, gutenberg, design
 Requires at least: 6.8
 Tested up to:      7.1
-Stable tag:        2.2.0
+Stable tag:        2.3.0
 Requires PHP:      7.4
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -118,6 +118,16 @@ Yes. Anything registered as post meta with show_in_rest is offered automatically
 == Screenshots ==
 
 == Changelog ==
+
+= 2.3.0 =
+* Connect Claude to your site from the new Agents tab in Appearance → Pattern Builder: it checks what a connection needs, installs the MCP Adapter plugin for you when it is missing, and gives you a message to paste into Claude, which sets the connection up itself
+* Your connections are listed with when each was last used, and any of them can be revoked in one click
+* With the MCP Adapter plugin active, every Pattern Builder ability is an MCP tool of its own, so you can let an agent read freely and still approve each change it makes
+* Agents install the pattern-author and design-reproduction skills from your site with one command and no password, instead of fetching every file through the conversation
+* Saving a pattern warns when a row or grid will not lay out as written, such as cards that stack one above another instead of sitting side by side
+* The block validator checks against the WordPress your site runs now, with nothing to save between runs, and its one dependency is installed once per computer rather than in every project
+* Security: theme pattern files can no longer be made to carry PHP beyond the code Pattern Builder generates itself, so permission to edit patterns cannot be used to run code on the site
+* Fixed: localizing text containing a backslash before a quote could write a pattern file that ran that text as code
 
 = 2.2.0 =
 * A Plugin tab in Appearance → Pattern Builder browses the patterns your plugins register, with the same previews, search and categories as your own
