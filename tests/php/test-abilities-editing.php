@@ -514,9 +514,32 @@ class Test_Abilities_Editing extends WP_UnitTestCase {
 	 * A description someone can choose the pattern by earns no warning at all.
 	 */
 	public function test_a_good_description_earns_no_warning() {
-		$answer = $this->described( 'Pricing section for a landing page: two plans side by side, each with a name, a price, what is included and a button. They stack on a narrow screen. Depends on nothing.' );
+		$answer = $this->described( 'Home page hero with the site header over a full-width photograph, a headline, a short sentence and two buttons.' );
 
 		$this->assertArrayNotHasKey( 'warnings', $answer );
+	}
+
+	/**
+	 * A description that explains how the pattern is built, in several sentences or one long
+	 * one, is told to say which pattern it is instead.
+	 */
+	public function test_a_description_longer_than_a_sentence_is_warned_about() {
+		$answer = $this->described( 'Pricing section for a landing page: two plans side by side, each with a name, a price, what is included and a button. They stack on a narrow screen. Depends on nothing.' );
+		$this->assertSame( array( 'description_long' ), $this->warning_codes( $answer ) );
+		$this->assertStringContainsString( '3 sentences', $answer['warnings'][0]['message'] );
+
+		$this->assertSame(
+			array( 'description_long' ),
+			$this->warning_codes( $this->described( 'Pricing section for a landing page with two plans side by side, each with its name, a price, a list of what is included, a note on billing and a button under it.' ) )
+		);
+	}
+
+	/**
+	 * A full stop inside a sentence, or a quoted title that ends one, is still one sentence.
+	 */
+	public function test_one_sentence_is_counted_as_one() {
+		$this->assertSame( array(), $this->warning_codes( $this->described( 'Price list for version 2.5 of the plans page, with three tiers side by side and a button under each.' ) ) );
+		$this->assertSame( array(), $this->warning_codes( $this->described( 'Newsletter band for the foot of a page, with a heading, an email field and a button labelled "Sign up."' ) ) );
 	}
 
 	/**
@@ -541,7 +564,7 @@ class Test_Abilities_Editing extends WP_UnitTestCase {
 	 * A description an update sets is judged like one a create sets.
 	 */
 	public function test_a_description_an_update_sets_is_judged() {
-		$created = $this->described( 'Pricing section for a landing page: two plans side by side, each with a name, a price, what is included and a button.' );
+		$created = $this->described( 'Pricing section for a landing page, with two plans side by side, each with a price and a button.' );
 		$id      = (string) $created['pattern']['id'];
 
 		$updated = $this->abilities->execute_update_pattern(
