@@ -515,12 +515,31 @@ export function AgentsTab( { agents } ) {
 				</table>
 			) }
 
+			<h3>{ __( 'Skills', 'pattern-builder' ) }</h3>
 			<p className="pattern-builder-agents__note">
 				{ __(
-					'Claude reads Pattern Builder’s authoring guides through the get-authoring-guide tool. To keep a copy with your project, ask it to install the pattern-author skill.',
+					'Claude reads Pattern Builder’s authoring guides through the get-authoring-guide tool. To keep a copy with your project, ask it to install either skill from this site:',
 					'pattern-builder'
 				) }
 			</p>
+			<ul className="pattern-builder-agents__skills">
+				<li>
+					<code>pattern-author</code>
+					{ ' — ' }
+					{ __(
+						'writing block patterns that use the theme’s design tokens and check as valid.',
+						'pattern-builder'
+					) }
+				</li>
+				<li>
+					<code>design-reproduction</code>
+					{ ' — ' }
+					{ __(
+						'rebuilding a design that already exists, such as a website, a screenshot or a Figma file. Install it alongside pattern-author.',
+						'pattern-builder'
+					) }
+				</li>
+			</ul>
 		</div>
 	);
 }

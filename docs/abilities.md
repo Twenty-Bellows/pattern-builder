@@ -217,6 +217,21 @@ never wrote; an update that moves the markup under an unchanged description
 gets `description_unchanged` instead, as something worth a look. The guidance
 on writing one is in `pattern-kinds.md`.
 
+**And about whether the markup lays out.** `Pattern_Builder_Composition_Checks`
+looks at every flex or grid container and asks whether its children can size in
+their tracks, following a `core/pattern` reference to the root block of the
+pattern it places: a child whose root is a constrained group fills the whole
+track (`composition_children_fill_track`), three or more children of a flex row
+with no width will not hold a grid (`composition_flex_unsized`), and a
+reference with more than one root block leaves its sizing unknown
+(`composition_reference_unknown`). A grid that sets a column count or a minimum
+column width sizes its own tracks and is left alone. These are warnings because
+the markup is valid and renders; it just renders as a vertical stack, and
+nothing else reports that. It runs on the site rather than beside the agent
+because it needs only the parser and the patterns a reference points at, both
+of which are here — an agent connected over MCP has neither. Like the
+description, only markup the write changed is judged.
+
 The reference check above runs when the *referencing* markup is written. The
 same failure can arrive from the other side: an update that removes or renames
 a slot sends every reference that filled it back to the pattern's own words.
@@ -290,6 +305,14 @@ site actually runs — the only version whose opinion counts. Nothing to install
 but `jsdom`; `--npm` falls back to `node_modules` where there is no install to
 find.
 
+**`jsdom` is installed once per machine, not per project.** `loadJsdom()` takes
+it from wherever Node finds it beside the scripts — a project that already has
+it — and otherwise from `MACHINE_DIR`, the user's cache directory
+(`~/.cache/pattern-builder`, or `%LOCALAPPDATA%` on Windows). When it is in
+neither, the error gives the one command that fills that folder. The skill's
+install stays a copy of its files: it runs no npm, and nothing lands in a skill
+folder or in a theme repository with no JavaScript of its own.
+
 The script order comes from core's generated `script-loader-packages.php`, and
 the files go in as real `<script>` elements because these bundles are
 strict-mode and a strict `eval` keeps its `var` declarations to itself, which
@@ -298,11 +321,31 @@ instead would ship 21MB, because every block's `save()` imports
 `@wordpress/block-editor` and core keeps each support's `addSaveProps` in the
 same module as that support's editor UI.
 
-An agent that only reaches the site over HTTP gets the same check from
-`get-validator` and `get-editor-scripts`. That second one is necessary because
-WordPress serves those files to anyone but not the graph, and the order is not
-forgiving: the JSX runtime reads `globalThis.React` as it loads, so React
-arriving late costs every JSX call in the bundles, silently.
+An agent with no WordPress beside it gets the same check from the site. The
+list of editor scripts has to come from there, because WordPress serves those
+files to anyone but not the graph, and the order is not forgiving: the JSX
+runtime reads `globalThis.React` as it loads, so React arriving late costs every
+JSX call in the bundles, silently.
+
+**The validator asks for that list itself, on every run.** Where it gets its
+block code is, in order: a list given with `--scripts`, a WordPress install
+(`--wp`, `WP_PATH`, or one it finds around it), a site named with `--site` or
+else the one an installed skill records in its front matter as
+`metadata.source`, and last `node_modules`. A site answers at
+`/pattern-builder/v1/editor-scripts`, which opens without credentials, because
+the validator runs in a shell beside an agent that holds none. It returns what
+`get-editor-scripts` does, the dependency closure of core's block editor
+packages and nothing a plugin registered, so it says no more than the WordPress
+version the front end's `?ver=` usually shows. Asking every run is what keeps
+the check current. A saved list goes stale silently: every script URL carries
+its version and the scripts are cached by URL, so a list kept from before an
+update checks against the old code, and an agent left to save one puts it
+wherever it likes. Asking leaves nothing to save.
+
+The scripts are cached in the system's temp folder, one folder per list. Each
+run touches its own folder and removes any other unused for a week, so a site
+that updated WordPress, or one no longer worked on, does not leave its old code
+behind for good, while several sites in use at once keep theirs.
 
 ## The guides
 
@@ -369,13 +412,14 @@ regardless.
 Reading a guide and keeping one are different jobs, and the ability answers
 both. Reading is by name (`input[guide]`). Keeping is by skill
 (`input[skill]`), which answers with a manifest — every file the skill is made
-of, each with the path to write it at, its size and its checksum — and an
-`install` recipe. Files are then fetched by path (`input[file]`), because an
+of, each with the path to write it at, its size, its checksum and a signed
+`url` — and an `install` recipe. Files are addressed by path, because an
 installer needs the layout: every one of these documents names the others by
 relative path, so a copy that flattened them would have a dangling link on
 every page. A path from a caller never reaches the filesystem; it is looked up
 in the skill's own inventory, so nothing can be named that the site was not
-already offering.
+already offering. One file can also be read through the ability
+(`input[file]`), but that is for looking, not installing.
 
 A theme's filtered guide may carry a `path` too, which puts it in a shipped
 skill's layout and makes it install alongside the rest — a house reference
@@ -384,18 +428,39 @@ installer chose: one that climbs out is dropped rather than corrected, leaving
 that guide where a guide with no place in a layout belongs, in the flat index
 and part of no skill.
 
-The recipe fetches each file straight to disk, so the bytes never pass through
-the agent's context — the same reason an image is uploaded as a request body
-rather than base64 inside JSON. The entry file also comes back with
-`frontmatter` to write above it: the name and description that make the skill
-trigger, which the prose alone does not carry, plus the site it came from and
-the skill's checksum.
+**The recipe is the commands themselves, and they need no credentials.** It
+downloads each file straight to disk, so the bytes never pass through the
+agent's context — the same reason an image is uploaded as a request body
+rather than base64 inside JSON — and ends by checking every file against the
+sha256 of what was served, with `sha256sum -c -` or `shasum -a 256 -c -`, the
+one form GNU, BSD and Perl's tools all read from stdin. The downloads are
+signed links to `/pattern-builder/v1/skills/{skill}/{path}`, signed as preview
+links are (an HMAC over the skill and an expiry an hour out, keyed from the
+site's salts) and good for that skill only. They have to be: an agent connected
+over MCP holds no password, because the Agents tab leaves it in the client's
+own settings, and an agent that went to read it from there would be stopped by
+its permissions, rightly. Before this, that left fetching every file through
+the ability, about 190 KB per skill passing through the model twice; the
+manifest an agent reads now is a few thousand tokens. The route answers with
+the file itself rather than JSON (`serve_skill_download()`), so `curl -o`
+writes exactly what the checksum covers.
 
-A skill's **scripts travel with it**, `check-slots.php` included. That one runs
-under WP-CLI rather than Node, which is why `get-validator` does not carry it —
-that ability hands over one tool that runs anywhere — but `design-content-split.md`
-names it, so a skill without it would send an agent after a file nothing would
-hand over.
+The entry file is served with `frontmatter` above its prose: the name and
+description that make the skill trigger, which the prose alone does not carry,
+plus the site it came from and the skill's checksum. That is why the recipe's
+check is against what was served, not against the manifest's per-file
+checksums, which cover the prose alone.
+
+A skill's **scripts travel with it**, and they are only the check no server can
+make: block validity, the validator and its loader, run with Node where the
+agent is. A check the site can make on every write does not travel. Slot errors
+are refused by `create-pattern` and `update-pattern`, and whether blocks lay out
+together is reported by them as warnings (below), so the skill carries no
+script for either, and the guides tell an agent writing theme files directly
+to compare slot names by hand and look at the rendered page. That also keeps
+every skill free of PHP, which would need WordPress and WP-CLI beside the
+agent, and of any link ending in `.php`, which some hosts answer themselves
+instead of handing to WordPress. A test holds it there.
 
 **Staleness is a checksum, not a version.** Each guide's checksum is taken over
 the text the site serves, *after* `pattern_builder_authoring_guides` runs, and

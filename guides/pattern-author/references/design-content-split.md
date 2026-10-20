@@ -133,7 +133,8 @@ Storing through `pattern-builder/create-pattern` catches all three: it
 refuses attribute JSON that does not parse, a `content` key that names no
 slot in the referenced pattern (and says which slots it has), a binding with
 no `metadata.name`, and a binding on a block core cannot bind. Writing files
-by hand, `scripts/check-slots.php` is the equivalent check, by rendering.
+by hand, nothing makes that check for you: do the comparison above yourself,
+then render the page and look for placeholder copy where a value should be.
 
 ## Static copy in a design pattern
 

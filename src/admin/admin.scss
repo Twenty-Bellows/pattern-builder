@@ -357,6 +357,12 @@ body.appearance_page_pattern-builder {
 	&__note {
 		color: #50575e;
 	}
+
+	&__skills {
+		margin: 0 0 0 20px;
+		list-style: disc;
+		color: #50575e;
+	}
 }
 
 // ---- Pattern cards: uniform 1:1 previews. ----

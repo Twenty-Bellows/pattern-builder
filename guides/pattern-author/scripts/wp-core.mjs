@@ -220,6 +220,88 @@ export function loadWordPressBlocks( wpRoot ) {
 }
 
 /**
+ * Where jsdom is installed once for the whole machine, so that neither a project nor a
+ * skill folder has to carry it: the user's cache directory, or %LOCALAPPDATA% on Windows.
+ */
+export const MACHINE_DIR =
+	process.platform === 'win32' && process.env.LOCALAPPDATA
+		? path.join( process.env.LOCALAPPDATA, 'pattern-builder' )
+		: path.join(
+				process.env.XDG_CACHE_HOME ||
+					path.join( os.homedir(), '.cache' ),
+				'pattern-builder'
+		  );
+
+/**
+ * The command that installs jsdom for the whole machine.
+ */
+export const JSDOM_SETUP = `npm i --prefix "${ MACHINE_DIR }" jsdom`;
+
+/**
+ * jsdom, from where Node finds it beside these scripts — a project that already has it —
+ * or else from the one install for the whole machine.
+ *
+ * @return {Object} The jsdom module.
+ */
+export function loadJsdom() {
+	try {
+		return require( 'jsdom' );
+	} catch {}
+
+	try {
+		return createRequire( path.join( MACHINE_DIR, 'package.json' ) )(
+			'jsdom'
+		);
+	} catch {
+		throw new Error(
+			"jsdom is needed to run WordPress's editor code outside a browser. Install it once for this machine:\n" +
+				`  ${ JSDOM_SETUP }`
+		);
+	}
+}
+
+/**
+ * What every folder of cached editor scripts is named with.
+ */
+const CACHE_PREFIX = 'pattern-builder-wp-';
+
+/**
+ * How long a folder of cached scripts may go unused before it is removed.
+ */
+const CACHE_MAX_IDLE = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Remove the cache folders no run has used for a week. Each script list gets a folder of
+ * its own, so a site that updates WordPress leaves its old folder behind, and so does a
+ * site no longer worked on. Several sites in use at once each keep theirs.
+ *
+ * @param {string} keep The folder this run uses.
+ */
+function pruneCaches( keep ) {
+	const parent = path.dirname( keep );
+	const cutoff = Date.now() - CACHE_MAX_IDLE;
+	let names = [];
+
+	try {
+		names = fs.readdirSync( parent );
+	} catch {
+		return;
+	}
+
+	for ( const name of names ) {
+		const dir = path.join( parent, name );
+		if ( ! name.startsWith( CACHE_PREFIX ) || dir === keep ) {
+			continue;
+		}
+		try {
+			if ( fs.statSync( dir ).mtimeMs < cutoff ) {
+				fs.rmSync( dir, { recursive: true, force: true } );
+			}
+		} catch {}
+	}
+}
+
+/**
  * The same, for a site reachable only over HTTP.
  *
  * @param {Array}  urls    Script URLs, dependencies first.
@@ -229,12 +311,14 @@ export function loadWordPressBlocks( wpRoot ) {
 export async function loadWordPressBlocksFromUrls( urls, options = {} ) {
 	const cacheDir =
 		options.cacheDir ||
-		path.join(
-			os.tmpdir(),
-			'pattern-builder-wp-' + digest( urls.join( '\n' ) )
-		);
+		path.join( os.tmpdir(), CACHE_PREFIX + digest( urls.join( '\n' ) ) );
 
 	fs.mkdirSync( cacheDir, { recursive: true } );
+
+	if ( ! options.cacheDir ) {
+		fs.utimesSync( cacheDir, new Date(), new Date() );
+		pruneCaches( cacheDir );
+	}
 
 	const sources = [];
 	let fetched = 0;
@@ -268,15 +352,7 @@ export async function loadWordPressBlocksFromUrls( urls, options = {} ) {
  * @return {Object} The block API, plus the window it lives in.
  */
 function bootBlocks( sources, missing ) {
-	let JSDOM, VirtualConsole;
-	try {
-		( { JSDOM, VirtualConsole } = require( 'jsdom' ) );
-	} catch {
-		throw new Error(
-			"jsdom is required to run WordPress's editor code outside a browser.\n" +
-				'  npm i --no-save jsdom'
-		);
-	}
+	const { JSDOM, VirtualConsole } = loadJsdom();
 
 	const dom = new JSDOM( '<!doctype html><html><body></body></html>', {
 		url: 'http://localhost',

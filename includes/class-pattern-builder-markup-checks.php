@@ -302,7 +302,7 @@ class Pattern_Builder_Markup_Checks {
 	 * @param string $slug Pattern name.
 	 * @return string|null
 	 */
-	private static function referenced_markup( $slug ) {
+	public static function referenced_markup( $slug ) {
 		$registry = WP_Block_Patterns_Registry::get_instance();
 		if ( $registry->is_registered( $slug ) ) {
 			$pattern = $registry->get_registered( $slug );

@@ -2,7 +2,7 @@
 name: design-reproduction
 description: Rebuild an existing design as WordPress block patterns — a live website, a Figma file, a screenshot, a PDF or a mockup — page by page, pulling the reusable parts out rather than transcribing the pixels. Use this whenever the source of the design already exists somewhere else and the job is to reproduce it: "recreate this site", "build this in WordPress", "match this design", "here's a screenshot of what we want". Reproduction fails quietly in two specific ways this covers — values approximated instead of read, and repeated parts copied instead of factored — and both look like a finished page. Load the pattern-author skill alongside it; this one decides what to build and how faithfully, that one is how a pattern gets written.
 metadata:
-  version: 1.3.0
+  version: 1.4.0
 ---
 
 # Reproducing an existing design
@@ -226,18 +226,16 @@ theme amends them through the `pattern_builder_authoring_guides` filter, so
 what a site serves is its house rules as well as the plugin's documents, and
 those are the part general documentation cannot know.
 
-To see whether the copy still matches:
+To see whether the copy still matches, ask that site's `get-authoring-guide`
+for its index — the `pattern-builder-get-authoring-guide` tool when you are
+connected over MCP — and compare the `checksum` it lists under `skills` for
+`design-reproduction` with the one recorded above.
 
-```bash
-curl -fsS -u "$WP_USER:$WP_APP_PASSWORD" \
-  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-authoring-guide/run" \
-  | jq -r '.skills[] | select(.name == "design-reproduction") | .checksum'
-```
-
-Different from the one recorded above, ask the same ability for
-`input[skill]=design-reproduction` and run the `install` recipe it answers with. It
-overwrites, which is the whole contract — there is nothing here to merge and
-no local edit to keep. A change worth keeping belongs in the theme, behind
+Different, ask the same ability for the skill, `{"skill": "design-reproduction"}`,
+and run the commands its `install` answers with, as they stand. They download
+every file by signed link, straight to disk, and need no password: never read
+one out of your client's configuration for this. It overwrites, which is the
+whole contract — there is nothing here to merge and no local edit to keep. A change worth keeping belongs in the theme, behind
 that filter, where it reaches every agent that asks the site instead of this
 one checkout.
 

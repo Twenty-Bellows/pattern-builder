@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.12.0
+  version: 1.16.0
 ---
 
 # Authoring block patterns
@@ -226,6 +226,9 @@ iterating on errors:
 
 ```js
 import { loadWordPressBlocksFromUrls } from '<skill>/scripts/wp-core.mjs';
+const { scripts: urls, wordpress: version } = await (
+        await fetch( `${ site }/?rest_route=/pattern-builder/v1/editor-scripts` )
+).json();
 const core = await loadWordPressBlocksFromUrls( urls, { version } );
 const { createBlock, serialize } = core.window.wp.blocks;
 
@@ -237,8 +240,9 @@ console.log( serialize( [
 ] ) );
 ```
 
-`urls` comes from `pattern-builder/get-editor-scripts`, or
-`loadWordPressBlocks( wpRoot )` against a local install. Outside the dozen
+`site` is the one in `metadata.source` above; that route needs no credentials,
+and the validator asks it the same way. Against a local install, use
+`loadWordPressBlocks( wpRoot )` instead. Outside the dozen
 common blocks this is the *only* reliable route — the accordion family saves a
 `role="group"`, an `has-icon has-icon-right` pair, a `__toggle-title` span and
 an icon span, and nothing but the block's own `save()` will tell you that.
@@ -291,48 +295,54 @@ and the design is just wrong. Fix and re-run; an empty report is the only
 acceptable result. A `core/missing` means the site lacks that block, or the
 markup has a typo.
 
-It validates against a **WordPress install, not npm** — every install carries
-the editor's block code under `wp-includes/js/dist`, and it is the exact
-version the pattern is destined for. It finds the install itself when you are
-working inside one. Otherwise:
+It validates against **the WordPress the pattern is destined for, not npm**:
+the editor's own block code, at the version that site runs. Where it gets that
+code needs nothing from you in the usual cases:
 
 | Situation | How |
 |---|---|
+| Working inside a WordPress install | Nothing: it finds the install itself |
 | WordPress elsewhere on disk | `--wp /path/to/wordpress`, or `WP_PATH=…` |
-| Only HTTP access to the site | `get-validator` for the script, `get-editor-scripts` > `scripts.json`, then `--scripts scripts.json` |
+| This skill installed from a site | Nothing: it asks the site in `metadata.source` above for its editor scripts |
+| Only `get-validator`'s copy of the script | `--site https://the-site.example` |
 | No WordPress anywhere | `--npm`, using `node_modules` |
 
-It needs a DOM either way: `npm i --no-save jsdom`. It handles a theme
+Asking the site happens on every run, so there is nothing to save, place or
+refresh: after the site updates WordPress, the next run checks against the new
+code. The scripts themselves are cached by URL in the system's temp folder, and
+a cache unused for a week is removed.
+
+It needs a DOM either way, from `jsdom`, installed once for the machine rather
+than in each project: `npm i --prefix ~/.cache/pattern-builder jsdom`. A
+project that already has `jsdom` is used first, and when neither is there the
+validator prints the exact command for this machine. It handles a theme
 pattern's PHP header and inline `<?php echo esc_url( … ); ?>`, and takes `-` to
 read from stdin. If the project has its own validator, prefer it.
 
 **Then check that it lays out.** Validation answers a question about one
 block; a section is a relationship *between* blocks, and nothing above can see
-one:
+one. The site checks this when you store through `create-pattern` or
+`update-pattern`, following `core/pattern` references to the patterns they
+place, and reports it under `warnings` with a `composition_` code: a flex or
+grid container whose children cannot size — most often a card pattern written
+with `{"layout":{"type":"constrained"}}` at its root, which fills the whole
+track, so six references render as six full-width cards stacked vertically.
+That markup is entirely valid, every token resolves, and nothing else reports
+it, so read the warnings after every write and fix one before moving on. For
+theme files written directly, look at the page in `render-pattern`'s `page`
+preview instead.
 
-```bash
-node <skill>/scripts/check-composition.mjs patterns/
-```
-
-It resolves `core/pattern` references against the theme's own files and reports
-any flex or grid container whose children cannot size — most often a card
-pattern written with `{"layout":{"type":"constrained"}}` at its root, which
-fills the whole track, so six references render as six full-width cards stacked
-vertically. That markup is entirely valid, every token resolves, and no other
-check in this workflow reports a thing. Static and immediate; it needs no
-browser and no rendering.
-
-**If the pattern uses Pattern Overrides slots, render it too.** Slot problems
-are invisible to block validation in both directions, and both ship the wrong
-words with no error anywhere:
-
-```bash
-wp eval-file <skill>/scripts/check-slots.php path/to/page-pattern.php
-```
-
-It reports which slots took their value and which still show placeholder copy.
-Also check the rules in `references/design-content-split.md` — malformed
-attributes there leave a *valid* block behind.
+**If the pattern uses Pattern Overrides slots, check that every value lands.**
+Slot problems are invisible to block validation in both directions, and both
+ship the wrong words with no error anywhere. Storing through `create-pattern`
+or `update-pattern` refuses them: a `content` key that names no slot in the
+referenced pattern, a binding with no `metadata.name`, a binding on a block
+core cannot bind. Writing theme files directly, nothing checks them for you:
+match every `content` key to a `metadata.name` yourself, copying the names
+rather than retyping them, then open the page in `render-pattern`'s `page`
+preview and look for placeholder copy where a value should be. The rules are in
+`references/design-content-split.md` — malformed attributes there leave a
+*valid* block behind.
 
 **Then use it, not only look at it.** Everything above is about structure and
 values. None of it notices a navigation overlay that will not open, a details
@@ -483,18 +493,16 @@ theme amends them through the `pattern_builder_authoring_guides` filter, so
 what a site serves is its house rules as well as the plugin's documents, and
 those are the part general documentation cannot know.
 
-To see whether the copy still matches:
+To see whether the copy still matches, ask that site's `get-authoring-guide`
+for its index — the `pattern-builder-get-authoring-guide` tool when you are
+connected over MCP — and compare the `checksum` it lists under `skills` for
+`pattern-author` with the one recorded above.
 
-```bash
-curl -fsS -u "$WP_USER:$WP_APP_PASSWORD" \
-  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-authoring-guide/run" \
-  | jq -r '.skills[] | select(.name == "pattern-author") | .checksum'
-```
-
-Different from the one recorded above, ask the same ability for
-`input[skill]=pattern-author` and run the `install` recipe it answers with. It
-overwrites, which is the whole contract — there is nothing here to merge and
-no local edit to keep. A change worth keeping belongs in the theme, behind
+Different, ask the same ability for the skill, `{"skill": "pattern-author"}`,
+and run the commands its `install` answers with, as they stand. They download
+every file by signed link, straight to disk, and need no password: never read
+one out of your client's configuration for this. It overwrites, which is the
+whole contract — there is nothing here to merge and no local edit to keep. A change worth keeping belongs in the theme, behind
 that filter, where it reaches every agent that asks the site instead of this
 one checkout.
 
