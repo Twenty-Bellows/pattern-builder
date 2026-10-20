@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.14.0
+  version: 1.15.0
 ---
 
 # Authoring block patterns
@@ -226,6 +226,9 @@ iterating on errors:
 
 ```js
 import { loadWordPressBlocksFromUrls } from '<skill>/scripts/wp-core.mjs';
+const { scripts: urls, wordpress: version } = await (
+        await fetch( `${ site }/?rest_route=/pattern-builder/v1/editor-scripts` )
+).json();
 const core = await loadWordPressBlocksFromUrls( urls, { version } );
 const { createBlock, serialize } = core.window.wp.blocks;
 
@@ -237,8 +240,9 @@ console.log( serialize( [
 ] ) );
 ```
 
-`urls` comes from `pattern-builder/get-editor-scripts`, or
-`loadWordPressBlocks( wpRoot )` against a local install. Outside the dozen
+`site` is the one in `metadata.source` above; that route needs no credentials,
+and the validator asks it the same way. Against a local install, use
+`loadWordPressBlocks( wpRoot )` instead. Outside the dozen
 common blocks this is the *only* reliable route — the accordion family saves a
 `role="group"`, an `has-icon has-icon-right` pair, a `__toggle-title` span and
 an icon span, and nothing but the block's own `save()` will tell you that.
@@ -291,25 +295,26 @@ and the design is just wrong. Fix and re-run; an empty report is the only
 acceptable result. A `core/missing` means the site lacks that block, or the
 markup has a typo.
 
-It validates against a **WordPress install, not npm** — every install carries
-the editor's block code under `wp-includes/js/dist`, and it is the exact
-version the pattern is destined for. It finds the install itself when you are
-working inside one. Otherwise:
+It validates against **the WordPress the pattern is destined for, not npm**:
+the editor's own block code, at the version that site runs. Where it gets that
+code needs nothing from you in the usual cases:
 
 | Situation | How |
 |---|---|
+| Working inside a WordPress install | Nothing: it finds the install itself |
 | WordPress elsewhere on disk | `--wp /path/to/wordpress`, or `WP_PATH=…` |
-| Only HTTP or MCP access to the site | `get-validator` for the script; the `get-editor-scripts` answer saved as `scripts.json`, fresh each session; then `--scripts scripts.json` |
+| This skill installed from a site | Nothing: it asks the site in `metadata.source` above for its editor scripts |
+| Only `get-validator`'s copy of the script | `--site https://the-site.example` |
 | No WordPress anywhere | `--npm`, using `node_modules` |
+
+Asking the site happens on every run, so there is nothing to save, place or
+refresh: after the site updates WordPress, the next run checks against the new
+code. The scripts themselves are cached by URL in the system's temp folder, and
+a cache unused for a week is removed.
 
 It needs a DOM either way: `npm i --no-save jsdom`. It handles a theme
 pattern's PHP header and inline `<?php echo esc_url( … ); ?>`, and takes `-` to
 read from stdin. If the project has its own validator, prefer it.
-
-Ask for `scripts.json` again each session rather than keeping one. It names
-each script by a URL carrying its version, and the validator caches by URL, so
-a list kept from before the site updated WordPress checks against the old code
-and says nothing.
 
 **Then check that it lays out.** Validation answers a question about one
 block; a section is a relationship *between* blocks, and nothing above can see

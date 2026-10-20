@@ -67,17 +67,32 @@ class Pattern_Builder_Abilities {
 
 		add_action( 'wp_abilities_api_categories_init', array( $this, 'register_category' ) );
 		add_action( 'wp_abilities_api_init', array( $this, 'register_abilities' ) );
-		add_action( 'rest_api_init', array( $this, 'register_skill_route' ) );
+		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
 		add_filter( 'rest_pre_serve_request', array( $this, 'serve_skill_download' ), 10, 3 );
 	}
 
 	/**
-	 * The route a skill's files download from, by signed link. An agent connected over MCP
-	 * keeps its password in its client's settings, out of its own reach, so the files of a
-	 * skill have to be fetchable without one — and fetched by a command rather than through
-	 * the agent, so they never pass through its context.
+	 * The two routes the scripts an agent runs reach without credentials. An agent connected
+	 * over MCP keeps its password in its client's settings, out of its own reach, so what a
+	 * command beside it fetches has to open without one.
+	 *
+	 * A skill's files download by signed link, and are fetched by a command rather than
+	 * through the agent, so they never pass through its context. The editor script list is
+	 * open to anyone: the validator asks for it on every run, so it always checks against
+	 * the WordPress the site runs now, and it names only core's own block editor scripts,
+	 * which says no more than the WordPress version the front end's `?ver=` usually shows.
 	 */
-	public function register_skill_route() {
+	public function register_routes() {
+		register_rest_route(
+			Pattern_Builder_Preview::REST_NAMESPACE,
+			'/editor-scripts',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'execute_editor_scripts' ),
+				'permission_callback' => '__return_true',
+			)
+		);
+
 		register_rest_route(
 			Pattern_Builder_Preview::REST_NAMESPACE,
 			'/skills/(?P<skill>[a-z0-9-]+)/(?P<file>[A-Za-z0-9._/-]+)',
@@ -2072,14 +2087,13 @@ class Pattern_Builder_Abilities {
 					'Write both files into one directory, then:',
 					'',
 					'  npm i --no-save jsdom',
-					"  # Save this site's get-editor-scripts answer as scripts.json: over MCP, the",
-					'  # pattern-builder-get-editor-scripts tool; over HTTP, that ability\'s run route.',
-					'  node validate-pattern.mjs --scripts scripts.json pattern.html',
+					'  node validate-pattern.mjs --site ' . home_url( '/' ) . ' pattern.html',
 					'',
-					"The first run downloads this site's block code (about 4MB) and caches it by URL.",
-					'Ask for scripts.json fresh in each session rather than keeping one: after the site',
-					'updates WordPress, a kept list still names the old versions, and the validator',
-					'checks against the old code without saying so.',
+					'It asks this site for its editor scripts on every run, so it always checks against',
+					'the WordPress the site runs now, and there is nothing to save between runs. The',
+					"scripts themselves (about 4MB the first time) are cached by URL in the system's temp",
+					'folder, and a cache unused for a week is removed. Inside a WordPress install it uses',
+					'that install instead; --wp <path> points at another.',
 					'Exit status is non-zero when anything is invalid, in an old form, or has lost an attribute.',
 					'',
 					'This answers a question about one block. Whether blocks lay out together, such as',
@@ -2098,7 +2112,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/get-editor-scripts',
 			array(
 				'label'               => __( 'Get this site\'s editor script URLs', 'pattern-builder' ),
-				'description'         => __( 'Returns the URLs of this site\'s own block editor JavaScript, in dependency order, for a validator to load. This is the block library this site actually runs, which is the only version whose opinion counts: whether markup is what a block writes today is a question different WordPress versions answer differently. Feed the response to the validator from get-validator.', 'pattern-builder' ),
+				'description'         => __( 'Returns the URLs of this site\'s own block editor JavaScript, in dependency order, for a validator to load. This is the block library this site actually runs, which is the only version whose opinion counts: whether markup is what a block writes today is a question different WordPress versions answer differently. The validator asks the site for this list itself on every run, so there is nothing to save from here.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',

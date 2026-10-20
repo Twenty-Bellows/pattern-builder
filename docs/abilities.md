@@ -313,11 +313,31 @@ instead would ship 21MB, because every block's `save()` imports
 `@wordpress/block-editor` and core keeps each support's `addSaveProps` in the
 same module as that support's editor UI.
 
-An agent that only reaches the site over HTTP gets the same check from
-`get-validator` and `get-editor-scripts`. That second one is necessary because
-WordPress serves those files to anyone but not the graph, and the order is not
-forgiving: the JSX runtime reads `globalThis.React` as it loads, so React
-arriving late costs every JSX call in the bundles, silently.
+An agent with no WordPress beside it gets the same check from the site. The
+list of editor scripts has to come from there, because WordPress serves those
+files to anyone but not the graph, and the order is not forgiving: the JSX
+runtime reads `globalThis.React` as it loads, so React arriving late costs every
+JSX call in the bundles, silently.
+
+**The validator asks for that list itself, on every run.** Where it gets its
+block code is, in order: a list given with `--scripts`, a WordPress install
+(`--wp`, `WP_PATH`, or one it finds around it), a site named with `--site` or
+else the one an installed skill records in its front matter as
+`metadata.source`, and last `node_modules`. A site answers at
+`/pattern-builder/v1/editor-scripts`, which opens without credentials, because
+the validator runs in a shell beside an agent that holds none. It returns what
+`get-editor-scripts` does, the dependency closure of core's block editor
+packages and nothing a plugin registered, so it says no more than the WordPress
+version the front end's `?ver=` usually shows. Asking every run is what keeps
+the check current. A saved list goes stale silently: every script URL carries
+its version and the scripts are cached by URL, so a list kept from before an
+update checks against the old code, and an agent left to save one puts it
+wherever it likes. Asking leaves nothing to save.
+
+The scripts are cached in the system's temp folder, one folder per list. Each
+run touches its own folder and removes any other unused for a week, so a site
+that updated WordPress, or one no longer worked on, does not leave its old code
+behind for good, while several sites in use at once keep theirs.
 
 ## The guides
 

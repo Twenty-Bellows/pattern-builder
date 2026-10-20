@@ -124,7 +124,7 @@ input and output schema.
 | `pattern-builder/render-pattern` | GET | the front-end HTML a stored pattern produces, which presets it references and whether this site defines them, and preview URLs: `standalone`, `page`, and under `themes` the page render against `blank-theme` and `opinionated-theme`. The same set comes again under `signed`: those open in any browser with no credentials, for that pattern only, until `expiresIn` seconds from now, which is what to hand a browser tool or a screenshot script. `input[id]` as above |
 | `pattern-builder/get-authoring-guide` | GET | these documents, as Markdown. No input for an index; `input[guide]` by name, or `all`. The index also carries a `validate` block naming what to run before storing anything |
 | `pattern-builder/get-validator` | GET | the source of the markup validator, as files to write and run with Node |
-| `pattern-builder/get-editor-scripts` | GET | this site's own block editor script URLs, in load order, for that validator |
+| `pattern-builder/get-editor-scripts` | GET | this site's own block editor script URLs, in load order. The validator asks for these itself, from a route that needs no credentials |
 | `pattern-builder/create-pattern` | POST | store finished markup. `title` and `content` required; `source` is `theme` (default) or `user`; also `name`, `description`, `categories`, `keywords`, `synced`, `blockTypes`, `postTypes`, `templateTypes`, `inserter`, `viewportWidth`. Refuses what PHP can see (below); a category nothing registered comes back under `unregisteredCategories`, and `warnings` says when the description is missing, too short or made of words that describe every pattern (see `pattern-kinds.md`) |
 | `pattern-builder/update-pattern` | POST | replace an existing pattern: `id`, plus `content` for the whole markup or `edits` to change part of it. Send the `hash` you read as `expectedHash` (required with `edits`): if the pattern changed since, nothing is written and the error carries `currentHash` to read again from. `edits` is a list of `{ old, new, replaceAll }`, fragments of what `get-pattern` returned, applied in order, all or none; each `old` must match exactly once unless `replaceAll`. Validate the result as you would markup sent whole. Removing or renaming a slot that a pattern or page still fills is refused, naming each place and key, unless `dropSlots` lists it; the answer's `reverted` then says which places went back to placeholder copy. The answer's `changed` is false when the write left the pattern as it was, and `warnings` judges a description the update sets and notes markup that moved under an unchanged one |
 | `pattern-builder/add-design-tokens` | POST | add presets to the design system. `input[tokens]` is a list of `{type, slug, name, value}`; `input[destination]` is `theme` (default) or `user`. Only ever **adds** — a slug already here is skipped |
@@ -389,8 +389,8 @@ yours, and this is only somewhere to put the result.
 **Nothing here decides whether a block is valid.** That is decided by
 re-running the block's `save()`, which is JavaScript; no PHP endpoint can
 answer it, and this one does not pretend to. What the site can do is hand you
-the tool and its own block code — `get-validator` and `get-editor-scripts`,
-described under **Validating from here** below. Run that before calling
+the tool and its own block code, described under **Validating from here**
+below. Run that before calling
 `create-pattern`, or you will store markup that renders correctly and breaks
 the moment anyone opens it in the editor.
 
@@ -410,6 +410,14 @@ So the order the guides prescribe is enforced: a page that references a
 section cannot be stored before the section is. A pattern written earlier in
 the same session counts, even before WordPress has registered it.
 
+**What the writes warn about**, without refusing, is markup that will not lay
+out as written: a flex or grid container whose children cannot size, most
+often a card pattern with a constrained root, which renders as a vertical stack
+(`composition_children_fill_track`); three or more children of a flex row with
+no width (`composition_flex_unsized`); a reference whose sizing cannot be known
+(`composition_reference_unknown`). The markup is valid, so nothing else says so.
+Read `warnings` after every write.
+
 `render-pattern` is the nearest thing to a check the site can offer, and it
 answers a different question: what HTML comes out. That is genuinely useful for
 catching a missing supports class — the styling that silently didn't apply —
@@ -422,27 +430,24 @@ You need a JavaScript runtime — Node, plus `jsdom` to play the browser
 WordPress's editor code expects as it loads. That is the one requirement no
 server can lift, because `save()` is JavaScript and PHP cannot run it.
 
-Everything else the site provides:
+Everything else the site provides. The installed skill already has the
+validator under `scripts/` and knows which site it came from; without the
+skill, write each file `get-validator` returns into one directory and name the
+site:
 
 ```bash
-# 1. The validator. Write each file it returns into one directory.
-curl -u "$WP_USER:$WP_APP_PASSWORD" \
-  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-validator/run"
-
-# 2. This site's own block code, in the order it loads.
-curl -u "$WP_USER:$WP_APP_PASSWORD" \
-  "$WP_URL/?rest_route=/wp-abilities/v1/abilities/pattern-builder/get-editor-scripts/run" \
-  > scripts.json
-
-# 3. Check.
 npm i --no-save jsdom
-node validate-pattern.mjs --scripts scripts.json pattern.html
+node <skill>/scripts/validate-pattern.mjs pattern.html     # the installed skill
+node validate-pattern.mjs --site "$WP_URL" pattern.html     # get-validator's copy
 ```
 
-The second call exists because WordPress serves its editor scripts to anyone
-but not the order they load in: core's dependency manifest is a PHP file, so a
-request for it executes and returns nothing at all. Only the site can answer
-it — and getting it wrong is not loud. The JSX runtime reads `globalThis.React`
+Either way it asks the site for its editor scripts on every run, at
+`/pattern-builder/v1/editor-scripts`, which opens without credentials: there is
+nothing to save, and after the site updates WordPress the next run checks
+against the new code. That list has to come from the site because WordPress
+serves its editor scripts to anyone but not the order they load in: core's
+dependency manifest is a PHP file, so a request for it executes and returns
+nothing at all. Only the site can answer it — and getting it wrong is not loud. The JSX runtime reads `globalThis.React`
 as it loads, so React arriving late costs every JSX call in the editor bundles,
 with nothing but a missing function to show for it.
 

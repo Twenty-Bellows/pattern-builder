@@ -220,6 +220,47 @@ export function loadWordPressBlocks( wpRoot ) {
 }
 
 /**
+ * What every folder of cached editor scripts is named with.
+ */
+const CACHE_PREFIX = 'pattern-builder-wp-';
+
+/**
+ * How long a folder of cached scripts may go unused before it is removed.
+ */
+const CACHE_MAX_IDLE = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Remove the cache folders no run has used for a week. Each script list gets a folder of
+ * its own, so a site that updates WordPress leaves its old folder behind, and so does a
+ * site no longer worked on. Several sites in use at once each keep theirs.
+ *
+ * @param {string} keep The folder this run uses.
+ */
+function pruneCaches( keep ) {
+	const parent = path.dirname( keep );
+	const cutoff = Date.now() - CACHE_MAX_IDLE;
+	let names = [];
+
+	try {
+		names = fs.readdirSync( parent );
+	} catch {
+		return;
+	}
+
+	for ( const name of names ) {
+		const dir = path.join( parent, name );
+		if ( ! name.startsWith( CACHE_PREFIX ) || dir === keep ) {
+			continue;
+		}
+		try {
+			if ( fs.statSync( dir ).mtimeMs < cutoff ) {
+				fs.rmSync( dir, { recursive: true, force: true } );
+			}
+		} catch {}
+	}
+}
+
+/**
  * The same, for a site reachable only over HTTP.
  *
  * @param {Array}  urls    Script URLs, dependencies first.
@@ -229,12 +270,14 @@ export function loadWordPressBlocks( wpRoot ) {
 export async function loadWordPressBlocksFromUrls( urls, options = {} ) {
 	const cacheDir =
 		options.cacheDir ||
-		path.join(
-			os.tmpdir(),
-			'pattern-builder-wp-' + digest( urls.join( '\n' ) )
-		);
+		path.join( os.tmpdir(), CACHE_PREFIX + digest( urls.join( '\n' ) ) );
 
 	fs.mkdirSync( cacheDir, { recursive: true } );
+
+	if ( ! options.cacheDir ) {
+		fs.utimesSync( cacheDir, new Date(), new Date() );
+		pruneCaches( cacheDir );
+	}
 
 	const sources = [];
 	let fetched = 0;

@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import {
 	addPatternContentAttribute,
 	findWordPress,
@@ -298,7 +299,97 @@ function readInput( file ) {
 }
 
 /**
- * Where the block code comes from.
+ * Load the block code a site serves, from the list of its editor scripts.
+ *
+ * @param {Array}  urls    Script URLs, dependencies first.
+ * @param {string} version The WordPress version the list came from.
+ * @return {Promise<Object>} The block API, with a line saying what it is.
+ */
+async function loadFromList( urls, version ) {
+	let core;
+	try {
+		core = await loadWordPressBlocksFromUrls( urls, { version } );
+	} catch ( err ) {
+		console.error( err.message );
+		process.exit( 2 );
+	}
+
+	return {
+		...core,
+		describe:
+			`Checked against WordPress ${
+				core.version || '(unknown version)'
+			} ` +
+			`served from ${ new URL( urls[ urls.length - 1 ] ).origin } — ` +
+			`${ core.getBlockTypes().length } block types.`,
+	};
+}
+
+/**
+ * The site this copy of the skill was installed from, as its SKILL.md records it under
+ * `metadata.source`. The copy in the plugin itself records none.
+ *
+ * @return {string} The site's URL, or an empty string.
+ */
+function skillSource() {
+	const entry = path.join(
+		path.dirname( fileURLToPath( import.meta.url ) ),
+		'..',
+		'SKILL.md'
+	);
+
+	try {
+		const front = fs
+			.readFileSync( entry, 'utf8' )
+			.match( /^---\n([\s\S]*?)\n---/ );
+		const source =
+			front && front[ 1 ].match( /^\s+source:\s*"?([^"\n]+)"?\s*$/m );
+		return source ? source[ 1 ].trim() : '';
+	} catch {
+		return '';
+	}
+}
+
+/**
+ * Ask a site for its editor scripts, as it runs them now. Asked on every run, so a site
+ * that has updated WordPress since the last one is checked against the new code.
+ *
+ * @param {string} site The site's URL.
+ * @return {Promise<Object>} The block API, with a line saying what it is.
+ */
+async function loadFromSite( site ) {
+	const list = new URL( site.replace( /\/?$/, '/' ) );
+	list.searchParams.set( 'rest_route', '/pattern-builder/v1/editor-scripts' );
+
+	let body;
+	try {
+		const response = await fetch( list );
+		if ( ! response.ok ) {
+			throw new Error( `${ list } → HTTP ${ response.status }` );
+		}
+		body = await response.json();
+	} catch ( err ) {
+		console.error(
+			`Could not ask ${ site } for its editor scripts: ${ err.message }\n\n` +
+				'Point at a WordPress install instead:\n' +
+				'  validate-pattern.mjs --wp /path/to/wordpress <file...>\n' +
+				"or save the site's get-editor-scripts answer and pass it:\n" +
+				'  validate-pattern.mjs --scripts scripts.json <file...>'
+		);
+		process.exit( 2 );
+	}
+
+	if ( ! Array.isArray( body.scripts ) || ! body.scripts.length ) {
+		console.error( `${ site } listed no editor scripts.` );
+		process.exit( 2 );
+	}
+
+	return loadFromList( body.scripts, body.wordpress || '' );
+}
+
+/**
+ * Where the block code comes from: a list given, a WordPress install, the site this skill
+ * came from, or node_modules, in that order.
  *
  * @return {Object} parse, validateBlock, getSaveContent, parseRaw, describe.
  */
@@ -325,25 +416,7 @@ async function loadCore() {
 			process.exit( 2 );
 		}
 
-		let core;
-		try {
-			core = await loadWordPressBlocksFromUrls( urls, { version } );
-		} catch ( err ) {
-			console.error( err.message );
-			process.exit( 2 );
-		}
-
-		return {
-			...core,
-			describe:
-				`Checked against WordPress ${
-					core.version || '(unknown version)'
-				} ` +
-				`served from ${
-					new URL( urls[ urls.length - 1 ] ).origin
-				} — ` +
-				`${ core.getBlockTypes().length } block types.`,
-		};
+		return loadFromList( urls, version );
 	}
 
 	const hint = flagValue( '--wp' );
@@ -371,6 +444,11 @@ async function loadCore() {
 			console.error( `No WordPress install at ${ hint }.` );
 			process.exit( 2 );
 		}
+
+		const site = flagValue( '--site' ) || skillSource();
+		if ( site ) {
+			return loadFromSite( site );
+		}
 	}
 	let blocks;
 	try {
@@ -384,6 +462,8 @@ async function loadCore() {
 				'  validate-pattern.mjs --wp /path/to/wordpress <file...>\n' +
 				'  WP_PATH=/path/to/wordpress validate-pattern.mjs <file...>\n' +
 				'  …or just run it from anywhere inside the install.\n\n' +
+				'Or name a site running Pattern Builder, which it asks for its editor scripts:\n' +
+				'  validate-pattern.mjs --site https://example.com <file...>\n\n' +
 				"It still needs jsdom, to play the browser WordPress's editor code expects:\n" +
 				'  npm i --no-save jsdom\n\n' +
 				'With no WordPress anywhere, the packages themselves work:\n' +
@@ -448,7 +528,7 @@ function flagValue( name ) {
 
 async function main() {
 	const argv = process.argv.slice( 2 );
-	const valueAt = [ '--wp', '--scripts' ]
+	const valueAt = [ '--wp', '--scripts', '--site' ]
 		.map( ( flag ) => argv.indexOf( flag ) )
 		.filter( ( at ) => at !== -1 )
 		.map( ( at ) => at + 1 );

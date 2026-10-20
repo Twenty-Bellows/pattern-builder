@@ -1,7 +1,8 @@
 <?php
 /**
- * Downloading a skill's files by signed link: what opens, for whom, and that what arrives is
- * exactly what the install checks it against.
+ * What the scripts beside an agent fetch without credentials: a skill's files by signed
+ * link, exactly as the install checks them, and the editor script list the validator asks
+ * for on every run.
  *
  * @package PatternBuilder
  */
@@ -173,5 +174,27 @@ class Test_Skill_Downloads extends WP_UnitTestCase {
 
 		$elsewhere = new WP_REST_Request( 'GET', '/wp/v2/types' );
 		$this->assertFalse( $this->abilities->serve_skill_download( false, new WP_REST_Response( 'text', 200 ), $elsewhere ) );
+	}
+
+	/**
+	 * The validator asks for this on every run, from a shell that holds no password, so it
+	 * opens for anyone. What justifies that is what it lists: core's own block editor
+	 * scripts, which say no more than the WordPress version.
+	 */
+	public function test_the_editor_script_list_opens_without_signing_in() {
+		wp_set_current_user( 0 );
+
+		$response = rest_do_request( new WP_REST_Request( 'GET', '/pattern-builder/v1/editor-scripts' ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( $this->abilities->execute_editor_scripts(), $data );
+		$this->assertNotEmpty( $data['scripts'] );
+		$this->assertSame( $GLOBALS['wp_version'], $data['wordpress'] );
+
+		foreach ( $data['scripts'] as $url ) {
+			$this->assertMatchesRegularExpression( '#/(wp-includes|wp-admin)/#', $url, $url . ' is not one of core\'s own scripts.' );
+			$this->assertStringNotContainsString( '/wp-content/', $url, $url . ' names a plugin or theme.' );
+		}
 	}
 }
