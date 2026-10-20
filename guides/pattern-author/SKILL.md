@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.15.0
+  version: 1.16.0
 ---
 
 # Authoring block patterns
@@ -312,7 +312,10 @@ refresh: after the site updates WordPress, the next run checks against the new
 code. The scripts themselves are cached by URL in the system's temp folder, and
 a cache unused for a week is removed.
 
-It needs a DOM either way: `npm i --no-save jsdom`. It handles a theme
+It needs a DOM either way, from `jsdom`, installed once for the machine rather
+than in each project: `npm i --prefix ~/.cache/pattern-builder jsdom`. A
+project that already has `jsdom` is used first, and when neither is there the
+validator prints the exact command for this machine. It handles a theme
 pattern's PHP header and inline `<?php echo esc_url( … ); ?>`, and takes `-` to
 read from stdin. If the project has its own validator, prefer it.
 

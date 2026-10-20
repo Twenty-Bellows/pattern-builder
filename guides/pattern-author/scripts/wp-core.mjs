@@ -220,6 +220,47 @@ export function loadWordPressBlocks( wpRoot ) {
 }
 
 /**
+ * Where jsdom is installed once for the whole machine, so that neither a project nor a
+ * skill folder has to carry it: the user's cache directory, or %LOCALAPPDATA% on Windows.
+ */
+export const MACHINE_DIR =
+	process.platform === 'win32' && process.env.LOCALAPPDATA
+		? path.join( process.env.LOCALAPPDATA, 'pattern-builder' )
+		: path.join(
+				process.env.XDG_CACHE_HOME ||
+					path.join( os.homedir(), '.cache' ),
+				'pattern-builder'
+		  );
+
+/**
+ * The command that installs jsdom for the whole machine.
+ */
+export const JSDOM_SETUP = `npm i --prefix "${ MACHINE_DIR }" jsdom`;
+
+/**
+ * jsdom, from where Node finds it beside these scripts — a project that already has it —
+ * or else from the one install for the whole machine.
+ *
+ * @return {Object} The jsdom module.
+ */
+export function loadJsdom() {
+	try {
+		return require( 'jsdom' );
+	} catch {}
+
+	try {
+		return createRequire( path.join( MACHINE_DIR, 'package.json' ) )(
+			'jsdom'
+		);
+	} catch {
+		throw new Error(
+			"jsdom is needed to run WordPress's editor code outside a browser. Install it once for this machine:\n" +
+				`  ${ JSDOM_SETUP }`
+		);
+	}
+}
+
+/**
  * What every folder of cached editor scripts is named with.
  */
 const CACHE_PREFIX = 'pattern-builder-wp-';
@@ -311,15 +352,7 @@ export async function loadWordPressBlocksFromUrls( urls, options = {} ) {
  * @return {Object} The block API, plus the window it lives in.
  */
 function bootBlocks( sources, missing ) {
-	let JSDOM, VirtualConsole;
-	try {
-		( { JSDOM, VirtualConsole } = require( 'jsdom' ) );
-	} catch {
-		throw new Error(
-			"jsdom is required to run WordPress's editor code outside a browser.\n" +
-				'  npm i --no-save jsdom'
-		);
-	}
+	const { JSDOM, VirtualConsole } = loadJsdom();
 
 	const dom = new JSDOM( '<!doctype html><html><body></body></html>', {
 		url: 'http://localhost',

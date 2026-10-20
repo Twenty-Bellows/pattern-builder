@@ -305,6 +305,14 @@ site actually runs — the only version whose opinion counts. Nothing to install
 but `jsdom`; `--npm` falls back to `node_modules` where there is no install to
 find.
 
+**`jsdom` is installed once per machine, not per project.** `loadJsdom()` takes
+it from wherever Node finds it beside the scripts — a project that already has
+it — and otherwise from `MACHINE_DIR`, the user's cache directory
+(`~/.cache/pattern-builder`, or `%LOCALAPPDATA%` on Windows). When it is in
+neither, the error gives the one command that fills that folder. The skill's
+install stays a copy of its files: it runs no npm, and nothing lands in a skill
+folder or in a theme repository with no JavaScript of its own.
+
 The script order comes from core's generated `script-loader-packages.php`, and
 the files go in as real `<script>` elements because these bundles are
 strict-mode and a strict `eval` keeps its `var` declarations to itself, which

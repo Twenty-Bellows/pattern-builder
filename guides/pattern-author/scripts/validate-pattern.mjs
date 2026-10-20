@@ -8,8 +8,10 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import {
+	JSDOM_SETUP,
 	addPatternContentAttribute,
 	findWordPress,
+	loadJsdom,
 	loadWordPressBlocks,
 	loadWordPressBlocksFromUrls,
 } from './wp-core.mjs';
@@ -21,7 +23,7 @@ const require = createRequire( import.meta.url );
  * imported. None of it runs during parsing; it just has to be present.
  */
 function installDom() {
-	const { JSDOM, VirtualConsole } = require( 'jsdom' );
+	const { JSDOM, VirtualConsole } = loadJsdom();
 	const dom = new JSDOM( '<!doctype html><html><body></body></html>', {
 		url: 'http://localhost',
 		pretendToBeVisual: true,
@@ -464,10 +466,11 @@ async function loadCore() {
 				'  …or just run it from anywhere inside the install.\n\n' +
 				'Or name a site running Pattern Builder, which it asks for its editor scripts:\n' +
 				'  validate-pattern.mjs --site https://example.com <file...>\n\n' +
-				"It still needs jsdom, to play the browser WordPress's editor code expects:\n" +
-				'  npm i --no-save jsdom\n\n' +
-				'With no WordPress anywhere, the packages themselves work:\n' +
-				'  npm i --no-save @wordpress/blocks @wordpress/block-library jsdom\n\n' +
+				"It still needs jsdom, to play the browser WordPress's editor code expects,\n" +
+				'installed once for this machine:\n' +
+				`  ${ JSDOM_SETUP }\n\n` +
+				'With no WordPress anywhere, the packages themselves work, in the project:\n' +
+				'  npm i --no-save @wordpress/blocks @wordpress/block-library\n\n' +
 				`( ${ err.message.split( '\n' )[ 0 ] } )`
 		);
 		process.exit( 2 );

@@ -2024,7 +2024,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/get-validator',
 			array(
 				'label'               => __( 'Get the pattern validator', 'pattern-builder' ),
-				'description'         => __( 'Returns the source of the block markup validator, as files to write next to each other and run with Node. Block validity is decided by re-running a block\'s save(), which is JavaScript, so no server can answer it and this site cannot validate on your behalf — but it can hand you the tool. Pair it with get-editor-scripts, which says where this site\'s own block code lives, and the check runs against the exact WordPress your pattern is destined for. Requires Node and jsdom (npm i --no-save jsdom).', 'pattern-builder' ),
+				'description'         => __( 'Returns the source of the block markup validator, as files to write next to each other and run with Node. Block validity is decided by re-running a block\'s save(), which is JavaScript, so no server can answer it and this site cannot validate on your behalf — but it can hand you the tool. It asks this site for its own block code on every run, so the check runs against the exact WordPress your pattern is destined for. Requires Node, and jsdom installed once per machine (npm i --prefix ~/.cache/pattern-builder jsdom).', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -2086,7 +2086,7 @@ class Pattern_Builder_Abilities {
 				array(
 					'Write both files into one directory, then:',
 					'',
-					'  npm i --no-save jsdom',
+					'  npm i --prefix ~/.cache/pattern-builder jsdom    # once per machine',
 					'  node validate-pattern.mjs --site ' . home_url( '/' ) . ' pattern.html',
 					'',
 					'It asks this site for its editor scripts on every run, so it always checks against',

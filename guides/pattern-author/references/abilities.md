@@ -436,7 +436,7 @@ skill, write each file `get-validator` returns into one directory and name the
 site:
 
 ```bash
-npm i --no-save jsdom
+npm i --prefix ~/.cache/pattern-builder jsdom              # once per machine
 node <skill>/scripts/validate-pattern.mjs pattern.html     # the installed skill
 node validate-pattern.mjs --site "$WP_URL" pattern.html     # get-validator's copy
 ```
