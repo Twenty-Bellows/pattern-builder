@@ -467,8 +467,9 @@ A localized write turns a pattern's text into
 `<?php echo wp_kses_post( 'text', 'domain' ); ?>`, and importing a pattern's
 images turns each one into `Pattern_Builder_Assets::theme_reference()` —
 `<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/images/x.svg' ); ?>`.
-And every theme save runs `restore_home_links()`, which turns each `href` to a
-page of this site into `<?php echo esc_url( home_url( '/about/' ) ); ?>`, or
+And every theme save runs `restore_home_links()`, which turns each link to a page
+of this site, in an `href` or a block's `url` attribute (a navigation link keeps
+its address there), into `<?php echo esc_url( home_url( '/about/' ) ); ?>`, or
 `home_url()` for the bare home. It leaves a link into `wp-content` or `wp-admin`,
 a link with a query string, and a link to any other site as written: the query
 string because `esc_url()` writes its entities differently, so the call would

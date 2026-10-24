@@ -1213,10 +1213,11 @@ class Pattern_File_Store {
 	}
 
 	/**
-	 * Points each link to a page of this site back at home_url(), which is what reading a
-	 * pattern file renders it from, so a save keeps the call and the link follows the theme
-	 * to any site. A path with a query string is left as it is: esc_url() would write its
-	 * entities differently, so the call could not give back the same link.
+	 * Points each link to a page of this site, in an href or a block's url attribute, back
+	 * at home_url(), which is what reading a pattern file renders it from, so a save keeps
+	 * the call and the link follows the theme to any site. A path with a query string is
+	 * left as it is: esc_url() would write its entities differently, so the call could not
+	 * give back the same link.
 	 *
 	 * @param Abstract_Pattern $pattern The pattern about to be written.
 	 * @return Abstract_Pattern
@@ -1225,9 +1226,9 @@ class Pattern_File_Store {
 		$home = untrailingslashit( home_url() );
 
 		$pattern->content = preg_replace_callback(
-			'/href="' . preg_quote( $home, '/' ) . '(\/[A-Za-z0-9\/._~%#-]*)?"/',
+			'/(href=|"url"\s*:\s*)"' . preg_quote( $home, '/' ) . '(\/[A-Za-z0-9\/._~%#-]*)?"/',
 			function ( $matches ) {
-				$path = isset( $matches[1] ) ? $matches[1] : '';
+				$path = isset( $matches[2] ) ? $matches[2] : '';
 
 				if ( preg_match( '#^/wp-(content|admin)(/|$)#', $path ) ) {
 					return $matches[0];
@@ -1235,7 +1236,7 @@ class Pattern_File_Store {
 
 				$call = '' === $path ? 'home_url()' : "home_url( '" . $path . "' )";
 
-				return 'href="<?php echo esc_url( ' . $call . ' ); ?>"';
+				return $matches[1] . '"<?php echo esc_url( ' . $call . ' ); ?>"';
 			},
 			(string) $pattern->content
 		);

@@ -390,9 +390,17 @@ the pattern under Uncategorized, where nobody looks.
 **A link to a page of the site is `home_url()`, never the site's address.** In
 a theme pattern write `href="<?php echo esc_url( home_url( '/about/' ) ); ?>"`,
 or `home_url()` alone for the home page, so the link follows the theme to any
-site. It is the one PHP a theme pattern may carry besides the `reference` that
-`find-media` and `add-asset` hand back; anything else is refused, and a theme
-save turns a link written as this site's address into the call itself.
+site. A navigation link takes the same call in its `url` attribute. It is the
+one PHP a theme pattern may carry besides the `reference` that `find-media` and
+`add-asset` hand back; anything else is refused, and a theme save turns a link
+written as this site's address into the call itself.
+
+**An image in a theme file you write by hand uses that `reference` form
+exactly:** `<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/images/logo.svg' ); ?>`.
+WordPress's other ways of reaching a theme file — `get_theme_file_uri()`,
+`get_template_directory_uri()` — render the same image but are not calls the
+plugin writes, so the pattern is treated as custom PHP: it can't be stored
+through `create-pattern`, and it opens read-only in the editor.
 
 Write the file directly when you have filesystem access. Against a running
 site, `pattern-builder/create-pattern` stores finished markup — it refuses what

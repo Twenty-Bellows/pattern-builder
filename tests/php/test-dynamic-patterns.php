@@ -534,6 +534,32 @@ class Test_Dynamic_Patterns extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A navigation link keeps its URL in the block's attributes rather than an href, and the
+	 * same save points it at home_url(): a theme's header is where most home links live.
+	 */
+	public function test_a_navigation_link_to_this_site_is_written_as_home_url() {
+		$home    = untrailingslashit( home_url() );
+		$content = '<!-- wp:navigation -->' .
+			'<!-- wp:navigation-link {"label":"About","url":"' . $home . '/about/","kind":"custom"} /-->' .
+			'<!-- wp:navigation-link {"label":"Uploads","url":"' . $home . '/wp-content/uploads/a.pdf","kind":"custom"} /-->' .
+			'<!-- wp:navigation-link {"label":"Elsewhere","url":"https://elsewhere.example/","kind":"custom"} /-->' .
+			'<!-- /wp:navigation -->';
+
+		$this->assertNotWPError( $this->write( array( 'content' => $content ), array( 'import_images' => false ) ) );
+
+		$file = $this->file_for( 'written' );
+		$this->assertStringContainsString( "\"url\":\"<?php echo esc_url( home_url( '/about/' ) ); ?>\"", $file );
+		$this->assertStringContainsString( '"url":"' . $home . '/wp-content/uploads/a.pdf"', $file );
+		$this->assertStringContainsString( '"url":"https://elsewhere.example/"', $file );
+
+		$read = Abstract_Pattern::from_file( $this->theme_dir . '/patterns/written.php' );
+		$this->assertStringContainsString( '"url":"' . home_url( '/about/' ) . '"', $read->content );
+
+		$this->assertNotWPError( $this->store->update_theme_pattern( $read, array( 'import_images' => false ) ) );
+		$this->assertStringContainsString( "\"url\":\"<?php echo esc_url( home_url( '/about/' ) ); ?>\"", $this->file_for( 'written' ) );
+	}
+
+	/**
 	 * The title is written inside the header comment, where a closing marker would end the
 	 * comment and make the rest of the title code. It stays text instead.
 	 */
