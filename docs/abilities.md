@@ -209,7 +209,8 @@ Pattern Overrides slot nothing can fill. Each is named under the error's
 
 A theme pattern meets one more refusal, in the file store rather than here
 because it applies to every caller: markup carrying PHP beyond the calls the
-plugin generates for localized text and the theme's own images is refused as
+plugin generates for localized text, the theme's own images and links to the
+site's own pages is refused as
 `pattern_has_custom_php`, quoting what was found (see
 [`architecture.md`](architecture.md#pattern-files-that-are-programs)). The
 `reference` that `find-media` and `add-asset` hand out is one of those calls, so

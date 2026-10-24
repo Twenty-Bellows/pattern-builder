@@ -446,6 +446,94 @@ class Test_Dynamic_Patterns extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A link to the site's home or one of its pages is the commonest PHP in a theme's
+	 * patterns, and a theme save writes it back itself, so it is not a program.
+	 */
+	public function test_a_home_link_does_not_count() {
+		$path = $this->given_file(
+			'home-links',
+			"<?php\n/**\n * Title: Home links\n * Slug: simple-theme/home-links\n */\n?>\n" .
+			"<!-- wp:paragraph -->\n<p>" .
+			'<a href="<?php echo esc_url( home_url( \'/\' ) ); ?>">Home</a> ' .
+			'<a href="<?php echo esc_url(home_url()); ?>">Also home</a> ' .
+			'<a href="<?php echo esc_url( home_url( "/about/" ) ); ?>">About</a>' .
+			"</p>\n<!-- /wp:paragraph -->\n"
+		);
+
+		$this->assertFalse( Abstract_Pattern::file_has_custom_php( $path ) );
+		$this->assertFalse( Abstract_Pattern::from_file( $path )->hasCustomPhp );
+	}
+
+	/**
+	 * Only a literal path is a link the plugin can write back; anything computed, or left
+	 * unescaped, is code.
+	 */
+	public function test_a_home_link_the_plugin_does_not_write_does_count() {
+		$links = array(
+			'<?php echo esc_url( home_url( $path ) ); ?>',
+			'<?php echo esc_url( home_url( \'/\' . $slug ) ); ?>',
+			'<?php echo esc_url( home_url( "/{$slug}/" ) ); ?>',
+			'<?php echo home_url( \'/\' ); ?>',
+			'<?php echo esc_url( home_url( \'/\', \'https\' ) ); ?>',
+		);
+
+		foreach ( $links as $link ) {
+			$this->assertNotNull( Abstract_Pattern::find_custom_php( '<a href="' . $link . '">x</a>' ), $link );
+		}
+	}
+
+	/**
+	 * A theme save points every link to a page of this site at home_url(), so the pattern
+	 * links to whichever site the theme is on. Files, the admin, a query string and other
+	 * sites stay as written.
+	 */
+	public function test_a_link_to_this_site_is_written_as_home_url() {
+		$home  = untrailingslashit( home_url() );
+		$links = array(
+			$home . '/'                          => "<?php echo esc_url( home_url( '/' ) ); ?>",
+			$home                                => '<?php echo esc_url( home_url() ); ?>',
+			$home . '/about/#team'               => "<?php echo esc_url( home_url( '/about/#team' ) ); ?>",
+			$home . '/wp-content/uploads/a.pdf'  => $home . '/wp-content/uploads/a.pdf',
+			$home . '/wp-admin/'                 => $home . '/wp-admin/',
+			$home . '/?s=seeds'                  => $home . '/?s=seeds',
+			'https://elsewhere.example/about/'   => 'https://elsewhere.example/about/',
+		);
+
+		$paragraphs = '';
+		foreach ( array_keys( $links ) as $url ) {
+			$paragraphs .= '<!-- wp:paragraph --><p><a href="' . $url . '">x</a></p><!-- /wp:paragraph -->';
+		}
+
+		$result = $this->write( array( 'content' => $paragraphs ), array( 'import_images' => false ) );
+
+		$this->assertNotWPError( $result );
+		$file = $this->file_for( 'written' );
+		foreach ( $links as $url => $written ) {
+			$this->assertStringContainsString( 'href="' . $written . '"', $file, $url );
+		}
+	}
+
+	/**
+	 * The round trip the shape exists for: reading renders the call to this site's URL, and
+	 * saving what was read puts the call back rather than the URL.
+	 */
+	public function test_a_home_link_survives_a_read_and_a_save() {
+		$this->write(
+			array( 'content' => '<!-- wp:paragraph --><p><a href="<?php echo esc_url( home_url( \'/shop/\' ) ); ?>">Shop</a></p><!-- /wp:paragraph -->' ),
+			array( 'import_images' => false )
+		);
+
+		$read = Abstract_Pattern::from_file( $this->theme_dir . '/patterns/written.php' );
+		$this->assertStringContainsString( 'href="' . home_url( '/shop/' ) . '"', $read->content );
+		$this->assertFalse( $read->hasCustomPhp );
+
+		$saved = $this->store->update_theme_pattern( $read, array( 'import_images' => false ) );
+
+		$this->assertNotWPError( $saved );
+		$this->assertStringContainsString( "href=\"<?php echo esc_url( home_url( '/shop/' ) ); ?>\"", $this->file_for( 'written' ) );
+	}
+
+	/**
 	 * The title is written inside the header comment, where a closing marker would end the
 	 * comment and make the rest of the title code. It stays text instead.
 	 */

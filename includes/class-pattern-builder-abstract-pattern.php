@@ -387,6 +387,11 @@ class Abstract_Pattern {
 		// `echo esc_url( get_stylesheet_directory_uri() . '/assets/images/square-1.svg' );`.
 		$shapes[] = array( T_ECHO, array( T_STRING, 'esc_url' ), '(', array( T_STRING, 'get_stylesheet_directory_uri' ), '(', ')', '.', T_CONSTANT_ENCAPSED_STRING, ')', ';' );
 
+		// A link to a page of this site, as Pattern_File_Store::restore_home_links() writes
+		// it, e.g. `echo esc_url( home_url( '/about/' ) );`, or `home_url()` for the bare home.
+		$shapes[] = array( T_ECHO, array( T_STRING, 'esc_url' ), '(', array( T_STRING, 'home_url' ), '(', T_CONSTANT_ENCAPSED_STRING, ')', ')', ';' );
+		$shapes[] = array( T_ECHO, array( T_STRING, 'esc_url' ), '(', array( T_STRING, 'home_url' ), '(', ')', ')', ';' );
+
 		return $shapes;
 	}
 

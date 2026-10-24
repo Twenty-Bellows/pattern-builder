@@ -94,7 +94,7 @@ plugin's own `pb_pattern` — and offering them promises fields that do not appl
 viewable post type is listed, because those are the ones a pattern lands in and
 the fields every post has apply to them even when they register no meta, which
 on a stock site `post` and `page` do not; any other post type is listed if the
-filter declared a field for it, a deliberate act honoured whatever the post
+filter declared a field for it, a deliberate act honored whatever the post
 type; failing that, a post type a plugin registered is listed if it has meta
 worth binding to. That last courtesy stops short of core's own internals, or
 `wp_block` would appear on the strength of the sync flag core registers against
@@ -216,8 +216,8 @@ preview document; a local tile is this site's own front-end render
 (`Pattern_Builder_Preview::serve_tile()`, `?pattern_builder_tile={id}&v={key}`
 on the home URL). Both are framed at one design width (1400px) and scaled into
 the tile by a constant the stylesheet computes from the two sizes
-(`src/_pattern-tiles.scss`). The tile document centres its own content, so a
-short pattern is centred and a tall one cropped at the same point in both
+(`src/_pattern-tiles.scss`). The tile document centers its own content, so a
+short pattern is centered and a tall one cropped at the same point in both
 grids, with nothing measuring anything in JavaScript.
 
 Drawing local tiles on the server is what makes them show what the site shows.
@@ -462,19 +462,30 @@ it sits outside the header comment and would be dropped just the same, so the
 conservative answer is the safe one. The cost is about the same as the `include`
 that already happens for every pattern read.
 
-The exceptions are the plugin's own writes, and there are two of them.
+The exceptions are the plugin's own writes, and there are three of them.
 A localized write turns a pattern's text into
 `<?php echo wp_kses_post( 'text', 'domain' ); ?>`, and importing a pattern's
 images turns each one into `Pattern_Builder_Assets::theme_reference()` —
 `<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/images/x.svg' ); ?>`.
-Both round-trip: reading the file runs the call, writing it puts the same call
-back, so a file carrying either is still one the plugin can rebuild.
+And every theme save runs `restore_home_links()`, which turns each `href` to a
+page of this site into `<?php echo esc_url( home_url( '/about/' ) ); ?>`, or
+`home_url()` for the bare home. It leaves a link into `wp-content` or `wp-admin`,
+a link with a query string, and a link to any other site as written: the query
+string because `esc_url()` writes its entities differently, so the call would
+not give back the same link. All three round-trip: reading the file runs the
+call, writing it puts the same call back, so a file carrying any of them is
+still one the plugin can rebuild. The home link is the one theme authors write
+by hand — it is the commonest PHP in a theme's patterns — and without the save
+turning the rendered URL back into the call, opening such a pattern and saving
+it would hard-code this site's address into the theme. An upload to the cloud
+exports the rendered markup, so a home link leaves as this site's address.
 
-`written_call_shapes()` names those two shapes in tokens and `shape_ends_at()`
+`written_call_shapes()` names those shapes in tokens and `shape_ends_at()`
 matches one exactly, down to the identifier in each position — the escape
 function is one of `LOCALIZED_STRING_FUNCTIONS`, the asset call is `esc_url`
-around `get_stylesheet_directory_uri`. A variable where a literal belongs, a
-different concatenation, or any other function fails. A hand-written
+around `get_stylesheet_directory_uri`, and the link call is `esc_url` around
+`home_url` with one literal path or none. A variable where a literal belongs, a
+different concatenation, a second argument, or any other function fails. A hand-written
 `esc_html_e()` is therefore custom PHP, correctly, and so is the same `esc_url`
 reaching for a directory that is not the theme's: the string would survive the
 round trip but the call around it would not.
@@ -483,7 +494,7 @@ Getting this list wrong is not a quiet failure. A pattern the plugin wrote
 itself, read back and misjudged, becomes a pattern the plugin refuses to save,
 and since the same shapes check every write (below), a writer whose output
 drifts from them has its writes refused at once — so the shapes here and the
-strings the two writers produce have to be changed together.
+strings the three writers produce have to be changed together.
 `test_the_plugins_own_php_still_writes()` holds them to each other.
 
 **A write is followed by a read, so the file has to be forgotten first.** A save
@@ -582,7 +593,7 @@ Two block themes ship with the plugin and nothing registers or activates them:
 - **`blank-theme`** — no presets, no styles, templates that constrain nothing,
   so a pattern rendered against it shows what the pattern itself does. It needs
   a `functions.php` because `theme.json` cannot make a theme blank on its own:
-  `settings.color.defaultPalette: false` hides core's colours from the picker
+  `settings.color.defaultPalette: false` hides core's colors from the picker
   but does not stop `--wp--preset--color--vivid-red` being emitted, so core's
   presets are emptied through `wp_theme_json_data_default` instead.
 - **`opinionated-theme`** — the worked example of `references/design-system.md`,

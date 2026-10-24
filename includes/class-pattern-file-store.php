@@ -597,6 +597,7 @@ class Pattern_File_Store {
 		if ( ! isset( $options['import_images'] ) || true === $options['import_images'] ) {
 			$pattern = $this->import_pattern_image_assets( $pattern );
 		}
+		$pattern = $this->restore_home_links( $pattern );
 		if ( isset( $options['localize'] ) && true === $options['localize'] ) {
 			$pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 		}
@@ -887,7 +888,7 @@ class Pattern_File_Store {
 				'pattern_has_custom_php',
 				sprintf(
 					/* translators: %s: the PHP found, e.g. "echo get_bloginfo( 'name' );". */
-					__( 'The pattern was not stored, because it would put PHP into the theme’s file: %s. Pattern Builder writes only the PHP it generates itself, for localized text and the theme’s own images. Write any other PHP in the theme’s pattern file directly.', 'pattern-builder' ),
+					__( 'The pattern was not stored, because it would put PHP into the theme’s file: %s. Pattern Builder writes only the PHP it generates itself, for localized text, the theme’s own images and links to the site’s own pages. Write any other PHP in the theme’s pattern file directly.', 'pattern-builder' ),
 					$custom_php
 				),
 				array( 'status' => 400 )
@@ -1206,6 +1207,37 @@ class Pattern_File_Store {
 				return $matches[0];
 			},
 			$pattern->content
+		);
+
+		return $pattern;
+	}
+
+	/**
+	 * Points each link to a page of this site back at home_url(), which is what reading a
+	 * pattern file renders it from, so a save keeps the call and the link follows the theme
+	 * to any site. A path with a query string is left as it is: esc_url() would write its
+	 * entities differently, so the call could not give back the same link.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern about to be written.
+	 * @return Abstract_Pattern
+	 */
+	private function restore_home_links( $pattern ) {
+		$home = untrailingslashit( home_url() );
+
+		$pattern->content = preg_replace_callback(
+			'/href="' . preg_quote( $home, '/' ) . '(\/[A-Za-z0-9\/._~%#-]*)?"/',
+			function ( $matches ) {
+				$path = isset( $matches[1] ) ? $matches[1] : '';
+
+				if ( preg_match( '#^/wp-(content|admin)(/|$)#', $path ) ) {
+					return $matches[0];
+				}
+
+				$call = '' === $path ? 'home_url()' : "home_url( '" . $path . "' )";
+
+				return 'href="<?php echo esc_url( ' . $call . ' ); ?>"';
+			},
+			(string) $pattern->content
 		);
 
 		return $pattern;
