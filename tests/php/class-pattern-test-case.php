@@ -17,6 +17,18 @@ abstract class Pattern_Test_Case extends WP_UnitTestCase {
 	private $registered = array();
 
 	/**
+	 * Where the block themes a test builds are written.
+	 */
+	const TEMPLATE_THEME_ROOT = 'pattern-builder-template-themes';
+
+	/**
+	 * The theme active before a test switched to one it built, or null.
+	 *
+	 * @var string|null
+	 */
+	private $theme_before = null;
+
+	/**
 	 * Sets the test up.
 	 */
 	public function set_up() {
@@ -41,7 +53,123 @@ abstract class Pattern_Test_Case extends WP_UnitTestCase {
 
 		\TwentyBellows\PatternBuilder\Synced_Patterns::flush();
 
+		if ( null !== $this->theme_before ) {
+			switch_theme( $this->theme_before );
+			$this->theme_before = null;
+			$this->remove_directory( $this->template_theme_root() );
+			wp_clean_theme_json_cache();
+		}
+
 		parent::tear_down();
+	}
+
+	/**
+	 * Build a block theme of the test's own and make it the active one, so templates are
+	 * read and written where core looks for them and nowhere the suite shares.
+	 *
+	 * It has an index template that places a header part, the header part, and a theme.json
+	 * naming the part's area. With $with_parent it is a child theme of a second one built
+	 * beside it, which carries its own index, single template and header part.
+	 *
+	 * @param bool $with_parent Whether the active theme is a child theme.
+	 * @return string The active theme's directory.
+	 */
+	protected function use_a_template_theme( bool $with_parent = false ): string {
+		$root = $this->template_theme_root();
+		$this->remove_directory( $root );
+
+		$files = array(
+			'templates/index.html' => "<!-- wp:template-part {\"slug\":\"header\"} /-->\n<!-- wp:post-content /-->\n",
+			'parts/header.html'    => "<!-- wp:site-title /-->\n",
+			'theme.json'           => wp_json_encode(
+				array(
+					'version'       => 3,
+					'templateParts' => array(
+						array(
+							'name'  => 'header',
+							'title' => 'Header',
+							'area'  => 'header',
+						),
+					),
+				),
+				JSON_PRETTY_PRINT
+			) . "\n",
+		);
+
+		$this->write_theme( $root . '/pb-template-test', $with_parent ? 'pb-template-parent' : '', $files );
+		if ( $with_parent ) {
+			$this->write_theme(
+				$root . '/pb-template-parent',
+				'',
+				array_merge(
+					$files,
+					array( 'templates/single.html' => "<!-- wp:template-part {\"slug\":\"header\"} /-->\n<!-- wp:post-title /-->\n" )
+				)
+			);
+		}
+
+		register_theme_directory( $root );
+		delete_site_transient( 'theme_roots' );
+		wp_clean_themes_cache();
+
+		if ( null === $this->theme_before ) {
+			$this->theme_before = get_stylesheet();
+		}
+		switch_theme( 'pb-template-test' );
+		wp_clean_theme_json_cache();
+
+		return get_stylesheet_directory();
+	}
+
+	/**
+	 * Write one theme's files.
+	 *
+	 * @param string $directory Theme directory.
+	 * @param string $parent Parent theme stylesheet, or '' for none.
+	 * @param array  $files Relative path => contents.
+	 * @return void
+	 */
+	private function write_theme( string $directory, string $parent, array $files ): void {
+		$header = "/*\nTheme Name: " . basename( $directory ) . "\n" . ( '' !== $parent ? 'Template: ' . $parent . "\n" : '' ) . "*/\n";
+
+		foreach ( array_merge( array( 'style.css' => $header ), $files ) as $relative => $contents ) {
+			$path = $directory . '/' . $relative;
+			if ( ! is_dir( dirname( $path ) ) ) {
+				mkdir( dirname( $path ), 0777, true );
+			}
+			file_put_contents( $path, $contents ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		}
+	}
+
+	/**
+	 * Where the themes a test builds live.
+	 *
+	 * @return string
+	 */
+	private function template_theme_root(): string {
+		return sys_get_temp_dir() . '/' . self::TEMPLATE_THEME_ROOT;
+	}
+
+	/**
+	 * Remove a directory and everything under it.
+	 *
+	 * @param string $directory Directory.
+	 * @return void
+	 */
+	private function remove_directory( string $directory ): void {
+		if ( ! is_dir( $directory ) ) {
+			return;
+		}
+
+		$entries = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $directory, FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::CHILD_FIRST );
+		foreach ( $entries as $entry ) {
+			if ( $entry->isDir() ) {
+				rmdir( $entry->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+			} else {
+				unlink( $entry->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			}
+		}
+		rmdir( $directory ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
 	}
 
 	/**
