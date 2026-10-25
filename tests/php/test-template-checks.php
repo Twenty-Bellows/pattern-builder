@@ -63,11 +63,25 @@ class Test_Template_Checks extends Pattern_Test_Case {
 		$this->assertStringContainsString( 'places itself', $result->get_error_message() );
 	}
 
-	public function test_php_is_refused() {
-		$result = Pattern_Builder_Template_Checks::check( 'template', 'landing', '<!-- wp:paragraph --><p><? echo 1; ?></p><!-- /wp:paragraph -->' );
+	/**
+	 * A cycle through another part renders the same error a part placing itself does.
+	 */
+	public function test_a_part_placing_itself_through_another_is_refused() {
+		file_put_contents( get_stylesheet_directory() . '/parts/nav.html', "<!-- wp:template-part {\"slug\":\"header\"} /-->\n" );
+
+		$result = Pattern_Builder_Template_Checks::check( 'template-part', 'header', '<!-- wp:template-part {"slug":"nav"} /-->' );
 
 		$this->assertWPError( $result );
-		$this->assertStringContainsString( 'never run', $result->get_error_message() );
+		$this->assertStringContainsString( 'which already places header', $result->get_error_message() );
+	}
+
+	public function test_part_slugs_names_only_this_theme_s_parts() {
+		$markup = '<!-- wp:group --><div class="wp-block-group"><!-- wp:template-part {"slug":" header "} /--></div><!-- /wp:group -->'
+			. '<!-- wp:template-part {"slug":"footer","theme":"another-theme"} /-->'
+			. '<!-- wp:template-part {"slug":"header","theme":"pb-template-test"} /-->'
+			. '<!-- wp:template-part /-->';
+
+		$this->assertSame( array( 'header' ), Pattern_Builder_Template_Checks::part_slugs( $markup ) );
 	}
 
 	/**

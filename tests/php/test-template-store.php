@@ -162,17 +162,70 @@ class Test_Template_Store extends Pattern_Test_Case {
 	}
 
 	/**
-	 * Core reads an empty postTypes as "offered for no post type", which is never what
-	 * clearing the list means.
+	 * Core offers a template whose entry names no post types to pages alone, and one whose
+	 * entry names an empty list to nothing; clearing the list means the first.
 	 */
-	public function test_an_empty_post_types_list_lifts_the_restriction() {
-		$this->store->save( 'template', 'landing', '<!-- wp:post-content /-->', array( 'postTypes' => array( 'page' ) ) );
+	public function test_an_empty_post_types_list_goes_back_to_pages() {
+		$this->store->save( 'template', 'landing', '<!-- wp:post-content /-->', array( 'postTypes' => array( 'post' ) ) );
 		$this->store->save( 'template', 'landing', '<!-- wp:post-content /-->', array( 'postTypes' => array() ) );
 
 		$config = json_decode( file_get_contents( $this->theme_dir . '/theme.json' ), true );
 
 		$this->assertArrayNotHasKey( 'postTypes', $config['customTemplates'][0] );
+		$this->assertSame( array( 'page' ), $this->store->find( 'template', 'landing' )['postTypes'] );
+	}
+
+	/**
+	 * With no entry at all, core offers a custom template for every post type, so there is no
+	 * list to report.
+	 */
+	public function test_a_custom_template_with_no_entry_names_no_post_types() {
+		$this->store->save( 'template', 'landing', '<!-- wp:post-content /-->' );
+
 		$this->assertArrayNotHasKey( 'postTypes', $this->store->find( 'template', 'landing' ) );
+	}
+
+	/**
+	 * Core lays a child theme's list over its parent's by position, so an entry appended to a
+	 * child's shorter list would overwrite one of the parent's.
+	 */
+	public function test_a_child_theme_s_entry_does_not_overwrite_the_parent_s() {
+		$child = $this->use_a_template_theme( true );
+		file_put_contents( $child . '/theme.json', wp_json_encode( array( 'version' => 3 ) ) );
+
+		$this->store->save(
+			'template-part',
+			'header-dark',
+			'<!-- wp:site-title /-->',
+			array(
+				'title' => 'Dark header',
+				'area'  => 'header',
+			)
+		);
+
+		$parent = new WP_Theme_JSON( json_decode( file_get_contents( get_template_directory() . '/theme.json' ), true ) );
+		$parent->merge( new WP_Theme_JSON( json_decode( file_get_contents( $child . '/theme.json' ), true ) ) );
+		$parts = $parent->get_template_parts();
+
+		$this->assertSame( 'header', $parts['header']['area'] );
+		$this->assertSame( 'Header', $parts['header']['title'] );
+		$this->assertSame( 'header', $parts['header-dark']['area'] );
+		$this->assertSame( 'header', $this->store->find( 'template-part', 'header' )['area'] );
+	}
+
+	/**
+	 * Removing the child's copy leaves the parent's rendering, and whatever the child said
+	 * about it still applies.
+	 */
+	public function test_deleting_a_child_s_copy_keeps_its_metadata_for_the_parent_s() {
+		$child = $this->use_a_template_theme( true );
+		$this->store->save( 'template-part', 'header', '<!-- wp:site-title /-->', array( 'title' => 'Site header' ) );
+
+		$this->store->delete( 'template-part', 'header' );
+
+		$config = json_decode( file_get_contents( $child . '/theme.json' ), true );
+		$this->assertSame( 'Site header', $config['templateParts'][0]['title'] );
+		$this->assertSame( 'Site header', $this->store->find( 'template-part', 'header' )['title'] );
 	}
 
 	public function test_a_part_records_its_area_in_theme_json() {

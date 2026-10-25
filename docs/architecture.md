@@ -573,10 +573,15 @@ file's bytes as they are.
 
 A template's title and post types, and a part's title and area, live only in
 `theme.json` (`customTemplates`, `templateParts`), so that is where the store
-records them, rewriting the file only when an entry changes. Deleting removes
-the active theme's file, any customization and that entry, and refuses the last
-`index.html`, without which WordPress stops treating the theme as a block
-theme. A template a plugin registered is read-only, as a plugin pattern is.
+records them, rewriting the file only when an entry changes. Core lays a child
+theme's list over its parent's by position (`WP_Theme_JSON::merge()` is an
+`array_replace_recursive()`), so an entry appended to a child's shorter list
+would land on one of the parent's. The store reads the lists that way and
+writes the whole effective list into the active theme's file, which reads back
+as itself. Deleting removes
+the active theme's file, any customization and, when nothing of the slug is left
+to render, that entry. It refuses the last `index.html`, without which WordPress
+stops treating the theme as a block theme. A template a plugin registered is read-only, as a plugin pattern is.
 
 ## Previews
 

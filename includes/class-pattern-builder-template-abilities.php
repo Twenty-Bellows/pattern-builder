@@ -130,7 +130,7 @@ class Pattern_Builder_Template_Abilities {
 			'postTypes' => array(
 				'type'        => 'array',
 				'items'       => array( 'type' => 'string' ),
-				'description' => 'Custom templates only: the post types an editor can pick this template for, e.g. ["page"]. An empty list makes it available to every post type.',
+				'description' => 'Custom templates only: the post types an editor can pick this template for, e.g. ["page", "post"]. Once a custom template has a title or post types recorded, WordPress offers it for pages alone unless this names others; an empty list goes back to that.',
 			),
 		);
 	}
@@ -490,7 +490,7 @@ class Pattern_Builder_Template_Abilities {
 		$summary  = $this->summary( $saved['template'] );
 		$warnings = $saved['warnings'];
 		// Markup this write left alone is not this write's to judge.
-		if ( (string) $saved['template']['content'] !== (string) $existing['content'] ) {
+		if ( Pattern_Builder_Template_Store::as_stored( $saved['template']['content'] ) !== Pattern_Builder_Template_Store::as_stored( $existing['content'] ) ) {
 			$warnings = array_merge( $warnings, Pattern_Builder_Template_Checks::warnings( $content ) );
 		}
 
@@ -606,7 +606,7 @@ class Pattern_Builder_Template_Abilities {
 	}
 
 	/**
-	 * Every template, other part and theme pattern that places a part.
+	 * Every template, other part, pattern and post that places a part.
 	 *
 	 * @param Pattern_Builder_Template_Store $store The store.
 	 * @param string                         $slug Part slug.
@@ -616,23 +616,18 @@ class Pattern_Builder_Template_Abilities {
 		$places = array();
 
 		foreach ( array_keys( Pattern_Builder_Template_Store::POST_TYPES ) as $type ) {
-			foreach ( array_keys( $store->all( $type ) ) as $other ) {
-				if ( 'template-part' === $type && $other === $slug ) {
-					continue;
-				}
-
-				$record = $store->find( $type, $other );
-				if ( null !== $record && self::places_part( $record['content'], $slug ) ) {
+			foreach ( $store->all( $type, true ) as $other => $record ) {
+				if ( ( 'template-part' !== $type || $other !== $slug ) && in_array( $slug, Pattern_Builder_Template_Checks::part_slugs( $record['content'] ), true ) ) {
 					$places[] = array(
 						'kind' => $type,
-						'name' => $other,
+						'name' => (string) $other,
 					);
 				}
 			}
 		}
 
 		foreach ( ( new Pattern_File_Store() )->get_theme_patterns() as $pattern ) {
-			if ( self::places_part( (string) $pattern->content, $slug ) ) {
+			if ( in_array( $slug, Pattern_Builder_Template_Checks::part_slugs( (string) $pattern->content ), true ) ) {
 				$places[] = array(
 					'kind' => 'pattern',
 					'name' => (string) $pattern->name,
@@ -640,36 +635,53 @@ class Pattern_Builder_Template_Abilities {
 			}
 		}
 
-		return $places;
+		return array_merge( $places, $this->posts_using_part( $slug ) );
 	}
 
 	/**
-	 * Whether markup places a part of the active theme.
+	 * The posts and user patterns that place a part, found with a LIKE and confirmed by
+	 * parsing.
 	 *
-	 * @param string $markup Block markup.
 	 * @param string $slug Part slug.
-	 * @return bool
+	 * @return array[] Each with kind, name and id.
 	 */
-	private static function places_part( $markup, $slug ) {
-		if ( false === strpos( (string) $markup, 'template-part' ) ) {
-			return false;
+	private function posts_using_part( $slug ) {
+		global $wpdb;
+
+		$skipped = array_values( array_diff( Pattern_Builder_Usage::SKIPPED_POST_TYPES, array( 'wp_block' ) ) );
+		$likes   = array(
+			'%' . $wpdb->esc_like( '"slug":"' . $slug . '"' ) . '%',
+			'%' . $wpdb->esc_like( '"slug": "' . $slug . '"' ) . '%',
+		);
+		$sql     = "SELECT ID, post_title, post_type FROM {$wpdb->posts}
+			WHERE post_type NOT IN (" . implode( ', ', array_fill( 0, count( $skipped ), '%s' ) ) . ')
+			AND post_status IN (' . implode( ', ', array_fill( 0, count( Pattern_Builder_Usage::STATUSES ), '%s' ) ) . ')
+			AND post_content LIKE %s
+			AND ( post_content LIKE %s OR post_content LIKE %s )';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- The SQL is built from placeholders only, and every value goes through prepare(); a LIKE on post_content has no API equivalent.
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, array_merge( $skipped, Pattern_Builder_Usage::STATUSES, array( '%' . $wpdb->esc_like( 'wp:template-part' ) . '%' ), $likes ) ) );
+
+		$places = array();
+		foreach ( (array) $rows as $row ) {
+			$post = get_post( (int) $row->ID );
+			if ( ! $post || ! in_array( $slug, Pattern_Builder_Template_Checks::part_slugs( $post->post_content ), true ) ) {
+				continue;
+			}
+
+			$readable = current_user_can( 'read_post', $post->ID );
+			$places[] = array(
+				'kind' => 'wp_block' === $post->post_type ? 'pattern' : 'post',
+				'name' => $readable && '' !== $post->post_title ? $post->post_title : sprintf(
+					/* translators: %d: post ID. */
+					__( 'post %d', 'pattern-builder' ),
+					$post->ID
+				),
+				'id'   => (int) $post->ID,
+			);
 		}
 
-		$blocks = parse_blocks( (string) $markup );
-		while ( $blocks ) {
-			$block = array_shift( $blocks );
-			if ( 'core/template-part' === $block['blockName'] ) {
-				$attrs = is_array( $block['attrs'] ) ? $block['attrs'] : array();
-				if ( isset( $attrs['slug'] ) && $slug === $attrs['slug'] && ( ! isset( $attrs['theme'] ) || get_stylesheet() === $attrs['theme'] ) ) {
-					return true;
-				}
-			}
-			if ( ! empty( $block['innerBlocks'] ) ) {
-				$blocks = array_merge( $blocks, $block['innerBlocks'] );
-			}
-		}
-
-		return false;
+		return $places;
 	}
 
 	/**
@@ -742,9 +754,10 @@ class Pattern_Builder_Template_Abilities {
 	 */
 	public static function hash( $record ) {
 		$fields = array();
-		foreach ( array( 'type', 'slug', 'source', 'theme', 'title', 'area', 'postTypes', 'content' ) as $key ) {
+		foreach ( array( 'type', 'slug', 'source', 'theme', 'title', 'area', 'postTypes' ) as $key ) {
 			$fields[ $key ] = isset( $record[ $key ] ) ? $record[ $key ] : null;
 		}
+		$fields['content'] = Pattern_Builder_Template_Store::as_stored( isset( $record['content'] ) ? $record['content'] : '' );
 
 		return hash( 'sha256', (string) wp_json_encode( $fields ) );
 	}

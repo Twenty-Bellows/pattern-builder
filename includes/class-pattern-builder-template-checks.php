@@ -16,10 +16,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * The checks a template or template part runs before it lands in the theme, on top of the
  * ones every pattern runs.
- *
- * A template is a theme file, read wherever the theme goes, so what it may carry is
- * narrower than a pattern: no PHP, since it is never run, and nothing that means something
- * on this site alone.
  */
 class Pattern_Builder_Template_Checks {
 	/**
@@ -69,15 +65,83 @@ class Pattern_Builder_Template_Checks {
 	 * @return string[]
 	 */
 	public static function problems( $type, $slug, $markup ) {
-		$problems = Pattern_Builder_Markup_Checks::problems( $markup );
-
-		if ( false !== strpos( $markup, '<?' ) ) {
-			$problems[] = __( 'The markup contains "<?". A template file is read as text and never run, so PHP in one is sent to the browser as it stands. Put dynamic output in a block, or in a pattern the template references.', 'pattern-builder' );
-		}
-
-		$problems = array_merge( $problems, self::part_references( parse_blocks( $markup ), $type, (string) $slug ) );
+		$problems = array_merge(
+			Pattern_Builder_Markup_Checks::problems( $markup ),
+			self::part_references( parse_blocks( $markup ), $type, (string) $slug )
+		);
 
 		return array_values( array_unique( $problems ) );
+	}
+
+	/**
+	 * The slugs of the active theme's parts some markup places.
+	 *
+	 * @param string $markup Block markup.
+	 * @return string[]
+	 */
+	public static function part_slugs( $markup ) {
+		if ( false === strpos( (string) $markup, 'template-part' ) ) {
+			return array();
+		}
+
+		$slugs = array();
+		foreach ( self::every_block( parse_blocks( (string) $markup ) ) as $block ) {
+			$part = self::own_part( $block );
+			if ( null !== $part ) {
+				$slugs[] = $part;
+			}
+		}
+
+		return array_values( array_unique( $slugs ) );
+	}
+
+	/**
+	 * The part a block places, when it is a reference to one of the active theme's parts.
+	 *
+	 * @param array $block A parsed block.
+	 * @return string|null
+	 */
+	private static function own_part( $block ) {
+		if ( 'core/template-part' !== $block['blockName'] ) {
+			return null;
+		}
+
+		$attrs = isset( $block['attrs'] ) && is_array( $block['attrs'] ) ? $block['attrs'] : array();
+		$part  = isset( $attrs['slug'] ) ? trim( (string) $attrs['slug'] ) : '';
+		if ( '' === $part || ( isset( $attrs['theme'] ) && get_stylesheet() !== $attrs['theme'] ) ) {
+			return null;
+		}
+
+		return $part;
+	}
+
+	/**
+	 * Whether a part places another, directly or through the parts it places.
+	 *
+	 * @param Pattern_Builder_Template_Store $store The store.
+	 * @param string                         $from The part to start from.
+	 * @param string                         $target The part to look for.
+	 * @param array                          $seen Parts already followed.
+	 * @return bool
+	 */
+	private static function places_part( $store, $from, $target, &$seen ) {
+		if ( isset( $seen[ $from ] ) ) {
+			return false;
+		}
+		$seen[ $from ] = true;
+
+		$record = $store->find( 'template-part', $from );
+		if ( null === $record ) {
+			return false;
+		}
+
+		foreach ( self::part_slugs( $record['content'] ) as $next ) {
+			if ( $next === $target || self::places_part( $store, $next, $target, $seen ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -141,6 +205,17 @@ class Pattern_Builder_Template_Checks {
 				$problems[] = sprintf(
 					/* translators: %s: part slug. */
 					__( 'The reference to the %s part resolves to nothing in this theme, and an unresolved part renders as nothing at all. Store the part first; list-templates with type "template-part" says what exists.', 'pattern-builder' ),
+					$part
+				);
+				continue;
+			}
+
+			$seen = array();
+			if ( 'template-part' === $type && self::places_part( $store, $part, $slug, $seen ) ) {
+				$problems[] = sprintf(
+					/* translators: 1: the part being stored, 2: the part it places. */
+					__( 'The %1$s part places %2$s, which already places %1$s, directly or through other parts. Core renders a part inside itself as an error message.', 'pattern-builder' ),
+					$slug,
 					$part
 				);
 			}

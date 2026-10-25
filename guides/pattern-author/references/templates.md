@@ -71,9 +71,10 @@ hierarchy is used wherever the hierarchy reaches it, with nothing to assign:
 | Search results, a missing page | `search`, `404` |
 | Anything without its own | `index`, the fallback every request reaches |
 
-Any other slug is a custom template: an editor picks it for a page from the
-Template panel. Give it a `title` they'll recognize, and `postTypes` when it
-only makes sense for some, such as `["page"]`.
+Any other slug is a custom template: an editor picks it from the Template
+panel. Give it a `title` they'll recognize. Once it has one, WordPress offers it
+for pages alone, so name `postTypes` when posts or another post type should get
+it too, such as `["page", "post"]`.
 
 Write `index` first if the theme has nothing yet. A theme with no
 `templates/index.html` isn't a block theme at all, which is also why
@@ -83,7 +84,8 @@ Write `index` first if the theme has nothing yet. A theme with no
 
 Store a part before any template that places it, the same bottom-up order
 patterns follow. A reference to a part that doesn't exist renders as nothing,
-so `create-template` refuses one.
+so `create-template` refuses one, and so is a part that ends up placing itself
+through another.
 
 **Give a part its `area`.** `header` and `footer` are the usual ones; the
 areas this site supports come back from `list-templates` with
@@ -143,8 +145,8 @@ renders in its place. The answer's `replaces` says what it took over from.
 `delete-template` removes the active theme's file, any customization of it, and
 its title or area in `theme.json`, and answers with what renders for that slug
 now. It refuses a part that templates, other parts or patterns still place,
-and names them in `usedBy`: change those first. Send the `hash` you read as
-`expectedHash` here too.
+and names them in `usedBy`, pages and user patterns included: change those
+first. Send the `hash` you read as `expectedHash` here too.
 
 ## Checking it
 

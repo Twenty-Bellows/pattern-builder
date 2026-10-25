@@ -18,11 +18,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Templates and template parts as WordPress resolves them, written only into the active
  * theme's own folders.
- *
- * What renders comes from one of three places, in core's order: a Site Editor
- * customization saved as a `wp_template` or `wp_template_part` row, then a theme file
- * (the child theme's before its parent's), then a template a plugin registered. Every
- * write lands in a file, and folds a customization of the same slug into it.
  */
 class Pattern_Builder_Template_Store {
 	/**
@@ -37,6 +32,13 @@ class Pattern_Builder_Template_Store {
 	 * A slug this store will write: lowercase, flat, and safe as a filename.
 	 */
 	const SLUG_PATTERN = '/^[a-z0-9][a-z0-9_-]{0,199}$/';
+
+	/**
+	 * The `customTemplates` and `templateParts` lists read during this instance's life.
+	 *
+	 * @var array
+	 */
+	private $theme_json_lists = array();
 
 	/**
 	 * The core post type for a type name.
@@ -59,12 +61,13 @@ class Pattern_Builder_Template_Store {
 	}
 
 	/**
-	 * Every template or template part that resolves on this site, without content.
+	 * Every template or template part that resolves on this site.
 	 *
 	 * @param string $type "template" or "template-part".
-	 * @return array[] Summaries, by slug.
+	 * @param bool   $with_content Whether to keep each one's markup.
+	 * @return array[] By slug.
 	 */
-	public function all( $type ) {
+	public function all( $type, $with_content = false ) {
 		$post_type = self::post_type( $type );
 		if ( null === $post_type ) {
 			return array();
@@ -97,7 +100,9 @@ class Pattern_Builder_Template_Store {
 				isset( $customizations[ $slug ] ) ? $customizations[ $slug ] : null
 			);
 			if ( null !== $record ) {
-				unset( $record['content'] );
+				if ( ! $with_content ) {
+					unset( $record['content'] );
+				}
 				$found[ $slug ] = $record;
 			}
 		}
@@ -193,11 +198,8 @@ class Pattern_Builder_Template_Store {
 	}
 
 	/**
-	 * Write a template or template part into the active theme.
-	 *
-	 * A Site Editor customization of the same slug is what the caller read and edited, so
-	 * once the file holds the new content the row is removed, as the Site Editor's own reset
-	 * removes it, and the file renders.
+	 * Write a template or template part into the active theme, folding a Site Editor
+	 * customization of the same slug into the file.
 	 *
 	 * @param string $type "template" or "template-part".
 	 * @param string $slug Template slug.
@@ -212,7 +214,7 @@ class Pattern_Builder_Template_Store {
 			return $refused;
 		}
 
-		$content = self::without_own_theme_attribute( (string) $content );
+		$content = self::as_stored( $content );
 		if ( false !== strpos( $content, '<?' ) ) {
 			return new WP_Error(
 				'pb_template_has_php',
@@ -227,7 +229,7 @@ class Pattern_Builder_Template_Store {
 		}
 
 		$path    = $this->own_path( $post_type, $slug );
-		$written = Pattern_Builder_Security::safe_file_write( $path, rtrim( $content ) . "\n", $this->own_folders() );
+		$written = Pattern_Builder_Security::safe_file_write( $path, $content, $this->own_folders() );
 		if ( is_wp_error( $written ) ) {
 			return $written;
 		}
@@ -325,7 +327,9 @@ class Pattern_Builder_Template_Store {
 			$removed['customization'] = true;
 		}
 
-		$this->remove_metadata( $post_type, $slug );
+		if ( ! $this->has_fallback( $type, $slug ) ) {
+			$this->remove_metadata( $post_type, $slug );
+		}
 
 		return array(
 			'removed' => $removed,
@@ -603,11 +607,12 @@ class Pattern_Builder_Template_Store {
 		}
 
 		$custom = $this->theme_json_entries( 'customTemplates' );
-		if ( ! empty( $custom[ $slug ]['title'] ) ) {
-			$metadata['title'] = (string) $custom[ $slug ]['title'];
-		}
-		if ( ! empty( $custom[ $slug ]['postTypes'] ) ) {
-			$metadata['postTypes'] = array_values( (array) $custom[ $slug ]['postTypes'] );
+		if ( isset( $custom[ $slug ] ) ) {
+			if ( ! empty( $custom[ $slug ]['title'] ) ) {
+				$metadata['title'] = (string) $custom[ $slug ]['title'];
+			}
+			// Core offers a template whose entry names no post types to pages alone.
+			$metadata['postTypes'] = isset( $custom[ $slug ]['postTypes'] ) && is_array( $custom[ $slug ]['postTypes'] ) ? array_values( $custom[ $slug ]['postTypes'] ) : array( 'page' );
 		}
 
 		$registered = WP_Block_Templates_Registry::get_instance()->get_by_slug( $slug );
@@ -622,34 +627,61 @@ class Pattern_Builder_Template_Store {
 	}
 
 	/**
-	 * The `customTemplates` or `templateParts` entries of the active theme and its parent, by
-	 * name, the active theme's winning a name both define.
+	 * A `customTemplates` or `templateParts` list as core reads it: the parent theme's, with
+	 * the active theme's laid over it position by position, as `WP_Theme_JSON::merge()` lays
+	 * one theme.json over another.
 	 *
-	 * Read from the files rather than through core's resolver, which keeps each theme.json it
-	 * has decoded for the rest of the request, so an entry written during it would not show.
+	 * Read from the files, since core's resolver keeps each theme.json it decodes for the rest
+	 * of the request and would hide an entry written during it.
+	 *
+	 * @param string $key "customTemplates" or "templateParts".
+	 * @return array[]
+	 */
+	private function theme_json_list( $key ) {
+		if ( ! isset( $this->theme_json_lists[ $key ] ) ) {
+			$merged = array();
+			foreach ( array_reverse( $this->themes(), true ) as $directory ) {
+				$list = $this->own_theme_json_list( $directory, $key );
+				if ( null !== $list ) {
+					$merged = array_replace_recursive( $merged, $list );
+				}
+			}
+			$this->theme_json_lists[ $key ] = array_values( $merged );
+		}
+
+		return $this->theme_json_lists[ $key ];
+	}
+
+	/**
+	 * One theme's own list, or null when its theme.json has none.
+	 *
+	 * @param string $directory Theme directory.
+	 * @param string $key "customTemplates" or "templateParts".
+	 * @return array[]|null
+	 */
+	private function own_theme_json_list( $directory, $key ) {
+		$path = $directory . '/theme.json';
+		if ( ! is_readable( $path ) ) {
+			return null;
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading a theme's own theme.json.
+		$config = json_decode( (string) file_get_contents( $path ), true );
+
+		return is_array( $config ) && isset( $config[ $key ] ) && is_array( $config[ $key ] ) ? array_values( $config[ $key ] ) : null;
+	}
+
+	/**
+	 * A list's entries by name, the last of a name winning, as core keys them.
 	 *
 	 * @param string $key "customTemplates" or "templateParts".
 	 * @return array name => entry.
 	 */
 	private function theme_json_entries( $key ) {
 		$entries = array();
-
-		foreach ( array_reverse( $this->themes(), true ) as $directory ) {
-			$path = $directory . '/theme.json';
-			if ( ! is_readable( $path ) ) {
-				continue;
-			}
-
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading a theme's own theme.json.
-			$config = json_decode( (string) file_get_contents( $path ), true );
-			if ( ! is_array( $config ) || empty( $config[ $key ] ) || ! is_array( $config[ $key ] ) ) {
-				continue;
-			}
-
-			foreach ( $config[ $key ] as $entry ) {
-				if ( is_array( $entry ) && isset( $entry['name'] ) ) {
-					$entries[ (string) $entry['name'] ] = $entry;
-				}
+		foreach ( $this->theme_json_list( $key ) as $entry ) {
+			if ( is_array( $entry ) && isset( $entry['name'] ) ) {
+				$entries[ (string) $entry['name'] ] = $entry;
 			}
 		}
 
@@ -657,9 +689,49 @@ class Pattern_Builder_Template_Store {
 	}
 
 	/**
-	 * The metadata a write records once it folds a customization: the row's title, and a
-	 * part's area, wherever the caller left them out. The row is where the Site Editor kept
-	 * them, and it is about to go, so a part made there would otherwise lose its area.
+	 * Where a slug's entry is in a list.
+	 *
+	 * @param array[] $entries Entries.
+	 * @param string  $slug Template slug.
+	 * @return int|null
+	 */
+	private static function position( $entries, $slug ) {
+		foreach ( $entries as $index => $entry ) {
+			if ( is_array( $entry ) && isset( $entry['name'] ) && $slug === $entry['name'] ) {
+				return $index;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Write a list into the active theme's theme.json whole: core lays it over the parent's
+	 * by position, so only the whole list reads back as itself.
+	 *
+	 * @param string  $key "customTemplates" or "templateParts".
+	 * @param array[] $entries Entries.
+	 * @return true|WP_Error
+	 */
+	private function write_theme_json_list( $key, $entries ) {
+		$config = Pattern_Builder_Theme_Json::load( 'theme' );
+		if ( is_wp_error( $config ) ) {
+			return $config;
+		}
+
+		if ( $entries ) {
+			$config[ $key ] = array_values( $entries );
+		} else {
+			unset( $config[ $key ] );
+		}
+		$this->theme_json_lists = array();
+
+		return Pattern_Builder_Theme_Json::save( 'theme', $config );
+	}
+
+	/**
+	 * The caller's metadata, with the customization's title and a part's area wherever the
+	 * caller left them out.
 	 *
 	 * @param string   $post_type Core post type.
 	 * @param string   $slug Template slug.
@@ -723,46 +795,35 @@ class Pattern_Builder_Template_Store {
 			);
 		}
 
-		$key    = 'wp_template' === $post_type ? 'customTemplates' : 'templateParts';
-		$config = Pattern_Builder_Theme_Json::load( 'theme' );
-		if ( ! is_wp_error( $config ) ) {
-			$list  = isset( $config[ $key ] ) && is_array( $config[ $key ] ) ? array_values( $config[ $key ] ) : array();
-			$index = null;
-			foreach ( $list as $position => $item ) {
-				if ( isset( $item['name'] ) && $slug === $item['name'] ) {
-					$index = $position;
-					break;
-				}
-			}
-
-			$current = null === $index ? array( 'name' => $slug ) : $list[ $index ];
-			$merged  = array_merge( $current, $entry );
-			// Core reads an empty postTypes as "no post type", not "every post type".
-			if ( isset( $merged['postTypes'] ) && ! $merged['postTypes'] ) {
-				unset( $merged['postTypes'] );
-			}
-
-			if ( null !== $index && $merged === $current ) {
-				return array();
-			}
-
-			if ( null === $index ) {
-				$list[] = $merged;
-			} else {
-				$list[ $index ] = $merged;
-			}
-			$config[ $key ] = $list;
-			$config         = Pattern_Builder_Theme_Json::save( 'theme', $config );
+		$key     = 'wp_template' === $post_type ? 'customTemplates' : 'templateParts';
+		$list    = $this->theme_json_list( $key );
+		$index   = self::position( $list, $slug );
+		$current = null === $index ? array( 'name' => $slug ) : $list[ $index ];
+		$updated = array_merge( $current, $entry );
+		// An entry naming no post types is offered for pages; an empty list would offer it for nothing.
+		if ( isset( $updated['postTypes'] ) && ! $updated['postTypes'] ) {
+			unset( $updated['postTypes'] );
 		}
 
-		if ( is_wp_error( $config ) ) {
+		if ( null !== $index && $updated === $current ) {
+			return array();
+		}
+
+		if ( null === $index ) {
+			$list[] = $updated;
+		} else {
+			$list[ $index ] = $updated;
+		}
+
+		$written = $this->write_theme_json_list( $key, $list );
+		if ( is_wp_error( $written ) ) {
 			return array(
 				array(
 					'code'    => 'template_metadata_not_recorded',
 					'message' => sprintf(
 						/* translators: %s: why theme.json could not be changed. */
 						__( 'The file was written, but its title, area or post types were not recorded, because theme.json could not be changed: %s', 'pattern-builder' ),
-						$config->get_error_message()
+						$written->get_error_message()
 					),
 				),
 			);
@@ -772,37 +833,39 @@ class Pattern_Builder_Template_Store {
 	}
 
 	/**
-	 * Drop a slug's entry from the active theme's theme.json, when it has one.
+	 * Drop a slug's entry from the active theme's theme.json, unless the parent theme defines
+	 * it too, in which case it comes back however the active theme's list reads.
 	 *
 	 * @param string $post_type Core post type.
 	 * @param string $slug Template slug.
 	 * @return void
 	 */
 	private function remove_metadata( $post_type, $slug ) {
-		$config = Pattern_Builder_Theme_Json::load( 'theme' );
-		$key    = 'wp_template' === $post_type ? 'customTemplates' : 'templateParts';
-		if ( is_wp_error( $config ) || empty( $config[ $key ] ) || ! is_array( $config[ $key ] ) ) {
+		$key   = 'wp_template' === $post_type ? 'customTemplates' : 'templateParts';
+		$list  = $this->theme_json_list( $key );
+		$index = self::position( $list, $slug );
+		if ( null === $index ) {
 			return;
 		}
 
-		$kept = array_values(
-			array_filter(
-				$config[ $key ],
-				static function ( $item ) use ( $slug ) {
-					return ! isset( $item['name'] ) || $slug !== $item['name'];
-				}
-			)
-		);
-		if ( count( $kept ) === count( $config[ $key ] ) ) {
+		$parent = get_template() !== get_stylesheet() ? $this->own_theme_json_list( get_template_directory(), $key ) : null;
+		if ( null !== $parent && null !== self::position( $parent, $slug ) ) {
 			return;
 		}
 
-		if ( $kept ) {
-			$config[ $key ] = $kept;
-		} else {
-			unset( $config[ $key ] );
-		}
-		Pattern_Builder_Theme_Json::save( 'theme', $config );
+		array_splice( $list, $index, 1 );
+		$this->write_theme_json_list( $key, $list );
+	}
+
+	/**
+	 * Markup as the store writes it: the active theme's own `theme` attribute dropped, and one
+	 * trailing newline.
+	 *
+	 * @param string $content Block markup.
+	 * @return string
+	 */
+	public static function as_stored( $content ) {
+		return rtrim( self::without_own_theme_attribute( (string) $content ) ) . "\n";
 	}
 
 	/**

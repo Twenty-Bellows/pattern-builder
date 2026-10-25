@@ -345,7 +345,9 @@ provides is refused, as a plugin pattern is: nothing is written back to a
 plugin. A title, a part's `area` or a custom template's `postTypes` go into the
 active theme's `theme.json` (`templateParts`, `customTemplates`), the only place
 a file's metadata lives; WordPress's own template types keep the titles WordPress
-gives them.
+gives them. `postTypes` reads as core reads it: a custom template with no entry
+is offered for every post type, one with an entry that names none for pages
+alone, so an empty list sent here goes back to pages.
 
 **Pinning and partial edits work as they do for patterns.** `get-template`
 answers a `hash` over everything that renders and everything an update
@@ -358,11 +360,12 @@ is there.
 
 **The checks are the pattern checks and then the theme file's.**
 `Pattern_Builder_Template_Checks` runs everything `Pattern_Builder_Markup_Checks`
-refuses, then refuses any `<?`, because a template is read as text and never
-run, and a `core/template-part` with no slug, one that resolves to nothing in
-this theme, one that places itself, or one whose `theme` names another theme. A
-`theme` naming the active theme is dropped on the way to disk, as core's own
-export drops it. Warnings, never refusals, cover what will not travel with the
+refuses, then refuses a `core/template-part` with no slug, one that resolves to
+nothing in this theme, one that places the part being stored (directly or
+through other parts), or one whose `theme` names another theme. A `theme`
+naming the active theme is dropped on the way to disk, as core's own export
+drops it. The store refuses any `<?` on the bytes it writes, for every caller,
+as `pb_template_has_php`: a template is read as text and never run. Warnings, never refusals, cover what will not travel with the
 theme: a `core/navigation` or `core/block` pointing at a row by its database ID
 (`template_database_id`), and images placed in the template rather than in a
 pattern, which is the only way to reach the theme's own assets from a template
@@ -373,9 +376,10 @@ any customization, and its `theme.json` entry, and answers `now`, what renders
 for the slug afterwards. It refuses the index template when no parent theme has
 one, since a theme without `templates/index.html` is no longer a block theme; a
 template only the parent or a plugin provides, since the active theme has
-nothing of its own to remove; and a part that templates, other parts or theme
-patterns still place, unless something of the same slug would be left to
-resolve, naming each place under `usedBy`.
+nothing of its own to remove; and a part that templates, other parts, theme or
+user patterns, or posts still place, unless something of the same slug would be
+left to resolve, naming each place under `usedBy`. While something of the slug
+is left, the `theme.json` entry stays with it.
 
 ## Two things deliberately absent
 

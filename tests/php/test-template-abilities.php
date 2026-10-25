@@ -163,6 +163,23 @@ class Test_Template_Abilities extends Pattern_Test_Case {
 		$this->assertSame( 'pb_template_exists', $created->get_error_code() );
 	}
 
+	/**
+	 * The store refuses PHP on the bytes it writes, whichever caller sent them.
+	 */
+	public function test_create_refuses_php() {
+		$created = $this->call(
+			'create-template',
+			array(
+				'type'    => 'template',
+				'slug'    => 'landing',
+				'content' => '<!-- wp:paragraph --><p><? echo 1; ?></p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$this->assertSame( 'pb_template_has_php', $created->get_error_code() );
+		$this->assertFileDoesNotExist( $this->theme_dir . '/templates/landing.html' );
+	}
+
 	public function test_create_refuses_a_part_that_does_not_exist() {
 		$created = $this->call(
 			'create-template',
@@ -382,6 +399,65 @@ class Test_Template_Abilities extends Pattern_Test_Case {
 			$deleted->get_error_data()['usedBy']
 		);
 		$this->assertFileExists( $this->theme_dir . '/parts/header.html' );
+	}
+
+	/**
+	 * A user pattern or a page can place a part too, and loses it just the same.
+	 */
+	public function test_delete_refuses_a_part_a_user_pattern_or_page_places() {
+		$this->call(
+			'create-template',
+			array(
+				'type'    => 'template-part',
+				'slug'    => 'promo',
+				'content' => '<!-- wp:site-title /-->',
+			)
+		);
+		$pattern = self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_block',
+				'post_title'   => 'Promo band',
+				'post_content' => '<!-- wp:template-part {"slug":"promo"} /-->',
+			)
+		);
+		$page    = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_title'   => 'Offers',
+				'post_content' => '<!-- wp:template-part {"slug": "promo"} /-->',
+			)
+		);
+
+		$deleted = $this->call(
+			'delete-template',
+			array(
+				'type' => 'template-part',
+				'slug' => 'promo',
+			)
+		);
+
+		$this->assertSame( 'pb_template_part_in_use', $deleted->get_error_code() );
+		$this->assertEqualSets( array( $pattern, $page ), wp_list_pluck( $deleted->get_error_data()['usedBy'], 'id' ) );
+		$this->assertContains( 'Promo band', wp_list_pluck( $deleted->get_error_data()['usedBy'], 'name' ) );
+	}
+
+	/**
+	 * A trailing newline the store adds is not a change.
+	 */
+	public function test_metadata_only_update_of_unchanged_markup_is_no_change() {
+		file_put_contents( $this->theme_dir . '/parts/plain.html', '<!-- wp:site-title /-->' );
+
+		$updated = $this->call(
+			'update-template',
+			array(
+				'type' => 'template-part',
+				'slug' => 'plain',
+				'area' => 'uncategorized',
+			)
+		);
+
+		$this->assertFalse( $updated['changed'] );
+		$this->assertArrayNotHasKey( 'warnings', $updated );
 	}
 
 	/**
