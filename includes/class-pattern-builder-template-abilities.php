@@ -284,7 +284,7 @@ class Pattern_Builder_Template_Abilities {
 			'pattern-builder/create-template',
 			array(
 				'label'            => __( 'Create a template', 'pattern-builder' ),
-				'description'      => __( 'Writes finished block markup into the active theme as a new template (templates/{slug}.html) or template part (parts/{slug}.html). A slug from WordPress\'s template hierarchy, such as "single", "page-about" or "archive-product", is used wherever the hierarchy reaches it; any other slug is a custom template an editor picks for a page. If the parent theme or a plugin already provides the slug, the new file takes its place, and the answer says what it replaced. Supply markup you have already validated with a JavaScript block validator, since no server can run a block\'s save(). What the site does refuse, by name, is what PHP can see: everything create-pattern refuses, PHP of any kind, and a core/template-part that resolves to nothing, places itself or names another theme. Store a part before the templates that place it. The answer carries warnings for what will not travel with the theme: a menu or synced pattern referenced by its database ID, and images placed in the template rather than in a pattern.', 'pattern-builder' ),
+				'description'      => __( 'Writes finished block markup into the active theme as a new template (templates/{slug}.html) or template part (parts/{slug}.html). A slug from WordPress\'s template hierarchy, such as "single", "page-about" or "archive-product", is used wherever the hierarchy reaches it; any other slug is a custom template an editor picks for a page. If the parent theme or a plugin already provides the slug, the new file takes its place, and the answer says what it replaced. Supply markup you have already validated with a JavaScript block validator, since no server can run a block\'s save(). What the site does refuse, by name, is what PHP can see: everything create-pattern refuses, PHP of any kind, and a core/template-part that resolves to nothing, places itself or names another theme. Store a part before the templates that place it. The answer carries warnings for what will not travel with the theme: a menu, a synced pattern or a query filter that names rows by database ID, and images placed in the template rather than in a pattern.', 'pattern-builder' ),
 				'input_schema'     => array(
 					'type'                 => 'object',
 					'properties'           => array_merge(
@@ -798,7 +798,7 @@ class Pattern_Builder_Template_Abilities {
 	private function warnings_schema() {
 		return array(
 			'type'        => 'array',
-			'description' => 'Things worth fixing that did not stop the write, each with a code and a message: a menu or synced pattern referenced by its database ID, images placed in the template rather than in a pattern, markup that will not lay out as written, and metadata that could not be recorded in theme.json.',
+			'description' => 'Things worth fixing that did not stop the write, each with a code and a message: a menu, a synced pattern or a query filter that names rows by database ID, images placed in the template rather than in a pattern, markup that will not lay out as written, and metadata that could not be recorded in theme.json.',
 			'items'       => array( 'type' => 'object' ),
 		);
 	}

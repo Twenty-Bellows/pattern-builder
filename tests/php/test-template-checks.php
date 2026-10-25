@@ -107,6 +107,23 @@ class Test_Template_Checks extends Pattern_Test_Case {
 		$this->assertSame( array( 'template_database_id' ), $this->codes( $warnings ) );
 	}
 
+	/**
+	 * A query's taxQuery, author, exclude and parents hold IDs; an inherited query ignores
+	 * its own and takes the request's.
+	 */
+	public function test_a_query_filtering_by_ids_is_warned_about() {
+		$filtered  = '<!-- wp:query {"query":{"inherit":false,"perPage":3,"taxQuery":{"category":[4]},"author":"2"}} --><div class="wp-block-query"></div><!-- /wp:query -->';
+		$inherited = '<!-- wp:query {"query":{"inherit":true,"taxQuery":{"category":[4]}}} --><div class="wp-block-query"></div><!-- /wp:query -->';
+		$latest    = '<!-- wp:query {"query":{"inherit":false,"perPage":3,"postType":"post"}} --><div class="wp-block-query"></div><!-- /wp:query -->';
+
+		$warnings = Pattern_Builder_Template_Checks::warnings( $filtered );
+
+		$this->assertSame( array( 'template_database_id' ), $this->codes( $warnings ) );
+		$this->assertStringContainsString( '(taxQuery, author)', $warnings[0]['message'] );
+		$this->assertSame( array(), Pattern_Builder_Template_Checks::warnings( $inherited ) );
+		$this->assertSame( array(), Pattern_Builder_Template_Checks::warnings( $latest ) );
+	}
+
 	public function test_navigation_without_a_ref_is_fine() {
 		$this->assertSame( array(), Pattern_Builder_Template_Checks::warnings( '<!-- wp:navigation /-->' ) );
 	}

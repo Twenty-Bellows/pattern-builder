@@ -19,6 +19,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Pattern_Builder_Template_Checks {
 	/**
+	 * The keys of a core/query that hold database IDs.
+	 */
+	const QUERY_ID_FILTERS = array( 'taxQuery', 'author', 'exclude', 'parents' );
+
+	/**
 	 * Blocks that carry an image, and the attributes the image is in.
 	 */
 	const MEDIA_ATTRIBUTES = array(
@@ -236,11 +241,8 @@ class Pattern_Builder_Template_Checks {
 
 		foreach ( self::every_block( $blocks ) as $block ) {
 			$attrs = isset( $block['attrs'] ) && is_array( $block['attrs'] ) ? $block['attrs'] : array();
-			if ( empty( $attrs['ref'] ) ) {
-				continue;
-			}
 
-			if ( 'core/navigation' === $block['blockName'] ) {
+			if ( 'core/navigation' === $block['blockName'] && ! empty( $attrs['ref'] ) ) {
 				$warnings[] = array(
 					'code'    => 'template_database_id',
 					'message' => sprintf(
@@ -249,7 +251,7 @@ class Pattern_Builder_Template_Checks {
 						(int) $attrs['ref']
 					),
 				);
-			} elseif ( 'core/block' === $block['blockName'] ) {
+			} elseif ( 'core/block' === $block['blockName'] && ! empty( $attrs['ref'] ) ) {
 				$warnings[] = array(
 					'code'    => 'template_database_id',
 					'message' => sprintf(
@@ -258,10 +260,45 @@ class Pattern_Builder_Template_Checks {
 						(int) $attrs['ref']
 					),
 				);
+			} elseif ( 'core/query' === $block['blockName'] ) {
+				$filters = self::query_id_filters( $attrs );
+				if ( $filters ) {
+					$warnings[] = array(
+						'code'    => 'template_database_id',
+						'message' => sprintf(
+							/* translators: %s: the query's filters, comma separated. */
+							__( 'A core/query filters by database IDs (%s), which name this site\'s categories, authors or posts and nothing on any other site the theme goes to. Keep a theme\'s lists to a post type and an order, and say in the handoff when one needs a filter set after the theme is installed.', 'pattern-builder' ),
+							implode( ', ', $filters )
+						),
+					);
+				}
 			}
 		}
 
 		return $warnings;
+	}
+
+	/**
+	 * The filters of a query that holds database IDs. An inherited query takes the request's
+	 * and ignores its own.
+	 *
+	 * @param array $attrs A core/query block's attributes.
+	 * @return string[]
+	 */
+	private static function query_id_filters( $attrs ) {
+		$query = isset( $attrs['query'] ) && is_array( $attrs['query'] ) ? $attrs['query'] : array();
+		if ( ! empty( $query['inherit'] ) ) {
+			return array();
+		}
+
+		$filters = array();
+		foreach ( self::QUERY_ID_FILTERS as $filter ) {
+			if ( ! empty( $query[ $filter ] ) ) {
+				$filters[] = $filter;
+			}
+		}
+
+		return $filters;
 	}
 
 	/**

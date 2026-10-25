@@ -366,10 +366,12 @@ through other parts), or one whose `theme` names another theme. A `theme`
 naming the active theme is dropped on the way to disk, as core's own export
 drops it. The store refuses any `<?` on the bytes it writes, for every caller,
 as `pb_template_has_php`: a template is read as text and never run. Warnings, never refusals, cover what will not travel with the
-theme: a `core/navigation` or `core/block` pointing at a row by its database ID
-(`template_database_id`), and images placed in the template rather than in a
-pattern, which is the only way to reach the theme's own assets from a template
-(`template_media`). The composition warnings carry over.
+theme: a `core/navigation` or `core/block` pointing at a row by its database ID,
+or a `core/query` that doesn't inherit the request's query and filters by
+`taxQuery`, `author`, `exclude` or `parents` (`template_database_id`), and
+images placed in the template rather than in a pattern, which is the only way
+to reach the theme's own assets from a template (`template_media`). The
+composition warnings carry over.
 
 **`delete-template` removes everything of the active theme's own**: its file,
 any customization, and its `theme.json` entry, and answers `now`, what renders
