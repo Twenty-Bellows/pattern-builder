@@ -210,9 +210,7 @@ whole, so always write it out:
 `core/query-title` names the category, tag or author on an archive, and with
 `"type":"search"` says what was searched for. `core/query-pagination` pages
 through the results, and `core/query-no-results` is what shows when there
-aren't any. When two lists share a card's look, give it a block style
-variation both post templates apply; `composition.md` says why that travels
-better than a pattern inside a query.
+aren't any.
 
 **A strip of latest posts on another page has its own query.** Set `inherit` to
 false and say how many:
@@ -233,6 +231,31 @@ false and say how many:
 category on this site and nothing anywhere else. Keep a theme's lists to a post
 type and an order, and say in the handoff when one needs a filter set after the
 theme is installed.
+
+**The card is the post blocks, laid out.** Every block inside
+`core/post-template` reads the post the loop is on, so a card is
+`core/post-featured-image`, `core/post-title`, `core/post-date`,
+`core/post-excerpt` and `core/post-terms` in whatever arrangement the design
+wants, with a binding to `core/post-meta` for a field of the site's own. While
+one list shows it, write it straight into the post template, as the examples
+above do.
+
+**When several lists show the same card, make it a synced pattern** and place
+it in each post template with `core/pattern`. Its blocks read each post just as
+they would written out, bindings included, and a change to the pattern reaches
+every list. Leave slots out of it: a loop holds one reference for every post,
+so a slot shows the same words on every card. Leave per-post PHP out too,
+because a pattern file runs once per request, not once per post.
+
+**A template part doesn't go inside a loop.** The editor won't insert one inside
+`core/post-template`, and that's deliberate: a part is a piece of the site's
+frame, not something repeated per post, and it looks itself up again for every
+post it renders in. When the single post template and the card share a piece,
+like the date and categories under a title, make that piece a synced pattern
+and place it in both.
+
+In the Site Editor a card placed by reference shows up as a copy. *When the
+Site Editor got there first* says why, and what that means for a write.
 
 ## Which block reads what
 
@@ -284,6 +307,17 @@ customization, so the template renders from the theme again; the answer says
 what `get-template` returned, send its `hash` as `expectedHash`, and tell the
 person when you folded one, because their Site Editor change now lives in the
 theme's file.
+
+**A customization holds copies of the template's patterns.** Before the Site
+Editor loads a template or part, core swaps every `core/pattern` in it for the
+pattern's blocks, synced or not, so a save there stores those copies. A
+pattern with one top block leaves its name on it in `metadata.patternName`;
+one with several leaves no mark. Fold the customization in as it stands and
+the theme's file stops following those patterns, so a change to the header or
+the card no longer reaches this template. Before you write, compare each copy
+with its pattern (`get-pattern`). Put the `core/pattern` reference back where
+they match, and ask the person where they don't, because then someone changed
+it in the Site Editor on purpose.
 
 ## The parent theme, and plugins
 
