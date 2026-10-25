@@ -93,6 +93,35 @@ class Test_Template_Store extends Pattern_Test_Case {
 	}
 
 	/**
+	 * A part made in the Site Editor keeps its title and area on the row; folding it removes
+	 * the row, so they have to land in theme.json or the part comes back uncategorized.
+	 */
+	public function test_folding_keeps_what_the_customization_said_about_itself() {
+		$post_id = $this->customize_template( 'wp_template_part', 'promo', '<!-- wp:site-title /-->' );
+		wp_set_post_terms( $post_id, WP_TEMPLATE_PART_AREA_FOOTER, 'wp_template_part_area' );
+
+		$before = $this->store->find( 'template-part', 'promo' );
+		$saved  = $this->store->save( 'template-part', 'promo', '<!-- wp:site-title /-->' );
+
+		$this->assertSame( WP_TEMPLATE_PART_AREA_FOOTER, $before['area'] );
+		$this->assertTrue( $saved['folded'] );
+		$this->assertSame( WP_TEMPLATE_PART_AREA_FOOTER, $saved['template']['area'] );
+		$this->assertSame( 'Customized promo', $saved['template']['title'] );
+	}
+
+	/**
+	 * What the caller sends wins over what the row said.
+	 */
+	public function test_folding_takes_the_caller_s_metadata_first() {
+		$post_id = $this->customize_template( 'wp_template_part', 'promo', '<!-- wp:site-title /-->' );
+		wp_set_post_terms( $post_id, WP_TEMPLATE_PART_AREA_FOOTER, 'wp_template_part_area' );
+
+		$saved = $this->store->save( 'template-part', 'promo', '<!-- wp:site-title /-->', array( 'area' => 'header' ) );
+
+		$this->assertSame( WP_TEMPLATE_PART_AREA_HEADER, $saved['template']['area'] );
+	}
+
+	/**
 	 * Core keeps a per-process list of a theme's template files; a template written during a
 	 * request still has to show up in that request.
 	 */

@@ -556,7 +556,9 @@ theme's file, then the parent's, then a template a plugin registered) and a
 write that lands in the file removes a customization of the same slug, as the
 Site Editor's own reset does. The caller read the customization and edited it,
 which the update's `expectedHash` proves, so the row goes and its content is
-the file. Only its revision history is lost.
+the file. Its title, and a part's area, go into `theme.json` unless the caller
+set them, since a part made in the Site Editor keeps its area nowhere else.
+Only its revision history is lost.
 
 **The store reads for itself rather than through core**, for two reasons that
 look alike. Core lists a theme's template files once per process

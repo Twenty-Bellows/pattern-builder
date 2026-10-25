@@ -221,6 +221,11 @@ class Pattern_Builder_Template_Store {
 			);
 		}
 
+		$customization = $this->customization( $post_type, $slug );
+		if ( null !== $customization ) {
+			$meta = $this->with_customization_metadata( $post_type, $slug, $meta, $customization );
+		}
+
 		$path    = $this->own_path( $post_type, $slug );
 		$written = Pattern_Builder_Security::safe_file_write( $path, rtrim( $content ) . "\n", $this->own_folders() );
 		if ( is_wp_error( $written ) ) {
@@ -649,6 +654,35 @@ class Pattern_Builder_Template_Store {
 		}
 
 		return $entries;
+	}
+
+	/**
+	 * The metadata a write records once it folds a customization: the row's title, and a
+	 * part's area, wherever the caller left them out. The row is where the Site Editor kept
+	 * them, and it is about to go, so a part made there would otherwise lose its area.
+	 *
+	 * @param string   $post_type Core post type.
+	 * @param string   $slug Template slug.
+	 * @param array    $meta The metadata the caller gave.
+	 * @param \WP_Post $customization The customization row.
+	 * @return array
+	 */
+	private function with_customization_metadata( $post_type, $slug, $meta, $customization ) {
+		$is_default = 'wp_template' === $post_type && isset( get_default_block_template_types()[ $slug ] );
+		$title      = trim( (string) $customization->post_title );
+
+		if ( ! $is_default && ! isset( $meta['title'] ) && '' !== $title && $slug !== $title ) {
+			$meta['title'] = $title;
+		}
+
+		if ( 'wp_template_part' === $post_type && ! isset( $meta['area'] ) ) {
+			$areas = get_the_terms( $customization, 'wp_template_part_area' );
+			if ( is_array( $areas ) && $areas ) {
+				$meta['area'] = $areas[0]->name;
+			}
+		}
+
+		return $meta;
 	}
 
 	/**
