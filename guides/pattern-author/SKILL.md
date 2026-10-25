@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.18.0
+  version: 1.19.0
 ---
 
 # Authoring block patterns
@@ -38,7 +38,8 @@ ones reference.
   them, then the *page* referencing those. Bottom-up, because a section cannot
   be written until its elements exist by name.
 - **A site:** settle the design system as **layout → tokens → styles → block
-  style variations**, then the patterns bottom-up, then the pages.
+  style variations**, then the patterns bottom-up, then the template parts and
+  templates that place them, then the pages.
 
 Layout first because every band's markup has to agree with it; tokens before
 styles because a style referencing an unresolvable slug renders as nothing.
@@ -59,7 +60,7 @@ else. Each fact lives in one of them; this table only points.
 | 4. Factor | `references/composition.md` for anything bigger than one section | |
 | 5. Generate | nothing more | `references/block-markup.md` if you cannot run Node; `references/assets.md` if the pattern needs an image or a typeface |
 | 6. Validate | `references/design-content-split.md` if the pattern has slots or fills them | |
-| 7. Place | nothing more | `references/pattern-kinds.md` for the headers, and how to write a description and keywords someone can find it by |
+| 7. Place | nothing more | `references/pattern-kinds.md` for the headers, and how to write a description and keywords someone can find it by; `references/templates.md` if it belongs in a template or template part, or you are building a whole site |
 
 `references/keeping-current.md` is for maintaining these guides, not for
 writing a pattern.
@@ -478,6 +479,7 @@ said to extend the system, add it with `pattern-builder/add-design-tokens`
 - `references/design-content-split.md` — Pattern Overrides slots and their silent failures
 - `references/changing-patterns.md`: reusing, extending or copying a pattern that already exists, and what a change to one costs
 - `references/assets.md` — images and fonts
+- `references/templates.md`: the theme's templates and template parts, what goes in them, and how a write treats a Site Editor customization
 - `references/abilities.md` — asking a running site for what it has
 - `references/keeping-current.md` — bringing these guides to a new WordPress release
 - The `design-reproduction` skill — rebuilding a design that already exists
