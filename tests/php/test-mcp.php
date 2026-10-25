@@ -149,7 +149,7 @@ class Test_Mcp extends WP_UnitTestCase {
 		sort( $expected );
 		sort( $served );
 
-		$this->assertCount( 28, $expected );
+		$this->assertCount( 33, $expected );
 		$this->assertSame( $expected, $served );
 		$this->assertSame( count( $expected ), count( Pattern_Builder_Mcp::tool_names() ) );
 	}

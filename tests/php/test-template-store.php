@@ -28,29 +28,6 @@ class Test_Template_Store extends Pattern_Test_Case {
 	}
 
 	/**
-	 * Save a Site Editor customization of a slug, the way the Site Editor stores one.
-	 *
-	 * @param string $post_type wp_template or wp_template_part.
-	 * @param string $slug Template slug.
-	 * @param string $content Block markup.
-	 * @return int Post ID.
-	 */
-	private function customize( string $post_type, string $slug, string $content ): int {
-		$post_id = self::factory()->post->create(
-			array(
-				'post_type'    => $post_type,
-				'post_name'    => $slug,
-				'post_title'   => 'Customized ' . $slug,
-				'post_content' => $content,
-				'post_status'  => 'publish',
-			)
-		);
-		wp_set_post_terms( $post_id, get_stylesheet(), 'wp_theme' );
-
-		return $post_id;
-	}
-
-	/**
 	 * What an update replaces is the bytes on disk, not core's reading of them, which adds
 	 * hooked blocks.
 	 */
@@ -88,7 +65,7 @@ class Test_Template_Store extends Pattern_Test_Case {
 	 * A customization is what renders, so it is what a read returns.
 	 */
 	public function test_a_customization_renders_in_place_of_the_file() {
-		$this->customize( 'wp_template', 'index', '<!-- wp:paragraph --><p>From the Site Editor</p><!-- /wp:paragraph -->' );
+		$this->customize_template( 'wp_template', 'index', '<!-- wp:paragraph --><p>From the Site Editor</p><!-- /wp:paragraph -->' );
 
 		$index = $this->store->find( 'template', 'index' );
 
@@ -103,7 +80,7 @@ class Test_Template_Store extends Pattern_Test_Case {
 	 * as the Site Editor's reset removes it.
 	 */
 	public function test_saving_folds_a_customization_into_the_file() {
-		$post_id = $this->customize( 'wp_template', 'index', '<!-- wp:paragraph --><p>From the Site Editor</p><!-- /wp:paragraph -->' );
+		$post_id = $this->customize_template( 'wp_template', 'index', '<!-- wp:paragraph --><p>From the Site Editor</p><!-- /wp:paragraph -->' );
 		$markup  = '<!-- wp:paragraph --><p>Edited from the customization</p><!-- /wp:paragraph -->';
 
 		$saved = $this->store->save( 'template', 'index', $markup );
@@ -259,7 +236,7 @@ class Test_Template_Store extends Pattern_Test_Case {
 
 	public function test_deleting_removes_the_file_the_customization_and_the_metadata() {
 		$this->store->save( 'template', 'landing', '<!-- wp:post-content /-->', array( 'title' => 'Landing' ) );
-		$post_id = $this->customize( 'wp_template', 'landing', '<!-- wp:paragraph --><p>Customized</p><!-- /wp:paragraph -->' );
+		$post_id = $this->customize_template( 'wp_template', 'landing', '<!-- wp:paragraph --><p>Customized</p><!-- /wp:paragraph -->' );
 
 		$deleted = $this->store->delete( 'template', 'landing' );
 
@@ -333,7 +310,7 @@ class Test_Template_Store extends Pattern_Test_Case {
 	 * own to remove.
 	 */
 	public function test_a_plugin_template_is_read_only() {
-		register_block_template(
+		$this->register_template(
 			'pb-test//plugin-landing',
 			array(
 				'title'       => 'Plugin landing',
@@ -345,7 +322,6 @@ class Test_Template_Store extends Pattern_Test_Case {
 		$listed  = $this->store->all( 'template' );
 		$found   = $this->store->find( 'template', 'plugin-landing' );
 		$deleted = $this->store->delete( 'template', 'plugin-landing' );
-		unregister_block_template( 'pb-test//plugin-landing' );
 
 		$this->assertArrayHasKey( 'plugin-landing', $listed );
 		$this->assertSame( 'plugin', $found['source'] );
@@ -355,8 +331,8 @@ class Test_Template_Store extends Pattern_Test_Case {
 	}
 
 	public function test_listing_names_each_slug_once_and_carries_no_content() {
-		$this->customize( 'wp_template', 'index', '<!-- wp:post-content /-->' );
-		$this->customize( 'wp_template', 'from-site-editor', '<!-- wp:post-content /-->' );
+		$this->customize_template( 'wp_template', 'index', '<!-- wp:post-content /-->' );
+		$this->customize_template( 'wp_template', 'from-site-editor', '<!-- wp:post-content /-->' );
 
 		$listed = $this->store->all( 'template' );
 

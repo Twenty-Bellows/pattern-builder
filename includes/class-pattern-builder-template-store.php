@@ -329,6 +329,27 @@ class Pattern_Builder_Template_Store {
 	}
 
 	/**
+	 * Whether a slug would still resolve once the active theme's own file and any
+	 * customization were gone: to the parent theme's file, or to a plugin's template.
+	 *
+	 * @param string $type "template" or "template-part".
+	 * @param string $slug Template slug.
+	 * @return bool
+	 */
+	public function has_fallback( $type, $slug ) {
+		$post_type = self::post_type( $type );
+		if ( null === $post_type ) {
+			return false;
+		}
+
+		if ( get_template() !== get_stylesheet() && file_exists( $this->theme_path( get_template(), $post_type, $slug ) ) ) {
+			return true;
+		}
+
+		return 'wp_template' === $post_type && null !== WP_Block_Templates_Registry::get_instance()->get_by_slug( $slug );
+	}
+
+	/**
 	 * The refusal for a write this store will not make, if any.
 	 *
 	 * @param string|null $post_type Core post type.

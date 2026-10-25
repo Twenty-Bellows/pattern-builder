@@ -29,6 +29,13 @@ abstract class Pattern_Test_Case extends WP_UnitTestCase {
 	private $theme_before = null;
 
 	/**
+	 * Names of the block templates registered by the running test.
+	 *
+	 * @var string[]
+	 */
+	private $registered_templates = array();
+
+	/**
 	 * Sets the test up.
 	 */
 	public function set_up() {
@@ -50,6 +57,13 @@ abstract class Pattern_Test_Case extends WP_UnitTestCase {
 		}
 
 		$this->registered = array();
+
+		foreach ( $this->registered_templates as $name ) {
+			if ( WP_Block_Templates_Registry::get_instance()->is_registered( $name ) ) {
+				unregister_block_template( $name );
+			}
+		}
+		$this->registered_templates = array();
 
 		\TwentyBellows\PatternBuilder\Synced_Patterns::flush();
 
@@ -119,6 +133,44 @@ abstract class Pattern_Test_Case extends WP_UnitTestCase {
 		wp_clean_theme_json_cache();
 
 		return get_stylesheet_directory();
+	}
+
+	/**
+	 * Registers a block template for the duration of the test, as a plugin would.
+	 *
+	 * @param string $name Template name, "plugin//slug".
+	 * @param array  $args Template arguments.
+	 * @return string The name.
+	 */
+	protected function register_template( string $name, array $args ): string {
+		register_block_template( $name, $args );
+		$this->registered_templates[] = $name;
+
+		return $name;
+	}
+
+	/**
+	 * Save a Site Editor customization of a template or part, the way the Site Editor stores
+	 * one: a published row filed under the active theme.
+	 *
+	 * @param string $post_type wp_template or wp_template_part.
+	 * @param string $slug Template slug.
+	 * @param string $content Block markup.
+	 * @return int Post ID.
+	 */
+	protected function customize_template( string $post_type, string $slug, string $content ): int {
+		$post_id = self::factory()->post->create(
+			array(
+				'post_type'    => $post_type,
+				'post_name'    => $slug,
+				'post_title'   => 'Customized ' . $slug,
+				'post_content' => $content,
+				'post_status'  => 'publish',
+			)
+		);
+		wp_set_post_terms( $post_id, get_stylesheet(), 'wp_theme' );
+
+		return $post_id;
 	}
 
 	/**

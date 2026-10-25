@@ -533,6 +533,49 @@ No capability lifts it: on a single site every administrator holds
 as one. A pattern that needs a value computed at render belongs in a block or a
 binding, or in a new shape added to `written_call_shapes()` in code.
 
+## Templates and template parts
+
+Templates and template parts are files too, and the same rule holds for them:
+the theme's file is what Pattern Builder writes, and nothing it writes lands
+anywhere else. They are reached only through the abilities
+([`abilities.md`](abilities.md#templates-and-template-parts)); there is no
+editing surface for them here, because the Site Editor already is one.
+
+`Pattern_Builder_Template_Store` is the one door, the way
+`update_theme_pattern()` is for patterns. It writes only into the active theme's
+template folders (`get_block_theme_folders()`, so a theme still on
+`block-templates/` keeps them), refuses a slug that is not a flat lowercase
+filename, and refuses `<?` on the bytes about to be written: a template file is
+read as text and never run.
+
+**Core keeps a second copy of a template, and the store has to decide what to do
+with it.** A Site Editor save is a `wp_template` or `wp_template_part` row filed
+under the theme, and it renders in place of the file with nothing on disk to
+say so. So the store reads in core's order (customization, then the active
+theme's file, then the parent's, then a template a plugin registered) and a
+write that lands in the file removes a customization of the same slug, as the
+Site Editor's own reset does. The caller read the customization and edited it,
+which the update's `expectedHash` proves, so the row goes and its content is
+the file. Only its revision history is lost.
+
+**The store reads for itself rather than through core**, for two reasons that
+look alike. Core lists a theme's template files once per process
+(`_get_block_templates_paths()` keeps a static list per folder) and
+`WP_Theme_JSON_Resolver` keeps each `theme.json` it has decoded for the rest of
+the request, and neither is cleared by anything a plugin can call. A template
+written during a request, or a part's area recorded in `theme.json`, would not
+show to a read later in the same request. And core's reader inserts hooked
+blocks into a file's markup, which a write would then store. So the store scans
+the folders and reads `theme.json` itself, child over parent, and returns a
+file's bytes as they are.
+
+A template's title and post types, and a part's title and area, live only in
+`theme.json` (`customTemplates`, `templateParts`), so that is where the store
+records them, rewriting the file only when an entry changes. Deleting removes
+the active theme's file, any customization and that entry, and refuses the last
+`index.html`, without which WordPress stops treating the theme as a block
+theme. A template a plugin registered is read-only, as a plugin pattern is.
+
 ## Previews
 
 `Pattern_Builder_Preview` renders a pattern as a whole page with the site's
@@ -622,6 +665,8 @@ map*, then deletes the rows and the old capabilities.
 | `Pattern_Builder_Block_Style_Variations` | The theme's `styles/*.json` partials. |
 | `Safe_Css` | The safe subset of literal CSS a variation may carry. See [`cloud.md`](cloud.md). |
 | `Pattern_Builder_Markup_Checks` | The failures PHP can see and every one of them silent at render. |
+| `Pattern_Builder_Template_Store` | The theme's templates and template parts: resolved as core resolves them, written only into the active theme. See [below](#templates-and-template-parts). |
+| `Pattern_Builder_Template_Checks` | The markup checks, plus what a theme file may not carry and what will not travel with it. |
 | `Pattern_Builder_Usage` | Where a pattern is used: the patterns, templates, template parts and posts that place it, directly or through another pattern. See [`abilities.md`](abilities.md). |
 | `Pattern_Builder_Migration` | The one-time 1.x upgrade. |
 | `Pattern_Builder_Security` / `Pattern_Builder_Localization` | Path-validated filesystem helpers; pattern localization. |

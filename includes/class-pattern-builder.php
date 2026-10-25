@@ -38,6 +38,7 @@ require_once __DIR__ . '/class-pattern-builder-fonts.php';
 require_once __DIR__ . '/class-pattern-builder-telemetry.php';
 require_once __DIR__ . '/class-pattern-builder-usage.php';
 require_once __DIR__ . '/class-pattern-builder-abilities.php';
+require_once __DIR__ . '/class-pattern-builder-template-abilities.php';
 require_once __DIR__ . '/class-pattern-builder-mcp.php';
 
 /**
@@ -72,6 +73,7 @@ class Pattern_Builder {
 		new Pattern_Builder_Telemetry();
 		new Pattern_Builder_Abilities();
 		new Pattern_Builder_Cloud_Abilities();
+		new Pattern_Builder_Template_Abilities();
 		new Pattern_Builder_Mcp();
 	}
 
