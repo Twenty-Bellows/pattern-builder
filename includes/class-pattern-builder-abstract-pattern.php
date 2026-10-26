@@ -291,7 +291,7 @@ class Abstract_Pattern {
 	const LOCALIZED_STRING_FUNCTIONS = array( 'wp_kses_post', 'esc_attr__' );
 
 	/**
-	 * Whether a pattern file holds PHP beyond the calls this plugin writes itself.
+	 * Whether a pattern file holds PHP beyond the calls a save writes back itself.
 	 *
 	 * @param string $pattern_file Absolute path to the pattern file.
 	 * @return bool
@@ -308,8 +308,8 @@ class Abstract_Pattern {
 	}
 
 	/**
-	 * The first PHP in a pattern file's contents that is not one of the calls this plugin
-	 * writes itself. Contents with no opening tag are read as markup, as a file is after its
+	 * The first PHP in a pattern file's contents that is not one of the calls a save writes
+	 * back itself. Contents with no opening tag are read as markup, as a file is after its
 	 * header closes.
 	 *
 	 * @param string $contents A pattern file's contents, or markup bound for one.
@@ -368,9 +368,9 @@ class Abstract_Pattern {
 	}
 
 	/**
-	 * The calls this plugin writes into pattern markup itself, as token shapes. An element is
-	 * a token type, a literal character, or a type paired with the one identifier accepted in
-	 * that position.
+	 * The calls a pattern file may carry because a save writes each one back, as token shapes.
+	 * An element is a token type, a literal character, or a type paired with the one identifier
+	 * accepted in that position.
 	 *
 	 * @return array[]
 	 */
@@ -383,9 +383,19 @@ class Abstract_Pattern {
 			$shapes[] = array( T_ECHO, array( T_STRING, $escape ), '(', T_CONSTANT_ENCAPSED_STRING, ',', T_CONSTANT_ENCAPSED_STRING, ')', ';' );
 		}
 
-		// An image the theme carries, as Pattern_Builder_Assets::theme_reference() writes it, e.g.
-		// `echo esc_url( get_stylesheet_directory_uri() . '/assets/images/square-1.svg' );`.
-		$shapes[] = array( T_ECHO, array( T_STRING, 'esc_url' ), '(', array( T_STRING, 'get_stylesheet_directory_uri' ), '(', ')', '.', T_CONSTANT_ENCAPSED_STRING, ')', ';' );
+		// A file the theme carries, as Pattern_Builder_Assets::theme_reference() and
+		// Pattern_File_Store::restore_theme_file_links() write it, e.g.
+		// `echo esc_url( get_theme_file_uri( 'assets/images/square-1.svg' ) );`.
+		foreach ( array( 'get_theme_file_uri', 'get_parent_theme_file_uri' ) as $function ) {
+			$shapes[] = array( T_ECHO, array( T_STRING, 'esc_url' ), '(', array( T_STRING, $function ), '(', T_CONSTANT_ENCAPSED_STRING, ')', ')', ';' );
+		}
+
+		// The other ways a theme reaches its own files, which a save writes back as the call
+		// above, e.g. `echo esc_url( get_template_directory_uri() . '/assets/images/x.svg' );`.
+		foreach ( array( 'get_stylesheet_directory_uri', 'get_template_directory_uri' ) as $function ) {
+			$shapes[] = array( T_ECHO, array( T_STRING, 'esc_url' ), '(', array( T_STRING, $function ), '(', ')', '.', T_CONSTANT_ENCAPSED_STRING, ')', ';' );
+			$shapes[] = array( T_ECHO, array( T_STRING, 'esc_url' ), '(', array( T_STRING, $function ), '(', ')', ')', ';' );
+		}
 
 		// A link to a page of this site, as Pattern_File_Store::restore_home_links() writes
 		// it, e.g. `echo esc_url( home_url( '/about/' ) );`, or `home_url()` for the bare home.

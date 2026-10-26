@@ -119,9 +119,9 @@ The things that bite. Each is expanded in the document beside it.
   namespaced. A pattern registered under a bare name is one no `core/pattern`
   reference can reach, and an unresolved reference renders as nothing rather
   than as an error. ([architecture](docs/architecture.md))
-- **No write puts PHP into a theme pattern file** beyond the calls the plugin
-  generates itself, for localized text, the theme's own images and links to the
-  site's own pages. Markup goes
+- **No write puts PHP into a theme pattern file** beyond the calls a save writes
+  back itself, for localized text, the theme's own files and links to the site's
+  own pages. Markup goes
   into the file whole, so anything else would make `edit_theme_options` the
   power to run code. The check is on the finished bytes, and no capability
   lifts it. ([architecture](docs/architecture.md))

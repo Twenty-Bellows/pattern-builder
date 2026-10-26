@@ -560,6 +560,175 @@ class Test_Dynamic_Patterns extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Records every HTTP request for the rest of the test and answers each with an error,
+	 * so a test can show a save fetched nothing.
+	 *
+	 * @return ArrayObject The URLs requested, filled in as they happen.
+	 */
+	private function record_http_requests() {
+		$requested = new ArrayObject();
+
+		add_filter(
+			'pre_http_request',
+			static function ( $response, $args, $url ) use ( $requested ) {
+				$requested[] = $url;
+
+				return new WP_Error( 'http_blocked', 'No HTTP in this test.' );
+			},
+			10,
+			3
+		);
+
+		return $requested;
+	}
+
+	/**
+	 * The ways a theme reaches its own files, written by hand or by another tool, render the
+	 * same URL a save writes back as get_theme_file_uri(), so none of them is a program.
+	 */
+	public function test_a_theme_file_call_does_not_count() {
+		$calls = array(
+			"<?php echo esc_url( get_theme_file_uri( 'assets/images/kfw-wordmark.svg' ) ); ?>",
+			"<?php echo esc_url( get_parent_theme_file_uri( 'assets/images/x.svg' ) ); ?>",
+			"<?php echo esc_url( get_template_directory_uri() . '/assets/images/x.svg' ); ?>",
+			"<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/images/x.svg' ); ?>",
+			'<?php echo esc_url( get_template_directory_uri() ); ?>/assets/images/x.svg',
+			'<?php echo esc_url( get_stylesheet_directory_uri() ); ?>/assets/images/x.svg',
+		);
+
+		$images = '';
+		foreach ( $calls as $call ) {
+			$images .= '<!-- wp:image --><figure class="wp-block-image"><img src="' . $call . '" alt=""/></figure><!-- /wp:image -->' . "\n";
+		}
+
+		$path = $this->given_file( 'theme-files', "<?php\n/**\n * Title: Theme files\n * Slug: simple-theme/theme-files\n */\n?>\n" . $images );
+
+		$this->assertFalse( Abstract_Pattern::file_has_custom_php( $path ) );
+		$this->assertFalse( Abstract_Pattern::from_file( $path )->hasCustomPhp );
+	}
+
+	/**
+	 * Only a literal path is one a save can write back; anything computed, or left
+	 * unescaped, is code.
+	 */
+	public function test_a_theme_file_call_the_plugin_cannot_write_back_does_count() {
+		$calls = array(
+			'<?php echo esc_url( get_theme_file_uri( $path ) ); ?>',
+			"<?php echo esc_url( get_theme_file_uri( 'assets/' . \$file ) ); ?>",
+			'<?php echo esc_url( get_theme_file_uri( "assets/{$file}" ) ); ?>',
+			"<?php echo get_theme_file_uri( 'assets/images/x.svg' ); ?>",
+			'<?php echo esc_url( get_theme_file_uri() ); ?>',
+			"<?php echo esc_url( get_template_directory_uri( 'x' ) ); ?>",
+		);
+
+		foreach ( $calls as $call ) {
+			$this->assertNotNull( Abstract_Pattern::find_custom_php( '<img src="' . $call . '" alt=""/>' ), $call );
+		}
+	}
+
+	/**
+	 * A theme save points each URL of a file in the theme back at get_theme_file_uri(),
+	 * wherever the file sits, and fetches nothing. Paths that leave the theme stay as written.
+	 */
+	public function test_a_link_to_a_theme_file_is_written_as_get_theme_file_uri() {
+		$requested = $this->record_http_requests();
+		$theme     = untrailingslashit( get_stylesheet_directory_uri() );
+		$content   = '<!-- wp:image --><figure class="wp-block-image"><img src="' . $theme . '/assets/images/kfw-wordmark.svg" alt=""/></figure><!-- /wp:image -->' .
+			'<!-- wp:paragraph --><p><a href="' . $theme . '/assets/docs/menu.pdf">Menu</a> <a href="' . $theme . '/../other-theme/notes.txt">Other</a></p><!-- /wp:paragraph -->' .
+			'<!-- wp:cover {"url":"' . $theme . '/assets/logos/kfw.png"} --><div class="wp-block-cover"></div><!-- /wp:cover -->';
+
+		$this->assertNotWPError( $this->write( array( 'content' => $content ) ) );
+
+		$file = $this->file_for( 'written' );
+		$this->assertStringContainsString( "src=\"<?php echo esc_url( get_theme_file_uri( 'assets/images/kfw-wordmark.svg' ) ); ?>\"", $file );
+		$this->assertStringContainsString( "href=\"<?php echo esc_url( get_theme_file_uri( 'assets/docs/menu.pdf' ) ); ?>\"", $file );
+		$this->assertStringContainsString( "\"url\":\"<?php echo esc_url( get_theme_file_uri( 'assets/logos/kfw.png' ) ); ?>\"", $file );
+		$this->assertStringContainsString( 'href="' . $theme . '/../other-theme/notes.txt"', $file );
+		$this->assertSame( array(), $requested->getArrayCopy(), 'A file already in the theme should not be fetched.' );
+		$this->assertFalse( is_dir( $this->theme_dir . '/assets/images' ), 'Nothing should be copied into the theme.' );
+	}
+
+	/**
+	 * The round trip that makes a hand-written call editable: reading renders it to this
+	 * site's URL, and saving what was read writes get_theme_file_uri() back in its place.
+	 */
+	public function test_a_hand_written_theme_file_call_survives_a_read_and_a_save() {
+		$requested = $this->record_http_requests();
+		$path      = $this->given_file(
+			'written',
+			"<?php\n/**\n * Title: Written\n * Slug: simple-theme/written\n */\n?>\n" .
+			"<!-- wp:image -->\n" .
+			'<figure class="wp-block-image"><img src="<?php echo esc_url( get_theme_file_uri( \'assets/images/kfw-wordmark.svg\' ) ); ?>" alt=""/></figure>' . "\n" .
+			"<!-- /wp:image -->\n" .
+			"<!-- wp:image -->\n" .
+			'<figure class="wp-block-image"><img src="<?php echo esc_url( get_template_directory_uri() ); ?>/assets/images/photo.jpg" alt=""/></figure>' . "\n" .
+			"<!-- /wp:image -->\n"
+		);
+
+		$read = Abstract_Pattern::from_file( $path );
+		$this->assertFalse( $read->hasCustomPhp );
+		$this->assertStringContainsString( 'src="' . get_theme_file_uri( 'assets/images/kfw-wordmark.svg' ) . '"', $read->content );
+
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$this->assertNotWPError( $this->store->update_theme_pattern( $read ) );
+
+		$file = $this->file_for( 'written' );
+		$this->assertStringContainsString( "src=\"<?php echo esc_url( get_theme_file_uri( 'assets/images/kfw-wordmark.svg' ) ); ?>\"", $file );
+		$this->assertStringContainsString( "src=\"<?php echo esc_url( get_theme_file_uri( 'assets/images/photo.jpg' ) ); ?>\"", $file );
+		$this->assertSame( array(), $requested->getArrayCopy() );
+	}
+
+	/**
+	 * Under a child theme, a file only the parent has is reached through get_theme_file_uri(),
+	 * which falls back to it. A parent's file the child also has is pointed at the parent's
+	 * copy, since that is the one the pattern showed.
+	 */
+	public function test_a_parent_theme_file_keeps_pointing_at_the_file_it_showed() {
+		$parent_dir = sys_get_temp_dir() . '/pattern-builder-dynamic-test-parent';
+		$parent_uri = 'http://example.org/wp-content/themes/simple-parent';
+		$template   = static function () use ( $parent_dir ) {
+			return $parent_dir;
+		};
+		$template_uri = static function () use ( $parent_uri ) {
+			return $parent_uri;
+		};
+		add_filter( 'template_directory', $template, 20 );
+		add_filter( 'template_directory_uri', $template_uri, 20 );
+
+		// The child has its own both.svg; only-in-parent.svg is the parent's alone.
+		wp_mkdir_p( $this->theme_dir . '/assets/images' );
+		file_put_contents( $this->theme_dir . '/assets/images/both.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_put_contents_file_put_contents
+
+		try {
+			$this->assertNotWPError(
+				$this->write(
+					array(
+						'content' => '<!-- wp:paragraph --><p>' .
+							'<img src="' . $parent_uri . '/assets/images/only-in-parent.svg" alt=""/>' .
+							'<img src="' . $parent_uri . '/assets/images/both.svg" alt=""/>' .
+							'</p><!-- /wp:paragraph -->',
+					),
+					array( 'import_images' => false )
+				)
+			);
+
+			$file = $this->file_for( 'written' );
+			$this->assertStringContainsString( "get_theme_file_uri( 'assets/images/only-in-parent.svg' )", $file );
+			$this->assertStringContainsString( "get_parent_theme_file_uri( 'assets/images/both.svg' )", $file );
+
+			$read = Abstract_Pattern::from_file( $this->theme_dir . '/patterns/written.php' );
+			$this->assertStringContainsString( 'src="' . $parent_uri . '/assets/images/only-in-parent.svg"', $read->content );
+			$this->assertStringContainsString( 'src="' . $parent_uri . '/assets/images/both.svg"', $read->content );
+		} finally {
+			unlink( $this->theme_dir . '/assets/images/both.svg' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			rmdir( $this->theme_dir . '/assets/images' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+			rmdir( $this->theme_dir . '/assets' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+			remove_filter( 'template_directory', $template, 20 );
+			remove_filter( 'template_directory_uri', $template_uri, 20 );
+		}
+	}
+
+	/**
 	 * The title is written inside the header comment, where a closing marker would end the
 	 * comment and make the rest of the title code. It stays text instead.
 	 */

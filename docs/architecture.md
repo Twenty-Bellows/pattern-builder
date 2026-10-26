@@ -462,31 +462,51 @@ it sits outside the header comment and would be dropped just the same, so the
 conservative answer is the safe one. The cost is about the same as the `include`
 that already happens for every pattern read.
 
-The exceptions are the plugin's own writes, and there are three of them.
-A localized write turns a pattern's text into
-`<?php echo wp_kses_post( 'text', 'domain' ); ?>`, and importing a pattern's
-images turns each one into `Pattern_Builder_Assets::theme_reference()` —
-`<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/images/x.svg' ); ?>`.
+The exceptions are calls a save writes back itself, so a file carrying them is
+still one the plugin can rebuild. A localized write turns a pattern's text into
+`<?php echo wp_kses_post( 'text', 'domain' ); ?>`.
+
+A file the theme carries is `Pattern_Builder_Assets::theme_reference()`,
+`<?php echo esc_url( get_theme_file_uri( 'assets/images/x.svg' ) ); ?>`. It's
+what importing a pattern's images writes, what `find-media` and `add-asset` hand
+out, and what every theme save writes back through `restore_theme_file_links()`.
+That step runs before the image import and turns each URL of a file in the
+active theme or its parent, in a `src`, an `href` or a block's `url` attribute,
+back into the call, so the theme's own files are never fetched or copied on a
+save. `get_theme_file_uri()` falls back to the parent theme's file, so one call
+covers a child theme and its parent. The one exception is a parent's file that
+the child also has, which becomes `get_parent_theme_file_uri()` so it keeps
+pointing at the copy the pattern showed. Because the save writes these back, the
+other ways a theme reaches its own files are accepted too:
+`get_parent_theme_file_uri()` with a literal path, and
+`get_stylesheet_directory_uri()` or `get_template_directory_uri()` on their own
+or joined to a literal path. Theme authors and other tools write those, and a
+pattern carrying one opens for editing; its first save respells it as
+`get_theme_file_uri()`.
+
 And every theme save runs `restore_home_links()`, which turns each link to a page
 of this site, in an `href` or a block's `url` attribute (a navigation link keeps
 its address there), into `<?php echo esc_url( home_url( '/about/' ) ); ?>`, or
 `home_url()` for the bare home. It leaves a link into `wp-content` or `wp-admin`,
 a link with a query string, and a link to any other site as written: the query
 string because `esc_url()` writes its entities differently, so the call would
-not give back the same link. All three round-trip: reading the file runs the
-call, writing it puts the same call back, so a file carrying any of them is
-still one the plugin can rebuild. The home link is the one theme authors write
-by hand — it is the commonest PHP in a theme's patterns — and without the save
-turning the rendered URL back into the call, opening such a pattern and saving
-it would hard-code this site's address into the theme. The match itself is
+not give back the same link. The home link is the one theme authors write by
+hand, the commonest PHP in a theme's patterns, and without the save turning the
+rendered URL back into the call, opening such a pattern and saving it would
+hard-code this site's address into the theme. The match itself is
 `Pattern_File_Store::replace_home_links()`, which the cloud export and install
 use too, so the links a save restores are the ones that travel as `pbp-home:`
 (see [`cloud.md`](cloud.md)).
 
+All of them round-trip: reading the file runs the call, and writing it puts back
+a call that renders the same URL or text.
+
 `written_call_shapes()` names those shapes in tokens and `shape_ends_at()`
-matches one exactly, down to the identifier in each position — the escape
-function is one of `LOCALIZED_STRING_FUNCTIONS`, the asset call is `esc_url`
-around `get_stylesheet_directory_uri`, and the link call is `esc_url` around
+matches one exactly, down to the identifier in each position. The escape
+function is one of `LOCALIZED_STRING_FUNCTIONS`. A theme file call is `esc_url`
+around `get_theme_file_uri` or `get_parent_theme_file_uri` with one literal
+path, or around `get_stylesheet_directory_uri` or `get_template_directory_uri`
+with a literal joined on or nothing. The link call is `esc_url` around
 `home_url` with one literal path or none. A variable where a literal belongs, a
 different concatenation, a second argument, or any other function fails. A hand-written
 `esc_html_e()` is therefore custom PHP, correctly, and so is the same `esc_url`
@@ -496,8 +516,8 @@ round trip but the call around it would not.
 Getting this list wrong is not a quiet failure. A pattern the plugin wrote
 itself, read back and misjudged, becomes a pattern the plugin refuses to save,
 and since the same shapes check every write (below), a writer whose output
-drifts from them has its writes refused at once — so the shapes here and the
-strings the three writers produce have to be changed together.
+drifts from them has its writes refused at once. So the shapes here and the
+strings the writers produce have to be changed together, and
 `test_the_plugins_own_php_still_writes()` holds them to each other.
 
 **A write is followed by a read, so the file has to be forgotten first.** A save

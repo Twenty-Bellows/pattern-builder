@@ -475,7 +475,7 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		$post = get_post( $response->get_data()['id'] );
 
 		$this->assertStringNotContainsString( '<?php', $post->post_content );
-		$this->assertStringNotContainsString( 'get_stylesheet_directory_uri', $post->post_content );
+		$this->assertStringNotContainsString( 'get_theme_file_uri', $post->post_content );
 		$this->assertStringContainsString( wp_upload_dir()['baseurl'], $post->post_content );
 	}
 

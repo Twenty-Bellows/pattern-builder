@@ -719,7 +719,7 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 					'type'        => 'string',
 				),
 				'hasCustomPhp'       => array(
-					'description' => __( 'Whether the pattern’s file holds PHP beyond the calls Pattern Builder writes itself, for localized text, the theme’s own images and links to the site’s own pages. Such a file can be read and rendered but not written, because reading it runs it and keeps the output.', 'pattern-builder' ),
+					'description' => __( 'Whether the pattern’s file holds PHP beyond the calls Pattern Builder writes back itself, for localized text, the theme’s own files and links to the site’s own pages. Such a file can be read and rendered but not written, because reading it runs it and keeps the output.', 'pattern-builder' ),
 					'type'        => 'boolean',
 					'readonly'    => true,
 				),

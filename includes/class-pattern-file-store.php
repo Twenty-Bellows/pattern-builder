@@ -594,6 +594,8 @@ class Pattern_File_Store {
 		if ( is_wp_error( $writable ) ) {
 			return $writable;
 		}
+		// Before the import, which would otherwise download the theme's own files and copy them.
+		$pattern = $this->restore_theme_file_links( $pattern );
 		if ( ! isset( $options['import_images'] ) || true === $options['import_images'] ) {
 			$pattern = $this->import_pattern_image_assets( $pattern );
 		}
@@ -888,7 +890,7 @@ class Pattern_File_Store {
 				'pattern_has_custom_php',
 				sprintf(
 					/* translators: %s: the PHP found, e.g. "echo get_bloginfo( 'name' );". */
-					__( 'The pattern was not stored, because it would put PHP into the theme’s file: %s. Pattern Builder writes only the PHP it generates itself, for localized text, the theme’s own images and links to the site’s own pages. Write any other PHP in the theme’s pattern file directly.', 'pattern-builder' ),
+					__( 'The pattern was not stored, because it would put PHP into the theme’s file: %s. Pattern Builder writes only the PHP it can write back itself, for localized text, the theme’s own files and links to the site’s own pages. Write any other PHP in the theme’s pattern file directly.', 'pattern-builder' ),
 					$custom_php
 				),
 				array( 'status' => 400 )
@@ -1207,6 +1209,54 @@ class Pattern_File_Store {
 				return $matches[0];
 			},
 			$pattern->content
+		);
+
+		return $pattern;
+	}
+
+	/**
+	 * Points each URL of a file in the active theme or its parent, in a src, an href or a
+	 * block's url attribute, back at get_theme_file_uri(), which is what reading a pattern
+	 * file renders it from. Nothing is downloaded or copied. A parent's file that the child
+	 * theme also has is pointed at the parent's copy, which is the one it rendered as.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern about to be written.
+	 * @return Abstract_Pattern
+	 */
+	private function restore_theme_file_links( $pattern ) {
+		$child = untrailingslashit( get_stylesheet_directory_uri() );
+		$bases = array_unique( array( $child, untrailingslashit( get_template_directory_uri() ) ) );
+		usort(
+			$bases,
+			static function ( $a, $b ) {
+				return strlen( $b ) - strlen( $a );
+			}
+		);
+		$bases = implode(
+			'|',
+			array_map(
+				static function ( $base ) {
+					return preg_quote( $base, '/' );
+				},
+				$bases
+			)
+		);
+
+		$pattern->content = preg_replace_callback(
+			'/(src=|href=|"url"\s*:\s*)"(' . $bases . ')\/([A-Za-z0-9\/._~%-]+)"/',
+			static function ( $matches ) use ( $child ) {
+				$path = $matches[3];
+
+				// A dot segment would point outside the theme.
+				if ( preg_match( '#(^|/)\.{1,2}(/|$)#', $path ) ) {
+					return $matches[0];
+				}
+
+				$from_parent = $child !== $matches[2] && file_exists( get_stylesheet_directory() . '/' . $path );
+
+				return $matches[1] . '"' . Pattern_Builder_Assets::theme_reference( $path, $from_parent ) . '"';
+			},
+			(string) $pattern->content
 		);
 
 		return $pattern;
