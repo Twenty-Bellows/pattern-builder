@@ -254,8 +254,10 @@ post it renders in. When the single post template and the card share a piece,
 like the date and categories under a title, make that piece a synced pattern
 and place it in both.
 
-In the Site Editor a card placed by reference shows up as a copy. *When the
-Site Editor got there first* says why, and what that means for a write.
+The Site Editor shows a synced card as a live instance with its design locked,
+so the lists keep sharing it after someone edits a template there. An unsynced
+pattern arrives there as a copy; *When the Site Editor got there first* says
+what that means for a write.
 
 ## Which block reads what
 
@@ -308,11 +310,13 @@ what `get-template` returned, send its `hash` as `expectedHash`, and tell the
 person when you folded one, because their Site Editor change now lives in the
 theme's file.
 
-**A customization holds copies of the template's patterns.** Before the Site
-Editor loads a template or part, core swaps every `core/pattern` in it for the
-pattern's blocks, synced or not, so a save there stores those copies. A
-pattern with one top block leaves its name on it in `metadata.patternName`;
-one with several leaves no mark. Fold the customization in as it stands and
+**A customization can hold copies of the template's patterns.** Before the Site
+Editor loads a template or part, core swaps each `core/pattern` in it for the
+pattern's blocks. Pattern Builder puts the synced ones back, so they stay
+references through a save, but an unsynced one arrives as blocks and a save
+stores those. So does any customization saved before Pattern Builder kept synced
+ones. A pattern with one top block leaves its name on its copy in
+`metadata.patternName`; one with several leaves no mark. Fold the customization in as it stands and
 the theme's file stops following those patterns, so a change to the header or
 the card no longer reaches this template. Before you write, compare each copy
 with its pattern (`get-pattern`). Put the `core/pattern` reference back where
