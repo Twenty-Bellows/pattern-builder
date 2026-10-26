@@ -166,6 +166,29 @@ function quietly( fn ) {
 }
 
 /**
+ * Classes core's own stylesheets style, so one in a `className` isn't a hook.
+ */
+const CORE_STYLED_CLASSES = [ 'screen-reader-text' ];
+
+/**
+ * The classes in a block's `className` that aren't a block style variation's,
+ * which nothing in WordPress styles unless a stylesheet of the theme's does.
+ *
+ * @param {Object} block A parsed block.
+ * @return {string[]} The classes.
+ */
+function stylingHooks( block ) {
+	return String( block.attributes?.className ?? '' )
+		.split( /\s+/ )
+		.filter(
+			( name ) =>
+				name &&
+				! name.startsWith( 'is-style-' ) &&
+				! CORE_STYLED_CLASSES.includes( name )
+		);
+}
+
+/**
  * Every block in the tree, inner blocks included.
  *
  * @param {Array} blocks
@@ -554,6 +577,7 @@ async function main() {
 	let problems = 0;
 	let oldForm = 0;
 	let lost = 0;
+	let hooked = 0;
 
 	for ( const file of files ) {
 		const label =
@@ -590,6 +614,20 @@ async function main() {
 			}
 			if ( block.name === null ) {
 				continue;
+			}
+
+			const hooks = stylingHooks( block );
+			if ( hooks.length ) {
+				console.log(
+					`${ label }: STYLING HOOK ${ block.name }: ${ hooks
+						.map( ( name ) => `"${ name }"` )
+						.join( ', ' ) } ${
+						hooks.length === 1
+							? "isn't a block style variation's class"
+							: "aren't block style variations' classes"
+					}.`
+				);
+				hooked++;
 			}
 			if ( block.originalContent === undefined ) {
 				continue;
@@ -644,7 +682,6 @@ async function main() {
 		console.log(
 			`All blocks valid and current across ${ files.length } file(s).`
 		);
-		process.exit( 0 );
 	}
 
 	if ( problems ) {
@@ -662,6 +699,12 @@ async function main() {
 	if ( lost ) {
 		console.log(
 			`\n${ lost } attribute(s) dropped. WordPress read the markup as an older version of the block and migrated it, and the migration threw these away — so the setting you wrote is simply not there any more. Write the markup the attribute implies (the class it needs is in the table in references/block-markup.md) and it will survive.`
+		);
+	}
+
+	if ( hooked ) {
+		console.log(
+			`\n${ hooked } block(s) carry a class that isn't a block style variation's. Nothing in WordPress styles a class like that, so it's either doing nothing or hanging a look on a stylesheet that nobody editing the page can see and that stays behind wherever the pattern goes. If it names a look, make it a block style variation and apply is-style-{slug}; if it's a size, a color or spacing, put it in the block's settings. "Where a look goes" in references/design-system.md has the order. This doesn't fail the run.`
 		);
 	}
 

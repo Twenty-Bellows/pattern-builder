@@ -2,7 +2,7 @@
 name: design-reproduction
 description: Rebuild an existing design as WordPress block patterns — a live website, a Figma file, a screenshot, a PDF or a mockup — page by page, pulling the reusable parts out rather than transcribing the pixels. Use this whenever the source of the design already exists somewhere else and the job is to reproduce it: "recreate this site", "build this in WordPress", "match this design", "here's a screenshot of what we want". Reproduction fails quietly in two specific ways this covers — values approximated instead of read, and repeated parts copied instead of factored — and both look like a finished page. Load the pattern-author skill alongside it; this one decides what to build and how faithfully, that one is how a pattern gets written.
 metadata:
-  version: 1.5.0
+  version: 1.6.0
 ---
 
 # Reproducing an existing design
@@ -143,6 +143,15 @@ headings their exact sizes on `styles.elements`, and let every other text size
 take the nearest of the five, with each one that rounds written in the tokens
 table.
 
+**Don't carry the exact values into a stylesheet instead.** With the theme's
+files open, it's tempting to give each label its own `clamp()` and each band its
+offsets in `vw` until the page matches the mockup. A rounded size in the tokens
+table is a decision someone can see and reject; a size per class in a
+stylesheet is a second type scale nobody chose, and the editor can't show it.
+Sizes, spacing and widths go in tokens and block settings, and a look that
+needs a name is a block style variation. `pattern-author`'s
+`references/design-system.md`, *Where a look goes*, has the order.
+
 ### 5. Factor, then build
 
 `pattern-author`'s **factor** step, rules unchanged: inventory what repeats,
@@ -214,7 +223,11 @@ what and where.
   refuses. What stays out of reach is anything needing a media query (core
   cannot place an at-rule there), a comma or a sibling combinator in a
   selector, or a rule on something the pattern's own markup does not carry.
-  Rebuild those from real blocks and say what changed.
+  Rebuild those from real blocks and say what changed. With the theme's files
+  open, a media query can go in the theme's stylesheet when nothing else can
+  hold it, scoped to a variation's class and named in the handoff. A rule keyed
+  to a class you added for the purpose isn't that: it's the same CSS, harder to
+  find.
 - **Variable font axes.** The font collection serves fixed instances, one file
   per weight. Ask `list-fonts` for the family before promising a match.
 - **Images you only have a picture of.** Use placeholders and hand back the

@@ -49,6 +49,56 @@ Three things follow, and they are the whole of the discipline:
 
 Which turns every naming choice into a choice about **who should win**.
 
+## Where a look goes, whoever is writing it
+
+The abilities can't write a theme stylesheet, so through them a look can only
+land in theme.json, a block's settings or a block style variation. With the
+theme's files open you can put CSS anywhere, and that's when this matters most,
+because nothing stops you. The order is the same either way: put a look in the
+first place that can hold it.
+
+- **theme.json**, when it's the site's: the palette, the type and spacing
+  scales, and what every heading, link and button looks like.
+- **The block's own settings**, using those tokens, when it's this block's: a
+  background color, padding from the spacing scale, one of the five font sizes,
+  a gap. They're what someone editing the page sees in the sidebar and can
+  change.
+- **A block style variation's styles**, when it's a named look more than one
+  block shares: the color, spacing, border and typography properties in its
+  `styles/{slug}.json`.
+- **The variation's `css`**, for what those properties can't say: a
+  pseudo-element, a mask, a transform, a hover state. *CSS in a variation*,
+  below, has what it accepts.
+- **The theme's stylesheet**, last, for what none of those can hold, like a
+  media query or a rule for `::selection` or a focus ring, and only when the
+  theme is yours to change. Scope each rule to a variation's `is-style-` class
+  or to an element, and say in the handoff what you put there and why nothing
+  above could hold it.
+
+The order breaks in the same few ways, and each one looks finished:
+
+**A class you make up is a styling hook, and the look behind it is hidden.** A
+paragraph with `{"className":"card__time"}` and its look in a stylesheet shows
+nothing in the editor, tells nobody what it does, and leaves its CSS behind
+wherever the pattern goes. When a look needs a name, make it a block style
+variation: the editor lists it, the cloud carries it, and anyone can apply it.
+The validator notes every class that isn't a variation's.
+
+**CSS that sets what the block already sets makes the editor lie.** A paragraph
+whose markup says `fontSize: medium`, overridden in a stylesheet by
+`clamp(1.125rem, 1.5vw, 1.375rem)`, shows Medium in the sidebar and ignores
+whatever size someone picks there. If the block has a setting for it, the value
+belongs in the setting.
+
+**A size the scale doesn't have isn't one to invent.** A 22px label between a
+20px `medium` and a 32px `large` is `medium`, with the rounding written into
+your tokens table (*Font sizes*, below). A stylesheet full of bespoke `clamp()`
+sizes matches the mockup and leaves the site without a type scale.
+
+Matching a mockup to the pixel is what pushes all of these. The deliverable is
+a page built from blocks that reads as the mockup at its width, not a page that
+matches it exactly by working around the blocks.
+
 ---
 
 # Tokens
@@ -358,12 +408,14 @@ A variation's own styles may reference presets, and those are collected too —
 the markup carries the class and no color at all, so a token named only inside
 a variation still ships. So does its `css`, below.
 
-## CSS, in a variation and nowhere else
+## CSS in a variation
 
 The style properties cannot express a pseudo-element, a descendant rule or a
-hover state, and those are most of what a variation is for. So a variation —
-alone among the things these abilities write — may carry a `css` string, at the
-top of its `styles` and nowhere deeper:
+hover state, and those are most of what a variation is for. So a variation,
+alone among the things these abilities write, may carry a `css` string, at the
+top of its `styles` and nowhere deeper. Writing the theme's files yourself, put
+that CSS here too rather than in a stylesheet: here it's scoped to the
+variation's class and travels with the definition.
 
 ```json
 {
@@ -543,6 +595,11 @@ transforms and transitions.
 9. **A second kind of anything is a variation, not a pile of attributes.**
 10. **Write styles only when the design is yours to set** — recreating a design
     or establishing one, not when writing a pattern for somebody's site.
+11. **Put a look in the first place that can hold it**: theme.json, the block's
+    settings, a variation's styles, its `css`, and the theme's stylesheet last,
+    scoped to a variation or an element. No made-up classes, no CSS setting
+    what the block already sets, and no sizes the scale doesn't have. That
+    holds when you edit the theme's files yourself too.
 
 ## The one case where the evidence above *is* a breakage map
 

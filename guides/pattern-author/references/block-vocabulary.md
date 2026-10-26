@@ -202,7 +202,9 @@ every child, and it stays right when a slot is filled with more or less text.
 
 **Prefer a style variation to inline styles.** `is-style-card` carries the
 theme's decision; a hand-rolled border and shadow carries yours, and drifts
-from everything else the moment the theme changes.
+from everything else the moment the theme changes. The same goes for a class
+of your own styled from the theme's stylesheet, which the editor can't show
+and nobody can apply. `design-system.md`, *Where a look goes*, has the order.
 
 **Match the heading level to the document, not the size.** A section heading
 inside a page is usually `h2`; use `fontSize` for how big it looks. An `h1`
