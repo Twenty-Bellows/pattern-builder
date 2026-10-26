@@ -382,6 +382,23 @@ The runtime classes (`Pattern_Block`, `Pattern_Resolver`, `Block_Markup`,
 are vendored from [synced-patterns-for-themes](https://github.com/Twenty-Bellows/synced-patterns-for-themes)
 and must stay logic-identical to it.
 
+**What the editor is sent.** Since 6.6 core flattens every `core/pattern` block
+on the server before the editor sees it, which would turn a synced instance into
+a copy and replace the content it was given with the pattern's placeholder
+copy. `Editor_Support` composes around that. The pattern list is recomposed from
+the registry after core has flattened it, and templates are composed on the
+`get_block_template` filters as they load. The templates controller flattens
+again after every filter has run, so a template or part that places a synced
+pattern is recomposed once more on `rest_request_after_callbacks`, for its
+routes, its revisions and its autosaves. A theme file or a plugin's template is
+recomposed from what the filters left, remembered on its first load in the
+request, because the controller writes the flattened markup back into a
+registered template's shared object and a second load hands that back. A
+template stored as a post is built again from the post with
+`_build_block_template_result_from_post()`, because `get_block_template()`
+returns those without running its filter at all. Everything else is left as core
+prepared it, so an unsynced pattern still reaches the Site Editor as a copy.
+
 Pattern Builder always registers the full stack. When both plugins are
 installed the companion sees `PATTERN_BUILDER_VERSION` at `plugins_loaded` and
 stays entirely unloaded — one check in one place. Deactivate Pattern Builder
