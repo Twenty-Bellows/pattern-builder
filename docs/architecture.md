@@ -478,8 +478,10 @@ call, writing it puts the same call back, so a file carrying any of them is
 still one the plugin can rebuild. The home link is the one theme authors write
 by hand — it is the commonest PHP in a theme's patterns — and without the save
 turning the rendered URL back into the call, opening such a pattern and saving
-it would hard-code this site's address into the theme. An upload to the cloud
-exports the rendered markup, so a home link leaves as this site's address.
+it would hard-code this site's address into the theme. The match itself is
+`Pattern_File_Store::replace_home_links()`, which the cloud export and install
+use too, so the links a save restores are the ones that travel as `pbp-home:`
+(see [`cloud.md`](cloud.md)).
 
 `written_call_shapes()` names those shapes in tokens and `shape_ends_at()`
 matches one exactly, down to the identifier in each position — the escape

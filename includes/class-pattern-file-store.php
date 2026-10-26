@@ -1223,25 +1223,45 @@ class Pattern_File_Store {
 	 * @return Abstract_Pattern
 	 */
 	private function restore_home_links( $pattern ) {
-		$home = untrailingslashit( home_url() );
+		$pattern->content = self::replace_home_links(
+			$pattern->content,
+			home_url(),
+			static function ( $path ) {
+				$call = '' === $path ? 'home_url()' : "home_url( '" . $path . "' )";
 
-		$pattern->content = preg_replace_callback(
-			'/(href=|"url"\s*:\s*)"' . preg_quote( $home, '/' ) . '(\/[A-Za-z0-9\/._~%#-]*)?"/',
-			function ( $matches ) {
+				return '<?php echo esc_url( ' . $call . ' ); ?>';
+			}
+		);
+
+		return $pattern;
+	}
+
+	/**
+	 * Replaces each link that starts with a base, in an href or a block's url attribute,
+	 * with what a callback makes of its path. Links into wp-content or wp-admin, links with
+	 * a query string, and links to anywhere else are left as they are. The theme save, the
+	 * cloud export and the cloud install all go through this, so all three agree on which
+	 * links are a site's own pages.
+	 *
+	 * @param string   $content Block markup.
+	 * @param string   $base    What the link starts with: a home URL, or a placeholder.
+	 * @param callable $replace Takes the path, '' for the bare base, and returns the link.
+	 * @return string
+	 */
+	public static function replace_home_links( $content, $base, $replace ) {
+		return preg_replace_callback(
+			'/(href=|"url"\s*:\s*)"' . preg_quote( untrailingslashit( $base ), '/' ) . '(\/[A-Za-z0-9\/._~%#-]*)?"/',
+			static function ( $matches ) use ( $replace ) {
 				$path = isset( $matches[2] ) ? $matches[2] : '';
 
 				if ( preg_match( '#^/wp-(content|admin)(/|$)#', $path ) ) {
 					return $matches[0];
 				}
 
-				$call = '' === $path ? 'home_url()' : "home_url( '" . $path . "' )";
-
-				return $matches[1] . '"<?php echo esc_url( ' . $call . ' ); ?>"';
+				return $matches[1] . '"' . $replace( $path ) . '"';
 			},
-			(string) $pattern->content
+			(string) $content
 		);
-
-		return $pattern;
 	}
 
 	/**

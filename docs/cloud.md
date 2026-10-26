@@ -42,9 +42,27 @@ GIF, WebP only), fails the export with that URL named. Attachment ids and
 `wp-image-N` classes are dropped on the way out, since id 57 names nothing on
 another site.
 
-**Imports** fetch package assets into the media library, re-sanitize the markup
-(KSES and scheme checks — never trust the wire), then land as a `wp_block` or
-flow through `Pattern_File_Store::update_theme_pattern()`. A user pattern's
+**A link to one of this site's own pages travels as `pbp-home:` plus its path**
+— `href="pbp-home:/about/"`, a navigation link's `"url":"pbp-home:/contact/"`,
+or `pbp-home:` alone for the bare home — because the export is the *rendered*
+markup, and a theme pattern's `home_url()` call has already become this site's
+address by then. Which links count is `Pattern_File_Store::replace_home_links()`,
+the same match the theme save uses to restore the call: an `href` or a block's
+`url` attribute under this site's home, but not into `wp-content` or `wp-admin`
+and not with a query string. Those, and links to other sites, leave as written.
+The service registers `pbp-home` as a KSES protocol beside `pbp-asset`; without
+that it would keep the path and drop the scheme.
+
+**Imports** fetch package assets into the media library, resolve each
+`pbp-home:` link against this site's home, re-sanitize the markup (KSES and
+scheme checks — never trust the wire), then land as a `wp_block` or flow through
+`Pattern_File_Store::update_theme_pattern()`. A user pattern is left with that
+absolute URL, which is what the editor's own link control writes and what a re-upload
+recognizes as home again; a theme pattern has it turned back into the
+`home_url()` call by that save. Both placeholders are resolved before the
+re-sanitize, whose KSES would strip either scheme, and a placeholder left over —
+an asset that was not delivered, or a link whose path is not one the export
+writes — refuses the install before the pattern is written. A user pattern's
 blocks are pointed at the attachments just created; a theme pattern's images
 move into the theme's own `assets/images`, so it carries no ids. Assets are
 always fetched from the configured service origin — URLs are re-rooted onto it,

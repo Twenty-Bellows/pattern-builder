@@ -1,6 +1,8 @@
 <?php
 
+use TwentyBellows\PatternBuilder\Abstract_Pattern;
 use TwentyBellows\PatternBuilder\Pattern_Builder_Cloud_Porter;
+use TwentyBellows\PatternBuilder\Pattern_File_Store;
 
 /**
  * The cloud porter: local pattern ↔ Portable Pattern Package conversion.
@@ -226,6 +228,72 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		$this->assertStringContainsString( '"url":"https://wordpress.org"', $exported['pbp']['content'] );
 	}
 
+	/**
+	 * A link to a page of this site means that page wherever the pattern lands, so it
+	 * travels as the home plus the path, in an href or a block's url attribute.
+	 */
+	public function test_export_carries_a_link_to_this_site_as_home() {
+		$home     = untrailingslashit( home_url() );
+		$exported = $this->export_content(
+			'<!-- wp:paragraph --><p><a href="' . $home . '/about/#team">About</a> <a href="' . $home . '">Home</a></p><!-- /wp:paragraph -->'
+			. '<!-- wp:navigation --><!-- wp:navigation-link {"label":"Contact","url":"' . $home . '/contact/"} /--><!-- /wp:navigation -->'
+		);
+
+		$this->assertIsArray( $exported );
+		$this->assertStringContainsString( 'href="pbp-home:/about/#team"', $exported['pbp']['content'] );
+		$this->assertStringContainsString( 'href="pbp-home:"', $exported['pbp']['content'] );
+		$this->assertStringContainsString( '"url":"pbp-home:/contact/"', $exported['pbp']['content'] );
+		$this->assertStringNotContainsString( $home, $exported['pbp']['content'] );
+	}
+
+	/**
+	 * The export takes the links a theme save turns into home_url(), and only those.
+	 */
+	public function test_export_leaves_other_links_to_this_site_as_written() {
+		$home  = untrailingslashit( home_url() );
+		$links = array(
+			$home . '/wp-admin/',
+			$home . '/wp-content/uploads/menu.pdf',
+			$home . '/?p=12',
+		);
+
+		$exported = $this->export_content(
+			'<!-- wp:paragraph --><p><a href="' . implode( '">x</a> <a href="', $links ) . '">x</a></p><!-- /wp:paragraph -->'
+		);
+
+		$this->assertIsArray( $exported );
+		foreach ( $links as $link ) {
+			$this->assertStringContainsString( 'href="' . $link . '"', $exported['pbp']['content'] );
+		}
+		$this->assertStringNotContainsString( 'pbp-home:', $exported['pbp']['content'] );
+	}
+
+	/**
+	 * A theme pattern is exported as it renders, so its home_url() calls arrive as this
+	 * site's address and leave as home.
+	 */
+	public function test_export_carries_a_theme_patterns_home_url_call_as_home() {
+		$patterns = $this->use_a_temporary_theme();
+		$saved    = ( new Pattern_File_Store() )->update_theme_pattern(
+			new Abstract_Pattern(
+				array(
+					'title'   => 'Header',
+					'name'    => 'simple-theme/header',
+					'content' => '<!-- wp:paragraph --><p><a href="<?php echo esc_url( home_url( \'/shop/\' ) ); ?>">Shop</a></p><!-- /wp:paragraph -->'
+						. '<!-- wp:navigation --><!-- wp:navigation-link {"label":"About","url":"<?php echo esc_url( home_url( \'/about/\' ) ); ?>"} /--><!-- /wp:navigation -->',
+				)
+			)
+		);
+		$this->assertNotWPError( $saved );
+		$this->assertStringContainsString( "home_url( '/shop/' )", file_get_contents( $patterns . '/header.php' ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+
+		$exported = ( new Pattern_Builder_Cloud_Porter() )->export_local( 'theme', 'simple-theme/header' );
+
+		$this->assertIsArray( $exported, is_wp_error( $exported ) ? $exported->get_error_message() : '' );
+		$this->assertStringContainsString( 'href="pbp-home:/shop/"', $exported['pbp']['content'] );
+		$this->assertStringContainsString( '"url":"pbp-home:/about/"', $exported['pbp']['content'] );
+	}
+
 	public function test_export_names_an_image_hosted_elsewhere() {
 		$exported = $this->export_content(
 			'<!-- wp:image --><figure><img src="https://images.example.com/photo.jpg" alt=""/></figure><!-- /wp:image -->'
@@ -266,6 +334,49 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 
 		$this->assertWPError( $porter->export_local( 'user', 999999 ) );
 		$this->assertWPError( $porter->export_local( 'theme', 'no-theme/nope' ) );
+	}
+
+	/**
+	 * Makes an empty temporary directory the active theme, so a test writes its theme
+	 * patterns there rather than into the suite's fixture theme.
+	 *
+	 * @return string The theme's patterns directory.
+	 */
+	private function use_a_temporary_theme() {
+		$theme = sys_get_temp_dir() . '/pattern-builder-home-links-test';
+		if ( ! is_dir( $theme . '/patterns' ) ) {
+			mkdir( $theme . '/patterns', 0777, true );
+		}
+		foreach ( (array) glob( $theme . '/patterns/*' ) as $file ) {
+			unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+		}
+
+		$dir  = static function () use ( $theme ) {
+			return $theme;
+		};
+		$slug = static function () {
+			return 'simple-theme';
+		};
+		add_filter( 'stylesheet_directory', $dir );
+		add_filter( 'template_directory', $dir );
+		add_filter( 'stylesheet', $slug );
+		add_filter( 'template', $slug );
+
+		return $theme . '/patterns';
+	}
+
+	/**
+	 * A downloadable PBP carrying links to the home it lands on, and no assets.
+	 *
+	 * @return array
+	 */
+	private function make_downloaded_pbp_with_home_links() {
+		$pbp            = $this->make_downloaded_pbp();
+		$pbp['content'] = '<!-- wp:paragraph --><p><a href="pbp-home:/about/#team">About</a> <a href="pbp-home:">Home</a></p><!-- /wp:paragraph -->'
+			. '<!-- wp:navigation --><!-- wp:navigation-link {"label":"Contact","url":"pbp-home:/contact/"} /--><!-- /wp:navigation -->';
+		$pbp['assets']  = array();
+
+		return $pbp;
 	}
 
 	/**
@@ -479,6 +590,79 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 		unlink( $test_dir . '/patterns/downloaded-hero.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 		remove_filter( 'stylesheet_directory', $dir_filter );
 		remove_filter( 'stylesheet', $slug_filter );
+	}
+
+	/**
+	 * A user pattern cannot run home_url(), so its links land as this site's address: what
+	 * the editor's own link control writes, and what a re-upload recognizes as home again.
+	 */
+	public function test_import_lands_a_home_link_on_this_site() {
+		$result = ( new Pattern_Builder_Cloud_Porter() )->import_pbp( $this->make_downloaded_pbp_with_home_links(), 'user' );
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$content = get_post( $result['id'] )->post_content;
+		$this->assertStringContainsString( 'href="' . home_url( '/about/#team' ) . '"', $content );
+		$this->assertStringContainsString( 'href="' . home_url() . '"', $content );
+		$this->assertStringContainsString( '"url":"' . home_url( '/contact/' ) . '"', $content );
+		$this->assertStringNotContainsString( 'pbp-home:', $content );
+	}
+
+	/**
+	 * A theme pattern gets the call back, so the link follows the theme too.
+	 */
+	public function test_import_writes_a_home_link_into_a_theme_pattern_as_the_call() {
+		$patterns = $this->use_a_temporary_theme();
+
+		$result = ( new Pattern_Builder_Cloud_Porter() )->import_pbp( $this->make_downloaded_pbp_with_home_links(), 'theme' );
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$file = file_get_contents( $patterns . '/downloaded-hero.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		$this->assertStringContainsString( "href=\"<?php echo esc_url( home_url( '/about/#team' ) ); ?>\"", $file );
+		$this->assertStringContainsString( 'href="<?php echo esc_url( home_url() ); ?>"', $file );
+		$this->assertStringContainsString( "\"url\":\"<?php echo esc_url( home_url( '/contact/' ) ); ?>\"", $file );
+		$this->assertStringNotContainsString( 'pbp-home:', $file );
+	}
+
+	/**
+	 * The point of it all: exported from one site, a link lands on another as that site's
+	 * page, including under a home in a subdirectory.
+	 */
+	public function test_a_home_link_follows_the_pattern_to_another_site() {
+		$exported = $this->export_content(
+			'<!-- wp:paragraph --><p><a href="' . home_url( '/about/' ) . '">About</a></p><!-- /wp:paragraph -->'
+		);
+		$this->assertIsArray( $exported );
+
+		add_filter(
+			'pre_option_home',
+			static function () {
+				return 'https://elsewhere.test/blog';
+			}
+		);
+		$result = ( new Pattern_Builder_Cloud_Porter() )->import_pbp( $exported['pbp'], 'user' );
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$this->assertStringContainsString( 'href="https://elsewhere.test/blog/about/"', get_post( $result['id'] )->post_content );
+	}
+
+	/**
+	 * The export only writes paths a home_url() call can carry. Anything else is a package
+	 * this site did not make, and nothing of it is written.
+	 */
+	public function test_import_refuses_a_home_link_it_cannot_read() {
+		$patterns = $this->use_a_temporary_theme();
+		$porter   = new Pattern_Builder_Cloud_Porter();
+
+		foreach ( array( "pbp-home:/a'.phpinfo().'/", 'pbp-home:/?p=12', 'pbp-home:/wp-admin/' ) as $link ) {
+			$pbp            = $this->make_downloaded_pbp_with_home_links();
+			$pbp['content'] = '<!-- wp:paragraph --><p><a href="' . $link . '">x</a></p><!-- /wp:paragraph -->';
+
+			$result = $porter->import_pbp( $pbp, 'theme' );
+
+			$this->assertWPError( $result, $link );
+			$this->assertSame( 'pb_cloud_bad_home_link', $result->get_error_code(), $link );
+			$this->assertFileDoesNotExist( $patterns . '/downloaded-hero.php', $link );
+		}
 	}
 
 	public function test_import_rejects_unsafe_content() {
