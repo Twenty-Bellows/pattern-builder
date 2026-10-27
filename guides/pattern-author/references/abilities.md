@@ -424,7 +424,9 @@ out as written: a flex or grid container whose children cannot size, most
 often a card pattern with a constrained root, which renders as a vertical stack
 (`composition_children_fill_track`); three or more children of a flex row with
 no width (`composition_flex_unsized`); a reference whose sizing cannot be known
-(`composition_reference_unknown`). The markup is valid, so nothing else says so.
+(`composition_reference_unknown`); a group that sets its own left or right
+padding to place its content, full width or with nothing painted behind it
+(`composition_side_padding`). The markup is valid, so nothing else says so.
 Read `warnings` after every write.
 
 `render-pattern` is the nearest thing to a check the site can offer, and it

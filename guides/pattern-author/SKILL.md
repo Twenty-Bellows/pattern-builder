@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.18.0
+  version: 2.0.0
 ---
 
 # Authoring block patterns
@@ -94,6 +94,9 @@ Otherwise read `theme.json` (`settings.color.palette`,
 `settings.spacing.spacingSizes`, `settings.typography.fontSizes`,
 `settings.layout`), plus `styles/*.json` and the parent theme. Then read two or
 three existing patterns — they carry house style better than any description.
+Take their tokens, blocks and voice, not a layout that breaks the width rule in
+step 5: one band that pads its own sides is all it takes for every later one to
+copy it.
 
 `references/design-system.md` covers the three layers a pattern leans on and
 which slugs are actually safe: the short version is a role for every color
@@ -190,7 +193,7 @@ Then place each row at its level:
 | Level | What it is | What it contains |
 |---|---|---|
 | **Element** | the smallest named repeated thing | markup, with slots |
-| **Section** | a full-width band | a heading and *references to elements* |
+| **Section** | a band of the page, Wide or Regular (step 5) | a heading and *references to elements* |
 | **Page** | the whole page | *references to sections*, plus its own markup |
 
 **Nesting is not limited to one hop** — a section may reference other sections.
@@ -266,6 +269,24 @@ Reference presets by slug, never by value — and note the two spellings:
 `var(--wp--preset--spacing--50)` in the `style` attribute's actual CSS. The
 shorthand inside CSS renders as no spacing at all.
 
+**Width comes from the layout, never from padding.** A theme gives a pattern
+two widths to place content with: **Regular**, the content size every child of
+a constrained group gets when it has no `align`, and **Wide**,
+`{"align":"wide"}`, its wide size. Use those and nothing else. A section is a
+Wide or Regular group with top and bottom padding only, and what is inside it
+is Wide or Regular too. The space between content and the window's edges is the
+theme's root padding (with `useRootPaddingAwareAlignments`), not the pattern's,
+so a group never sets left or right padding to place its content: it doubles
+the gutter on one theme and fights the next. Full width, `{"align":"full"}`, is
+only for a group that has to reach the window's edges — a band whose
+background paints to them, or a wrapper holding one — and its content is still
+Regular or Wide, with no side padding either. WordPress's own default themes
+model the opposite: most of Twenty Twenty-Four's full-width groups pad their
+sides with the value its root padding already applies, and most of Twenty
+Twenty-Five's paint nothing behind them. Do not take the shape from them.
+Padding inside a painted plate or card, to keep text off its own edges, is not
+layout and is fine. The validator reports the habit as **SIDE PADDING**.
+
 **If you cannot run Node**, hand-write it against the attribute-to-class table
 in `references/block-markup.md`. Every row there is a class the supports
 filters would have added for you, and getting one wrong leaves the block
@@ -281,7 +302,7 @@ the inserter preview.
 node <skill>/scripts/validate-pattern.mjs path/to/pattern.php
 ```
 
-It reports three things, and only the first is the one people expect:
+It reports four things, and only the first is the one people expect:
 
 - **INVALID** — no version of the block ever wrote this. The editor will say
   "unexpected or invalid content".
@@ -290,9 +311,12 @@ It reports three things, and only the first is the one people expect:
   the block writes today — nearly always a supports class, so the style
   silently does not apply on the front end.
 - **DROPPED ATTRIBUTE** — that migration threw away something you wrote.
+- **SIDE PADDING** — a group sets its own left or right padding to place its
+  content, on a full-width group or one with nothing painted behind it. Drop
+  it and use Wide or Regular (step 5).
 
-The last two are the dangerous ones: the pattern renders, the editor is quiet,
-and the design is just wrong. Fix and re-run; an empty report is the only
+The last three are the dangerous ones: the pattern renders, the editor is
+quiet, and the design is just wrong. Fix and re-run; an empty report is the only
 acceptable result. A `core/missing` means the site lacks that block, or the
 markup has a typo.
 
@@ -328,10 +352,11 @@ place, and reports it under `warnings` with a `composition_` code: a flex or
 grid container whose children cannot size — most often a card pattern written
 with `{"layout":{"type":"constrained"}}` at its root, which fills the whole
 track, so six references render as six full-width cards stacked vertically.
-That markup is entirely valid, every token resolves, and nothing else reports
-it, so read the warnings after every write and fix one before moving on. For
-theme files written directly, look at the page in `render-pattern`'s `page`
-preview instead.
+It also reports a group that pads its own sides (`composition_side_padding`),
+the habit the validator calls SIDE PADDING. That markup is entirely valid,
+every token resolves, and nothing else reports it, so read the warnings after
+every write and fix one before moving on. For theme files written directly,
+look at the page in `render-pattern`'s `page` preview instead.
 
 **If the pattern uses Pattern Overrides slots, check that every value lands.**
 Slot problems are invisible to block validation in both directions, and both

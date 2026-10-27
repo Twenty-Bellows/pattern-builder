@@ -130,7 +130,7 @@ sentence beside it together.
 
 ### 4. Run the evals
 
-`evals/evals.json` carries three prompt-level cases that exercise the skill end
+`evals/evals.json` carries five prompt-level cases that exercise the skill end
 to end. They are the check on whether the *guidance* still produces good
 patterns, which none of the above can tell you. Run them with the
 `skill-creator` tooling after any substantive edit.

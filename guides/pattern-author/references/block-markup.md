@@ -228,7 +228,10 @@ Every attribute has its class; every preset appears in both spellings;
 every slug is one `design-system.md` says is safe to assume — `base`,
 `contrast`, the numeric spacing scale — and the heading sets no size, so it
 takes the site's `h2`. That is what lets this band land on another theme and
-take that theme's colors and type.
+take that theme's colors and type. It is full width only because its
+background has to reach the window's edges; without one it would be
+`"align":"wide"` or have no `align`. Either way it pads its top and bottom and
+never its sides — the theme's root padding keeps its text off the edges.
 
 The example is checked, not just written: `keeping-current.md` runs the
 validator over every example in these documents at each release.

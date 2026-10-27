@@ -5,7 +5,9 @@ namespace TwentyBellows\PatternBuilder;
 /**
  * Whether markup lays out as written: the relationship between blocks that no check of one
  * block can see. A flex or grid container whose children cannot size renders as a vertical
- * stack, and that markup is entirely valid, so nothing else reports it.
+ * stack, and that markup is entirely valid, so nothing else reports it. So does a group that
+ * pads its own sides to place its content, which renders but does the theme's job: content
+ * takes its width from Regular or Wide and its gutter from the root padding.
  *
  * Made here, on the site, because everything it needs is here: the parser, and the patterns
  * a reference points at. These are warnings rather than refusals — the markup works, it
@@ -35,13 +37,27 @@ class Pattern_Builder_Composition_Checks {
 	}
 
 	/**
-	 * Check one block's children, then each child's.
+	 * Check one block's own padding and its children, then each child.
 	 *
 	 * @param array $block    A parsed block.
 	 * @param array $warnings Warnings so far.
 	 * @param array $roots    Referenced patterns' root blocks, by slug, as resolved so far.
 	 */
 	private static function visit( $block, &$warnings, &$roots ) {
+		$padding = self::side_padding( $block );
+		if ( $padding ) {
+			$name       = $block['attrs']['metadata']['name'] ?? '';
+			$warnings[] = array(
+				'code'    => 'composition_side_padding',
+				'message' => sprintf(
+					/* translators: 1: the group's name in quotes, or nothing, 2: why its side padding is placing its content. */
+					__( 'The group%1$s is %2$s to place its content. Content gets its width from Regular (no align: the content size) or Wide ("align":"wide"), and its distance from the window\'s edges from the theme\'s root padding: drop the left and right padding and use those. Keep full width for a band whose background has to reach the edges.', 'pattern-builder' ),
+					'' === $name ? '' : sprintf( ' "%s"', $name ),
+					$padding
+				),
+			);
+		}
+
 		$children = self::named( $block['innerBlocks'] ?? array() );
 		$layout   = $block['attrs']['layout'] ?? array();
 		$type     = is_array( $layout ) ? ( $layout['type'] ?? null ) : null;
@@ -139,6 +155,57 @@ class Pattern_Builder_Composition_Checks {
 			'constrained' => 'constrained' === $type,
 			'via'         => $via,
 		);
+	}
+
+	/**
+	 * Why a group's own left or right padding is placing its content, or an empty string
+	 * when it is not: on a full-width group, or on one with nothing painted behind it.
+	 * Padding inside a painted plate or card keeps text off its own edges and is left
+	 * alone, and so is a block style variation, which may paint one. Keep in step with
+	 * sidePadding() in guides/pattern-author/scripts/validate-pattern.mjs.
+	 *
+	 * @param array $block A parsed block.
+	 * @return string
+	 */
+	private static function side_padding( $block ) {
+		$attrs   = $block['attrs'] ?? array();
+		$padding = $attrs['style']['spacing']['padding'] ?? null;
+
+		if ( 'core/group' !== $block['blockName'] || ! is_array( $padding ) ) {
+			return '';
+		}
+
+		$sides = array_values(
+			array_filter(
+				array( 'left', 'right' ),
+				static fn( $side ) => isset( $padding[ $side ] ) && ! preg_match( '/^0(px|r?em|%)?$/', trim( (string) $padding[ $side ] ) )
+			)
+		);
+		if ( ! $sides ) {
+			return '';
+		}
+
+		$set = 2 === count( $sides )
+			? __( 'setting left and right padding', 'pattern-builder' )
+			/* translators: %s: "left" or "right". */
+			: sprintf( __( 'setting %s padding', 'pattern-builder' ), $sides[0] );
+
+		if ( 'full' === ( $attrs['align'] ?? '' ) ) {
+			/* translators: %s: which padding it sets, as in "setting left and right padding". */
+			return sprintf( __( 'full width and %s', 'pattern-builder' ), $set );
+		}
+
+		$painted = ! empty( $attrs['backgroundColor'] )
+			|| ! empty( $attrs['gradient'] )
+			|| ! empty( $attrs['borderColor'] )
+			|| ! empty( $attrs['style']['color']['background'] )
+			|| ! empty( $attrs['style']['color']['gradient'] )
+			|| ! empty( $attrs['style']['background']['backgroundImage'] )
+			|| ! empty( $attrs['style']['border'] )
+			|| preg_match( '/(^|\s)is-style-/', (string) ( $attrs['className'] ?? '' ) );
+
+		/* translators: %s: which padding it sets, as in "setting left and right padding". */
+		return $painted ? '' : sprintf( __( 'painting nothing behind it and %s', 'pattern-builder' ), $set );
 	}
 
 	/**

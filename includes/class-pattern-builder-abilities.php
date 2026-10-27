@@ -423,7 +423,7 @@ class Pattern_Builder_Abilities {
 						),
 						'layout'       => array(
 							'type'        => 'object',
-							'description' => 'contentSize and wideSize — the widths a constrained layout caps its children at — plus useRootPaddingAwareAlignments, which decides whether a full-width band escapes the root padding. Change them with set-layout; a pattern whose bands do not match these has to restate the width on every band.',
+							'description' => 'contentSize and wideSize — the widths a constrained layout caps its children at, and the only two a pattern places content with: Regular (a child with no align) and Wide (alignwide). A pattern never pads its own sides; the space at the window\'s edges is the root padding, under styles.spacing.padding. Plus useRootPaddingAwareAlignments, which decides whether a full-width band escapes the root padding. Change them with set-layout; a pattern whose bands do not match these has to restate the width on every band.',
 						),
 						'variations'   => array(
 							'type'        => 'array',

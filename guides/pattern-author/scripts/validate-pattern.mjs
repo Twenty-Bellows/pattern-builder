@@ -293,6 +293,57 @@ function formatIssue( issue ) {
 	} );
 }
 
+/**
+ * Why a group's own left or right padding is placing its content, or an empty
+ * string when it is not. Content gets its width from the layout's two sizes,
+ * Regular and Wide, and its distance from the window's edges from the theme's
+ * root padding, so side padding on a full-width group, or on one with nothing
+ * painted behind it, is a pattern doing the theme's job. Padding inside a
+ * painted plate or card keeps text off its own edges and is left alone, and so
+ * is a block style variation, which may paint one. Keep in step with
+ * Pattern_Builder_Composition_Checks::side_padding().
+ *
+ * @param {Object} block A parsed block.
+ * @return {string} The reason, or ''.
+ */
+function sidePadding( block ) {
+	const attributes = block.attributes || {};
+	const padding = attributes.style?.spacing?.padding;
+	if (
+		block.name !== 'core/group' ||
+		! padding ||
+		typeof padding !== 'object'
+	) {
+		return '';
+	}
+
+	const sides = [ 'left', 'right' ].filter(
+		( side ) =>
+			padding[ side ] !== undefined &&
+			! /^0(px|r?em|%)?$/.test( String( padding[ side ] ).trim() )
+	);
+	if ( ! sides.length ) {
+		return '';
+	}
+
+	const set = `sets ${ sides.join( ' and ' ) } padding`;
+	if ( attributes.align === 'full' ) {
+		return `a full-width group ${ set }`;
+	}
+
+	const painted =
+		attributes.backgroundColor ||
+		attributes.gradient ||
+		attributes.borderColor ||
+		attributes.style?.color?.background ||
+		attributes.style?.color?.gradient ||
+		attributes.style?.background?.backgroundImage ||
+		attributes.style?.border ||
+		/(^|\s)is-style-/.test( attributes.className || '' );
+
+	return painted ? '' : `a group with nothing painted behind it ${ set }`;
+}
+
 function readInput( file ) {
 	if ( file === '-' ) {
 		return fs.readFileSync( 0, 'utf8' );
@@ -554,6 +605,7 @@ async function main() {
 	let problems = 0;
 	let oldForm = 0;
 	let lost = 0;
+	let padded = 0;
 
 	for ( const file of files ) {
 		const label =
@@ -591,6 +643,18 @@ async function main() {
 			if ( block.name === null ) {
 				continue;
 			}
+
+			const padding = sidePadding( block );
+			if ( padding ) {
+				const name = block.attributes?.metadata?.name;
+				console.log(
+					`${ label }: SIDE PADDING ${ block.name }${
+						name ? ` "${ name }"` : ''
+					} — ${ padding } to place its content. Use Wide or Regular instead.`
+				);
+				padded++;
+			}
+
 			if ( block.originalContent === undefined ) {
 				continue;
 			}
@@ -640,7 +704,7 @@ async function main() {
 		}
 	}
 
-	if ( problems === 0 && oldForm === 0 && lost === 0 ) {
+	if ( problems === 0 && oldForm === 0 && lost === 0 && padded === 0 ) {
 		console.log(
 			`All blocks valid and current across ${ files.length } file(s).`
 		);
@@ -665,7 +729,15 @@ async function main() {
 		);
 	}
 
-	process.exit( problems || lost || ( oldForm && ! allowOldForm ) ? 1 : 0 );
+	if ( padded ) {
+		console.log(
+			`\n${ padded } group(s) pad their own sides. Content gets its width from the layout's two sizes — Regular (no "align": the content size) and Wide ("align":"wide") — and its distance from the window's edges from the theme's root padding, so a pattern that pads its sides doubles that gutter on one theme and fights the next. Drop the left and right padding and make the group, or what is inside it, Wide or Regular. Keep full width for a band whose background has to reach the edges, constrained inside and unpadded at the sides.`
+		);
+	}
+
+	process.exit(
+		problems || lost || padded || ( oldForm && ! allowOldForm ) ? 1 : 0
+	);
 }
 
 main().catch( ( err ) => {

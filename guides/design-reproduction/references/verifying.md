@@ -85,7 +85,9 @@ a claim somebody can check; "it matches" is not.
 ## Things worth checking
 
 - **Every band's width.** The most common single error, because the site's
-  measure and a block's own override are two different numbers.
+  measure and a block's own override are two different numbers. A band whose
+  text sits in from the window's edges gets that from Wide or Regular and the
+  root padding, never from padding on its sides.
 - **Alignment, on the elements that are not the widest.** Check the short
   paragraph and the button row against the headline, not the headline against
   the margin — a near-full-width line looks the same centred or left-aligned,
