@@ -34,6 +34,9 @@ class Pattern_Builder_Abilities {
 		'pattern-builder/add-placeholder-image'     => array( 'assets' ),
 		'pattern-builder/add-font'                  => array( 'assets' ),
 		'pattern-builder/render-pattern'            => array( 'verifying' ),
+		'pattern-builder/create-template'           => array( 'templates', 'block-markup' ),
+		'pattern-builder/update-template'           => array( 'templates', 'block-markup' ),
+		'pattern-builder/delete-template'           => array( 'templates' ),
 	);
 
 	/**
@@ -1289,6 +1292,7 @@ class Pattern_Builder_Abilities {
 			'design-content-split' => __( 'Writing a synced pattern with slots, or the page that fills them.', 'pattern-builder' ),
 			'changing-patterns'    => __( 'The site already has patterns, or you are changing one that pages use.', 'pattern-builder' ),
 			'assets'               => __( 'The pattern needs an image or a typeface.', 'pattern-builder' ),
+			'templates'            => __( 'Writing the theme\'s templates or template parts, or deciding what goes in them when building a whole site.', 'pattern-builder' ),
 			'keeping-current'      => __( 'Bringing these guides to a new WordPress release, or checking an installed copy against the site.', 'pattern-builder' ),
 			'abilities'            => __( 'Reaching the site over HTTP rather than through tools already loaded.', 'pattern-builder' ),
 			'reproduction'         => __( 'The design already exists somewhere else: a site, a Figma file, a screenshot, a PDF.', 'pattern-builder' ),
@@ -1313,6 +1317,7 @@ class Pattern_Builder_Abilities {
 			'design-content-split' => 'pattern-author/references/design-content-split.md',
 			'changing-patterns'    => 'pattern-author/references/changing-patterns.md',
 			'assets'               => 'pattern-author/references/assets.md',
+			'templates'            => 'pattern-author/references/templates.md',
 			'keeping-current'      => 'pattern-author/references/keeping-current.md',
 			'abilities'            => 'pattern-author/references/abilities.md',
 			'reproduction'         => 'design-reproduction/SKILL.md',

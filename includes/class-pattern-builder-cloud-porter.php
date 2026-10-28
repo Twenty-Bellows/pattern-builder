@@ -58,6 +58,14 @@ class Pattern_Builder_Cloud_Porter {
 			);
 		}
 
+		$content = Pattern_File_Store::replace_home_links(
+			$content,
+			home_url(),
+			static function ( $path ) {
+				return 'pbp-home:' . $path;
+			}
+		);
+
 		$content    = $this->strip_attachment_identity( $content );
 		$variations = Pattern_Builder_Block_Style_Variations::carried_by( $content );
 		if ( is_wp_error( $variations ) ) {
@@ -368,6 +376,23 @@ class Pattern_Builder_Cloud_Porter {
 
 		if ( false !== strpos( $content, 'pbp-asset:' ) ) {
 			return new WP_Error( 'pb_cloud_missing_asset', __( 'The downloaded pattern references an asset that was not delivered.', 'pattern-builder' ), array( 'status' => 502 ) );
+		}
+
+		// The service can hand a block's attributes back with their slashes escaped, as the
+		// asset placeholders above allow for, so a home link is read in either spelling.
+		$content = preg_replace_callback(
+			'/pbp-home:(?:\\\\\/|[A-Za-z0-9\/._~%#-])*/',
+			static function ( $matches ) {
+				return str_replace( '\\/', '/', $matches[0] );
+			},
+			$content
+		);
+
+		// A theme pattern gets its home_url() call back from the save, which restores it.
+		$content = Pattern_File_Store::replace_home_links( $content, 'pbp-home:', 'home_url' );
+
+		if ( false !== strpos( $content, 'pbp-home:' ) ) {
+			return new WP_Error( 'pb_cloud_bad_home_link', __( 'The downloaded pattern links to a page of this site in a form Pattern Builder cannot read.', 'pattern-builder' ), array( 'status' => 502 ) );
 		}
 
 		// Never trust the wire, even our own service.

@@ -5,11 +5,13 @@ Guidance for Claude Code and other AI coding agents working in this repository.
 ## What this is
 
 **Pattern Builder** is a WordPress plugin by [Twenty Bellows](https://twentybellows.com)
-for creating, editing and organising block patterns in the admin. It unifies
+for creating, editing and organizing block patterns in the admin. It unifies
 theme patterns (PHP files) and user patterns (`wp_block` posts) in one UI,
 browses the read-only ones a plugin registers beside them — copying one into the
 theme with the patterns it places — and connects to
-[patternbuilderwp.com](https://patternbuilderwp.com) for sharing them.
+[patternbuilderwp.com](https://patternbuilderwp.com) for sharing them. Through
+its abilities, an agent can also read and write the theme's templates and
+template parts.
 
 - **Requires:** WordPress 6.8+, PHP 7.4+ · **License:** GPL-2.0-or-later
 - **Issues:** https://github.com/twenty-bellows/pattern-builder/issues
@@ -23,7 +25,7 @@ is right.
 | Document | Covers |
 |---|---|
 | [`docs/architecture.md`](docs/architecture.md) | The shape of the plugin: the rowless `pb_pattern` entity, the file store, editing surfaces, the browse grid and its tiles, previews and lab themes, the vendored runtime, the webpack bundles, the 1.x migration. |
-| [`docs/abilities.md`](docs/abilities.md) | The agent interface: the 28 abilities, how annotations pick the HTTP method, the markup checks, the validator, the authoring guides, media and fonts. |
+| [`docs/abilities.md`](docs/abilities.md) | The agent interface: the 33 abilities, how annotations pick the HTTP method, the markup checks, templates and template parts, the validator, the authoring guides, media and fonts. |
 | [`docs/cloud.md`](docs/cloud.md) | patternbuilderwp.com: connecting, the proxy, the `pbp/1` porter, what travels with a pattern, `Safe_Css`, accounts and telemetry. |
 | [`docs/collections.md`](docs/collections.md) | Collections as the plugin sees them. |
 | [`docs/dependencies.md`](docs/dependencies.md) | Dependency trees and attribution. |
@@ -119,8 +121,15 @@ The things that bite. Each is expanded in the document beside it.
   namespaced. A pattern registered under a bare name is one no `core/pattern`
   reference can reach, and an unresolved reference renders as nothing rather
   than as an error. ([architecture](docs/architecture.md))
-- **No write puts PHP into a theme pattern file** beyond the calls the plugin
-  generates itself, for localized text and the theme's own images. Markup goes
+- **Every template and template part write goes through
+  `Pattern_Builder_Template_Store`**, into the active theme's own folders, and
+  folds a Site Editor customization of the same slug into the file. A
+  customization renders in place of the file with nothing on disk to say so, so
+  a write that left one behind would look like it never happened.
+  ([architecture](docs/architecture.md#templates-and-template-parts))
+- **No write puts PHP into a theme pattern file** beyond the calls a save writes
+  back itself, for localized text, the theme's own files and links to the site's
+  own pages. Markup goes
   into the file whole, so anything else would make `edit_theme_options` the
   power to run code. The check is on the finished bytes, and no capability
   lifts it. ([architecture](docs/architecture.md))
@@ -154,7 +163,7 @@ Before you open a pull request:
 
 1. **Find what your change touched** in the table above, and read that
    document. Ask whether any sentence in it is now wrong — a renamed class, a
-   moved file, a behaviour that changed, a count that shifted, a mechanism
+   moved file, a behavior that changed, a count that shifted, a mechanism
    replaced by another.
 2. **Update `readme.md`** if you changed what the plugin *is*, what it
    requires, or how it is run. It is deliberately minimal; keep it that way and

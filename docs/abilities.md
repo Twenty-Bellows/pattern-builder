@@ -1,7 +1,9 @@
 # Abilities — the agent interface
 
-Pattern Builder registers **28 abilities** with WordPress core's Abilities API:
-twenty-one in `Pattern_Builder_Abilities` and seven more for the cloud in
+Pattern Builder registers **33 abilities** with WordPress core's Abilities API:
+twenty-one in `Pattern_Builder_Abilities`, five for the theme's templates and
+template parts in `Pattern_Builder_Template_Abilities`
+([below](#templates-and-template-parts)), and seven for the cloud in
 `Pattern_Builder_Cloud_Abilities` (see [`cloud.md`](cloud.md)). Core exposes the
 registry over REST at `wp-abilities/v1`, and `Pattern_Builder_Mcp` serves the
 same abilities as MCP tools through the WordPress MCP Adapter plugin
@@ -20,7 +22,8 @@ controller remains the baseline.
 - `meta.annotations` **select the HTTP method**: `readonly` is GET,
   `destructive` **and** `idempotent` together are DELETE, everything else is
   POST. So `update-pattern` is deliberately not marked destructive — that word
-  means delete-like here, not "changes data".
+  means delete-like here, not "changes data". `delete-template` is the one
+  ability marked both, and core accepts it over DELETE and nothing else.
 - Input arrives under an `input` key, not at the top level: `input[key]=value`
   query args on a GET, `{"input":{…}}` in the body on a POST.
 
@@ -95,6 +98,8 @@ are not called.
 | `list-fonts` | The font collection; naming a `family` describes that one, including whether it has a variable face. |
 | `get-validator` | The validator script itself. |
 | `get-editor-scripts` | The site's own editor script URLs, in load order. |
+| `list-templates` | Every template and template part that resolves here, and where each comes from; listing parts also returns the areas a part can fill. |
+| `get-template` | One template or template part with its markup and a `hash`. |
 
 Two of these need their shape explained.
 
@@ -144,6 +149,7 @@ name this site does not have comes back under `unknown`.
 | `add-block-style-variation` | Registers a named look as a `styles/{slug}.json` partial. |
 | `set-layout` | `settings.layout.contentSize`, `wideSize`, `useRootPaddingAwareAlignments`. |
 | `add-asset`, `add-placeholder-image`, `add-font` | Put a file where a pattern can reach it. |
+| `create-template`, `update-template`, `delete-template` | Write, change and remove the active theme's templates and template parts. |
 
 Every asset answer carries a **`reference`** — the string to put in the markup —
 because the right string is not guessable: a theme pattern is a PHP file whose
@@ -208,8 +214,9 @@ Pattern Overrides slot nothing can fill. Each is named under the error's
 `problems`.
 
 A theme pattern meets one more refusal, in the file store rather than here
-because it applies to every caller: markup carrying PHP beyond the calls the
-plugin generates for localized text and the theme's own images is refused as
+because it applies to every caller: markup carrying PHP beyond the calls a save
+writes back itself, for localized text, the theme's own files and links to the
+site's own pages, is refused as
 `pattern_has_custom_php`, quoting what was found (see
 [`architecture.md`](architecture.md#pattern-files-that-are-programs)). The
 `reference` that `find-media` and `add-asset` hand out is one of those calls, so
@@ -306,6 +313,77 @@ of the stored markup by `Pattern_Builder_Abilities::apply_edits()`.
 Content and edits together are refused, and so is an update with neither. The
 input schema cannot say "one of", so the ability does.
 
+## Templates and template parts
+
+`Pattern_Builder_Template_Abilities` reads and writes the active theme's
+`templates/*.html` and `parts/*.html` (or the older `block-templates/` and
+`block-template-parts/`, where a theme still uses them) through
+`Pattern_Builder_Template_Store`, which [`architecture.md`](architecture.md#templates-and-template-parts)
+describes. Every one takes a `type`, `"template"` or `"template-part"`, and a
+`slug`, the filename without `.html`.
+
+**What a read returns is what renders**, resolved in core's order: a Site Editor
+customization, then the active theme's file, then the parent's, then a template
+a plugin registered. Each says which in `source` (`custom`, `theme` or `plugin`),
+names the theme a file is in and its path there, and says whether a file and a
+customization exist. A theme file's markup is its bytes on disk, not core's
+reading of it, which inserts hooked blocks: those bytes are what an update
+replaces.
+
+**Reading needs `edit_theme_options`, not `edit_posts`** as the pattern reads
+do, because core's own templates endpoint asks for it to read as well as to
+write. A template is the theme's structure rather than content an author
+places.
+
+**A write lands in a file in the active theme, and nowhere else.**
+`create-template` refuses a slug the active theme already has as a file or a
+customization; one that only the parent theme or a plugin provides is allowed,
+and the answer's `replaces` says what the new file now renders in place of.
+`update-template` on a customization folds it into the file and removes the row,
+as the Site Editor's reset removes it, and answers `folded`; on a parent's
+template it writes the active theme's own copy. A template only a plugin
+provides is refused, as a plugin pattern is: nothing is written back to a
+plugin. A title, a part's `area` or a custom template's `postTypes` go into the
+active theme's `theme.json` (`templateParts`, `customTemplates`), the only place
+a file's metadata lives; WordPress's own template types keep the titles WordPress
+gives them. `postTypes` reads as core reads it: a custom template with no entry
+is offered for every post type, one with an entry that names none for pages
+alone, so an empty list sent here goes back to pages.
+
+**Pinning and partial edits work as they do for patterns.** `get-template`
+answers a `hash` over everything that renders and everything an update
+replaces, the theme the file is in included, so a customization saved, folded or
+reset in between changes it. `update-template` and `delete-template` take it as
+`expectedHash` and refuse a stale one with `pb_template_changed`.
+`update-template` takes `edits`, applied by the same `apply_edits()`, and an
+update with metadata but neither `content` nor `edits` rewrites the markup that
+is there.
+
+**The checks are the pattern checks and then the theme file's.**
+`Pattern_Builder_Template_Checks` runs everything `Pattern_Builder_Markup_Checks`
+refuses, then refuses a `core/template-part` with no slug, one that resolves to
+nothing in this theme, one that places the part being stored (directly or
+through other parts), or one whose `theme` names another theme. A `theme`
+naming the active theme is dropped on the way to disk, as core's own export
+drops it. The store refuses any `<?` on the bytes it writes, for every caller,
+as `pb_template_has_php`: a template is read as text and never run. Warnings, never refusals, cover what will not travel with the
+theme: a `core/navigation` or `core/block` pointing at a row by its database ID,
+or a `core/query` that doesn't inherit the request's query and filters by
+`taxQuery`, `author`, `exclude` or `parents` (`template_database_id`), and
+images placed in the template rather than in a pattern, which is the only way
+to reach the theme's own assets from a template (`template_media`). The
+composition warnings carry over.
+
+**`delete-template` removes everything of the active theme's own**: its file,
+any customization, and its `theme.json` entry, and answers `now`, what renders
+for the slug afterwards. It refuses the index template when no parent theme has
+one, since a theme without `templates/index.html` is no longer a block theme; a
+template only the parent or a plugin provides, since the active theme has
+nothing of its own to remove; and a part that templates, other parts, theme or
+user patterns, or posts still place, unless something of the same slug would be
+left to resolve, naming each place under `usedBy`. While something of the slug
+is left, the `theme.json` entry stays with it.
+
 ## Two things deliberately absent
 
 **Nothing takes a prompt.** An `execute_callback` that turned a description
@@ -314,7 +392,7 @@ this plugin is out of. The judgment lives in whatever agent is calling.
 
 **Block validity cannot be offered and is not.** `save()` is JavaScript, so the
 one check most worth having is the one no server can perform. The agent runs it
-before calling `create-pattern`.
+before calling `create-pattern` or `create-template`.
 
 ## The validator
 

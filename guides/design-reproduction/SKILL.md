@@ -42,7 +42,7 @@ table only points; each fact lives where it names.
 | 3. Write down | nothing more | |
 | 4. Install | | whole page or site: `pattern-author`'s `references/design-system.md` |
 | 5. Factor, then build | `pattern-author`'s `SKILL.md` | a whole page or site: `pattern-author`'s `references/composition.md` |
-| 6. Place | `pattern-author`'s step 7 | |
+| 6. Place | `pattern-author`'s step 7 | a whole site: `pattern-author`'s `references/templates.md` |
 | 7. Check | the last section of `references/verifying.md`, *What no comparison can see* | a readable source and a whole rebuild: the rest of `references/verifying.md` |
 | 8. Say what you left | nothing more | |
 
@@ -168,6 +168,13 @@ product grid, a card deck — is a template someone else already wrote.
 A page pattern is not a page; create one whose content is a single reference to
 it (`pattern-author`, step 7).
 
+A whole site has a frame as well as pages. The header and footer every page
+shares become template parts, and each kind of page (the front page, a post, the
+blog) a template that places them around its content, written into the theme
+with `create-template`. `pattern-author`'s `references/templates.md` says what
+goes where; the short version is that a template places parts and patterns and
+carries no design of its own.
+
 Watch for blocks that read the *destination's* state rather than carrying their
 own: `core/site-title` prints this site's name, `core/navigation` with no inner
 blocks fabricates a menu from this site's pages, `core/query` lists this site's
@@ -205,16 +212,15 @@ the method, the properties that most often differ, and what "done" means.
 ### 8. Say what you left *(whole page or site)*
 
 **List what you added** — presets, styles, block style variations, layout
-settings, uploaded images, installed fonts. A reproduction touches far more
-than the patterns, and nobody can review or undo what they were not told about.
+settings, templates and template parts, uploaded images, installed fonts, and
+any Site Editor customization a template update folded into its file. A
+reproduction touches far more than the patterns, and nobody can review or undo
+what they were not told about.
 Anything you created only to look at something, remove; if you could not, say
 what and where.
 
 ## What you cannot reproduce, and should say so
 
-- **Templates and template parts.** Nothing here writes them. A header and
-  footer become patterns referenced by each page — same rendering, not the same
-  block-theme structure.
 - **Anything needing CSS outside a block style variation.** A variation may
   carry a `css` string, which covers most of what theme.json has no property
   for — pseudo-elements, `list-style`, transforms, transitions, hover states —

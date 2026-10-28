@@ -94,7 +94,7 @@ plugin's own `pb_pattern` — and offering them promises fields that do not appl
 viewable post type is listed, because those are the ones a pattern lands in and
 the fields every post has apply to them even when they register no meta, which
 on a stock site `post` and `page` do not; any other post type is listed if the
-filter declared a field for it, a deliberate act honoured whatever the post
+filter declared a field for it, a deliberate act honored whatever the post
 type; failing that, a post type a plugin registered is listed if it has meta
 worth binding to. That last courtesy stops short of core's own internals, or
 `wp_block` would appear on the strength of the sync flag core registers against
@@ -216,8 +216,8 @@ preview document; a local tile is this site's own front-end render
 (`Pattern_Builder_Preview::serve_tile()`, `?pattern_builder_tile={id}&v={key}`
 on the home URL). Both are framed at one design width (1400px) and scaled into
 the tile by a constant the stylesheet computes from the two sizes
-(`src/_pattern-tiles.scss`). The tile document centres its own content, so a
-short pattern is centred and a tall one cropped at the same point in both
+(`src/_pattern-tiles.scss`). The tile document centers its own content, so a
+short pattern is centered and a tall one cropped at the same point in both
 grids, with nothing measuring anything in JavaScript.
 
 Drawing local tiles on the server is what makes them show what the site shows.
@@ -382,6 +382,23 @@ The runtime classes (`Pattern_Block`, `Pattern_Resolver`, `Block_Markup`,
 are vendored from [synced-patterns-for-themes](https://github.com/Twenty-Bellows/synced-patterns-for-themes)
 and must stay logic-identical to it.
 
+**What the editor is sent.** Since 6.6 core flattens every `core/pattern` block
+on the server before the editor sees it, which would turn a synced instance into
+a copy and replace the content it was given with the pattern's placeholder
+copy. `Editor_Support` composes around that. The pattern list is recomposed from
+the registry after core has flattened it, and templates are composed on the
+`get_block_template` filters as they load. The templates controller flattens
+again after every filter has run, so a template or part that places a synced
+pattern is recomposed once more on `rest_request_after_callbacks`, for its
+routes, its revisions and its autosaves. A theme file or a plugin's template is
+recomposed from what the filters left, remembered on its first load in the
+request, because the controller writes the flattened markup back into a
+registered template's shared object and a second load hands that back. A
+template stored as a post is built again from the post with
+`_build_block_template_result_from_post()`, because `get_block_template()`
+returns those without running its filter at all. Everything else is left as core
+prepared it, so an unsynced pattern still reaches the Site Editor as a copy.
+
 Pattern Builder always registers the full stack. When both plugins are
 installed the companion sees `PATTERN_BUILDER_VERSION` at `plugins_loaded` and
 stays entirely unloaded — one check in one place. Deactivate Pattern Builder
@@ -462,19 +479,57 @@ it sits outside the header comment and would be dropped just the same, so the
 conservative answer is the safe one. The cost is about the same as the `include`
 that already happens for every pattern read.
 
-The exceptions are the plugin's own writes, and there are two of them.
-A localized write turns a pattern's text into
-`<?php echo wp_kses_post( 'text', 'domain' ); ?>`, and importing a pattern's
-images turns each one into `Pattern_Builder_Assets::theme_reference()` —
-`<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/images/x.svg' ); ?>`.
-Both round-trip: reading the file runs the call, writing it puts the same call
-back, so a file carrying either is still one the plugin can rebuild.
+The exceptions are calls a save writes back itself, so a file carrying them is
+still one the plugin can rebuild. A localized write turns a pattern's text into
+`<?php echo wp_kses_post( 'text', 'domain' ); ?>`.
 
-`written_call_shapes()` names those two shapes in tokens and `shape_ends_at()`
-matches one exactly, down to the identifier in each position — the escape
-function is one of `LOCALIZED_STRING_FUNCTIONS`, the asset call is `esc_url`
-around `get_stylesheet_directory_uri`. A variable where a literal belongs, a
-different concatenation, or any other function fails. A hand-written
+A file the theme carries is `Pattern_Builder_Assets::theme_reference()`,
+`<?php echo esc_url( get_theme_file_uri( 'assets/images/x.svg' ) ); ?>`. It's
+what importing a pattern's images writes, what `find-media` and `add-asset` hand
+out, and what every theme save writes back through `restore_theme_file_links()`.
+That step runs before the image import and turns each URL of a file in the
+active theme or its parent, in a `src`, an `href` or a block's `url` attribute,
+back into the call, so the theme's own files are never fetched or copied on a
+save. `get_theme_file_uri()` falls back to the parent theme's file, so one call
+covers a child theme and its parent. The one exception is a parent's file that
+the child also has, which becomes `get_parent_theme_file_uri()` so it keeps
+pointing at the copy the pattern showed. Because the save writes these back, the
+other ways a theme reaches its own files are accepted too:
+`get_parent_theme_file_uri()` with a literal path, and
+`get_stylesheet_directory_uri()` or `get_template_directory_uri()` on their own
+or joined to a literal path. Theme authors and other tools write those, and a
+pattern carrying one opens for editing; its first save respells it as
+`get_theme_file_uri()`.
+
+And every theme save runs `restore_home_links()`, which turns each link to a page
+of this site, in an `href` or a block's `url` attribute (a navigation link keeps
+its address there), into `<?php echo esc_url( home_url( '/about/' ) ); ?>`, or
+`home_url()` for the bare home. It leaves a link into WordPress's own
+directories (wherever this site keeps wp-content, wp-admin and wp-includes, and
+WordPress itself when it is installed below the home), a link with a query
+string, and a link to any other site as written: the query string because
+`esc_url()` writes its entities differently, so the call would not give back the
+same link. A link typed in another case, or with `http://` on a site that has
+since moved to HTTPS, is still a link to this site and is restored like any
+other. The home link is the one theme authors write by
+hand, the commonest PHP in a theme's patterns, and without the save turning the
+rendered URL back into the call, opening such a pattern and saving it would
+hard-code this site's address into the theme. The match itself is
+`Pattern_File_Store::replace_home_links()`, which the cloud export and install
+use too, so the links a save restores are the ones that travel as `pbp-home:`
+(see [`cloud.md`](cloud.md)).
+
+All of them round-trip: reading the file runs the call, and writing it puts back
+a call that renders the same URL or text.
+
+`written_call_shapes()` names those shapes in tokens and `shape_ends_at()`
+matches one exactly, down to the identifier in each position. The escape
+function is one of `LOCALIZED_STRING_FUNCTIONS`. A theme file call is `esc_url`
+around `get_theme_file_uri` or `get_parent_theme_file_uri` with one literal
+path, or around `get_stylesheet_directory_uri` or `get_template_directory_uri`
+with a literal joined on or nothing. The link call is `esc_url` around
+`home_url` with one literal path or none. A variable where a literal belongs, a
+different concatenation, a second argument, or any other function fails. A hand-written
 `esc_html_e()` is therefore custom PHP, correctly, and so is the same `esc_url`
 reaching for a directory that is not the theme's: the string would survive the
 round trip but the call around it would not.
@@ -482,8 +537,8 @@ round trip but the call around it would not.
 Getting this list wrong is not a quiet failure. A pattern the plugin wrote
 itself, read back and misjudged, becomes a pattern the plugin refuses to save,
 and since the same shapes check every write (below), a writer whose output
-drifts from them has its writes refused at once — so the shapes here and the
-strings the two writers produce have to be changed together.
+drifts from them has its writes refused at once. So the shapes here and the
+strings the writers produce have to be changed together, and
 `test_the_plugins_own_php_still_writes()` holds them to each other.
 
 **A write is followed by a read, so the file has to be forgotten first.** A save
@@ -532,6 +587,63 @@ No capability lifts it: on a single site every administrator holds
 `edit_themes`, so an exception there would reopen the hole for any agent working
 as one. A pattern that needs a value computed at render belongs in a block or a
 binding, or in a new shape added to `written_call_shapes()` in code.
+
+## Templates and template parts
+
+Templates and template parts are files too, and the same rule holds for them:
+the theme's file is what Pattern Builder writes, and nothing it writes lands
+anywhere else. They are reached only through the abilities
+([`abilities.md`](abilities.md#templates-and-template-parts)); there is no
+editing surface for them here, because the Site Editor already is one.
+
+`Pattern_Builder_Template_Store` is the one door, the way
+`update_theme_pattern()` is for patterns. It writes only into the active theme's
+template folders (`get_block_theme_folders()`, so a theme still on
+`block-templates/` keeps them), refuses a slug that is not a flat lowercase
+filename, and refuses `<?` on the bytes about to be written: a template file is
+read as text and never run.
+
+**Core keeps a second copy of a template, and the store has to decide what to do
+with it.** A Site Editor save is a `wp_template` or `wp_template_part` row filed
+under the theme, and it renders in place of the file with nothing on disk to
+say so. So the store reads in core's order (customization, then the active
+theme's file, then the parent's, then a template a plugin registered) and a
+write that lands in the file removes a customization of the same slug, as the
+Site Editor's own reset does. The caller read the customization and edited it,
+which the update's `expectedHash` proves, so the row goes and its content is
+the file. Its title, and a part's area, go into `theme.json` unless the caller
+set them, since a part made in the Site Editor keeps its area nowhere else; they
+are recorded before the row goes, and the row stays, with a warning, when they
+could not be. A theme with no `theme.json` is given one for them. Only the row's
+revision history is lost. A slug the template hierarchy reaches on its own, one
+of WordPress's own types or one narrowed to a post type, a term or a page
+(`single-product`, `page-about`), is never recorded as a custom template: it
+keeps the title WordPress gives it. A part's entry always names an area, since
+core reports an entry without one as unsupported on every listing.
+
+**The store reads for itself rather than through core**, for two reasons that
+look alike. Core lists a theme's template files once per process
+(`_get_block_templates_paths()` keeps a static list per folder) that nothing a
+plugin can call clears, so a template written during a request would not show to
+a read later in the same request. Core's `theme.json` reader is cleared by
+`wp_clean_theme_json_cache()`, which the plugin's own writes call, but it hands
+back the merged whole rather than each theme's own list, and the store needs the
+parent's and the child's apart to lay one over the other (below). And core's
+reader inserts hooked blocks into a file's markup, which a write would then
+store. So the store scans the folders and reads `theme.json` itself, child over
+parent, and returns a file's bytes as they are.
+
+A template's title and post types, and a part's title and area, live only in
+`theme.json` (`customTemplates`, `templateParts`), so that is where the store
+records them, rewriting the file only when an entry changes. Core lays a child
+theme's list over its parent's by position (`WP_Theme_JSON::merge()` is an
+`array_replace_recursive()`), so an entry appended to a child's shorter list
+would land on one of the parent's. The store reads the lists that way and
+writes the whole effective list into the active theme's file, which reads back
+as itself. Deleting removes
+the active theme's file, any customization and, when nothing of the slug is left
+to render, that entry. It refuses the last `index.html`, without which WordPress
+stops treating the theme as a block theme. A template a plugin registered is read-only, as a plugin pattern is.
 
 ## Previews
 
@@ -582,7 +694,7 @@ Two block themes ship with the plugin and nothing registers or activates them:
 - **`blank-theme`** — no presets, no styles, templates that constrain nothing,
   so a pattern rendered against it shows what the pattern itself does. It needs
   a `functions.php` because `theme.json` cannot make a theme blank on its own:
-  `settings.color.defaultPalette: false` hides core's colours from the picker
+  `settings.color.defaultPalette: false` hides core's colors from the picker
   but does not stop `--wp--preset--color--vivid-red` being emitted, so core's
   presets are emptied through `wp_theme_json_data_default` instead.
 - **`opinionated-theme`** — the worked example of `references/design-system.md`,
@@ -622,6 +734,8 @@ map*, then deletes the rows and the old capabilities.
 | `Pattern_Builder_Block_Style_Variations` | The theme's `styles/*.json` partials. |
 | `Safe_Css` | The safe subset of literal CSS a variation may carry. See [`cloud.md`](cloud.md). |
 | `Pattern_Builder_Markup_Checks` | The failures PHP can see and every one of them silent at render. |
+| `Pattern_Builder_Template_Store` | The theme's templates and template parts: resolved as core resolves them, written only into the active theme. See [below](#templates-and-template-parts). |
+| `Pattern_Builder_Template_Checks` | The markup checks, plus what a theme file may not carry and what will not travel with it. |
 | `Pattern_Builder_Usage` | Where a pattern is used: the patterns, templates, template parts and posts that place it, directly or through another pattern. See [`abilities.md`](abilities.md). |
 | `Pattern_Builder_Migration` | The one-time 1.x upgrade. |
 | `Pattern_Builder_Security` / `Pattern_Builder_Localization` | Path-validated filesystem helpers; pattern localization. |

@@ -38,7 +38,8 @@ ones reference.
   them, then the *page* referencing those. Bottom-up, because a section cannot
   be written until its elements exist by name.
 - **A site:** settle the design system as **layout → tokens → styles → block
-  style variations**, then the patterns bottom-up, then the pages.
+  style variations**, then the patterns bottom-up, then the template parts and
+  templates that place them, then the pages.
 
 Layout first because every band's markup has to agree with it; tokens before
 styles because a style referencing an unresolvable slug renders as nothing.
@@ -59,7 +60,7 @@ else. Each fact lives in one of them; this table only points.
 | 4. Factor | `references/composition.md` for anything bigger than one section | |
 | 5. Generate | nothing more | `references/block-markup.md` if you cannot run Node; `references/assets.md` if the pattern needs an image or a typeface |
 | 6. Validate | `references/design-content-split.md` if the pattern has slots or fills them | |
-| 7. Place | nothing more | `references/pattern-kinds.md` for the headers, and how to write a description and keywords someone can find it by |
+| 7. Place | nothing more | `references/pattern-kinds.md` for the headers, and how to write a description and keywords someone can find it by; `references/templates.md` if it belongs in a template or template part, or you are building a whole site |
 
 `references/keeping-current.md` is for maintaining these guides, not for
 writing a pattern.
@@ -403,6 +404,23 @@ how to write a `Description` and `Keywords` someone can find the pattern by.
 theme's through `register_block_pattern_category()`; an unregistered slug files
 the pattern under Uncategorized, where nobody looks.
 
+**A link to a page of the site is `home_url()`, never the site's address.** In
+a theme pattern write `href="<?php echo esc_url( home_url( '/about/' ) ); ?>"`,
+or `home_url()` alone for the home page, so the link follows the theme to any
+site. A navigation link takes the same call in its `url` attribute. A theme
+save turns a link written as this site's address into the call itself.
+
+**A file the theme carries is `get_theme_file_uri()`, never its URL:**
+`<?php echo esc_url( get_theme_file_uri( 'assets/images/logo.svg' ) ); ?>`.
+That's the `reference` `find-media` and `add-asset` hand back. It finds the file
+in a child theme or its parent, and a theme save turns a URL into the theme back
+into this call. `get_template_directory_uri()` and
+`get_stylesheet_directory_uri()` with a literal path are accepted as well, and
+the next save respells them. Those calls, localized text and the home link are
+the only PHP a theme pattern may carry. Anything else, including a path built
+from a variable or a call without `esc_url()`, is refused by `create-pattern`
+and opens read-only in the editor.
+
 Write the file directly when you have filesystem access. Against a running
 site, `pattern-builder/create-pattern` stores finished markup — it refuses what
 PHP can see (attribute JSON that does not parse, a heading contradicting its
@@ -496,6 +514,7 @@ pattern that references it.
 - `references/design-content-split.md` — Pattern Overrides slots and their silent failures
 - `references/changing-patterns.md`: reusing, extending or copying a pattern that already exists, and what a change to one costs
 - `references/assets.md` — images and fonts
+- `references/templates.md`: the theme's templates and template parts, what goes in them, and how a write treats a Site Editor customization
 - `references/abilities.md` — asking a running site for what it has
 - `references/keeping-current.md` — bringing these guides to a new WordPress release
 - The `design-reproduction` skill — rebuilding a design that already exists

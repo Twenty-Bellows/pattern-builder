@@ -171,7 +171,7 @@ class Test_Assets extends WP_UnitTestCase {
 		$this->assertSame( 'mark.svg', $stored['filename'] );
 		$this->assertFileExists( $this->theme_dir . '/assets/images/mark.svg' );
 		$this->assertSame(
-			"<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/images/mark.svg' ); ?>",
+			"<?php echo esc_url( get_theme_file_uri( 'assets/images/mark.svg' ) ); ?>",
 			$stored['reference']
 		);
 	}
@@ -381,7 +381,7 @@ class Test_Assets extends WP_UnitTestCase {
 		$this->assertCount( 1, $found['theme'] );
 		$this->assertSame( 'logo.svg', $found['theme'][0]['filename'] );
 		$this->assertSame( 'assets/images/logo.svg', $found['theme'][0]['path'] );
-		$this->assertStringContainsString( 'get_stylesheet_directory_uri', $found['theme'][0]['reference'] );
+		$this->assertStringContainsString( 'get_theme_file_uri', $found['theme'][0]['reference'] );
 	}
 
 	/**

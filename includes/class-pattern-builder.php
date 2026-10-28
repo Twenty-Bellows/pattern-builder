@@ -21,11 +21,13 @@ require_once __DIR__ . '/class-pattern-builder-editor.php';
 require_once __DIR__ . '/class-pattern-builder-migration.php';
 require_once __DIR__ . '/class-pattern-builder-cloud.php';
 require_once __DIR__ . '/class-pattern-builder-theme-json.php';
+require_once __DIR__ . '/class-pattern-builder-template-store.php';
 require_once __DIR__ . '/class-safe-css.php';
 require_once __DIR__ . '/class-pattern-builder-theme-styles.php';
 require_once __DIR__ . '/class-pattern-builder-block-style-variations.php';
 require_once __DIR__ . '/class-pattern-builder-markup-checks.php';
 require_once __DIR__ . '/class-pattern-builder-composition-checks.php';
+require_once __DIR__ . '/class-pattern-builder-template-checks.php';
 require_once __DIR__ . '/class-pattern-builder-cloud-tokens.php';
 require_once __DIR__ . '/class-pattern-builder-cloud-porter.php';
 require_once __DIR__ . '/class-pattern-builder-cloud-controller.php';
@@ -36,6 +38,7 @@ require_once __DIR__ . '/class-pattern-builder-fonts.php';
 require_once __DIR__ . '/class-pattern-builder-telemetry.php';
 require_once __DIR__ . '/class-pattern-builder-usage.php';
 require_once __DIR__ . '/class-pattern-builder-abilities.php';
+require_once __DIR__ . '/class-pattern-builder-template-abilities.php';
 require_once __DIR__ . '/class-pattern-builder-mcp.php';
 
 /**
@@ -70,6 +73,7 @@ class Pattern_Builder {
 		new Pattern_Builder_Telemetry();
 		new Pattern_Builder_Abilities();
 		new Pattern_Builder_Cloud_Abilities();
+		new Pattern_Builder_Template_Abilities();
 		new Pattern_Builder_Mcp();
 	}
 

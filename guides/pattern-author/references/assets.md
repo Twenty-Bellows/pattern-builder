@@ -32,7 +32,7 @@ same string in both cases, and the difference matters:
 | Where the file is | `reference` looks like |
 | --- | --- |
 | Media library | `https://example.com/wp-content/uploads/2026/09/hero.webp` |
-| Theme assets | `<?php echo get_stylesheet_directory_uri() . '/assets/images/hero.webp'; ?>` |
+| Theme assets | `<?php echo esc_url( get_theme_file_uri( 'assets/images/hero.webp' ) ); ?>` |
 
 A theme pattern is a PHP file, so its own assets are composed at render — a
 hard-coded URL breaks the moment the theme is installed anywhere else. That is
