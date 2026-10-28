@@ -106,7 +106,8 @@ Top-level fields give `input is not of type object`.
 
 **The annotations pick the HTTP method.** A read-only ability is refused over
 anything but GET; a write wants POST. `Read-only abilities require GET method`
-means exactly that, not that anything is misconfigured.
+means exactly that, not that anything is misconfigured. `delete-template` is
+the one that wants DELETE, with its input as query arguments, as on a GET.
 
 Discover what a site offers with `GET /wp-abilities/v1/abilities` — the list is
 filtered to what the authenticated user may run, and each entry carries its
@@ -136,6 +137,11 @@ input and output schema.
 | `pattern-builder/add-placeholder-image` | POST | draw a plain placeholder into the theme: `width`, `height`, optional `label` |
 | `pattern-builder/list-fonts` | GET | font families installable from the collection WordPress ships. Optional `input[search]`, `input[category]`; `input[family]` names one and answers with its weights, styles and whether it has a variable face |
 | `pattern-builder/add-font` | POST | install a family and register its preset: `family`, optional `weights`, `styles`, `destination` (`theme` default, or `user`) |
+| `pattern-builder/list-templates` | GET | the theme's templates and template parts as they resolve here, without markup: each with `source` (`theme` for a file, `custom` for a Site Editor customization, which renders in place of the file, `plugin` for one a plugin registered), the `theme` and `path` of its file, its `title`, and a part's `area` or a custom template's `postTypes`. Optional `input[type]=template\|template-part`; listing parts also returns the `areas` a part can fill. Needs `edit_theme_options`, as every template ability does |
+| `pattern-builder/get-template` | GET | one template or part with its markup and a `hash`. `input[type]` and `input[slug]`, the filename without `.html` |
+| `pattern-builder/create-template` | POST | write a new template (`templates/{slug}.html`) or part (`parts/{slug}.html`) into the active theme: `type`, `slug`, `content`, and optionally `title`, a part's `area`, a custom template's `postTypes`. Refused when the active theme already has the slug; one only the parent or a plugin provides is replaced, and `replaces` says which. Refuses what create-pattern refuses, PHP, and a `core/template-part` that resolves to nothing; `warnings` names database IDs (a menu, a synced pattern, a query filter) and images that will not travel with the theme. See `templates.md` |
+| `pattern-builder/update-template` | POST | replace a template's markup with `content` or `edits`, and its metadata when given; `expectedHash` as for update-pattern. A Site Editor customization is folded into the file and removed (`folded`), and a parent's template becomes the active theme's own copy. A plugin's is refused |
+| `pattern-builder/delete-template` | DELETE | remove the active theme's file, any customization and its `theme.json` entry: `input[type]`, `input[slug]`, optional `input[expectedHash]`. Answers with what renders now. Refuses the last `index`, a template only the parent or a plugin provides, and a part still placed somewhere, naming each place in `usedBy` |
 
 ### The one route that is not an ability
 
@@ -288,14 +294,18 @@ because a string that closes its own selector writes rules for the whole
 document — and a `css` at the root or on an element is scoped to nothing a
 pattern brought with it.
 
-**`add-block-style-variation` does**, at the top of its `styles` and nowhere
-deeper, because there the selector is a class the pattern's own markup carries.
-It is the only way to write a pseudo-element, a descendant rule or a hover
-state into a variation, and it travels with the pattern. What goes in is a
-sequence of declarations and then nested rules anchored on `&`:
+**`add-block-style-variation` does**, at the top of its `styles` and in each
+entry of its `blocks`, nowhere else, because there the selector is a class the
+pattern's own markup carries. It is the only way to write a pseudo-element, a
+hover state or a rule for markup the block renders itself (an image's `img`)
+into a variation, and it travels with the pattern. Each `css` styles one block:
+the top one the block the variation is applied to, a `blocks` entry's that kind
+of block inside it, with `&` standing for that block. Neither reaches into
+another block. What goes in is a sequence of declarations and then nested rules
+anchored on `&`:
 
 ```json
-{"styles": {"css": "position: relative; & > * { z-index: 1; } &::before { content: \"\"; inset: 0; }"}}
+{"styles": {"css": "position: relative; isolation: isolate; &::before { content: \"\"; position: absolute; inset: 0; z-index: -1; }", "blocks": {"core/heading": {"css": "rotate: -2deg;"}}}}
 ```
 
 A safe-subset check decides what is accepted, and it refuses rather than

@@ -1100,7 +1100,7 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'guides', $index );
 		$names = wp_list_pluck( $index['guides'], 'name' );
 
-		foreach ( array( 'authoring', 'pattern-kinds', 'block-vocabulary', 'block-markup', 'composition', 'design-content-split', 'assets', 'keeping-current', 'abilities', 'reproduction', 'reading-a-source', 'verifying' ) as $expected ) {
+		foreach ( array( 'authoring', 'pattern-kinds', 'block-vocabulary', 'block-markup', 'composition', 'design-content-split', 'assets', 'templates', 'keeping-current', 'abilities', 'reproduction', 'reading-a-source', 'verifying' ) as $expected ) {
 			$this->assertContains( $expected, $names, $expected . ' is missing from the index.' );
 		}
 
@@ -1168,7 +1168,7 @@ class Test_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Two of the documents are whole skills and the other twelve are their references,
+	 * Two of the documents are whole skills and the other thirteen are their references,
 	 * which a flat index gives no sign of.
 	 */
 	public function test_the_index_says_where_to_start() {
@@ -1272,9 +1272,9 @@ class Test_Abilities extends WP_UnitTestCase {
 		}
 
 		$this->assertSame(
-			13,
+			14,
 			$skills['pattern-author']['files'],
-			"The pattern-author skill's two scripts travel with its eleven documents."
+			"The pattern-author skill's two scripts travel with its twelve documents."
 		);
 		$this->assertSame( 3, $skills['design-reproduction']['files'] );
 	}
@@ -1361,7 +1361,7 @@ class Test_Abilities extends WP_UnitTestCase {
 		$this->assertSame( 'SKILL.md', $skill['entry'] );
 		$this->assertNotEmpty( $skill['description'] );
 		$this->assertNotEmpty( $skill['version'] );
-		$this->assertCount( 13, $skill['files'] );
+		$this->assertCount( 14, $skill['files'] );
 
 		$paths = wp_list_pluck( $skill['files'], 'path' );
 		$this->assertSame( 'SKILL.md', $paths[0], 'The entry is not the first thing an installer writes.' );
@@ -2451,7 +2451,7 @@ class Test_Abilities extends WP_UnitTestCase {
 
 		$this->assertNotWPError( $result );
 		$this->assertSame( 'dot.svg', $result['filename'] );
-		$this->assertStringContainsString( 'get_stylesheet_directory_uri', $result['reference'] );
+		$this->assertStringContainsString( 'get_theme_file_uri', $result['reference'] );
 	}
 
 	/**
@@ -2471,7 +2471,7 @@ class Test_Abilities extends WP_UnitTestCase {
 
 		$this->assertNotWPError( $result );
 		$this->assertSame( 'placeholder-1400x700.svg', $result['filename'] );
-		$this->assertStringContainsString( 'get_stylesheet_directory_uri', $result['reference'] );
+		$this->assertStringContainsString( 'get_theme_file_uri', $result['reference'] );
 	}
 
 	/**

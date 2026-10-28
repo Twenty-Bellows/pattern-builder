@@ -194,10 +194,13 @@ grow. Menu items, products, team members, projects, events, articles. Then the
 words do not belong in a pattern, where only someone editing patterns can
 change them. They belong in posts, or a post type of their own, and the section
 is a Query Loop over them, or the block a commerce or events plugin ships for
-its own records. What gets factored is the card's design, the post template
-inside the query. Slots fill from a reference's `content`, not from a post, so
-the card's look travels best as a block style variation that the query's card
-and any element pattern both apply.
+its own records. What gets factored is the card, the post template inside the
+query, built from blocks that read the post: the post blocks, and bindings to
+the post's fields. When more than one list shows it, the card is a synced
+pattern each post template places; `templates.md` says what one can't hold
+inside a loop. A slot fills from the reference, not from the post, so a card
+and an element pattern used as section content can't be the same pattern. When
+they should look alike, give them a block style variation both apply.
 
 It is **section content** when it is a small, fixed set written as part of the
 section: features, steps, pricing tiers, stats, a logo strip. Then it is

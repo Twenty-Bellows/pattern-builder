@@ -118,8 +118,8 @@ value stops following the design system in the editor's eyes.
 
 ## How the validator reports a mismatch
 
-`scripts/validate-pattern.mjs` runs the real `save()` and reports three things.
-Only the first is the one people expect.
+`scripts/validate-pattern.mjs` runs the real `save()` and reports these. Only
+the first is the one people expect.
 
 **INVALID** — no version of this block ever wrote markup like this. The editor
 says "unexpected or invalid content" the moment it opens the pattern. A heading
@@ -138,6 +138,12 @@ so the styling silently does not apply on the front end.
 paragraph with `{"fontSize":"large"}` whose tag carries no
 `has-large-font-size` comes back with no `fontSize` at all, perfectly
 self-consistent, with nothing reporting it.
+
+It also notes a **STYLING HOOK**, without failing the run: a `className` that
+isn't a block style variation's `is-style-…` class. The markup is valid, but
+nothing in WordPress styles that class, so the look it stands for is either
+missing or sitting in a stylesheet nobody editing the page can see.
+`design-system.md`, *Where a look goes*, says where it belongs instead.
 
 Two things it stays deliberately quiet about, because the markup is fine and
 only the check would be wrong:

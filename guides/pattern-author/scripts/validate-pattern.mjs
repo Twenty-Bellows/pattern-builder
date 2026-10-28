@@ -166,6 +166,29 @@ function quietly( fn ) {
 }
 
 /**
+ * Classes core's own stylesheets style, so one in a `className` isn't a hook.
+ */
+const CORE_STYLED_CLASSES = [ 'screen-reader-text' ];
+
+/**
+ * The classes in a block's `className` that aren't a block style variation's,
+ * which nothing in WordPress styles unless a stylesheet of the theme's does.
+ *
+ * @param {Object} block A parsed block.
+ * @return {string[]} The classes.
+ */
+function stylingHooks( block ) {
+	return String( block.attributes?.className ?? '' )
+		.split( /\s+/ )
+		.filter(
+			( name ) =>
+				name &&
+				! name.startsWith( 'is-style-' ) &&
+				! CORE_STYLED_CLASSES.includes( name )
+		);
+}
+
+/**
  * Every block in the tree, inner blocks included.
  *
  * @param {Array} blocks
@@ -606,6 +629,7 @@ async function main() {
 	let oldForm = 0;
 	let lost = 0;
 	let padded = 0;
+	let hooked = 0;
 
 	for ( const file of files ) {
 		const label =
@@ -655,6 +679,19 @@ async function main() {
 				padded++;
 			}
 
+			const hooks = stylingHooks( block );
+			if ( hooks.length ) {
+				console.log(
+					`${ label }: STYLING HOOK ${ block.name }: ${ hooks
+						.map( ( name ) => `"${ name }"` )
+						.join( ', ' ) } ${
+						hooks.length === 1
+							? "isn't a block style variation's class"
+							: "aren't block style variations' classes"
+					}.`
+				);
+				hooked++;
+			}
 			if ( block.originalContent === undefined ) {
 				continue;
 			}
@@ -708,7 +745,6 @@ async function main() {
 		console.log(
 			`All blocks valid and current across ${ files.length } file(s).`
 		);
-		process.exit( 0 );
 	}
 
 	if ( problems ) {
@@ -732,6 +768,12 @@ async function main() {
 	if ( padded ) {
 		console.log(
 			`\n${ padded } group(s) pad their own sides. Content gets its width from the layout's two sizes — Regular (no "align": the content size) and Wide ("align":"wide") — and its distance from the window's edges from the theme's root padding, so a pattern that pads its sides doubles that gutter on one theme and fights the next. Drop the left and right padding and make the group, or what is inside it, Wide or Regular. Keep full width for a band whose background has to reach the edges, constrained inside and unpadded at the sides.`
+		);
+	}
+
+	if ( hooked ) {
+		console.log(
+			`\n${ hooked } block(s) carry a class that isn't a block style variation's. Nothing in WordPress styles a class like that, so it's either doing nothing or hanging a look on a stylesheet that nobody editing the page can see and that stays behind wherever the pattern goes. If it names a look, make it a block style variation and apply is-style-{slug}; if it's a size, a color or spacing, put it in the block's settings. "Where a look goes" in references/design-system.md has the order. This doesn't fail the run.`
 		);
 	}
 

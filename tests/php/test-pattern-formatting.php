@@ -208,7 +208,7 @@ class Test_Pattern_Formatting extends WP_UnitTestCase {
 		$reference = Pattern_Builder_Assets::theme_reference( '/assets/images/mark.svg' );
 
 		$this->assertSame(
-			"<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/images/mark.svg' ); ?>",
+			"<?php echo esc_url( get_theme_file_uri( 'assets/images/mark.svg' ) ); ?>",
 			$reference
 		);
 	}
@@ -227,7 +227,7 @@ class Test_Pattern_Formatting extends WP_UnitTestCase {
 
 		$this->assertStringContainsString( 'esc_url(', $contents );
 		$this->assertStringNotContainsString(
-			'<?php echo get_stylesheet_directory_uri()',
+			'<?php echo get_theme_file_uri(',
 			$contents
 		);
 	}

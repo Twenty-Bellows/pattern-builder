@@ -34,6 +34,9 @@ class Pattern_Builder_Abilities {
 		'pattern-builder/add-placeholder-image'     => array( 'assets' ),
 		'pattern-builder/add-font'                  => array( 'assets' ),
 		'pattern-builder/render-pattern'            => array( 'verifying' ),
+		'pattern-builder/create-template'           => array( 'templates', 'block-markup' ),
+		'pattern-builder/update-template'           => array( 'templates', 'block-markup' ),
+		'pattern-builder/delete-template'           => array( 'templates' ),
 	);
 
 	/**
@@ -1289,6 +1292,7 @@ class Pattern_Builder_Abilities {
 			'design-content-split' => __( 'Writing a synced pattern with slots, or the page that fills them.', 'pattern-builder' ),
 			'changing-patterns'    => __( 'The site already has patterns, or you are changing one that pages use.', 'pattern-builder' ),
 			'assets'               => __( 'The pattern needs an image or a typeface.', 'pattern-builder' ),
+			'templates'            => __( 'Writing the theme\'s templates or template parts, or deciding what goes in them when building a whole site.', 'pattern-builder' ),
 			'keeping-current'      => __( 'Bringing these guides to a new WordPress release, or checking an installed copy against the site.', 'pattern-builder' ),
 			'abilities'            => __( 'Reaching the site over HTTP rather than through tools already loaded.', 'pattern-builder' ),
 			'reproduction'         => __( 'The design already exists somewhere else: a site, a Figma file, a screenshot, a PDF.', 'pattern-builder' ),
@@ -1313,6 +1317,7 @@ class Pattern_Builder_Abilities {
 			'design-content-split' => 'pattern-author/references/design-content-split.md',
 			'changing-patterns'    => 'pattern-author/references/changing-patterns.md',
 			'assets'               => 'pattern-author/references/assets.md',
+			'templates'            => 'pattern-author/references/templates.md',
 			'keeping-current'      => 'pattern-author/references/keeping-current.md',
 			'abilities'            => 'pattern-author/references/abilities.md',
 			'reproduction'         => 'design-reproduction/SKILL.md',
@@ -3687,7 +3692,7 @@ class Pattern_Builder_Abilities {
 			'pattern-builder/add-block-style-variation',
 			array(
 				'label'               => __( 'Add a block style variation', 'pattern-builder' ),
-				'description'         => __( 'Registers a named block style — a second kind of button, a card treatment, an inset quote — that a pattern applies by putting the returned class on a block. Use this instead of setting the same attributes on every block: the styling lives in one place, the editor offers it by name, and it applies only where the class is, so it changes nothing else on the site. Writes a theme.json partial into the active theme\'s styles directory, which is what registers a variation without PHP. Call get-design-system first: its blockStyles lists what is already here, and reusing one of WordPress\'s own (is-style-outline and the like) beats defining a new one. This is the one writer that accepts literal CSS, in styles.css and nowhere deeper, because a variation\'s selector is a class the pattern\'s own markup carries: a sequence of declarations and then nested rules anchored on "&", as in: position: relative; & > * { z-index: 1; } &::before { content: ""; inset: 0; } — which is what expresses a pseudo-element, a descendant rule or a hover state. It goes through a safe-subset check that names what it refuses: no url() or any function outside a fixed list, no @media or other at-rule, no comments, no "<" anywhere, no comma, "+" or "~" in a selector, no backslash outside a quoted string, and a declaration must come before the first nested rule. A partial can carry style properties, elements and inner blocks but not a block state: WordPress reads it as a whole-theme styles tree, so a button variation\'s :hover goes in theme.json under styles.blocks.core/button.variations.{slug} through set-global-styles once the variation exists, and the answer says so when a state was given.', 'pattern-builder' ),
+				'description'         => __( 'Registers a named block style — a second kind of button, a card treatment, an inset quote — that a pattern applies by putting the returned class on a block. Use this instead of setting the same attributes on every block: the styling lives in one place, the editor offers it by name, and it applies only where the class is, so it changes nothing else on the site. Writes a theme.json partial into the active theme\'s styles directory, which is what registers a variation without PHP. Call get-design-system first: its blockStyles lists what is already here, and reusing one of WordPress\'s own (is-style-outline and the like) beats defining a new one. This is the one writer that accepts literal CSS, in styles.css and in styles.blocks.{block}.css and nowhere else, because a variation\'s selector is a class the pattern\'s own markup carries: a sequence of declarations and then nested rules anchored on "&", as in: position: relative; isolation: isolate; &::before { content: ""; position: absolute; inset: 0; z-index: -1; } — which is what expresses a pseudo-element, a hover state or a rule for markup the block renders itself, such as an image\'s img. Each css styles one block, with "&" standing for it: styles.css the block the class is on, styles.blocks.{block}.css that kind of block inside it. Neither reaches into another block; the blocks inside a variation are styled through styles.blocks, not by a selector. It goes through a safe-subset check that names what it refuses: no url() or any function outside a fixed list, no @media or other at-rule, no comments, no "<" anywhere, no comma, "+" or "~" in a selector, no backslash outside a quoted string, and a declaration must come before the first nested rule. A partial can carry style properties, elements and inner blocks but not a block state: WordPress reads it as a whole-theme styles tree, so a button variation\'s :hover goes in theme.json under styles.blocks.core/button.variations.{slug} through set-global-styles once the variation exists, and the answer says so when a state was given.', 'pattern-builder' ),
 				'category'            => self::CATEGORY,
 				'input_schema'        => array(
 					'type'                 => 'object',
@@ -3703,7 +3708,7 @@ class Pattern_Builder_Abilities {
 						),
 						'styles'      => array(
 							'type'        => 'object',
-							'description' => 'A theme.json "styles" subtree for this variation — for example { "color": { "background": "var:preset|color|accent" }, "border": { "radius": "999px" } }. Reference presets rather than hard-coding values. May also carry a "css" string of literal CSS at its top level — declarations, then nested rules anchored on "&" — for the pseudo-elements, descendant rules and states the style properties cannot express; a "css" any deeper is refused, and so is anything outside the safe subset, with the rule and the offending fragment named.',
+							'description' => 'A theme.json "styles" subtree for this variation — for example { "color": { "background": "var:preset|color|accent" }, "border": { "radius": "999px" } }. Reference presets rather than hard-coding values. May also carry a "css" string of literal CSS — declarations, then nested rules anchored on "&" — at its top level, for the block the variation is applied to, and in each styles.blocks.{block} entry, for that kind of block inside it: the pseudo-elements, states and markup the block renders itself (an image\'s img) that the style properties cannot express. Neither styles a block nested in its own; a "css" anywhere else is refused, and so is anything outside the safe subset, with the rule and the offending fragment named.',
 						),
 						'title'       => array(
 							'type'        => 'string',

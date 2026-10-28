@@ -42,9 +42,30 @@ GIF, WebP only), fails the export with that URL named. Attachment ids and
 `wp-image-N` classes are dropped on the way out, since id 57 names nothing on
 another site.
 
-**Imports** fetch package assets into the media library, re-sanitize the markup
-(KSES and scheme checks — never trust the wire), then land as a `wp_block` or
-flow through `Pattern_File_Store::update_theme_pattern()`. A user pattern's
+**A link to one of this site's own pages travels as `pbp-home:` plus its path**
+— `href="pbp-home:/about/"`, a navigation link's `"url":"pbp-home:/contact/"`,
+or `pbp-home:` alone for the bare home — because the export is the *rendered*
+markup, and a theme pattern's `home_url()` call has already become this site's
+address by then. Which links count is `Pattern_File_Store::replace_home_links()`,
+the same match the theme save uses to restore the call: an `href` or a block's
+`url` attribute under this site's home, but not into WordPress's own directories
+(wp-content, wp-admin, wp-includes and WordPress itself, wherever this site
+keeps them) and not with a query string. Those, and links to other sites, leave
+as written. On install the placeholder is read with its slashes escaped as well
+as plain, since the service can hand a block's attributes back either way.
+The service registers `pbp-home` as a KSES protocol beside `pbp-asset`; without
+that it would keep the path and drop the scheme.
+
+**Imports** fetch package assets into the media library, resolve each
+`pbp-home:` link against this site's home, re-sanitize the markup (KSES and
+scheme checks — never trust the wire), then land as a `wp_block` or flow through
+`Pattern_File_Store::update_theme_pattern()`. A user pattern is left with that
+absolute URL, which is what the editor's own link control writes and what a re-upload
+recognizes as home again; a theme pattern has it turned back into the
+`home_url()` call by that save. Both placeholders are resolved before the
+re-sanitize, whose KSES would strip either scheme, and a placeholder left over —
+an asset that was not delivered, or a link whose path is not one the export
+writes — refuses the install before the pattern is written. A user pattern's
 blocks are pointed at the attachments just created; a theme pattern's images
 move into the theme's own `assets/images`, so it carries no ids. Assets are
 always fetched from the configured service origin — URLs are re-rooted onto it,
@@ -102,10 +123,19 @@ document. `set-global-styles` therefore refuses one outright: a `css` at the
 root or on an element is scoped to nothing a pattern brought with it.
 
 A variation is the exception. `add-block-style-variation` accepts a `css` at the
-partial's top-level `styles.css` and nowhere deeper, because its selector is a
-class the pattern's own markup carries — and without one a variation cannot
-express a pseudo-element, a descendant rule or a hover state, which is most of
-what a variation is for.
+partial's top-level `styles.css` and at `styles.blocks.{block}.css`, and nowhere
+else, because each selector is a class the pattern's own markup carries — and
+without one a variation cannot express a pseudo-element, a hover state or a rule
+for markup its block renders itself, which is most of what a variation is for.
+Core scopes the first to the block the variation is applied to and the second
+to that kind of block inside it (`.is-style-x--{n} .wp-block-heading`), so each
+styles one block. The grammar still accepts a descendant selector, since an
+image variation's `& img` needs one; the guides are what keep it off blocks
+placed inside. `check_css()` in `Pattern_Builder_Block_Style_Variations` decides
+where a `css` may sit, for the write, the export and the install alike, and
+`rewrite_variations()` stamps the namespace into both places. The service's own
+check accepts only the top-level `styles.css` so far, so a variation carrying
+`styles.blocks.{block}.css` is refused on upload until it matches.
 
 What it accepts is decided by **`Safe_Css`**, a grammar rather than a filter:
 declarations first, then nested rules anchored on `&`. That is a strict subset
