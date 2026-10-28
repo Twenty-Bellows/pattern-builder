@@ -2451,7 +2451,7 @@ class Test_Abilities extends WP_UnitTestCase {
 
 		$this->assertNotWPError( $result );
 		$this->assertSame( 'dot.svg', $result['filename'] );
-		$this->assertStringContainsString( 'get_stylesheet_directory_uri', $result['reference'] );
+		$this->assertStringContainsString( 'get_theme_file_uri', $result['reference'] );
 	}
 
 	/**
@@ -2471,7 +2471,7 @@ class Test_Abilities extends WP_UnitTestCase {
 
 		$this->assertNotWPError( $result );
 		$this->assertSame( 'placeholder-1400x700.svg', $result['filename'] );
-		$this->assertStringContainsString( 'get_stylesheet_directory_uri', $result['reference'] );
+		$this->assertStringContainsString( 'get_theme_file_uri', $result['reference'] );
 	}
 
 	/**

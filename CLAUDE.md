@@ -5,7 +5,7 @@ Guidance for Claude Code and other AI coding agents working in this repository.
 ## What this is
 
 **Pattern Builder** is a WordPress plugin by [Twenty Bellows](https://twentybellows.com)
-for creating, editing and organising block patterns in the admin. It unifies
+for creating, editing and organizing block patterns in the admin. It unifies
 theme patterns (PHP files) and user patterns (`wp_block` posts) in one UI,
 browses the read-only ones a plugin registers beside them — copying one into the
 theme with the patterns it places — and connects to
@@ -119,8 +119,9 @@ The things that bite. Each is expanded in the document beside it.
   namespaced. A pattern registered under a bare name is one no `core/pattern`
   reference can reach, and an unresolved reference renders as nothing rather
   than as an error. ([architecture](docs/architecture.md))
-- **No write puts PHP into a theme pattern file** beyond the calls the plugin
-  generates itself, for localized text and the theme's own images. Markup goes
+- **No write puts PHP into a theme pattern file** beyond the calls a save writes
+  back itself, for localized text, the theme's own files and links to the site's
+  own pages. Markup goes
   into the file whole, so anything else would make `edit_theme_options` the
   power to run code. The check is on the finished bytes, and no capability
   lifts it. ([architecture](docs/architecture.md))
@@ -154,7 +155,7 @@ Before you open a pull request:
 
 1. **Find what your change touched** in the table above, and read that
    document. Ask whether any sentence in it is now wrong — a renamed class, a
-   moved file, a behaviour that changed, a count that shifted, a mechanism
+   moved file, a behavior that changed, a count that shifted, a mechanism
    replaced by another.
 2. **Update `readme.md`** if you changed what the plugin *is*, what it
    requires, or how it is run. It is deliberately minimal; keep it that way and

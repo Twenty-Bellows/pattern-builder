@@ -594,9 +594,12 @@ class Pattern_File_Store {
 		if ( is_wp_error( $writable ) ) {
 			return $writable;
 		}
+		// Before the import, which would otherwise download the theme's own files and copy them.
+		$pattern = $this->restore_theme_file_links( $pattern );
 		if ( ! isset( $options['import_images'] ) || true === $options['import_images'] ) {
 			$pattern = $this->import_pattern_image_assets( $pattern );
 		}
+		$pattern = $this->restore_home_links( $pattern );
 		if ( isset( $options['localize'] ) && true === $options['localize'] ) {
 			$pattern = Pattern_Builder_Localization::localize_pattern_content( $pattern );
 		}
@@ -887,7 +890,7 @@ class Pattern_File_Store {
 				'pattern_has_custom_php',
 				sprintf(
 					/* translators: %s: the PHP found, e.g. "echo get_bloginfo( 'name' );". */
-					__( 'The pattern was not stored, because it would put PHP into the theme’s file: %s. Pattern Builder writes only the PHP it generates itself, for localized text and the theme’s own images. Write any other PHP in the theme’s pattern file directly.', 'pattern-builder' ),
+					__( 'The pattern was not stored, because it would put PHP into the theme’s file: %s. Pattern Builder writes only the PHP it can write back itself, for localized text, the theme’s own files and links to the site’s own pages. Write any other PHP in the theme’s pattern file directly.', 'pattern-builder' ),
 					$custom_php
 				),
 				array( 'status' => 400 )
@@ -1209,6 +1212,139 @@ class Pattern_File_Store {
 		);
 
 		return $pattern;
+	}
+
+	/**
+	 * Points each URL of a file in the active theme or its parent, in a src, an href or a
+	 * block's url attribute, back at get_theme_file_uri(), which is what reading a pattern
+	 * file renders it from. Nothing is downloaded or copied. A parent's file that the child
+	 * theme also has is pointed at the parent's copy, which is the one it rendered as.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern about to be written.
+	 * @return Abstract_Pattern
+	 */
+	private function restore_theme_file_links( $pattern ) {
+		$child = untrailingslashit( get_stylesheet_directory_uri() );
+		$bases = array_unique( array( $child, untrailingslashit( get_template_directory_uri() ) ) );
+		usort(
+			$bases,
+			static function ( $a, $b ) {
+				return strlen( $b ) - strlen( $a );
+			}
+		);
+		$bases = implode(
+			'|',
+			array_map(
+				static function ( $base ) {
+					return preg_quote( $base, '/' );
+				},
+				$bases
+			)
+		);
+
+		$pattern->content = preg_replace_callback(
+			'/(src=|href=|"url"\s*:\s*)"(' . $bases . ')\/([A-Za-z0-9\/._~%-]+)"/',
+			static function ( $matches ) use ( $child ) {
+				$path = $matches[3];
+
+				// A dot segment would point outside the theme.
+				if ( preg_match( '#(^|/)\.{1,2}(/|$)#', $path ) ) {
+					return $matches[0];
+				}
+
+				$from_parent = $child !== $matches[2] && file_exists( get_stylesheet_directory() . '/' . $path );
+
+				return $matches[1] . '"' . Pattern_Builder_Assets::theme_reference( $path, $from_parent ) . '"';
+			},
+			(string) $pattern->content
+		);
+
+		return $pattern;
+	}
+
+	/**
+	 * Points each link to a page of this site, in an href or a block's url attribute, back
+	 * at home_url(), which is what reading a pattern file renders it from, so a save keeps
+	 * the call and the link follows the theme to any site. A path with a query string is
+	 * left as it is: esc_url() would write its entities differently, so the call could not
+	 * give back the same link.
+	 *
+	 * @param Abstract_Pattern $pattern The pattern about to be written.
+	 * @return Abstract_Pattern
+	 */
+	private function restore_home_links( $pattern ) {
+		$pattern->content = self::replace_home_links(
+			$pattern->content,
+			home_url(),
+			static function ( $path ) {
+				$call = '' === $path ? 'home_url()' : "home_url( '" . $path . "' )";
+
+				return '<?php echo esc_url( ' . $call . ' ); ?>';
+			}
+		);
+
+		return $pattern;
+	}
+
+	/**
+	 * Replaces each link that starts with a base, in an href or a block's url attribute,
+	 * with what a callback makes of its path. Links into WordPress's own directories (the
+	 * paths of wp-content, wp-admin and wp-includes on this site, and of WordPress itself
+	 * when it lives in a directory below the home), links with a query string, and links to
+	 * anywhere else are left as they are. A base with a scheme matches either scheme and
+	 * any case, since a link typed by hand or kept from before a move to HTTPS is still a
+	 * link to this site. The theme save, the cloud export and the cloud install all go
+	 * through this, so all three agree on which links are a site's own pages.
+	 *
+	 * @param string   $content Block markup.
+	 * @param string   $base    What the link starts with: a home URL, or a placeholder.
+	 * @param callable $replace Takes the path, '' for the bare base, and returns the link.
+	 * @return string
+	 */
+	public static function replace_home_links( $content, $base, $replace ) {
+		$base = untrailingslashit( $base );
+		$base = preg_match( '/^https?:\/\/(.+)$/i', $base, $matches )
+			? 'https?:\/\/' . preg_quote( $matches[1], '/' )
+			: preg_quote( $base, '/' );
+		$skip = self::own_directory_paths();
+
+		return preg_replace_callback(
+			'/(href=|"url"\s*:\s*)"' . $base . '(\/[A-Za-z0-9\/._~%#-]*)?"/i',
+			static function ( $matches ) use ( $replace, $skip ) {
+				$path = isset( $matches[2] ) ? $matches[2] : '';
+
+				foreach ( $skip as $directory ) {
+					if ( $path === $directory || 0 === strpos( $path, $directory . '/' ) ) {
+						return $matches[0];
+					}
+				}
+
+				return $matches[1] . '"' . $replace( $path ) . '"';
+			},
+			(string) $content
+		);
+	}
+
+	/**
+	 * The paths under this site's home that are WordPress's own rather than its pages: where
+	 * wp-content, wp-admin and wp-includes are, and WordPress itself when it is installed in
+	 * a directory below the home. A link into one of them is a file or a screen, not a page,
+	 * so it is not a link home_url() should carry.
+	 *
+	 * @return string[] Paths from the home, each with a leading slash and no trailing one.
+	 */
+	private static function own_directory_paths() {
+		$home  = untrailingslashit( home_url() );
+		$paths = array();
+
+		foreach ( array( content_url(), admin_url(), includes_url(), site_url() ) as $url ) {
+			$url = untrailingslashit( $url );
+			if ( 0 === stripos( $url, $home . '/' ) ) {
+				$paths[] = substr( $url, strlen( $home ) );
+			}
+		}
+
+		return array_values( array_unique( $paths ) );
 	}
 
 	/**

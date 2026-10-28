@@ -1,7 +1,8 @@
 <?php
 /**
  * The cloud round trip, over the wire: upload a theme pattern with an image, re-upload it
- * to take the update path, download it back as a user pattern, and check what landed.
+ * to take the update path, download it back as a user pattern, and check what landed. A
+ * pattern linking to this site's own pages goes up as home and comes back as this site.
  *
  * @package PatternBuilder
  */
@@ -122,6 +123,18 @@ if ( 'install' === $pattern_id ) {
 
 	if ( $unstyled ) {
 		WP_CLI::error( 'Installed patterns apply block styles that are not here: ' . implode( ', ', array_unique( $unstyled ) ) );
+	}
+	foreach ( $landed as $r ) {
+		if ( 'E2E Home Links' !== $r['title'] ) {
+			continue;
+		}
+		$content = 'user' === $r['type']
+			? (string) get_post_field( 'post_content', $r['id'] )
+			: (string) ( $store->find_theme_pattern( $r['id'] )->content ?? '' );
+
+		if ( false === strpos( $content, 'href="' . home_url( '/about/' ) . '"' ) || false === strpos( $content, '"url":"' . home_url( '/contact/' ) . '"' ) ) {
+			WP_CLI::error( 'A link to the source site\'s own page did not land as this site: ' . $content );
+		}
 	}
 
 	WP_CLI::success( sprintf( 'Collection installed: %d landed, %d already here, all under %s, every reference resolves.', $install['installed'], $install['skipped'], $category ) );
@@ -316,6 +329,65 @@ if ( ! is_wp_error( $made ) && ! is_wp_error( $made_inner ) ) {
 		$checks['its css was renamespaced'] = false !== strpos( $carried_css, 'is-style-' . $pill )
 			&& false === strpos( $carried_css, ' .is-style-e2e-pill ' );
 	}
+}
+
+$home_linked = $store->update_theme_pattern(
+	new \TwentyBellows\PatternBuilder\Abstract_Pattern(
+		array(
+			'id'      => 'simple-theme/e2e-home-links',
+			'name'    => 'simple-theme/e2e-home-links',
+			'title'   => 'E2E Home Links',
+			'source'  => 'theme',
+			'content' => '<!-- wp:paragraph -->' . "\n"
+				. '<p><a href="' . home_url( '/about/' ) . '">About</a> <a href="' . home_url() . '">Home</a></p>' . "\n"
+				. '<!-- /wp:paragraph -->' . "\n"
+				. '<!-- wp:navigation -->' . "\n"
+				. '<!-- wp:navigation-link {"label":"Contact","url":"' . home_url( '/contact/' ) . '"} /-->' . "\n"
+				. '<!-- /wp:navigation -->',
+		)
+	)
+);
+
+if ( ! is_wp_error( $home_linked ) ) {
+	$out['home'] = $attempt(
+		'Upload home links',
+		$controller->upload(
+			$request(
+				'upload',
+				array(
+					'patternType' => 'theme',
+					'patternId'   => 'simple-theme/e2e-home-links',
+					'collection'  => $e2e['id'],
+				)
+			)
+		)
+	);
+
+	$stored_home = Pattern_Builder_Cloud::request( 'GET', '/library/patterns/' . (int) ( $out['home']['pattern']['id'] ?? 0 ) );
+	$home_markup = is_wp_error( $stored_home ) ? '' : (string) ( $stored_home['content'] ?? '' );
+	$home_back   = $attempt(
+		'Download home links',
+		$controller->download(
+			$request(
+				'download',
+				array(
+					'source'      => 'library',
+					'cloudId'     => $out['home']['pattern']['id'],
+					'destination' => 'user',
+				)
+			)
+		)
+	);
+	$home_landed = (string) get_post_field( 'post_content', $home_back['id'] );
+
+	$checks['home links went up as home']      = false !== strpos( $home_markup, 'href="pbp-home:/about/"' )
+		&& false !== strpos( $home_markup, 'href="pbp-home:"' )
+		&& false !== strpos( $home_markup, '"url":"pbp-home:/contact/"' )
+		&& false === strpos( $home_markup, untrailingslashit( home_url() ) );
+	$checks['home links came back as this site'] = false !== strpos( $home_landed, 'href="' . home_url( '/about/' ) . '"' )
+		&& false !== strpos( $home_landed, 'href="' . home_url() . '"' )
+		&& false !== strpos( $home_landed, '"url":"' . home_url( '/contact/' ) . '"' )
+		&& false === strpos( $home_landed, 'pbp-home:' );
 }
 
 $out['checks'] = $checks;
