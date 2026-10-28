@@ -62,7 +62,10 @@ first place that can hold it.
 - **The block's own settings**, using those tokens, when it's this block's: a
   background color, padding from the spacing scale, one of the five font sizes,
   a gap. They're what someone editing the page sees in the sidebar and can
-  change.
+  change. On WordPress 7.1 and later that includes a different value at a
+  narrower width: a grid that drops to one column on phones, or padding that
+  shrinks, goes under the block's `style["@tablet"]` and `style["@mobile"]`
+  (`block-vocabulary.md`, *A different look at another width*).
 - **A block style variation's styles**, when it's a named look more than one
   block shares: the color, spacing, border and typography properties in its
   `styles/{slug}.json`.
@@ -70,10 +73,11 @@ first place that can hold it.
   block it's on: a pseudo-element, a mask, a transform, a hover state.
   *CSS in a variation*, below, has what it accepts.
 - **The theme's stylesheet**, last, for what none of those can hold, like a
-  media query or a rule for `::selection` or a focus ring, and only when the
-  theme is yours to change. Scope each rule to a variation's `is-style-` class
-  and the block carrying it, or to an element, and say in the handoff what you
-  put there and why nothing above could hold it.
+  rule for `::selection` or a focus ring, or a media query for something the
+  block's per-viewport settings can't express (any media query, before 7.1),
+  and only when the theme is yours to change. Scope each rule to a variation's
+  `is-style-` class and the block carrying it, or to an element, and say in the
+  handoff what you put there and why nothing above could hold it.
 
 Whichever of these holds it, CSS styles one block. A variation's `css` styles
 the block it's applied to and markup that block renders itself, like an image's
@@ -482,7 +486,7 @@ that installs it. What the check refuses, and why:
 | Refused | Because |
 |---|---|
 | `url()`, `image-set()`, `attr()`, `expression()` — any function not on a fixed allow list | a stored pattern fetches nothing, and an unknown name is refused rather than ignored |
-| `@media` and every other at-rule | core's parser cannot place one here at all, so a media query in variation CSS does not work today |
+| `@media` and every other at-rule | core's parser cannot place one here at all, so a media query in variation CSS does not work today. On 7.1 and later, a difference at a width goes on the block's own per-viewport settings instead |
 | comments (`/* … */`) | stripping them correctly means stripping them exactly as a browser does |
 | `<`, anywhere, quoted strings included | `</style` ends the style element whatever CSS thinks a string is |
 | `,`, `+` and `~` in a selector | a comma escapes the variation's scope and lands `body` at the top level; a sibling combinator reaches outside the block the pattern carries |

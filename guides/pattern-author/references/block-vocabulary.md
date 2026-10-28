@@ -127,6 +127,63 @@ columns or grid decide its width. This is the trap in the factor step: an
 element pattern reads like a small standalone thing, so it gets written like a
 band, and then it cannot be composed.
 
+**A different look at another width is a block setting, on WordPress 7.1 and
+later.** A block's `style` takes values per viewport, under `@tablet` and
+`@mobile`, and WordPress prints them inside the matching media query. The change
+stays on the block, where the editor shows it, rather than in a stylesheet:
+
+```html
+<!-- wp:group {"style":{"@tablet":{"layout":{"columnCount":1}},"@mobile":{"layout":{"columnCount":1}}},"layout":{"type":"grid","columnCount":3}} -->
+<div class="wp-block-group"><!-- wp:paragraph {"style":{"spacing":{"padding":{"top":"var:preset|spacing|60"}},"@mobile":{"spacing":{"padding":{"top":"var:preset|spacing|40"}}}}} -->
+<p style="padding-top:var(--wp--preset--spacing--60)">Wider apart on a desktop, closer on a phone.</p>
+<!-- /wp:paragraph --></div>
+<!-- /wp:group -->
+```
+
+The saved HTML doesn't change; the per-viewport values live in the comment, and
+the block library serializes and validates them like any other attribute.
+
+- **The breakpoints** are the theme's `settings.viewport`, `mobile` and
+  `tablet` in px, em or rem, and 480px and 782px when it sets none. `@mobile` is
+  `width <= 480px` and `@tablet` is `480px < width <= 782px`, so a change for
+  everything below 782px sets both.
+- **What it covers:** everything under the block's `style`: spacing,
+  typography, color, border, dimensions. It also covers layout under
+  `style["@…"].layout`, both a container's own settings (`columnCount`,
+  `justifyContent`) and a child's place in its parent (`columnStart`,
+  `columnSpan`, `rowStart`, `rowSpan`, `selfStretch`, `flexSize`). An attribute
+  outside `style`, like an image's `width`, has no per-viewport value.
+- **A grid position is overridden whole.** Give the override every value the
+  placement needs (`columnStart`, `columnSpan`, `rowStart`); `null` doesn't
+  clear the desktop one.
+- **A Buttons block's justification outranks it.** `justifyContent` on
+  `core/buttons` adds an `is-content-justification-*` class that beats a
+  per-viewport override. To center the buttons only on phones, leave the base
+  justification unset and give the block a `blockGap`, which still gets it a
+  layout class, then set `justifyContent` under `@tablet` and `@mobile`.
+- **In the editor,** the **Responsive styles** switch in the device preview menu
+  makes Tablet and Mobile edit only that viewport's values. It's there unless a
+  site sets the `responsiveEditingEnabled` editor setting to `false`.
+
+**A grid with manual placement has to be complete in the markup.** With
+`{"layout":{"type":"grid","columnCount":8,"isManualPlacement":true,"rowCount":3}}`,
+give every child its `columnStart` and `rowStart`, and give the grid a
+`rowCount` that reaches the lowest row. When the editor opens a manual grid it
+places any child missing either value and raises a missing or short `rowCount`.
+So markup without them changes the moment someone opens it, and the page shows
+as edited. `rowCount` also prints
+`grid-template-rows: repeat(3, minmax(1rem, auto))`, which an empty spanned row
+can use to absorb a tall item's extra height. The editor's Column and Row inputs
+and its Auto/Manual switch are behind `window.__experimentalEnableGridInteractivity`,
+which WordPress leaves off. Without it the positions render, but nobody editing
+the page can see or change them. A site that needs them editable turns it on
+from its own plugin:
+`wp_add_inline_script( 'wp-block-editor', 'window.__experimentalEnableGridInteractivity = true;', 'before' )`.
+Say in the handoff whether it's on.
+
+Before 7.1 there are no per-viewport values, and a difference at a width is a
+media query in the theme's stylesheet (`design-system.md`, *Where a look goes*).
+
 ### Text
 
 `core/heading` (with `level`), `core/paragraph`, `core/list` + `core/list-item`,

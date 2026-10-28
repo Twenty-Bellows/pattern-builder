@@ -220,18 +220,24 @@ what and where.
   for — pseudo-elements, `list-style`, transforms, transitions, hover states —
   scoped to the blocks carrying its class, and to those blocks alone. Reach for
   that first; `pattern-author`'s `references/design-system.md` has the subset
-  and what it refuses. What stays out of reach is anything needing a media
-  query (core cannot place an at-rule there), a comma or a sibling combinator
-  in a selector, or a rule on something the pattern's own markup does not
-  carry. Rebuild those from real blocks and say what changed. A source whose
-  card styles its heading, image and button from one class becomes a card
-  variation whose `blocks` entries style each kind of block inside it, or blocks
-  that carry their own look, not one `css` that reaches into all of them.
-  With the theme's files open, a media query can go in the theme's stylesheet
-  when nothing else can hold it, scoped to a variation's class and the block
-  carrying it, and named in the handoff. A rule keyed
-  to a class you added for the purpose isn't that: it's the same CSS, harder to
-  find.
+  and what it refuses. What stays out of a variation's reach is anything
+  needing a media query (core cannot place an at-rule there), a comma or a
+  sibling combinator in a selector, or a rule on something the pattern's own
+  markup does not carry. Rebuild those from real blocks and say what changed.
+  A source whose card styles its heading, image and button from one class
+  becomes a card variation whose `blocks` entries style each kind of block
+  inside it, or blocks that carry their own look, not one `css` that reaches
+  into all of them.
+  Most of what a source's media queries do is not out of reach on WordPress
+  7.1 and later. A grid dropping to one column, padding shrinking or a block
+  moving to another row is a per-viewport setting on that block
+  (`pattern-author`'s `references/block-vocabulary.md`, *A different look at
+  another width*). Read the source's breakpoints against the theme's
+  (480px and 782px unless `settings.viewport` says otherwise) and say where
+  they differ. With the theme's files open, a media query those settings can't
+  express can go in the theme's stylesheet, scoped to a variation's class and
+  the block carrying it, and named in the handoff. A rule keyed to a class you
+  added for the purpose isn't that: it's the same CSS, harder to find.
 - **Variable font axes.** The font collection serves fixed instances, one file
   per weight. Ask `list-fonts` for the family before promising a match.
 - **Images you only have a picture of.** Use placeholders and hand back the
