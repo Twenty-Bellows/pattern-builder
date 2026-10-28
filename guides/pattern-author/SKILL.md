@@ -388,6 +388,23 @@ how to write a `Description` and `Keywords` someone can find the pattern by.
 theme's through `register_block_pattern_category()`; an unregistered slug files
 the pattern under Uncategorized, where nobody looks.
 
+**A link to a page of the site is `home_url()`, never the site's address.** In
+a theme pattern write `href="<?php echo esc_url( home_url( '/about/' ) ); ?>"`,
+or `home_url()` alone for the home page, so the link follows the theme to any
+site. A navigation link takes the same call in its `url` attribute. A theme
+save turns a link written as this site's address into the call itself.
+
+**A file the theme carries is `get_theme_file_uri()`, never its URL:**
+`<?php echo esc_url( get_theme_file_uri( 'assets/images/logo.svg' ) ); ?>`.
+That's the `reference` `find-media` and `add-asset` hand back. It finds the file
+in a child theme or its parent, and a theme save turns a URL into the theme back
+into this call. `get_template_directory_uri()` and
+`get_stylesheet_directory_uri()` with a literal path are accepted as well, and
+the next save respells them. Those calls, localized text and the home link are
+the only PHP a theme pattern may carry. Anything else, including a path built
+from a variable or a call without `esc_url()`, is refused by `create-pattern`
+and opens read-only in the editor.
+
 Write the file directly when you have filesystem access. Against a running
 site, `pattern-builder/create-pattern` stores finished markup — it refuses what
 PHP can see (attribute JSON that does not parse, a heading contradicting its

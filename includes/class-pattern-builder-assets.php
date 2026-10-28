@@ -608,13 +608,16 @@ class Pattern_Builder_Assets {
 	}
 
 	/**
-	 * The PHP a theme pattern file uses to point at one of its own assets.
+	 * The PHP a theme pattern file uses to point at one of the theme's own files.
 	 *
-	 * @param string $relative Path from the stylesheet directory, leading slash.
+	 * @param string $relative    Path from the theme's directory, with or without a leading slash.
+	 * @param bool   $from_parent Whether to point at the parent theme's file even where the child theme has one.
 	 * @return string
 	 */
-	public static function theme_reference( $relative ) {
-		return '<?php echo esc_url( get_stylesheet_directory_uri() . \'' . addcslashes( $relative, "\\'" ) . '\' ); ?>';
+	public static function theme_reference( $relative, $from_parent = false ) {
+		$function = $from_parent ? 'get_parent_theme_file_uri' : 'get_theme_file_uri';
+
+		return '<?php echo esc_url( ' . $function . "( '" . addcslashes( ltrim( $relative, '/' ), "\\'" ) . "' ) ); ?>";
 	}
 
 	/**
