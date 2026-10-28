@@ -62,6 +62,9 @@ const ALLOW = new Set( [
 	'wp-abilities/v1',
 	'get_the_content()',
 	'NON_CONTEXTUAL_POST_TYPES',
+	'_get_block_templates_paths()',
+	'block-templates/',
+	'block-template-parts/',
 	// The host environment and other repositories.
 	'sqlite-database-integration',
 	'db.copy',
