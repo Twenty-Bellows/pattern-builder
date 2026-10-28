@@ -48,8 +48,11 @@ or `pbp-home:` alone for the bare home — because the export is the *rendered*
 markup, and a theme pattern's `home_url()` call has already become this site's
 address by then. Which links count is `Pattern_File_Store::replace_home_links()`,
 the same match the theme save uses to restore the call: an `href` or a block's
-`url` attribute under this site's home, but not into `wp-content` or `wp-admin`
-and not with a query string. Those, and links to other sites, leave as written.
+`url` attribute under this site's home, but not into WordPress's own directories
+(wp-content, wp-admin, wp-includes and WordPress itself, wherever this site
+keeps them) and not with a query string. Those, and links to other sites, leave
+as written. On install the placeholder is read with its slashes escaped as well
+as plain, since the service can hand a block's attributes back either way.
 The service registers `pbp-home` as a KSES protocol beside `pbp-asset`; without
 that it would keep the path and drop the scheme.
 

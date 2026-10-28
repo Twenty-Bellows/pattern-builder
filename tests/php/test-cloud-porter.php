@@ -608,6 +608,22 @@ class Test_Cloud_Porter extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A block's attributes can come back from the service with their slashes escaped, and
+	 * a home link in them is still read.
+	 */
+	public function test_import_reads_a_home_link_whose_slashes_are_escaped() {
+		$pbp            = $this->make_downloaded_pbp_with_home_links();
+		$pbp['content'] = '<!-- wp:navigation --><!-- wp:navigation-link {"label":"Contact","url":"pbp-home:\\/contact\\/"} /--><!-- /wp:navigation -->';
+
+		$result = ( new Pattern_Builder_Cloud_Porter() )->import_pbp( $pbp, 'user' );
+
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$content = get_post( $result['id'] )->post_content;
+		$this->assertStringContainsString( home_url( '/contact/' ), $content );
+		$this->assertStringNotContainsString( 'pbp-home:', $content );
+	}
+
+	/**
 	 * A theme pattern gets the call back, so the link follows the theme too.
 	 */
 	public function test_import_writes_a_home_link_into_a_theme_pattern_as_the_call() {

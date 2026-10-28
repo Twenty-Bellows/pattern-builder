@@ -360,6 +360,16 @@ class Pattern_Builder_Cloud_Porter {
 			return new WP_Error( 'pb_cloud_missing_asset', __( 'The downloaded pattern references an asset that was not delivered.', 'pattern-builder' ), array( 'status' => 502 ) );
 		}
 
+		// The service can hand a block's attributes back with their slashes escaped, as the
+		// asset placeholders above allow for, so a home link is read in either spelling.
+		$content = preg_replace_callback(
+			'/pbp-home:(?:\\\\\/|[A-Za-z0-9\/._~%#-])*/',
+			static function ( $matches ) {
+				return str_replace( '\\/', '/', $matches[0] );
+			},
+			$content
+		);
+
 		// A theme pattern gets its home_url() call back from the save, which restores it.
 		$content = Pattern_File_Store::replace_home_links( $content, 'pbp-home:', 'home_url' );
 

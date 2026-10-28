@@ -1288,10 +1288,13 @@ class Pattern_File_Store {
 
 	/**
 	 * Replaces each link that starts with a base, in an href or a block's url attribute,
-	 * with what a callback makes of its path. Links into wp-content or wp-admin, links with
-	 * a query string, and links to anywhere else are left as they are. The theme save, the
-	 * cloud export and the cloud install all go through this, so all three agree on which
-	 * links are a site's own pages.
+	 * with what a callback makes of its path. Links into WordPress's own directories (the
+	 * paths of wp-content, wp-admin and wp-includes on this site, and of WordPress itself
+	 * when it lives in a directory below the home), links with a query string, and links to
+	 * anywhere else are left as they are. A base with a scheme matches either scheme and
+	 * any case, since a link typed by hand or kept from before a move to HTTPS is still a
+	 * link to this site. The theme save, the cloud export and the cloud install all go
+	 * through this, so all three agree on which links are a site's own pages.
 	 *
 	 * @param string   $content Block markup.
 	 * @param string   $base    What the link starts with: a home URL, or a placeholder.
@@ -1299,19 +1302,49 @@ class Pattern_File_Store {
 	 * @return string
 	 */
 	public static function replace_home_links( $content, $base, $replace ) {
+		$base = untrailingslashit( $base );
+		$base = preg_match( '/^https?:\/\/(.+)$/i', $base, $matches )
+			? 'https?:\/\/' . preg_quote( $matches[1], '/' )
+			: preg_quote( $base, '/' );
+		$skip = self::own_directory_paths();
+
 		return preg_replace_callback(
-			'/(href=|"url"\s*:\s*)"' . preg_quote( untrailingslashit( $base ), '/' ) . '(\/[A-Za-z0-9\/._~%#-]*)?"/',
-			static function ( $matches ) use ( $replace ) {
+			'/(href=|"url"\s*:\s*)"' . $base . '(\/[A-Za-z0-9\/._~%#-]*)?"/i',
+			static function ( $matches ) use ( $replace, $skip ) {
 				$path = isset( $matches[2] ) ? $matches[2] : '';
 
-				if ( preg_match( '#^/wp-(content|admin)(/|$)#', $path ) ) {
-					return $matches[0];
+				foreach ( $skip as $directory ) {
+					if ( $path === $directory || 0 === strpos( $path, $directory . '/' ) ) {
+						return $matches[0];
+					}
 				}
 
 				return $matches[1] . '"' . $replace( $path ) . '"';
 			},
 			(string) $content
 		);
+	}
+
+	/**
+	 * The paths under this site's home that are WordPress's own rather than its pages: where
+	 * wp-content, wp-admin and wp-includes are, and WordPress itself when it is installed in
+	 * a directory below the home. A link into one of them is a file or a screen, not a page,
+	 * so it is not a link home_url() should carry.
+	 *
+	 * @return string[] Paths from the home, each with a leading slash and no trailing one.
+	 */
+	private static function own_directory_paths() {
+		$home  = untrailingslashit( home_url() );
+		$paths = array();
+
+		foreach ( array( content_url(), admin_url(), includes_url(), site_url() ) as $url ) {
+			$url = untrailingslashit( $url );
+			if ( 0 === stripos( $url, $home . '/' ) ) {
+				$paths[] = substr( $url, strlen( $home ) );
+			}
+		}
+
+		return array_values( array_unique( $paths ) );
 	}
 
 	/**

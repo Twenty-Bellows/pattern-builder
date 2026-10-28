@@ -514,6 +514,70 @@ class Test_Dynamic_Patterns extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A link typed in capitals, or kept from before the site moved to HTTPS, is still a link
+	 * to this site, and the save writes it as one.
+	 */
+	public function test_a_link_in_another_case_or_scheme_is_still_written_as_home_url() {
+		$home  = untrailingslashit( home_url() );
+		$other = 0 === strpos( $home, 'https://' ) ? 'http://' . substr( $home, 8 ) : 'https://' . substr( $home, 7 );
+
+		$result = $this->write(
+			array(
+				'content' => '<!-- wp:paragraph --><p><a href="' . strtoupper( $home ) . '/about/">x</a> <a href="' . $other . '/contact/">y</a></p><!-- /wp:paragraph -->',
+			),
+			array( 'import_images' => false )
+		);
+
+		$this->assertNotWPError( $result );
+		$file = $this->file_for( 'written' );
+		$this->assertStringContainsString( "href=\"<?php echo esc_url( home_url( '/about/' ) ); ?>\"", $file );
+		$this->assertStringContainsString( "href=\"<?php echo esc_url( home_url( '/contact/' ) ); ?>\"", $file );
+	}
+
+	/**
+	 * WordPress's own directories are wherever this site keeps them, not always under
+	 * wp-content and wp-admin: a site that installs WordPress in its own directory, or moves
+	 * its content directory, still has its files and screens left as written.
+	 */
+	public function test_links_into_wordpress_own_directories_are_left_wherever_the_site_keeps_them() {
+		$home    = untrailingslashit( home_url() );
+		$site    = static function ( $url ) use ( $home ) {
+			return preg_replace( '#^' . preg_quote( $home, '#' ) . '#', $home . '/wp', $url );
+		};
+		$content = static function ( $url ) use ( $home ) {
+			return preg_replace( '#^' . preg_quote( $home, '#' ) . '/wp-content#', $home . '/app', $url );
+		};
+		add_filter( 'site_url', $site );
+		add_filter( 'content_url', $content );
+
+		$links = array(
+			$home . '/about/'                   => "<?php echo esc_url( home_url( '/about/' ) ); ?>",
+			$home . '/wp/wp-admin/'             => $home . '/wp/wp-admin/',
+			$home . '/wp/wp-includes/js/x.js'   => $home . '/wp/wp-includes/js/x.js',
+			$home . '/app/uploads/menu.pdf'     => $home . '/app/uploads/menu.pdf',
+			$home . '/wp-content/uploads/a.pdf' => "<?php echo esc_url( home_url( '/wp-content/uploads/a.pdf' ) ); ?>",
+		);
+
+		$paragraphs = '';
+		foreach ( array_keys( $links ) as $url ) {
+			$paragraphs .= '<!-- wp:paragraph --><p><a href="' . $url . '">x</a></p><!-- /wp:paragraph -->';
+		}
+
+		try {
+			$result = $this->write( array( 'content' => $paragraphs ), array( 'import_images' => false ) );
+		} finally {
+			remove_filter( 'site_url', $site );
+			remove_filter( 'content_url', $content );
+		}
+
+		$this->assertNotWPError( $result );
+		$file = $this->file_for( 'written' );
+		foreach ( $links as $url => $written ) {
+			$this->assertStringContainsString( 'href="' . $written . '"', $file, $url );
+		}
+	}
+
+	/**
 	 * The round trip the shape exists for: reading renders the call to this site's URL, and
 	 * saving what was read puts the call back rather than the URL.
 	 */

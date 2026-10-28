@@ -504,10 +504,14 @@ pattern carrying one opens for editing; its first save respells it as
 And every theme save runs `restore_home_links()`, which turns each link to a page
 of this site, in an `href` or a block's `url` attribute (a navigation link keeps
 its address there), into `<?php echo esc_url( home_url( '/about/' ) ); ?>`, or
-`home_url()` for the bare home. It leaves a link into `wp-content` or `wp-admin`,
-a link with a query string, and a link to any other site as written: the query
-string because `esc_url()` writes its entities differently, so the call would
-not give back the same link. The home link is the one theme authors write by
+`home_url()` for the bare home. It leaves a link into WordPress's own
+directories (wherever this site keeps wp-content, wp-admin and wp-includes, and
+WordPress itself when it is installed below the home), a link with a query
+string, and a link to any other site as written: the query string because
+`esc_url()` writes its entities differently, so the call would not give back the
+same link. A link typed in another case, or with `http://` on a site that has
+since moved to HTTPS, is still a link to this site and is restored like any
+other. The home link is the one theme authors write by
 hand, the commonest PHP in a theme's patterns, and without the save turning the
 rendered URL back into the call, opening such a pattern and saving it would
 hard-code this site's address into the theme. The match itself is
