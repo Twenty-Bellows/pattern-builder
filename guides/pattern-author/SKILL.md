@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.19.0
+  version: 2.0.0
 ---
 
 # Authoring block patterns
@@ -54,7 +54,7 @@ else. Each fact lives in one of them; this table only points.
 
 | Step | Read before it | Only when |
 |---|---|---|
-| 1. Orient | nothing more | `references/abilities.md` if you reach the site over HTTP or through its `pattern-builder-*` MCP tools; `references/changing-patterns.md` if the site already has patterns; `references/design-system.md` if you set color, type, spacing or layout beyond the shared presets, or install a design system |
+| 1. Orient | nothing more | `references/abilities.md` if you reach the site over HTTP or through its `pattern-builder-*` MCP tools; `references/changing-patterns.md` if the site already has patterns; `references/design-system.md` if you set color, type, spacing or layout beyond the shared presets, style anything beyond a block's own settings, or install a design system |
 | 2. Vocabulary | nothing more | `references/block-vocabulary.md` for a block beyond paragraph, heading, image, button, group and columns, or a destination other than this site |
 | 3. Kind | nothing more | `references/pattern-kinds.md` for any kind but a plain design pattern; `references/design-content-split.md` for a synced pattern with slots or the page that fills it |
 | 4. Factor | `references/composition.md` for anything bigger than one section | |
@@ -103,6 +103,16 @@ which slugs are actually safe: the short version is a role for every color
 Check anything else before using it. It also says the thing hardest to see from
 markup: what the site already styles is what the pattern inherits, so restating
 it is how a pattern stops adapting.
+
+**A look goes in the first place that can hold it:** theme.json, then the
+block's own settings, then a block style variation, and the theme's stylesheet
+only for what none of those can. That holds when you're editing the theme's
+files directly, which is when it's easiest to forget. A class you make up and
+style from a stylesheet hides the look from everyone editing the page; when a
+look needs a name, it's a variation. A variation's `css` styles the block it's
+on, never the blocks placed inside it; it styles those through its JSON
+`blocks`, each of which can carry `css` for that block alone. *Where a look
+goes* in `references/design-system.md` has the order and the ways it breaks.
 
 **Then look for the pattern before you write it.** On a site that already has
 patterns, what you are asked for is often close to one that exists. Search
@@ -282,7 +292,7 @@ the inserter preview.
 node <skill>/scripts/validate-pattern.mjs path/to/pattern.php
 ```
 
-It reports three things, and only the first is the one people expect:
+It reports these, and only the first is the one people expect:
 
 - **INVALID** — no version of the block ever wrote this. The editor will say
   "unexpected or invalid content".
@@ -292,10 +302,16 @@ It reports three things, and only the first is the one people expect:
   silently does not apply on the front end.
 - **DROPPED ATTRIBUTE** — that migration threw away something you wrote.
 
-The last two are the dangerous ones: the pattern renders, the editor is quiet,
-and the design is just wrong. Fix and re-run; an empty report is the only
-acceptable result. A `core/missing` means the site lacks that block, or the
-markup has a typo.
+OLD FORM and DROPPED ATTRIBUTE are the dangerous ones: the pattern renders, the
+editor is quiet, and the design is just wrong. Fix and re-run; an empty report
+is the only acceptable result. A `core/missing` means the site lacks that
+block, or the markup has a typo.
+
+It also notes a **STYLING HOOK**: a block whose `className` holds a class that
+isn't a block style variation's (`is-style-…`). That doesn't fail the run,
+because the markup is valid, but nothing in WordPress styles that class, so
+it's either doing nothing or it's hanging a look on a stylesheet nobody editing
+the page can see. Make the look a variation, or put it in the block's settings.
 
 It validates against **the WordPress the pattern is destined for, not npm**:
 the editor's own block code, at the version that site runs. Where it gets that
@@ -482,15 +498,17 @@ what you'd call it, what value — and **build with the nearest existing token
 meanwhile**, putting the proposal in the handoff. Stopping to ask hands back
 the work you were given, and the answer costs nothing after the fact. Never
 inline the value in the markup: that opts the pattern out of the site's
-palette, its dark mode and every future restyle. Where the user has already
-said to extend the system, add it with `pattern-builder/add-design-tokens`
-(or `theme.json` directly) **before** the pattern that references it.
+palette, its dark mode and every future restyle. Moving it into a stylesheet
+behind a class of your own does the same, and hides it as well. Where the user
+has already said to extend the system, add it with
+`pattern-builder/add-design-tokens` (or `theme.json` directly) **before** the
+pattern that references it.
 
 ## References
 
 - `references/pattern-kinds.md` — the six kinds and the headers each writes
 - `references/block-vocabulary.md` — which blocks are allowed where, and the core vocabulary by purpose
-- `references/design-system.md` — tokens, inherited styles, block style variations, and which names travel
+- `references/design-system.md` — tokens, inherited styles, block style variations, where a look goes, and which names travel
 - `references/block-markup.md` — the attribute-to-markup contract per block, for hand-writing and for debugging
 - `references/composition.md` — factoring into elements, sections and pages
 - `references/design-content-split.md` — Pattern Overrides slots and their silent failures

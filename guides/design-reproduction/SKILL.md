@@ -143,6 +143,15 @@ headings their exact sizes on `styles.elements`, and let every other text size
 take the nearest of the five, with each one that rounds written in the tokens
 table.
 
+**Don't carry the exact values into a stylesheet instead.** With the theme's
+files open, it's tempting to give each label its own `clamp()` and each band its
+offsets in `vw` until the page matches the mockup. A rounded size in the tokens
+table is a decision someone can see and reject; a size per class in a
+stylesheet is a second type scale nobody chose, and the editor can't show it.
+Sizes, spacing and widths go in tokens and block settings, and a look that
+needs a name is a block style variation. `pattern-author`'s
+`references/design-system.md`, *Where a look goes*, has the order.
+
 ### 5. Factor, then build
 
 `pattern-author`'s **factor** step, rules unchanged: inventory what repeats,
@@ -215,12 +224,26 @@ what and where.
 - **Anything needing CSS outside a block style variation.** A variation may
   carry a `css` string, which covers most of what theme.json has no property
   for — pseudo-elements, `list-style`, transforms, transitions, hover states —
-  scoped to the blocks carrying its class. Reach for that first;
-  `pattern-author`'s `references/design-system.md` has the subset and what it
-  refuses. What stays out of reach is anything needing a media query (core
-  cannot place an at-rule there), a comma or a sibling combinator in a
-  selector, or a rule on something the pattern's own markup does not carry.
-  Rebuild those from real blocks and say what changed.
+  scoped to the blocks carrying its class, and to those blocks alone. Reach for
+  that first; `pattern-author`'s `references/design-system.md` has the subset
+  and what it refuses. What stays out of a variation's reach is anything
+  needing a media query (core cannot place an at-rule there), a comma or a
+  sibling combinator in a selector, or a rule on something the pattern's own
+  markup does not carry. Rebuild those from real blocks and say what changed.
+  A source whose card styles its heading, image and button from one class
+  becomes a card variation whose `blocks` entries style each kind of block
+  inside it, or blocks that carry their own look, not one `css` that reaches
+  into all of them.
+  Most of what a source's media queries do is not out of reach on WordPress
+  7.1 and later. A grid dropping to one column, padding shrinking or a block
+  moving to another row is a per-viewport setting on that block
+  (`pattern-author`'s `references/block-vocabulary.md`, *A different look at
+  another width*). Read the source's breakpoints against the theme's
+  (480px and 782px unless `settings.viewport` says otherwise) and say where
+  they differ. With the theme's files open, a media query those settings can't
+  express can go in the theme's stylesheet, scoped to a variation's class and
+  the block carrying it, and named in the handoff. A rule keyed to a class you
+  added for the purpose isn't that: it's the same CSS, harder to find.
 - **Variable font axes.** The font collection serves fixed instances, one file
   per weight. Ask `list-fonts` for the family before promising a match.
 - **Images you only have a picture of.** Use placeholders and hand back the

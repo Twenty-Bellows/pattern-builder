@@ -16,7 +16,7 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 	}
 
 	public function tear_down() {
-		foreach ( array( 'core/button' => array( 'button-secondary', 'button-hover', 'button-hover-css' ), 'core/group' => array( 'group-hover' ) ) as $block => $slugs ) {
+		foreach ( array( 'core/button' => array( 'button-secondary', 'button-hover', 'button-hover-css' ), 'core/group' => array( 'group-hover', 'group-plate' ) ) as $block => $slugs ) {
 			foreach ( $slugs as $slug ) {
 				if ( WP_Block_Styles_Registry::get_instance()->is_registered( $block, $slug ) ) {
 					unregister_block_style( $block, $slug );
@@ -272,7 +272,8 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 	}
 
 	/**
-	 * One `css`, at the top of the variation's own styles tree.
+	 * CSS sits at the top of the variation's styles, for the block it is applied to, or on a
+	 * block type it styles inside itself, for that block. An element isn't a block.
 	 */
 	public function test_css_deeper_in_the_tree_is_refused() {
 		$result = Pattern_Builder_Block_Style_Variations::add(
@@ -288,6 +289,82 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 		$this->assertWPError( $result );
 		$this->assertSame( 'pb_variation_nested_css', $result->get_error_code() );
 		$this->assertStringContainsString( 'elements.link.css', $result->get_error_message() );
+	}
+
+	/**
+	 * A variation styles the blocks inside it through its `blocks`, and each of those may
+	 * carry CSS of its own, for that block.
+	 */
+	public function test_a_block_inside_the_variation_can_carry_its_own_css() {
+		$heading = 'rotate: -2deg; &::after { content: "*"; }';
+		$result  = Pattern_Builder_Block_Style_Variations::add(
+			$this->args(
+				array(
+					'slug'       => 'group-plate',
+					'blockTypes' => array( 'core/group' ),
+					'styles'     => array(
+						'css'    => 'position: relative;',
+						'blocks' => array(
+							'core/heading' => array(
+								'typography' => array( 'fontSize' => '3rem' ),
+								'css'        => $heading,
+							),
+						),
+					),
+				)
+			)
+		);
+
+		$this->assertNotWPError( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+
+		$partial = json_decode( (string) file_get_contents( Pattern_Builder_Block_Style_Variations::directory() . '/group-plate.json' ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test assertion.
+		$this->assertSame( $heading, $partial['styles']['blocks']['core/heading']['css'] );
+		$this->assertSame( '3rem', $partial['styles']['blocks']['core/heading']['typography']['fontSize'] );
+	}
+
+	/**
+	 * That CSS goes through the same check as the variation's own, and the refusal says
+	 * which block's it was.
+	 */
+	public function test_css_on_a_block_inside_is_checked_too() {
+		$result = Pattern_Builder_Block_Style_Variations::add(
+			$this->args(
+				array(
+					'styles' => array(
+						'blocks' => array(
+							'core/heading' => array( 'css' => 'background: url(https://evil.test/x.png);' ),
+						),
+					),
+				)
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_variation_css_refused', $result->get_error_code() );
+		$this->assertStringContainsString( 'blocks.core/heading.css', $result->get_error_message() );
+	}
+
+	/**
+	 * Nothing deeper than the block: its elements, states and breakpoints are refused.
+	 */
+	public function test_css_deeper_than_a_block_inside_is_refused() {
+		$result = Pattern_Builder_Block_Style_Variations::add(
+			$this->args(
+				array(
+					'styles' => array(
+						'blocks' => array(
+							'core/heading' => array(
+								'elements' => array( 'link' => array( 'css' => 'color: red;' ) ),
+							),
+						),
+					),
+				)
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'pb_variation_nested_css', $result->get_error_code() );
+		$this->assertStringContainsString( 'blocks.core/heading.elements.link.css', $result->get_error_message() );
 	}
 
 	/**
@@ -342,6 +419,49 @@ class Test_Block_Style_Variations extends WP_UnitTestCase {
 		$this->assertStringContainsString( ':hover', $css );
 		$this->assertStringContainsString( '#123456', $css );
 		$this->assertStringContainsString( ':root :where(', $css, 'Core scopes the rules to the variation rather than emitting them bare.' );
+	}
+
+	/**
+	 * A block inside the variation gets its CSS scoped to itself within the variation: `&` is
+	 * that block, not the one the variation is applied to.
+	 */
+	public function test_css_on_a_block_inside_renders_scoped_to_that_block() {
+		$written = Pattern_Builder_Block_Style_Variations::add(
+			$this->args(
+				array(
+					'slug'       => 'group-plate',
+					'blockTypes' => array( 'core/group' ),
+					'styles'     => array(
+						'blocks' => array(
+							'core/heading' => array( 'css' => 'rotate: -2deg; &::after { content: "*"; color: #654321; }' ),
+						),
+					),
+				)
+			)
+		);
+		$this->assertNotWPError( $written, is_wp_error( $written ) ? $written->get_error_message() : '' );
+
+		wp_clean_theme_json_cache();
+		\WP_Theme_JSON_Resolver::get_theme_data();
+		wp_register_block_style_variations_from_theme_json_partials(
+			\WP_Theme_JSON_Resolver::get_style_variations( 'block' )
+		);
+		wp_clean_theme_json_cache();
+
+		do_blocks(
+			'<!-- wp:group {"className":"is-style-group-plate"} -->'
+				. '<div class="wp-block-group is-style-group-plate">'
+				. '<!-- wp:heading --><h2 class="wp-block-heading">Plate</h2><!-- /wp:heading -->'
+				. '</div>'
+				. '<!-- /wp:group -->'
+		);
+
+		$after = wp_styles()->get_data( 'block-style-variation-styles', 'after' );
+		$css   = is_array( $after ) ? implode( "\n", $after ) : (string) $after;
+		$GLOBALS['wp_styles'] = null;
+
+		$this->assertMatchesRegularExpression( '/\.is-style-group-plate--\d+ \.wp-block-heading\)\s*\{\s*rotate: -2deg;/', $css );
+		$this->assertMatchesRegularExpression( '/\.is-style-group-plate--\d+ \.wp-block-heading\)::after\s*\{[^}]*#654321/', $css );
 	}
 
 	public function test_a_variation_needs_a_block_type() {

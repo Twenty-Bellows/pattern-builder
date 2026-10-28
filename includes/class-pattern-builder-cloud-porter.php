@@ -282,24 +282,42 @@ class Pattern_Builder_Cloud_Porter {
 			$renamed[]         = $variation;
 		}
 		foreach ( $renamed as $index => $variation ) {
-			if ( ! isset( $variation['styles']['css'] ) || ! is_string( $variation['styles']['css'] ) ) {
-				continue;
+			if ( isset( $variation['styles']['css'] ) && is_string( $variation['styles']['css'] ) ) {
+				$renamed[ $index ]['styles']['css'] = self::rename_variations_in_css( $variation['styles']['css'], $variations, $prefix );
 			}
 
-			$css = $variation['styles']['css'];
-			foreach ( $variations as $original ) {
-				$from = (string) $original['slug'];
-				$css  = preg_replace(
-					'/\bis-style-' . preg_quote( $from, '/' ) . '(?![a-z0-9-])/',
-					'is-style-' . $prefix . '-' . $from,
-					$css
-				);
+			// A block placed inside the variation can carry CSS of its own, which can name a variation too.
+			if ( isset( $variation['styles']['blocks'] ) && is_array( $variation['styles']['blocks'] ) ) {
+				foreach ( $variation['styles']['blocks'] as $name => $block ) {
+					if ( is_array( $block ) && isset( $block['css'] ) && is_string( $block['css'] ) ) {
+						$renamed[ $index ]['styles']['blocks'][ $name ]['css'] = self::rename_variations_in_css( $block['css'], $variations, $prefix );
+					}
+				}
 			}
-
-			$renamed[ $index ]['styles']['css'] = $css;
 		}
 
 		return array( $content, $renamed );
+	}
+
+	/**
+	 * Stamp the collection onto every travelling variation's class a CSS string names.
+	 *
+	 * @param string $css A variation's CSS.
+	 * @param array  $variations The definitions travelling with it, under their own slugs.
+	 * @param string $prefix The collection, as a slug prefix.
+	 * @return string
+	 */
+	private static function rename_variations_in_css( $css, $variations, $prefix ) {
+		foreach ( $variations as $original ) {
+			$from = (string) $original['slug'];
+			$css  = preg_replace(
+				'/\bis-style-' . preg_quote( $from, '/' ) . '(?![a-z0-9-])/',
+				'is-style-' . $prefix . '-' . $from,
+				$css
+			);
+		}
+
+		return $css;
 	}
 
 	/**

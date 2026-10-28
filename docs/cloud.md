@@ -123,10 +123,19 @@ document. `set-global-styles` therefore refuses one outright: a `css` at the
 root or on an element is scoped to nothing a pattern brought with it.
 
 A variation is the exception. `add-block-style-variation` accepts a `css` at the
-partial's top-level `styles.css` and nowhere deeper, because its selector is a
-class the pattern's own markup carries — and without one a variation cannot
-express a pseudo-element, a descendant rule or a hover state, which is most of
-what a variation is for.
+partial's top-level `styles.css` and at `styles.blocks.{block}.css`, and nowhere
+else, because each selector is a class the pattern's own markup carries — and
+without one a variation cannot express a pseudo-element, a hover state or a rule
+for markup its block renders itself, which is most of what a variation is for.
+Core scopes the first to the block the variation is applied to and the second
+to that kind of block inside it (`.is-style-x--{n} .wp-block-heading`), so each
+styles one block. The grammar still accepts a descendant selector, since an
+image variation's `& img` needs one; the guides are what keep it off blocks
+placed inside. `check_css()` in `Pattern_Builder_Block_Style_Variations` decides
+where a `css` may sit, for the write, the export and the install alike, and
+`rewrite_variations()` stamps the namespace into both places. The service's own
+check accepts only the top-level `styles.css` so far, so a variation carrying
+`styles.blocks.{block}.css` is refused on upload until it matches.
 
 What it accepts is decided by **`Safe_Css`**, a grammar rather than a filter:
 declarations first, then nested rules anchored on `&`. That is a strict subset

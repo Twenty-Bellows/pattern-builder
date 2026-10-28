@@ -173,6 +173,31 @@ class Test_Cloud_Variations extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A block inside the variation carries CSS of its own, which can name a travelling
+	 * variation as well, so the stamp reaches that string too.
+	 */
+	public function test_the_namespace_rewrite_reaches_a_block_inside_the_variation() {
+		list( , $variations ) = Pattern_Builder_Cloud_Porter::rewrite_variations(
+			$this->group_with( 'card' ),
+			array(
+				array(
+					'slug'       => 'card',
+					'title'      => 'Card',
+					'blockTypes' => array( 'core/group' ),
+					'styles'     => array(
+						'blocks' => array(
+							'core/heading' => array( 'css' => '&.is-style-card { color: red; }' ),
+						),
+					),
+				),
+			),
+			'studio-a/heroes'
+		);
+
+		$this->assertSame( '&.is-style-studio-a-heroes-card { color: red; }', $variations[0]['styles']['blocks']['core/heading']['css'] );
+	}
+
+	/**
 	 * The markup carries the class and no colour at all — the preset the variation resolves
 	 * to lives in its definition.
 	 */
