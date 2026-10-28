@@ -379,8 +379,15 @@ approximating them:
   on Show template themselves.
 - **A header that changes as the page scrolls**, shrinking or changing color.
   That's script.
-- **Anything that needs a media query**, such as a different layout below a
-  width the blocks don't already respond to. `design-system.md` says what a
-  block style variation can and can't carry.
+- **A media query the blocks' own settings can't express.** On WordPress 7.1
+  and later, a block takes values per viewport under `style["@tablet"]` and
+  `style["@mobile"]`, at the theme's breakpoints (480px and 782px unless
+  `settings.viewport` says otherwise). Its spacing, typography, colors and
+  layout can all differ there, so a footer grid that drops to one column on
+  phones, or a frame whose padding shrinks, is markup a template or pattern can
+  carry.
+  Before 7.1, or for a rule those values can't hold, it's a media query in the
+  theme's stylesheet. `design-system.md` says what a block style variation can
+  and can't carry.
 - **Sticky positioning on a theme that hasn't turned it on.** The markup is
   above; the setting is the theme's.
