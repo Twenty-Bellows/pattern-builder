@@ -3,7 +3,7 @@ Contributors:      twentybellows, pbking
 Tags:              block-patterns, patterns, block-editor, gutenberg, design
 Requires at least: 6.8
 Tested up to:      7.1
-Stable tag:        2.3.1
+Stable tag:        2.3.2
 Requires PHP:      7.4
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -118,6 +118,16 @@ Yes. Anything registered as post meta with show_in_rest is offered automatically
 == Screenshots ==
 
 == Changelog ==
+
+= 2.3.2 =
+* Agents can read, create, change and delete the active theme's templates and template parts through five new abilities, with the same checks and warnings a pattern gets, a guide to what belongs in a template, a part or a pattern, and a Site Editor customization folded into the theme's file when one is updated
+* Theme patterns may link to the site's own pages with home_url() and reach the theme's own files with get_theme_file_uri(), the calls theme authors already write; saving a pattern writes them back, so such patterns open for editing instead of read-only, and a link typed as this site's address follows the theme to any site
+* Links to the site's own pages travel through patternbuilderwp.com as pages of whichever site installs the pattern, rather than as links back to the site that uploaded it
+* A theme's own images are no longer downloaded and copied into the theme on every save
+* A block style variation can carry CSS for a kind of block placed inside it, scoped to that block, and the guides now say where a look belongs: theme.json, the block's settings, a variation, and a stylesheet last
+* The block validator notes a class that nothing in WordPress styles, and reports a group that pads its own sides to place its content, which saving a pattern now warns about as well
+* The authoring guides place sections at the theme's Wide and Regular widths rather than as padded full-width bands, and cover per-viewport block styles on WordPress 7.1
+* Fixed: a synced pattern placed in a template reached the Site Editor as an unlinked copy with its slot content replaced by placeholder text, and saving the template stored that copy
 
 = 2.3.1 =
 * Agents give each color they add to your design system a name for the job it does (base, surface, primary, accent, hairline and so on) rather than its hue, so a restyle never leaves a color misnamed, and a name outside that list is refused
