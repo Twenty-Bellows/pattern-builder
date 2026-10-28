@@ -253,7 +253,15 @@ reference with more than one root block leaves its sizing unknown
 (`composition_reference_unknown`). A grid that sets a column count or a minimum
 column width sizes its own tracks and is left alone. These are warnings because
 the markup is valid and renders; it just renders as a vertical stack, and
-nothing else reports that. It runs on the site rather than beside the agent
+nothing else reports that. The same class reports a group that sets its own
+left or right padding to place its content (`composition_side_padding`): on a
+full-width group, or on one with nothing painted behind it — no background,
+gradient, image, border or block style variation. Content gets its width from
+the layout's two sizes, Regular and Wide, and its distance from the window's
+edges from the theme's root padding, so that padding is a pattern doing the
+theme's job; WordPress's default themes do it on most sections, which is why
+agents reach for it. Padding inside something painted keeps text off its own
+edges and is left alone. It runs on the site rather than beside the agent
 because it needs only the parser and the patterns a reference points at, both
 of which are here — an agent connected over MCP has neither. Like the
 description, only markup the write changed is judged.
@@ -443,6 +451,14 @@ The scripts are cached in the system's temp folder, one folder per list. Each
 run touches its own folder and removes any other unused for a week, so a site
 that updated WordPress, or one no longer worked on, does not leave its old code
 behind for good, while several sites in use at once keep theirs.
+
+**It also reports SIDE PADDING**, which is not about validity: a group that
+pads its own sides to place its content, the shape `composition_side_padding`
+warns about on a write. `sidePadding()` and the class's `side_padding()` apply
+the same rule and have to be kept in step. It is here as well as on the site
+because theme pattern files are usually written straight to disk, where no
+write ability ever sees them, and the validator is the one thing the guide has
+an agent run on every file. It fails the run like the other reports.
 
 ## The guides
 

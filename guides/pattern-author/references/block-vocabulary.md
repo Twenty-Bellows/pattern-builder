@@ -107,9 +107,24 @@ the site rather than at a page.
 | A visible rule | `core/separator` | |
 
 Most spacing problems are solved by a group's `blockGap` rather than by
-spacers. Two rules about the first four rows matter more than the rows
-themselves, because getting either wrong produces a page that is entirely
-valid and has no layout.
+spacers. Three rules about the first four rows matter more than the rows
+themselves, because getting any of them wrong produces a page that is entirely
+valid and has the wrong layout.
+
+**Width is Wide or Regular, never padding.** Content is placed with the
+layout's two sizes and nothing else: Regular, which a child of a constrained
+group gets when it has no `align`, and Wide, `{"align":"wide"}`. A section is
+a constrained group that is itself Wide or Regular, padded top and bottom
+only. Left and right padding is never how content gets its width or its
+distance from the window's edges — that distance is the theme's root padding,
+and a band that adds its own doubles it on one theme and fights another. Full
+width is for a band whose background has to reach the window's edges, or a
+wrapper holding one: `{"align":"full"}` with that background, constrained
+inside so its content is still Regular or Wide, and no side padding. The shape
+to unlearn is a full-width group with no background, padded on both sides,
+wrapping a Wide group to get back to the column; WordPress's default themes
+use it on most sections, which is why it feels normal. Padding inside a painted
+plate or card, which keeps text off its own edges, is not layout and is fine.
 
 **A flex row will not make a grid of cards.** A flex child with no width sizes
 to its own content, and a `core/group` with `{"layout":{"type":"constrained"}}`
@@ -249,10 +264,12 @@ somebody's website instead of as the service.
 later. If a group has no background, no padding and no layout of its own, it
 is probably not earning its place.
 
-**One full-width band, constrained inside.** The common section shape is
-`{"align":"full"}` on the outer group with `{"layout":{"type":"constrained"}}`,
-so the background reaches the edges while the content respects `contentSize`.
-Nesting several full-width groups is usually a mistake.
+**One constrained group per section, Wide or Regular.** A section is a group
+with `{"layout":{"type":"constrained"}}` that is `{"align":"wide"}` or has no
+`align`, padded top and bottom only. Make it `{"align":"full"}` only when its
+background has to reach the window's edges; its content stays Regular or Wide
+either way, and no section pads its sides (see *Width is Wide or Regular*
+above). Nesting several full-width groups is usually a mistake.
 
 **Let layout do spacing.** `blockGap` on the container beats a spacer between
 every child, and it stays right when a slot is filled with more or less text.

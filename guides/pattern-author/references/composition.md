@@ -48,7 +48,7 @@ signal that a pattern is wanted**, and it is easy to read as content.
 | Level | What it is | What it contains | Repeats? |
 |---|---|---|---|
 | **Element** | the smallest named thing | markup, with slots | many times |
-| **Section** | a full-width band | a heading and references to elements | sometimes across pages |
+| **Section** | a band of the page, Wide or Regular | a heading and references to elements | sometimes across pages |
 | **Page** | a whole page | references to sections, and this page's own markup | once |
 
 A pattern at any level may reference patterns below it, **and the nesting is

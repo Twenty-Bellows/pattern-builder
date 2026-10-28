@@ -128,6 +128,55 @@ class Test_Composition_Checks extends Pattern_Test_Case {
 	}
 
 	/**
+	 * A group with the attributes given, as JSON without its braces, around a paragraph.
+	 *
+	 * @param string $attrs The group's attributes.
+	 * @return string
+	 */
+	private function band( $attrs ) {
+		return '<!-- wp:group {' . $attrs . '} --><div class="wp-block-group"><!-- wp:paragraph --><p>Band</p><!-- /wp:paragraph --></div><!-- /wp:group -->';
+	}
+
+	/**
+	 * The habit this exists for: a full-width band padded at its sides, doing the job of the
+	 * theme's two widths and its root padding.
+	 */
+	public function test_a_full_width_group_padding_its_sides_is_reported() {
+		$warnings = Pattern_Builder_Composition_Checks::warnings(
+			$this->band( '"align":"full","metadata":{"name":"Intro"},"style":{"spacing":{"padding":{"top":"2rem","right":"var:preset|spacing|50","bottom":"2rem","left":"var:preset|spacing|50"}}},"layout":{"type":"constrained"}' )
+		);
+
+		$this->assertSame( array( 'composition_side_padding' ), array_column( $warnings, 'code' ) );
+		$this->assertStringContainsString( '"Intro"', $warnings[0]['message'] );
+		$this->assertStringContainsString( 'left and right', $warnings[0]['message'] );
+	}
+
+	public function test_a_group_with_nothing_painted_padding_one_side_is_reported() {
+		$this->assertSame(
+			array( 'composition_side_padding' ),
+			$this->codes( $this->container( '{"type":"constrained"}', array( $this->band( '"style":{"spacing":{"padding":{"left":"3rem"}}}' ) ) ) )
+		);
+	}
+
+	/**
+	 * Padding inside something painted keeps its text off its own edges, which is not layout;
+	 * a style variation may be what paints it.
+	 */
+	public function test_a_painted_group_may_pad_its_sides() {
+		$padded = '"style":{"spacing":{"padding":{"left":"1rem","right":"1rem"}}}';
+
+		$this->assertSame( array(), $this->codes( $this->band( '"backgroundColor":"contrast",' . $padded ) ) );
+		$this->assertSame( array(), $this->codes( $this->band( '"className":"is-style-card",' . $padded ) ) );
+		$this->assertSame( array(), $this->codes( $this->band( '"style":{"border":{"width":"1px"},"spacing":{"padding":{"left":"1rem","right":"1rem"}}}' ) ) );
+	}
+
+	public function test_wide_and_regular_groups_padded_top_and_bottom_draw_nothing() {
+		$this->assertSame( array(), $this->codes( $this->band( '"align":"wide","style":{"spacing":{"padding":{"top":"2rem","bottom":"2rem"}}},"layout":{"type":"constrained"}' ) ) );
+		$this->assertSame( array(), $this->codes( $this->band( '"style":{"spacing":{"padding":{"top":"2rem","bottom":"2rem"}}},"layout":{"type":"constrained"}' ) ) );
+		$this->assertSame( array(), $this->codes( $this->band( '"align":"full","backgroundColor":"contrast","style":{"spacing":{"padding":{"top":"2rem","bottom":"2rem","left":"0","right":"0px"}}}' ) ) );
+	}
+
+	/**
 	 * The writes report it, so an agent that stores through the site is told without running
 	 * anything — and an update that leaves the markup alone is no occasion to repeat it.
 	 */

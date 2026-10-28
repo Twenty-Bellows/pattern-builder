@@ -276,6 +276,13 @@ and every band written beforehand has the wrong measure baked into its markup.
 giving the root a left/right padding, or every `alignfull` band is inset by
 that padding instead of reaching the edges of the window.
 
+That root padding is the only side spacing a site has. Patterns place their
+content with the two widths — Regular for a child with no `align`, Wide for
+`alignwide` — and never pad their own sides, so when a design wants more room
+at the window's edges, change the root padding once in `set-global-styles`
+rather than in every band. It is under `styles.spacing.padding` in what
+`get-design-system` returns.
+
 ## Two tiers, and why a theme wants both
 
 The portable vocabulary is small, and a real design system needs more than two
