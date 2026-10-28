@@ -66,14 +66,21 @@ first place that can hold it.
 - **A block style variation's styles**, when it's a named look more than one
   block shares: the color, spacing, border and typography properties in its
   `styles/{slug}.json`.
-- **The variation's `css`**, for what those properties can't say: a
-  pseudo-element, a mask, a transform, a hover state. *CSS in a variation*,
-  below, has what it accepts.
+- **The variation's `css`**, for what those properties can't say about the
+  block it's on: a pseudo-element, a mask, a transform, a hover state.
+  *CSS in a variation*, below, has what it accepts.
 - **The theme's stylesheet**, last, for what none of those can hold, like a
   media query or a rule for `::selection` or a focus ring, and only when the
   theme is yours to change. Scope each rule to a variation's `is-style-` class
-  or to an element, and say in the handoff what you put there and why nothing
-  above could hold it.
+  and the block carrying it, or to an element, and say in the handoff what you
+  put there and why nothing above could hold it.
+
+Whichever of these holds it, CSS styles one block. A variation's `css` styles
+the block it's applied to and markup that block renders itself, like an image's
+`img` or a button's link, and never a block placed inside it. A variation still
+styles the blocks inside it, through its JSON: an entry in its `blocks` gives
+one kind of block inside it its own properties, and can carry a `css` of its
+own, which styles that block the same way and nothing nested in it.
 
 The order breaks in the same few ways, and each one looks finished:
 
@@ -94,6 +101,18 @@ belongs in the setting.
 20px `medium` and a 32px `large` is `medium`, with the rounding written into
 your tokens table (*Font sizes*, below). A stylesheet full of bespoke `clamp()`
 sizes matches the mockup and leaves the site without a type scale.
+
+**CSS that reaches into the blocks inside a variation is one component's
+stylesheet.** A group variation whose `css` sizes the heading with `& h2`, tilts
+the image with `& .hero__photo` and sets the button's size with `& > * > a` is
+keyed to the classes and positions the first pattern happened to use. Rename the
+class or move a block and the look stops applying, with nothing to say so, and
+nothing on the heading says where its size comes from. Give each piece its look
+where it belongs: its own settings, a variation of its own, or the group
+variation's `blocks` entry for that kind of block, whose properties and `css`
+core scopes to that block inside the variation. If someone can select it in the
+editor and move, remove or replace it, it's a block of its own, and no other
+block's `css` styles it.
 
 Matching a mockup to the pixel is what pushes all of these. The deliverable is
 a page built from blocks that reads as the mockup at its width, not a page that
@@ -410,22 +429,47 @@ a variation still ships. So does its `css`, below.
 
 ## CSS in a variation
 
-The style properties cannot express a pseudo-element, a descendant rule or a
-hover state, and those are most of what a variation is for. So a variation,
-alone among the things these abilities write, may carry a `css` string, at the
-top of its `styles` and nowhere deeper. Writing the theme's files yourself, put
-that CSS here too rather than in a stylesheet: here it's scoped to the
-variation's class and travels with the definition.
+The style properties cannot express a pseudo-element, a hover state or a rule
+for markup the block renders itself, and those are most of what a variation is
+for. So a variation, alone among the things these abilities write, may carry
+CSS in two places and no others: a `css` string at the top of its `styles`, and
+one in each entry of its `blocks`. Writing the theme's files yourself, put that
+CSS here too rather than in a stylesheet: here it's scoped to the variation's
+class and travels with the definition.
+
+Each of those strings styles one block, with `&` standing for it. The top one
+styles the block the variation is applied to. A `blocks` entry's styles that
+kind of block inside the variation, and core scopes it there:
+`blocks.core/heading.css` prints scoped to `.is-style-band-dark--{n} .wp-block-heading`.
+Either may reach markup its own block renders, like an image's `img`, a
+button's link or a search's input, and neither reaches into another block. The
+blocks inside a variation are styled through its JSON, `blocks` and `elements`
+(which is how a dark band inverts its link color, *What the schema cannot tell
+you*, below), never by a selector in the variation's own `css`.
 
 ```json
 {
   "slug": "band-dark",
   "blockTypes": ["core/group"],
   "styles": {
-    "css": "position: relative; overflow: hidden; & > * { position: relative; z-index: 1; } &::before { content: \"\"; position: absolute; inset: 0; background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px); background-size: 22px 22px; }"
+    "css": "position: relative; isolation: isolate; overflow: hidden; &::before { content: \"\"; position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px); background-size: 22px 22px; }",
+    "blocks": {
+      "core/heading": {
+        "typography": { "letterSpacing": "0.04em" },
+        "css": "&::after { content: \"\"; display: block; width: 3rem; margin-top: 0.5rem; border-bottom: 2px solid currentColor; }"
+      }
+    }
   }
 }
 ```
+
+The dots sit behind the band's content without a rule on anything inside it.
+`isolation: isolate` makes the band its own stacking context, so the
+pseudo-element's `z-index: -1` puts it above the band's background and below
+everything in the band. The usual alternative, `& > * { z-index: 1 }`, gets
+there by reaching into every block placed in it. The headings get their
+tracking and the short rule under them from the `blocks` entry, where `&` is the
+heading.
 
 The shape is **declarations first, then nested rules anchored on `&`** — and
 the order matters: WordPress folds a declaration written after a rule into that
@@ -462,11 +506,10 @@ block entirely.
 An upload therefore stamps the collection onto the name:
 `is-style-button-secondary` becomes `is-style-studio-a-heroes-button-secondary`
 in the markup, and the definition's slug moves with it — as does any
-`is-style-` its own `css` names, so a variation that reaches for a sibling by
-class keeps reaching for it. **You do not do this
-yourself.** Author under the readable local name; the namespace is applied on
-the way up, once, and never rewritten afterwards — a re-upload that renamed it
-would install a second identical variation beside the first.
+`is-style-` its own `css` names. **You do not do this yourself.** Author under
+the readable local name; the namespace is applied on the way up, once, and
+never rewritten afterwards — a re-upload that renamed it would install a second
+identical variation beside the first.
 
 ---
 
@@ -600,6 +643,11 @@ transforms and transitions.
     scoped to a variation or an element. No made-up classes, no CSS setting
     what the block already sets, and no sizes the scale doesn't have. That
     holds when you edit the theme's files yourself too.
+12. **A variation's CSS styles one block.** Its top-level `css` styles the block
+    it's applied to, and a `blocks` entry's `css` that kind of block inside it.
+    Each reaches its own block's pseudo-elements, states and rendered markup,
+    and never a block nested in it: the blocks inside a variation are styled
+    through its JSON, not by a selector.
 
 ## The one case where the evidence above *is* a breakage map
 

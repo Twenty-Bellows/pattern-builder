@@ -2,7 +2,7 @@
 name: pattern-author
 description: Write WordPress block patterns — hero sections, pricing tables, FAQ lists, CTA bands, testimonials, page layouts — as valid block markup that uses the theme's own design tokens, factored into reusable parts rather than written out longhand. Use this whenever the task involves creating, editing, or composing a block pattern, a theme pattern file, a reusable block, or a section of a block-theme page. Hand-written block markup is invalid far more often than it looks, because invalid markup renders perfectly on the front end and only breaks when someone opens the editor — so reach for this skill even for a "quick" pattern, and especially before writing markup into a theme. To rebuild a design that already exists somewhere — a site, a Figma file, a screenshot — load the design-reproduction skill as well; it decides what to build and how faithfully, and leans on this one to build it.
 metadata:
-  version: 1.19.0
+  version: 2.0.0
 ---
 
 # Authoring block patterns
@@ -108,8 +108,10 @@ block's own settings, then a block style variation, and the theme's stylesheet
 only for what none of those can. That holds when you're editing the theme's
 files directly, which is when it's easiest to forget. A class you make up and
 style from a stylesheet hides the look from everyone editing the page; when a
-look needs a name, it's a variation. *Where a look goes* in
-`references/design-system.md` has the order and the ways it breaks.
+look needs a name, it's a variation. A variation's `css` styles the block it's
+on, never the blocks placed inside it; it styles those through its JSON
+`blocks`, each of which can carry `css` for that block alone. *Where a look
+goes* in `references/design-system.md` has the order and the ways it breaks.
 
 **Then look for the pattern before you write it.** On a site that already has
 patterns, what you are asked for is often close to one that exists. Search

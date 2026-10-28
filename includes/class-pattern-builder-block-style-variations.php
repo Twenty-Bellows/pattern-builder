@@ -269,43 +269,64 @@ class Pattern_Builder_Block_Style_Variations {
 	 * @return true|WP_Error
 	 */
 	private static function check_css( $styles ) {
-		$deeper = array();
-		foreach ( Pattern_Builder_Theme_Styles::find_css( $styles ) as $path ) {
-			if ( 'css' !== $path ) {
-				$deeper[] = $path;
-			}
-		}
+		$carried = self::css_by_path( $styles );
+		$deeper  = array_values( array_diff( Pattern_Builder_Theme_Styles::find_css( $styles ), array_keys( $carried ) ) );
 
 		if ( $deeper ) {
 			return new WP_Error(
 				'pb_variation_nested_css',
 				sprintf(
 					/* translators: %s: dotted paths within the styles tree, comma separated. */
-					__( 'A block style variation may carry CSS only at the top of its styles tree, and this one carries it at %s. Move the rules into the one "css" string, where a nested selector can say the same thing.', 'pattern-builder' ),
+					__( 'A block style variation may carry CSS at the top of its styles tree, for the block it is applied to, and under blocks.{block}.css, for a block placed inside it. This one carries it at %s. Put each rule on the block it styles.', 'pattern-builder' ),
 					implode( ', ', $deeper )
 				),
 				array( 'status' => 400 )
 			);
 		}
 
-		if ( ! isset( $styles['css'] ) ) {
-			return true;
-		}
-
-		$safe = Safe_Css::check( $styles['css'] );
-		if ( is_wp_error( $safe ) ) {
-			return new WP_Error(
-				'pb_variation_css_refused',
-				sprintf(
-					/* translators: %s: the rule that was broken and the CSS that broke it. */
-					__( 'This CSS is outside the subset a block style variation may carry — %s', 'pattern-builder' ),
-					$safe->get_error_message()
-				),
-				array( 'status' => 400 )
-			);
+		foreach ( $carried as $path => $css ) {
+			$safe = Safe_Css::check( $css );
+			if ( is_wp_error( $safe ) ) {
+				return new WP_Error(
+					'pb_variation_css_refused',
+					sprintf(
+						/* translators: %s: the rule that was broken and the CSS that broke it. */
+						__( 'This CSS is outside the subset a block style variation may carry — %s', 'pattern-builder' ),
+						'css' === $path ? $safe->get_error_message() : $path . ': ' . $safe->get_error_message()
+					),
+					array( 'status' => 400 )
+				);
+			}
 		}
 
 		return true;
+	}
+
+	/**
+	 * The CSS a variation carries where it may, by dotted path: `css` at the top of its
+	 * styles, which styles the block the variation is applied to, and `blocks.{block}.css`,
+	 * which styles that kind of block inside it. Core scopes each to its own block, with `&`
+	 * standing for that block.
+	 *
+	 * @param array $styles A variation's `styles` subtree.
+	 * @return array Dotted path => the `css` value.
+	 */
+	private static function css_by_path( $styles ) {
+		$found = array();
+
+		if ( isset( $styles['css'] ) ) {
+			$found['css'] = $styles['css'];
+		}
+
+		if ( isset( $styles['blocks'] ) && is_array( $styles['blocks'] ) ) {
+			foreach ( $styles['blocks'] as $name => $block ) {
+				if ( is_array( $block ) && isset( $block['css'] ) ) {
+					$found[ 'blocks.' . $name . '.css' ] = $block['css'];
+				}
+			}
+		}
+
+		return $found;
 	}
 
 	/**

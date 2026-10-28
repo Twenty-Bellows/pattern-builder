@@ -288,14 +288,18 @@ because a string that closes its own selector writes rules for the whole
 document — and a `css` at the root or on an element is scoped to nothing a
 pattern brought with it.
 
-**`add-block-style-variation` does**, at the top of its `styles` and nowhere
-deeper, because there the selector is a class the pattern's own markup carries.
-It is the only way to write a pseudo-element, a descendant rule or a hover
-state into a variation, and it travels with the pattern. What goes in is a
-sequence of declarations and then nested rules anchored on `&`:
+**`add-block-style-variation` does**, at the top of its `styles` and in each
+entry of its `blocks`, nowhere else, because there the selector is a class the
+pattern's own markup carries. It is the only way to write a pseudo-element, a
+hover state or a rule for markup the block renders itself (an image's `img`)
+into a variation, and it travels with the pattern. Each `css` styles one block:
+the top one the block the variation is applied to, a `blocks` entry's that kind
+of block inside it, with `&` standing for that block. Neither reaches into
+another block. What goes in is a sequence of declarations and then nested rules
+anchored on `&`:
 
 ```json
-{"styles": {"css": "position: relative; & > * { z-index: 1; } &::before { content: \"\"; inset: 0; }"}}
+{"styles": {"css": "position: relative; isolation: isolate; &::before { content: \"\"; position: absolute; inset: 0; z-index: -1; }", "blocks": {"core/heading": {"css": "rotate: -2deg;"}}}}
 ```
 
 A safe-subset check decides what is accepted, and it refuses rather than

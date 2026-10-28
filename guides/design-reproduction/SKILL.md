@@ -218,14 +218,18 @@ what and where.
 - **Anything needing CSS outside a block style variation.** A variation may
   carry a `css` string, which covers most of what theme.json has no property
   for — pseudo-elements, `list-style`, transforms, transitions, hover states —
-  scoped to the blocks carrying its class. Reach for that first;
-  `pattern-author`'s `references/design-system.md` has the subset and what it
-  refuses. What stays out of reach is anything needing a media query (core
-  cannot place an at-rule there), a comma or a sibling combinator in a
-  selector, or a rule on something the pattern's own markup does not carry.
-  Rebuild those from real blocks and say what changed. With the theme's files
-  open, a media query can go in the theme's stylesheet when nothing else can
-  hold it, scoped to a variation's class and named in the handoff. A rule keyed
+  scoped to the blocks carrying its class, and to those blocks alone. Reach for
+  that first; `pattern-author`'s `references/design-system.md` has the subset
+  and what it refuses. What stays out of reach is anything needing a media
+  query (core cannot place an at-rule there), a comma or a sibling combinator
+  in a selector, or a rule on something the pattern's own markup does not
+  carry. Rebuild those from real blocks and say what changed. A source whose
+  card styles its heading, image and button from one class becomes a card
+  variation whose `blocks` entries style each kind of block inside it, or blocks
+  that carry their own look, not one `css` that reaches into all of them.
+  With the theme's files open, a media query can go in the theme's stylesheet
+  when nothing else can hold it, scoped to a variation's class and the block
+  carrying it, and named in the handoff. A rule keyed
   to a class you added for the purpose isn't that: it's the same CSS, harder to
   find.
 - **Variable font axes.** The font collection serves fixed instances, one file
