@@ -145,8 +145,8 @@ Write `index` first if the theme has nothing yet. A theme with no
 
 Store a part before any template that places it, the same bottom-up order
 patterns follow. A reference to a part that doesn't exist renders as nothing,
-so `create-template` refuses one, and so is a part that ends up placing itself
-through another.
+so `create-template` refuses one, as it refuses a part that ends up placing
+itself through another.
 
 **Give a part its `area`.** `header` and `footer` are the usual ones; the
 areas this site supports come back from `list-templates` with

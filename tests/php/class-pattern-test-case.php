@@ -70,7 +70,12 @@ abstract class Pattern_Test_Case extends WP_UnitTestCase {
 		if ( null !== $this->theme_before ) {
 			switch_theme( $this->theme_before );
 			$this->theme_before = null;
+			// Rescanning the registered directories once this one is gone would warn about it on
+			// every later test, so it is unregistered first.
+			$GLOBALS['wp_theme_directories'] = array_values( array_diff( (array) $GLOBALS['wp_theme_directories'], array( $this->template_theme_root() ) ) );
 			$this->remove_directory( $this->template_theme_root() );
+			delete_site_transient( 'theme_roots' );
+			wp_clean_themes_cache();
 			wp_clean_theme_json_cache();
 		}
 

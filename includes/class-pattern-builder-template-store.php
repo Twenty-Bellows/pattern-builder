@@ -235,13 +235,16 @@ class Pattern_Builder_Template_Store {
 		}
 		clearstatcache( true, $path );
 
-		$folded = false;
-		foreach ( $this->customizations( $post_type, $slug ) as $post ) {
-			wp_delete_post( $post->ID, true );
-			$folded = true;
-		}
-
+		// The row's title and area live nowhere else, so they are recorded before it goes, and
+		// it stays when they could not be.
 		$warnings = $this->write_metadata( $post_type, $slug, $meta );
+		$folded   = false;
+		if ( null !== $customization && ! in_array( 'template_metadata_not_recorded', array_column( $warnings, 'code' ), true ) ) {
+			foreach ( $this->customizations( $post_type, $slug ) as $post ) {
+				wp_delete_post( $post->ID, true );
+				$folded = true;
+			}
+		}
 
 		return array(
 			'template' => $this->find( $type, $slug ),
@@ -715,6 +718,10 @@ class Pattern_Builder_Template_Store {
 	 */
 	private function write_theme_json_list( $key, $entries ) {
 		$config = Pattern_Builder_Theme_Json::load( 'theme' );
+		if ( is_wp_error( $config ) && 'pb_cloud_no_theme_json' === $config->get_error_code() ) {
+			// A block theme can go without a theme.json, but a part's area has nowhere else to live.
+			$config = array( 'version' => 3 );
+		}
 		if ( is_wp_error( $config ) ) {
 			return $config;
 		}
@@ -740,7 +747,7 @@ class Pattern_Builder_Template_Store {
 	 * @return array
 	 */
 	private function with_customization_metadata( $post_type, $slug, $meta, $customization ) {
-		$is_default = 'wp_template' === $post_type && isset( get_default_block_template_types()[ $slug ] );
+		$is_default = 'wp_template' === $post_type && self::is_hierarchy_slug( $slug );
 		$title      = trim( (string) $customization->post_title );
 
 		if ( ! $is_default && ! isset( $meta['title'] ) && '' !== $title && $slug !== $title ) {
@@ -782,7 +789,7 @@ class Pattern_Builder_Template_Store {
 			return array();
 		}
 
-		if ( 'wp_template' === $post_type && isset( get_default_block_template_types()[ $slug ] ) ) {
+		if ( 'wp_template' === $post_type && self::is_hierarchy_slug( $slug ) ) {
 			return array(
 				array(
 					'code'    => 'template_default_metadata',
@@ -803,6 +810,11 @@ class Pattern_Builder_Template_Store {
 		// An entry naming no post types is offered for pages; an empty list would offer it for nothing.
 		if ( isset( $updated['postTypes'] ) && ! $updated['postTypes'] ) {
 			unset( $updated['postTypes'] );
+		}
+		// Core reads a part entry's area whenever the entry exists, and reports an empty one as
+		// an unsupported area on every listing, so an entry always names one.
+		if ( 'wp_template_part' === $post_type && empty( $updated['area'] ) ) {
+			$updated['area'] = WP_TEMPLATE_PART_AREA_UNCATEGORIZED;
 		}
 
 		if ( null !== $index && $updated === $current ) {
@@ -830,6 +842,20 @@ class Pattern_Builder_Template_Store {
 		}
 
 		return array();
+	}
+
+	/**
+	 * Whether a template slug is one the template hierarchy reaches on its own: one of
+	 * WordPress's own types, or one of them narrowed to a post type, a term or a page, as
+	 * `single-product` or `page-about` are. WordPress names and places those itself, so they
+	 * are never recorded as custom templates.
+	 *
+	 * @param string $slug Template slug.
+	 * @return bool
+	 */
+	public static function is_hierarchy_slug( $slug ) {
+		return isset( get_default_block_template_types()[ $slug ] )
+			|| 1 === preg_match( '/^(page|single|singular|category|tag|taxonomy|author|archive|attachment)-/', (string) $slug );
 	}
 
 	/**

@@ -612,19 +612,26 @@ write that lands in the file removes a customization of the same slug, as the
 Site Editor's own reset does. The caller read the customization and edited it,
 which the update's `expectedHash` proves, so the row goes and its content is
 the file. Its title, and a part's area, go into `theme.json` unless the caller
-set them, since a part made in the Site Editor keeps its area nowhere else.
-Only its revision history is lost.
+set them, since a part made in the Site Editor keeps its area nowhere else; they
+are recorded before the row goes, and the row stays, with a warning, when they
+could not be. A theme with no `theme.json` is given one for them. Only the row's
+revision history is lost. A slug the template hierarchy reaches on its own, one
+of WordPress's own types or one narrowed to a post type, a term or a page
+(`single-product`, `page-about`), is never recorded as a custom template: it
+keeps the title WordPress gives it. A part's entry always names an area, since
+core reports an entry without one as unsupported on every listing.
 
 **The store reads for itself rather than through core**, for two reasons that
 look alike. Core lists a theme's template files once per process
-(`_get_block_templates_paths()` keeps a static list per folder) and
-`WP_Theme_JSON_Resolver` keeps each `theme.json` it has decoded for the rest of
-the request, and neither is cleared by anything a plugin can call. A template
-written during a request, or a part's area recorded in `theme.json`, would not
-show to a read later in the same request. And core's reader inserts hooked
-blocks into a file's markup, which a write would then store. So the store scans
-the folders and reads `theme.json` itself, child over parent, and returns a
-file's bytes as they are.
+(`_get_block_templates_paths()` keeps a static list per folder) that nothing a
+plugin can call clears, so a template written during a request would not show to
+a read later in the same request. Core's `theme.json` reader is cleared by
+`wp_clean_theme_json_cache()`, which the plugin's own writes call, but it hands
+back the merged whole rather than each theme's own list, and the store needs the
+parent's and the child's apart to lay one over the other (below). And core's
+reader inserts hooked blocks into a file's markup, which a write would then
+store. So the store scans the folders and reads `theme.json` itself, child over
+parent, and returns a file's bytes as they are.
 
 A template's title and post types, and a part's title and area, live only in
 `theme.json` (`customTemplates`, `templateParts`), so that is where the store

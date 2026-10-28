@@ -112,8 +112,9 @@ class Pattern_Builder_Template_Checks {
 		}
 
 		$attrs = isset( $block['attrs'] ) && is_array( $block['attrs'] ) ? $block['attrs'] : array();
-		$part  = isset( $attrs['slug'] ) ? trim( (string) $attrs['slug'] ) : '';
-		if ( '' === $part || ( isset( $attrs['theme'] ) && get_stylesheet() !== $attrs['theme'] ) ) {
+		$part  = isset( $attrs['slug'] ) ? (string) $attrs['slug'] : '';
+		// Core looks a slug up as written, so one with whitespace around it reaches no part.
+		if ( '' === $part || trim( $part ) !== $part || ( isset( $attrs['theme'] ) && get_stylesheet() !== $attrs['theme'] ) ) {
 			return null;
 		}
 
@@ -180,10 +181,19 @@ class Pattern_Builder_Template_Checks {
 			}
 
 			$attrs = isset( $block['attrs'] ) && is_array( $block['attrs'] ) ? $block['attrs'] : array();
-			$part  = isset( $attrs['slug'] ) ? trim( (string) $attrs['slug'] ) : '';
+			$part  = isset( $attrs['slug'] ) ? (string) $attrs['slug'] : '';
 
 			if ( '' === $part ) {
 				$problems[] = __( 'A core/template-part block names no part: with no slug it renders as nothing at all.', 'pattern-builder' );
+				continue;
+			}
+
+			if ( trim( $part ) !== $part ) {
+				$problems[] = sprintf(
+					/* translators: %s: the part slug as written, in quotes. */
+					__( 'A core/template-part block names its part as %s, with whitespace around the slug. Core looks the slug up exactly as written, so the reference renders as nothing.', 'pattern-builder' ),
+					'"' . $part . '"'
+				);
 				continue;
 			}
 

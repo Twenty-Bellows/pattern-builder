@@ -245,6 +245,59 @@ class Test_Template_Store extends Pattern_Test_Case {
 	}
 
 	/**
+	 * Core reads a part entry's area whenever the entry exists and reports an empty one as
+	 * unsupported on every listing, so a part recorded for its title alone gets an area too.
+	 */
+	public function test_a_part_recorded_for_its_title_alone_is_uncategorized_rather_than_arealess() {
+		$saved = $this->store->save( 'template-part', 'promo', '<!-- wp:site-title /-->', array( 'title' => 'Promo' ) );
+
+		$this->assertSame( 'Promo', $saved['template']['title'] );
+		$this->assertSame( WP_TEMPLATE_PART_AREA_UNCATEGORIZED, $saved['template']['area'] );
+
+		$config = json_decode( file_get_contents( $this->theme_dir . '/theme.json' ), true );
+		$entry  = array_column( $config['templateParts'], null, 'name' )['promo'];
+		$this->assertSame( WP_TEMPLATE_PART_AREA_UNCATEGORIZED, $entry['area'] );
+		$this->assertSame( WP_TEMPLATE_PART_AREA_UNCATEGORIZED, _add_block_template_part_area_info( array( 'slug' => 'promo' ) )['area'] );
+	}
+
+	/**
+	 * A part's area has nowhere to live but theme.json, so a theme without one is given one
+	 * rather than losing the area with the row.
+	 */
+	public function test_folding_in_a_theme_without_theme_json_writes_one() {
+		unlink( $this->theme_dir . '/theme.json' );
+		wp_clean_theme_json_cache();
+		$post_id = $this->customize_template( 'wp_template_part', 'promo', '<!-- wp:site-title /-->' );
+		wp_set_post_terms( $post_id, WP_TEMPLATE_PART_AREA_FOOTER, 'wp_template_part_area' );
+
+		$saved = $this->store->save( 'template-part', 'promo', '<!-- wp:site-title /-->' );
+
+		$this->assertSame( array(), $saved['warnings'] );
+		$this->assertTrue( $saved['folded'] );
+		$this->assertSame( WP_TEMPLATE_PART_AREA_FOOTER, $saved['template']['area'] );
+		$this->assertFileExists( $this->theme_dir . '/theme.json' );
+		$this->assertSame( 3, json_decode( file_get_contents( $this->theme_dir . '/theme.json' ), true )['version'] );
+	}
+
+	/**
+	 * The template hierarchy reaches page-about and single-product on its own and WordPress
+	 * names them itself, so neither a folded row's title nor a caller's makes one a custom
+	 * template.
+	 */
+	public function test_a_hierarchy_variant_is_not_recorded_as_a_custom_template() {
+		$this->customize_template( 'wp_template', 'page-about', '<!-- wp:post-content /-->' );
+
+		$folded  = $this->store->save( 'template', 'page-about', '<!-- wp:post-content /-->' );
+		$titled  = $this->store->save( 'template', 'single-product', '<!-- wp:post-content /-->', array( 'title' => 'Product' ) );
+		$config  = json_decode( file_get_contents( $this->theme_dir . '/theme.json' ), true );
+
+		$this->assertTrue( $folded['folded'] );
+		$this->assertSame( array(), $folded['warnings'] );
+		$this->assertSame( 'template_default_metadata', $titled['warnings'][0]['code'] );
+		$this->assertArrayNotHasKey( 'customTemplates', $config );
+	}
+
+	/**
 	 * theme.json is re-encoded when written, so it is only written when something changed.
 	 */
 	public function test_unchanged_metadata_leaves_theme_json_alone() {

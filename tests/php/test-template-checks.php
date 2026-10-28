@@ -40,6 +40,17 @@ class Test_Template_Checks extends Pattern_Test_Case {
 		$this->assertStringContainsString( 'footer part resolves to nothing', $result->get_error_data()['problems'][0] );
 	}
 
+	/**
+	 * Core looks a slug up exactly as written, so one with whitespace around it is a reference
+	 * to nothing, however much it looks like the header.
+	 */
+	public function test_a_part_slug_with_whitespace_around_it_is_refused() {
+		$result = Pattern_Builder_Template_Checks::check( 'template', 'landing', '<!-- wp:template-part {"slug":" header "} /-->' );
+
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( '" header "', $result->get_error_data()['problems'][0] );
+	}
+
 	public function test_a_part_with_no_slug_is_refused() {
 		$this->assertWPError( Pattern_Builder_Template_Checks::check( 'template', 'landing', '<!-- wp:template-part /-->' ) );
 	}
