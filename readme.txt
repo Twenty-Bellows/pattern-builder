@@ -98,6 +98,14 @@ Yes, and with no code to write. Choose a post type in the Pattern Bindings panel
 
 Yes. Anything registered as post meta with show_in_rest is offered automatically. For data of your own, register a block binding source: WordPress resolves the value from your PHP callback, and registering the same source in the editor with a getFieldsList puts your fields in the panel.
 
+== Screenshots ==
+
+1. Appearance > Pattern Builder. Theme patterns as tiles the site draws itself, with the details sidebar for the one selected.
+2. Create Pattern. Pick the kind of pattern, and whether it is stored as a file in the theme or as a user pattern.
+3. A theme pattern open in the WordPress editor, with the Pattern Bindings panel naming the blocks whoever places it may change.
+4. The Uploaded tab. Your collections on patternbuilderwp.com, with install and edit for each pattern.
+5. The patterns of one collection: the pages and sections of a whole site, installed as theme patterns and yours to edit.
+
 == Changelog ==
 
 = 2.3.2 =
