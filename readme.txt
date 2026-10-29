@@ -3,7 +3,7 @@ Contributors:      twentybellows, pbking
 Tags:              block-patterns, patterns, block-editor, gutenberg, mcp
 Requires at least: 6.8
 Tested up to:      7.1
-Stable tag:        2.3.2
+Stable tag:        2.3.3
 Requires PHP:      7.4
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -107,6 +107,9 @@ Yes. Anything registered as post meta with show_in_rest is offered automatically
 5. The patterns of one collection: the pages and sections of a whole site, installed as theme patterns and yours to edit.
 
 == Changelog ==
+
+= 2.3.3 =
+* The WordPress.org listing says what the plugin does and what a connected agent can do with it, in that order, and has screenshots
 
 = 2.3.2 =
 * Agents can read, create, change and delete the active theme's templates and template parts through five new abilities, with the same checks and warnings a pattern gets, a guide to what belongs in a template, a part or a pattern, and a Site Editor customization folded into the theme's file when one is updated
