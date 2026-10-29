@@ -1,6 +1,6 @@
 === Pattern Builder ===
 Contributors:      twentybellows, pbking
-Tags:              block-patterns, patterns, block-editor, gutenberg, design
+Tags:              block-patterns, patterns, block-editor, gutenberg, mcp
 Requires at least: 6.8
 Tested up to:      7.1
 Stable tag:        2.3.2
@@ -8,114 +8,95 @@ Requires PHP:      7.4
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
-Manage Block Patterns Like a Pro - Create, edit, and organize WordPress block patterns directly in your admin area with a powerful, intuitive interface.
+Edit your theme's block patterns in the WordPress editor, yourself or with Claude connected to the site. Theme patterns stay files in the theme.
 
 == Description ==
 
-Pattern Builder transforms how you work with WordPress block patterns, providing a comprehensive solution for creating, managing, and organizing patterns right from your WordPress admin.
+Pattern Builder puts a theme's pattern files and the patterns saved in the editor on one screen under Appearance, opens either kind in the WordPress editor, and writes theme patterns back to the theme's files. Nothing is mirrored into the database, so the theme in your repository is the theme on the site.
 
-= Key Features =
+It also gives an AI agent a proper set of tools for the same work. Connect Claude from the Agents tab and it can read the site's design system, write patterns that use it, check them before they're saved, and read and write the theme's templates and template parts. Every operation is a tool of its own, so you can let it read freely and approve each change it makes.
 
-**Pattern Management Made Easy**
-* **Unified Interface** - Manage both theme patterns and user-created patterns in one place
-* **Plugin patterns** - Browse the patterns your plugins register, and copy any of them into your theme to make it yours, with the sections it is built from
-* **Visual Editor** - Create patterns using the familiar WordPress block editor
-* **Live Preview** - See your patterns in action before saving
+= Working with an agent =
 
-**Powerful Organization**
-* **Categories** - Organize patterns by category for easy discovery
-* **Advanced Search** - Find patterns quickly with powerful filtering options
-* **Tags & Keywords** - Add metadata to make patterns discoverable
-* **Sync Status** - Manage synced and unsynced patterns effortlessly
+**Connecting is one paste.** The Agents tab checks what a connection needs, installs the MCP Adapter plugin for you when it's missing, creates a password only the agent uses, and hands you a message for Claude Code. Paste it in and Claude sets the connection up itself. Each connection is listed with when it was last used, and any of them can be revoked in one click.
 
-**Your Patterns, on Every Site**
-* **Collections** - Keep patterns on patternbuilderwp.com in collections: a private Personal for yourself, private collections of your own on Pro, and the curated collections Twenty Bellows and partner studios publish
-* **Install a whole collection** - Save any directory collection to a site in one action, as theme patterns or user patterns, images included
-* **Agents welcome** - An agent connected to your site can browse, install and upload through your account, and never holds a cloud credential
+**What the agent can do.** List, read, render, create and update patterns. Read the design system and add to it: color, spacing and type presets, global styles, block style variations and the layout widths. Find the images the site already has, and add images and fonts. Read, create, change and delete the theme's templates and template parts. With an account connected, upload patterns to patternbuilderwp.com and install from it through your account, without ever holding a cloud credential.
 
-**Developer-Friendly**
-* **Export to Theme** - Convert user patterns to theme files with proper formatting
-* **Asset Management** - Automatically handles pattern images and media
-* **Block Bindings** - Bind a pattern's blocks to post meta, ACF fields or any registered binding source, or leave them for whoever places the pattern to fill in
+**What the writes refuse.** A write that fails Pattern Builder's checks is refused with the problem named, and the authoring guide has the agent run the block validator, against the WordPress your site runs, before it saves anything. A theme pattern file can't be made to carry PHP, so permission to edit patterns is never permission to run code on the site.
 
-= Use Cases =
+**The skills that travel with it.** pattern-author is how a pattern gets written: the theme's own design tokens, markup that checks as valid, and sections factored out so a layout is built once and placed many times. design-reproduction is for rebuilding a design that already exists, whether a live site, a screenshot or a Figma file. Claude installs either one from your site with a single command.
 
-**For Theme Developers**
-* Create and manage theme patterns visually
-* Export patterns with proper formatting
-* Organize patterns by category
-* Test patterns before deployment
+**No model inside.** Pattern Builder has no AI in it and sends nothing to any AI service. The tools are WordPress core's Abilities API, served over REST and, through the MCP Adapter plugin, as MCP tools, so any MCP client can connect; the Agents tab writes the message for Claude Code. The agent tools need WordPress 6.9 or later. Everything else works on 6.8.
 
-**For Site Builders**
-* Build custom patterns without coding
-* Reuse patterns across multiple pages
-* Carry patterns between sites
-* Maintain pattern library
+= Editing patterns yourself =
 
-**For Agencies**
-* Create pattern libraries for clients
-* Standardize design systems
-* Speed up development workflow
-* Maintain brand consistency
+**Theme and user patterns on one screen.** Theme patterns (the PHP files in your theme's patterns folder, parent theme included) and user patterns (the ones saved in the editor) are browsed together, with the same previews, search and categories, and each opens in the WordPress editor. A theme pattern is written back to its file with everything in its header: title, description, categories, keywords, block types, post types, template types, viewport width, inserter visibility and synced status.
+
+**Synced theme patterns.** A synced pattern kept in a file is placed through the core pattern block, so inserted copies stay linked to the file and each copy can override the content you've opened up for editing. Design stays locked to the theme. Content stays editable.
+
+**Pattern Bindings.** Bind a block's value to a post type's custom fields, to Advanced Custom Fields, or to any registered binding source, picked per attribute from the fields that post type really offers. Or leave a slot for whoever places the pattern to fill in.
+
+**The patterns your plugins register.** The Plugin tab browses them beside your own. A plugin owns those, so they're read-only until you copy one into the theme, which brings its images and every pattern it's built from, and from then on it's yours to edit.
+
+**Shipping the theme.** A production site that only needs to render synced theme patterns can run Synced Patterns for Themes, the free runtime, instead of this plugin. When the theme is updated, only the theme's changes arrive, and the site uses the patterns without being able to change them.
+
+= Your patterns on other sites =
+
+Everything above works without an account. If you want a pattern somewhere other than the theme it was built in, sign in to patternbuilderwp.com from Appearance > Pattern Builder. A free account keeps up to 25 patterns in a private Personal collection and installs them on any number of connected sites. The Directory tab browses the collections Twenty Bellows and partner studios publish; save one pattern or a whole collection to a site, with the design tokens it needs, as theme patterns or user patterns, images included. A page pattern travels with the patterns it references.
+
+Pro is a subscription on your account, $9 a month or $89 a year, not a license for the plugin. It removes the cap, adds private collections of your own, and opens the premium collections. Cancel, and what you've uploaded stays readable and installable.
 
 == Installation ==
 
-= From WordPress Admin =
+Install it from Plugins > Add New by searching for "Pattern Builder", activate it, and open Appearance > Pattern Builder. Your theme's patterns are already there.
 
-1. Navigate to Plugins > Add New
-2. Search for "Pattern Builder"
-3. Click "Install Now" and then "Activate"
-4. Navigate to Appearance > Pattern Builder to start creating patterns
+To connect Claude, open the Agents tab on that screen. It tells you what the site still needs, if anything, and gives you the message to paste.
 
-= Manual Installation =
-
-1. Download the plugin zip file
-2. Navigate to Plugins > Add New > Upload Plugin
-3. Choose the downloaded file and click "Install Now"
-4. Activate the plugin through the 'Plugins' screen in WordPress
-5. Navigate to Appearance > Pattern Builder to start creating patterns
-
-= For Developers =
-
-1. Clone the repository: `git clone https://github.com/Twenty-Bellows/pattern-builder.git`
-2. Install dependencies: `npm install && composer install`
-3. Build assets: `npm run build`
-4. Start development environment: `npm run start`
-5. Watch for changes: `npm run watch`
+The source is on GitHub, with build instructions in its readme: https://github.com/Twenty-Bellows/pattern-builder
 
 == External services ==
 
-Everything local works without an account and without sending anything anywhere. Three services are involved only when you choose to use them:
+Everything local works without an account and without sending anything anywhere. The services below are involved only when you choose to use them.
 
-**patternbuilderwp.com** — the cloud library and its directory of curated collections, and the account behind them. When you sign in or create an account from Appearance → Pattern Builder, your email and password are relayed once, server-side, to patternbuilderwp.com; only the returned access token is stored, on this site, for your WordPress user. Browsing the Uploaded and Directory tabs, managing your collections, uploading patterns and installing patterns or whole collections, starting a password reset, and confirming a purchase all talk to patternbuilderwp.com through this site. Pattern Builder is the only way to install anything from patternbuilderwp.com: the website shows collections and sends people here. Anonymous usage reporting, if you allow it, goes there too (see below). Terms: https://patternbuilderwp.com/terms/ — Privacy: https://patternbuilderwp.com/privacy/
+**patternbuilderwp.com:** the cloud library and its directory of curated collections, and the account behind them. When you sign in or create an account from Appearance > Pattern Builder, your email and password are relayed once, server-side, to patternbuilderwp.com; only the returned access token is stored, on this site, for your WordPress user. Browsing the Uploaded and Directory tabs, managing your collections, uploading patterns and installing patterns or whole collections, starting a password reset, and confirming a purchase all talk to patternbuilderwp.com through this site. Pattern Builder is the only way to install anything from patternbuilderwp.com: the website shows collections and sends people here. Anonymous usage reporting, if you allow it, goes there too (see below). Terms: https://patternbuilderwp.com/terms/ and privacy: https://patternbuilderwp.com/privacy/
 
-**Freemius** — the checkout for Pattern Builder Pro. Choosing Go Pro loads Freemius's checkout script (https://checkout.freemius.com/js/v1/) on the Pattern Builder screen and opens their checkout; nothing from Freemius loads anywhere else or before that click. Terms: https://freemius.com/terms/ — Privacy: https://freemius.com/privacy/
+**Freemius:** the checkout for Pattern Builder Pro. Choosing Go Pro loads Freemius's checkout script (https://checkout.freemius.com/js/v1/) on the Pattern Builder screen and opens their checkout; nothing from Freemius loads anywhere else or before that click. Terms: https://freemius.com/terms/ and privacy: https://freemius.com/privacy/
 
-**Google Fonts, through WordPress.org** — installing a font. Adding a font family (from the pattern authoring tools, or by an agent using the add-font ability) fetches the list of available families from WordPress.org (https://s.w.org/), which is the same list WordPress core's own Manage Fonts screen uses, and then downloads the font files you chose from Google's font server (https://fonts.gstatic.com/). The files are saved to your site and served from it, so your visitors' browsers never request anything from Google. No request is made until you install a font. Google Fonts terms: https://developers.google.com/fonts/terms — Privacy: https://policies.google.com/privacy
+**Google Fonts, through WordPress.org:** installing a font. Adding a font family (from the pattern authoring tools, or by an agent using the add-font ability) fetches the list of available families from WordPress.org (https://s.w.org/), which is the same list WordPress core's own Manage Fonts screen uses, and then downloads the font files you chose from Google's font server (https://fonts.gstatic.com/). The files are saved to your site and served from it, so your visitors' browsers never request anything from Google. No request is made until you install a font. Google Fonts terms: https://developers.google.com/fonts/terms and privacy: https://policies.google.com/privacy
 
 = Usage reporting (opt-in) =
 
-The first time the pattern browser opens on a site, it asks once whether Pattern Builder may report anonymous usage, with Allow and No thanks buttons. Nothing is sent unless an administrator chooses Allow, and the choice can be changed on the same screen at any time. What is sent when allowed: which features are used (the browser opened, a pattern created, the community browsed, an upload or download) and the environment — WordPress, PHP and plugin versions, locale, active theme, multisite, and environment type — under a random install id. What is never sent: the site's address or name, pattern content, or anything about the site's visitors.
+The first time the pattern browser opens on a site, it asks once whether Pattern Builder may report anonymous usage, with Allow and No thanks buttons. Nothing is sent unless an administrator chooses Allow, and the choice can be changed on the same screen at any time. What is sent when allowed: which features are used (the browser opened, a pattern created, the community browsed, an upload or download) and the environment (WordPress, PHP and plugin versions, locale, active theme, multisite, and environment type), under a random install id. What is never sent: the site's address or name, pattern content, or anything about the site's visitors.
 
 == Frequently Asked Questions ==
 
+= Do I need an account? =
+
+No. Everything that happens on your site works without one. The account on patternbuilderwp.com is for keeping patterns somewhere other than one theme and installing them on other sites, and the free tier covers 25 patterns.
+
+= Which agents can connect? =
+
+The Agents tab writes a message for Claude Code, which sets the connection up itself. Any MCP client that can send an Authorization header connects the same way: the server is at /wp-json/pattern-builder/v1/mcp and the credential is a WordPress Application Password. The same abilities are reachable over plain REST, under wp-abilities/v1, with no MCP involved.
+
+= Does the plugin send my patterns to an AI service? =
+
+No. Pattern Builder doesn't call a model, and the only services it ever talks to are the ones listed under External services. What an agent you connect reads from the site goes to that agent's provider under your agreement with them, the same as anything else you show it.
+
 = Can I use this with any theme? =
 
-Yes! Pattern Builder works with any WordPress theme that supports the block editor. It's especially powerful when used with block themes.
+Yes, with any theme that supports the block editor. It does the most for block themes, where the templates, template parts and design system are all there to be read and written.
 
 = Can I manage existing theme patterns? =
 
-Yes, Pattern Builder provides a unified interface to manage both theme patterns (PHP files in your theme's patterns directory) and user-created patterns stored in the database. The patterns your plugins register are browsable alongside them; a plugin owns those, so they are read-only until you copy one.
+Yes. Theme patterns (the PHP files in your theme's patterns directory) and user patterns (stored in the database) are managed in one interface. The patterns your plugins register are browsable alongside them; a plugin owns those, so they're read-only until you copy one.
 
 = Does it work with Advanced Custom Fields? =
 
-Yes, and with no code to write. Choose a post type in the Pattern Bindings panel and the ACF fields attached to it are offered alongside that post type's own custom fields. One ACF setting has to be on first: open the field, and under Presentation switch on "Allow Access to Value in Editor UI". ACF leaves that off for any field created since its 6.3.6, and a field without it renders nothing wherever it is bound, so Pattern Builder does not offer one until it is on.
+Yes, and with no code to write. Choose a post type in the Pattern Bindings panel and the ACF fields attached to it are offered alongside that post type's own custom fields. One ACF setting has to be on first: open the field, and under Presentation switch on "Allow Access to Value in Editor UI". ACF leaves that off for any field created since its 6.3.6, and a field without it renders nothing wherever it is bound, so Pattern Builder doesn't offer one until it's on.
 
 = Can I bind a block to my own data? =
 
 Yes. Anything registered as post meta with show_in_rest is offered automatically. For data of your own, register a block binding source: WordPress resolves the value from your PHP callback, and registering the same source in the editor with a getFieldsList puts your fields in the panel.
-
-== Screenshots ==
 
 == Changelog ==
 
@@ -148,7 +129,7 @@ Yes. Anything registered as post meta with show_in_rest is offered automatically
 
 = 2.2.0 =
 * A Plugin tab in Appearance → Pattern Builder browses the patterns your plugins register, with the same previews, search and categories as your own
-* Copy any of them into your theme — images and all, and with every pattern it is built from — and it is yours to edit, to build on, and to upload to a cloud collection
+* Copy any of them into your theme (images and all, and with every pattern it is built from) and it is yours to edit, to build on, and to upload to a cloud collection
 * Copying is repeatable: a pattern you have already copied is the one you get back, so two pages built from the same section share one copy of it
 * A pattern whose blocks are stored in an older form can be rewritten in place from its details, instead of being opened in the editor and saved
 * Fixed: a pattern carrying images imported into the theme was read as a file containing PHP, which showed a notice saying it could not be saved and then refused to save it
@@ -162,7 +143,7 @@ Yes. Anything registered as post meta with show_in_rest is offered automatically
 * The plugin's version constant is reported correctly again. It had fallen a release behind, which left the 2.1.0 upgrade step unrun and pattern previews serving what they had drawn before the update
 
 = 2.1.0 =
-* Pattern Bindings: bind a block's value to any registered source, not pattern overrides alone — a post type's custom fields, Advanced Custom Fields, or a source a plugin registers — picked per attribute from the fields that post type really offers
+* Pattern Bindings: bind a block's value to any registered source, not pattern overrides alone: a post type's custom fields, Advanced Custom Fields, or a source a plugin registers, picked per attribute from the fields that post type really offers
 * Cloud collections: sign in to a free patternbuilderwp.com account from Appearance → Pattern Builder and keep your patterns in a private Personal collection, on every site you connect; Pro adds private collections of your own
 * The Directory tab browses curated collections; save one pattern or a whole collection to this site, with the design tokens it needs, and the Uploaded tab manages your own collections
 * A page pattern travels with the patterns it references, uploading and installing them alongside it, and a copy records the pattern it came from
@@ -172,10 +153,10 @@ Yes. Anything registered as post meta with show_in_rest is offered automatically
 * Opt-in anonymous usage reporting, asked once, never on by default
 
 = 2.0.0 =
-* Complete architectural overhaul: theme pattern files are now the single source of truth — no more database mirror posts, no more custom post type rows, and no more interception of the /wp/v2/blocks REST API
-* New pattern browser under Appearance → Pattern Builder; every pattern opens in the WordPress editor itself — user patterns in the Site Editor, theme patterns in the core editor bound straight to the pattern file
+* Complete architectural overhaul: theme pattern files are now the single source of truth: no more database mirror posts, no more custom post type rows, and no more interception of the /wp/v2/blocks REST API
+* New pattern browser under Appearance → Pattern Builder; every pattern opens in the WordPress editor itself: user patterns in the Site Editor, theme patterns in the core editor bound straight to the pattern file
 * Theme patterns are now real REST entities (string IDs, like core templates) at /pattern-builder/v1/patterns, editable in the post editor in place
-* Synced theme patterns now work through the core/pattern block's content attribute (the same mechanism as the Synced Patterns for Themes plugin 2.0) — inserted copies stay linked to the pattern file with per-instance overrides, and no post ID is involved anywhere
+* Synced theme patterns now work through the core/pattern block's content attribute (the same mechanism as the Synced Patterns for Themes plugin 2.0). Inserted copies stay linked to the pattern file with per-instance overrides, and no post ID is involved anywhere
 * Full pattern metadata management: title, description, categories, keywords, block types, post types, template types, viewport width, inserter visibility, and synced status all round-trip through the pattern file header
 * Viewport Width is now preserved when editing patterns (previously lost on save)
 * Parent theme patterns are now included (previously only the child theme was scanned)
@@ -215,11 +196,6 @@ Yes. Anything registered as post meta with show_in_rest is offered automatically
 * Pattern preview
 * Asset management
 
-
 == Development ==
 
-Pattern Builder is open source and welcomes contributions. Visit our [GitHub repository](https://github.com/Twenty-Bellows/pattern-builder) to:
-
-== Credits ==
-
-Pattern Builder is developed and maintained by [Twenty Bellows](https://twentybellows.com).
+Pattern Builder is developed in the open by [Twenty Bellows](https://twentybellows.com). Report a bug or send a change at the [GitHub repository](https://github.com/Twenty-Bellows/pattern-builder).
