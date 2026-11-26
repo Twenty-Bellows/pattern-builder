@@ -636,6 +636,84 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		$this->assertSame( $reference, get_post( $page )->post_content );
 	}
 
+	public function test_the_preview_says_what_a_conversion_would_rewrite_and_changes_nothing() {
+		$post_id   = self::factory()->post->create( array( 'post_type' => 'wp_block' ) );
+		$reference = '<!-- wp:block {"ref":' . $post_id . '} /-->';
+		$pages     = self::factory()->post->create_many(
+			12,
+			array(
+				'post_type'    => 'page',
+				'post_content' => $reference,
+			)
+		);
+		mkdir( $this->test_dir . '/parts' );
+		file_put_contents( $this->test_dir . '/parts/footer.html', $reference );
+
+		$request = $this->create_rest_request( 'GET', '/pattern-builder/v1/conversion' );
+		$request->set_query_params(
+			array(
+				'type' => 'user',
+				'id'   => (string) $post_id,
+			)
+		);
+		$data = rest_get_server()->dispatch( $request )->get_data();
+
+		$this->assertSame( array(), $data['blockers'] );
+		$this->assertSame( 12, $data['postTotal'] );
+		$this->assertSame( array_slice( $pages, 0, 10 ), wp_list_pluck( $data['posts'], 'id' ) );
+		$this->assertSame(
+			array(
+				array(
+					'kind' => 'template-part',
+					'file' => 'parts/footer.html',
+				),
+			),
+			$data['files']
+		);
+		$this->assertSame( $reference, get_post( $pages[0] )->post_content );
+		$this->assertSame( $reference, file_get_contents( $this->test_dir . '/parts/footer.html' ) );
+	}
+
+	public function test_the_preview_names_what_blocks_a_theme_pattern() {
+		$this->copy_test_pattern( 'theme_synced_pattern.php' );
+		mkdir( $this->test_dir . '/templates' );
+		file_put_contents( $this->test_dir . '/templates/front-page.html', '<!-- wp:pattern {"slug":"simple-theme/theme-synced-pattern"} /-->' );
+
+		$request = $this->create_rest_request( 'GET', '/pattern-builder/v1/conversion' );
+		$request->set_query_params(
+			array(
+				'type' => 'theme',
+				'id'   => 'simple-theme/theme-synced-pattern',
+			)
+		);
+		$data = rest_get_server()->dispatch( $request )->get_data();
+
+		$this->assertSame(
+			array(
+				array(
+					'kind' => 'template',
+					'file' => 'templates/front-page.html',
+				),
+			),
+			$data['blockers']
+		);
+		$this->assertSame( array(), $data['files'] );
+	}
+
+	public function test_the_preview_is_for_whoever_may_convert() {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'editor' ) ) );
+
+		$request = $this->create_rest_request( 'GET', '/pattern-builder/v1/conversion' );
+		$request->set_query_params(
+			array(
+				'type' => 'user',
+				'id'   => '1',
+			)
+		);
+
+		$this->assertSame( 403, rest_get_server()->dispatch( $request )->get_status() );
+	}
+
 	public function test_convert_theme_image_pattern_exports_assets() {
 		$this->copy_test_pattern( 'theme_image_test.php' );
 		mkdir( $this->test_dir . '/assets' );
