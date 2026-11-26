@@ -648,15 +648,18 @@ class Pattern_File_Store {
 	}
 
 	/**
-	 * Creates a theme pattern from a user pattern (wp_block), deleting the post.
+	 * Creates a theme pattern from a user pattern (wp_block), points everything that placed
+	 * the post at the new pattern's slug, and deletes the post.
 	 *
 	 * @param \WP_Post         $post The wp_block post to convert.
 	 * @param Abstract_Pattern $pattern The pattern data to write (already carrying any
 	 * edits).
 	 * @param array            $options Optional settings passed to update_theme_pattern().
+	 * @param array|null       $repointed Set to what was rewritten, as
+	 * Pattern_Builder_References::repoint_everywhere() reports it.
 	 * @return Abstract_Pattern|WP_Error The new theme pattern, or an error.
 	 */
-	public function convert_user_pattern_to_theme( $post, Abstract_Pattern $pattern, $options = array() ) {
+	public function convert_user_pattern_to_theme( $post, Abstract_Pattern $pattern, $options = array(), &$repointed = null ) {
 		if ( ! current_user_can( 'edit_theme_options' ) ) {
 			return new WP_Error(
 				'insufficient_permissions',
@@ -676,19 +679,39 @@ class Pattern_File_Store {
 			return $saved;
 		}
 
+		// Only once the file exists, and before the post goes: at every point in between,
+		// each reference names something that is there.
+		$repointed = Pattern_Builder_References::repoint_everywhere( 'ref:' . (int) $post->ID, 'slug:' . $saved->name );
+
+		if ( is_wp_error( $repointed ) ) {
+			// No row has moved yet, so the post is still what everything names: take the file back out.
+			$this->delete_theme_pattern( $saved );
+
+			return $repointed;
+		}
+
+		// A reference rewritten in a pattern file changes what that pattern is registered as.
+		$this->flush_pattern_caches();
+
 		wp_delete_post( $post->ID, true );
 
 		return $saved;
 	}
 
 	/**
-	 * Converts a theme pattern into a user pattern (wp_block), deleting the file.
+	 * Converts a theme pattern into a user pattern (wp_block), points every row that placed
+	 * the slug at the new post, and deletes the file.
+	 *
+	 * Refused while the theme's own files, or a plugin's pattern, place it: see
+	 * Pattern_Builder_References::blockers().
 	 *
 	 * @param Abstract_Pattern $pattern The theme pattern to convert.
+	 * @param array|null       $repointed Set to what was rewritten, as
+	 * Pattern_Builder_References::repoint_everywhere() reports it.
 	 * @return Abstract_Pattern|WP_Error The new user pattern (with its post ID), or an
 	 * error.
 	 */
-	public function convert_theme_pattern_to_user( Abstract_Pattern $pattern ) {
+	public function convert_theme_pattern_to_user( Abstract_Pattern $pattern, &$repointed = null ) {
 		if ( ! current_user_can( 'edit_theme_options' ) ) {
 			return new WP_Error(
 				'insufficient_permissions',
@@ -697,11 +720,26 @@ class Pattern_File_Store {
 			);
 		}
 
+		$token    = 'slug:' . $pattern->name;
+		$blockers = Pattern_Builder_References::blockers( Pattern_Builder_References::places( $token ) );
+
+		if ( $blockers ) {
+			return Pattern_Builder_References::blocked_error( $blockers );
+		}
+
 		$filepath = $this->get_pattern_filepath( $pattern );
 		$created  = $this->create_user_pattern( $pattern );
 
 		if ( is_wp_error( $created ) ) {
 			return $created;
+		}
+
+		$repointed = Pattern_Builder_References::repoint_everywhere( $token, 'ref:' . (int) $created->id );
+
+		if ( is_wp_error( $repointed ) ) {
+			wp_delete_post( (int) $created->id, true );
+
+			return $repointed;
 		}
 
 		if ( ! is_wp_error( $filepath ) && $filepath ) {

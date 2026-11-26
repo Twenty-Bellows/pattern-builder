@@ -134,6 +134,72 @@ class Pattern_Builder_References {
 	}
 
 	/**
+	 * The places that stop a theme pattern becoming a user pattern: the ones that would be
+	 * left pointing at a database ID a theme cannot carry with it (its own pattern, template
+	 * and template part files), and the ones nothing here can rewrite (a plugin's patterns).
+	 *
+	 * @param array $places What places() answered.
+	 * @return array[] Each a file or a plugin pattern, as places() describes them, the latter
+	 * with kind "plugin-pattern".
+	 */
+	public static function blockers( array $places ) {
+		$blockers = $places['files'];
+
+		foreach ( $places['plugins'] as $plugin ) {
+			$blockers[] = array_merge( array( 'kind' => 'plugin-pattern' ), $plugin );
+		}
+
+		return $blockers;
+	}
+
+	/**
+	 * The refusal for a conversion the theme's own files stand in the way of.
+	 *
+	 * @param array[] $blockers What blockers() answered.
+	 * @return WP_Error
+	 */
+	public static function blocked_error( array $blockers ) {
+		$named = array();
+		foreach ( array_slice( $blockers, 0, 5 ) as $blocker ) {
+			$named[] = isset( $blocker['file'] ) ? $blocker['file'] : $blocker['name'];
+		}
+		if ( count( $blockers ) > 5 ) {
+			/* translators: %d: how many more places. */
+			$named[] = sprintf( __( 'and %d more', 'pattern-builder' ), count( $blockers ) - 5 );
+		}
+
+		return new WP_Error(
+			'pattern_builder_theme_places_pattern',
+			sprintf(
+				/* translators: %s: the theme files and plugin patterns that place the pattern. */
+				__( 'This pattern cannot become a user pattern while the theme places it: %s. A user pattern is reached by its database ID, which a theme file cannot carry to another site. Remove the pattern from those places first.', 'pattern-builder' ),
+				implode( ', ', $named )
+			),
+			array(
+				'status'   => 409,
+				'blockers' => self::without_paths( $blockers ),
+			)
+		);
+	}
+
+	/**
+	 * Places as they leave the server: without the absolute path a file was found at.
+	 *
+	 * @param array[] $places Files, or blockers.
+	 * @return array[]
+	 */
+	public static function without_paths( array $places ) {
+		return array_map(
+			static function ( $place ) {
+				unset( $place['path'] );
+
+				return $place;
+			},
+			$places
+		);
+	}
+
+	/**
 	 * Point every reference to a pattern, in the database and in the theme's files, at
 	 * another address.
 	 *
