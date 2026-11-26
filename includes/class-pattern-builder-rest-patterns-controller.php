@@ -231,8 +231,10 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 			);
 		}
 
+		$repointed = null;
+
 		if ( $from_post ) {
-			$saved = $this->store->convert_user_pattern_to_theme( $from_post, $pattern, $this->get_save_options( $request ) );
+			$saved = $this->store->convert_user_pattern_to_theme( $from_post, $pattern, $this->get_save_options( $request ), $repointed );
 		} else {
 			$saved = $this->store->update_theme_pattern( $pattern, $this->get_save_options( $request ) );
 		}
@@ -241,7 +243,7 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 			return $this->as_rest_error( $saved );
 		}
 
-		$response = rest_ensure_response( $this->prepare_pattern_for_response( $saved, $request ) );
+		$response = rest_ensure_response( $this->with_repointed( $this->prepare_pattern_for_response( $saved, $request ), $repointed ) );
 		$response->set_status( 201 );
 
 		return $response;
@@ -269,13 +271,14 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 		}
 
 		if ( 'user' === $request['source'] ) {
-			$converted = $this->store->convert_theme_pattern_to_user( $pattern );
+			$repointed = null;
+			$converted = $this->store->convert_theme_pattern_to_user( $pattern, $repointed );
 
 			if ( is_wp_error( $converted ) ) {
 				return $this->as_rest_error( $converted );
 			}
 
-			return rest_ensure_response( $this->prepare_pattern_for_response( $converted, $request ) );
+			return rest_ensure_response( $this->with_repointed( $this->prepare_pattern_for_response( $converted, $request ), $repointed ) );
 		}
 
 		$saved = $this->store->update_theme_pattern( $pattern, $this->get_save_options( $request ) );
@@ -317,6 +320,26 @@ class Pattern_Builder_REST_Patterns_Controller extends WP_REST_Controller {
 				'previous' => $previous,
 			)
 		);
+	}
+
+	/**
+	 * Adds what a conversion rewrote to its response, so the editor can bring its own copies
+	 * of those posts up to date.
+	 *
+	 * @param array      $data The pattern, prepared for a response.
+	 * @param array|null $repointed What Pattern_Builder_References::repoint_everywhere()
+	 * reported, or null when nothing was converted.
+	 * @return array
+	 */
+	protected function with_repointed( array $data, $repointed ) {
+		if ( is_array( $repointed ) ) {
+			$data['repointed'] = array(
+				'posts' => $repointed['posts'],
+				'files' => Pattern_Builder_References::without_paths( $repointed['files'] ),
+			);
+		}
+
+		return $data;
 	}
 
 	/**

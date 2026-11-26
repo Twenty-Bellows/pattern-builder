@@ -46,6 +46,29 @@ class Pattern_Builder_API {
 
 		register_rest_route(
 			'pattern-builder/v1',
+			'/conversion',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_conversion_preview' ),
+				'permission_callback' => array( $this, 'convert_permission_callback' ),
+				'args'                => array(
+					'type' => array(
+						'description' => __( 'What the pattern is now.', 'pattern-builder' ),
+						'type'        => 'string',
+						'enum'        => array( 'theme', 'user' ),
+						'required'    => true,
+					),
+					'id'   => array(
+						'description' => __( 'A theme pattern\'s namespaced name, or a user pattern\'s post ID.', 'pattern-builder' ),
+						'type'        => 'string',
+						'required'    => true,
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'pattern-builder/v1',
 			'/binding-fields',
 			array(
 				'methods'             => 'GET',
@@ -77,6 +100,67 @@ class Pattern_Builder_API {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Whether the user may ask what converting a pattern would touch: whoever may convert one.
+	 *
+	 * @return true|WP_Error
+	 */
+	public function convert_permission_callback() {
+		if ( ! current_user_can( 'edit_theme_options' ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				__( 'Sorry, you are not allowed to manage theme patterns.', 'pattern-builder' ),
+				array( 'status' => rest_authorization_required_code() )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * How many posts a conversion preview names before it only counts the rest.
+	 */
+	const PREVIEW_NAMED_POSTS = 10;
+
+	/**
+	 * What converting a pattern to the other storage would touch, without touching it.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return WP_REST_Response|WP_Error {
+	 *     blockers:  array[] What refuses the conversion; empty when it can go ahead.
+	 *     files:     array[] Theme files whose reference would be rewritten.
+	 *     posts:     array[] The first rows whose reference would be rewritten.
+	 *     postTotal: int     How many rows in all.
+	 * }
+	 */
+	public function get_conversion_preview( $request ) {
+		$is_theme = 'theme' === $request['type'];
+		$exists   = $is_theme
+			? null !== $this->store->find_theme_pattern( (string) $request['id'] )
+			: 'wp_block' === get_post_type( (int) $request['id'] );
+
+		if ( ! $exists ) {
+			return new WP_Error(
+				'pattern_builder_pattern_not_found',
+				__( 'No pattern was found to convert.', 'pattern-builder' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$places   = Pattern_Builder_References::places( $is_theme ? 'slug:' . $request['id'] : 'ref:' . (int) $request['id'] );
+		$blockers = $is_theme ? Pattern_Builder_References::blockers( $places ) : array();
+
+		return rest_ensure_response(
+			array(
+				'blockers'  => Pattern_Builder_References::without_paths( $blockers ),
+				// A blocked conversion rewrites nothing, and a theme pattern's files are its blockers.
+				'files'     => $is_theme ? array() : Pattern_Builder_References::without_paths( $places['files'] ),
+				'posts'     => array_slice( $places['posts'], 0, self::PREVIEW_NAMED_POSTS ),
+				'postTotal' => count( $places['posts'] ),
+			)
+		);
 	}
 
 	/**

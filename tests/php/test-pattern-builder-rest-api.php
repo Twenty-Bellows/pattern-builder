@@ -456,6 +456,264 @@ class Pattern_Builder_REST_API_Test extends WP_UnitTestCase {
 		);
 	}
 
+	/**
+	 * A page, a user pattern and a Site Editor customization that place a theme pattern all
+	 * follow it into the database, keeping the slot the page fills.
+	 */
+	public function test_converting_to_a_user_pattern_repoints_everything_that_placed_it() {
+		$this->copy_test_pattern( 'theme_synced_pattern.php' );
+		$filled = '<!-- wp:pattern {"slug":"simple-theme/theme-synced-pattern","content":{"headline":{"content":"Filled here"}}} /-->';
+		$plain  = '<!-- wp:pattern {"slug":"simple-theme/theme-synced-pattern"} /-->';
+
+		$page   = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_content' => "<!-- wp:paragraph -->\n<p>Before</p>\n<!-- /wp:paragraph -->\n" . $filled,
+			)
+		);
+		$user   = self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_block',
+				'post_content' => $plain,
+			)
+		);
+		$custom = self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_template',
+				'post_name'    => 'index',
+				'post_content' => $plain,
+			)
+		);
+
+		$request = $this->create_rest_request( 'PUT', '/pattern-builder/v1/patterns/simple-theme/theme-synced-pattern' );
+		$request->set_body_params( array( 'source' => 'user' ) );
+		$response = rest_get_server()->dispatch( $request );
+		$data     = $response->get_data();
+
+		$this->assertEquals( 200, $response->get_status() );
+		$this->assertEqualsCanonicalizing( array( $page, $user, $custom ), wp_list_pluck( $data['repointed']['posts'], 'id' ) );
+		$this->assertSame( array(), $data['repointed']['files'] );
+
+		$this->assertSame(
+			"<!-- wp:paragraph -->\n<p>Before</p>\n<!-- /wp:paragraph -->\n" . '<!-- wp:block {"ref":' . $data['id'] . ',"content":{"headline":{"content":"Filled here"}}} /-->',
+			get_post( $page )->post_content
+		);
+		$this->assertSame( '<!-- wp:block {"ref":' . $data['id'] . '} /-->', get_post( $user )->post_content );
+		$this->assertSame( '<!-- wp:block {"ref":' . $data['id'] . '} /-->', get_post( $custom )->post_content );
+		$this->assertNotSame( '', trim( do_blocks( get_post( $user )->post_content ) ), 'the reference still renders the pattern' );
+	}
+
+	/**
+	 * A theme file would be left pointing at a database ID no other site has, so the
+	 * conversion stops before anything changes and says which files are in the way.
+	 */
+	public function test_converting_to_a_user_pattern_is_refused_while_the_theme_places_it() {
+		$this->copy_test_pattern( 'theme_synced_pattern.php' );
+		$reference = '<!-- wp:pattern {"slug":"simple-theme/theme-synced-pattern"} /-->';
+		mkdir( $this->test_dir . '/templates' );
+		file_put_contents( $this->test_dir . '/templates/front-page.html', $reference );
+		file_put_contents( $this->test_dir . '/patterns/landing.php', "<?php\n/**\n * Title: Landing\n * Slug: simple-theme/landing\n */\n?>\n" . $reference );
+		$page = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_content' => $reference,
+			)
+		);
+
+		$request = $this->create_rest_request( 'PUT', '/pattern-builder/v1/patterns/simple-theme/theme-synced-pattern' );
+		$request->set_body_params( array( 'source' => 'user' ) );
+		$response = rest_get_server()->dispatch( $request );
+
+		$this->assertEquals( 409, $response->get_status() );
+		$this->assertSame( 'pattern_builder_theme_places_pattern', $response->get_data()['code'] );
+		$this->assertSame(
+			array(
+				array(
+					'kind' => 'pattern',
+					'file' => 'patterns/landing.php',
+				),
+				array(
+					'kind' => 'template',
+					'file' => 'templates/front-page.html',
+				),
+			),
+			$response->get_data()['data']['blockers']
+		);
+		$this->assertStringContainsString( 'patterns/landing.php, templates/front-page.html', $response->get_data()['message'] );
+
+		$this->assertFileExists( $this->test_dir . '/patterns/theme_synced_pattern.php' );
+		$this->assertSame( $reference, get_post( $page )->post_content );
+		$this->assertSame( $reference, file_get_contents( $this->test_dir . '/templates/front-page.html' ) );
+		$this->assertCount(
+			0,
+			get_posts(
+				array(
+					'post_type'   => 'wp_block',
+					'numberposts' => -1,
+					'post_status' => 'any',
+				)
+			)
+		);
+	}
+
+	/**
+	 * Everything that placed a user pattern by its ID follows it into the theme, the theme's
+	 * own files included, and a pattern file's PHP is still there afterwards.
+	 */
+	public function test_converting_to_a_theme_pattern_repoints_everything_that_placed_it() {
+		$post_id   = wp_insert_post(
+			array(
+				'post_title'   => 'Test User Pattern',
+				'post_name'    => 'test-user-pattern',
+				'post_content' => '<!-- wp:paragraph --><p>User pattern content</p><!-- /wp:paragraph -->',
+				'post_type'    => 'wp_block',
+				'post_status'  => 'publish',
+			)
+		);
+		$reference = '<!-- wp:block {"ref":' . $post_id . ',"content":{"headline":{"content":"Filled here"}}} /-->';
+		$moved     = '<!-- wp:pattern {"slug":"simple-theme/test-user-pattern","content":{"headline":{"content":"Filled here"}}} /-->';
+		$header    = "<?php\n/**\n * Title: Landing\n * Slug: simple-theme/landing\n */\n?>\n<p><?php echo esc_html( gmdate( 'Y' ) ); ?></p>\n";
+
+		$page  = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_content' => $reference,
+			)
+		);
+		$other = self::factory()->post->create( array( 'post_content' => '<!-- wp:block {"ref":' . ( $post_id + 1000 ) . '} /-->' ) );
+		mkdir( $this->test_dir . '/parts' );
+		file_put_contents( $this->test_dir . '/parts/footer.html', $reference );
+		file_put_contents( $this->test_dir . '/patterns/landing.php', $header . $reference );
+
+		$request = $this->create_rest_request( 'POST', '/pattern-builder/v1/patterns' );
+		$request->set_body_params( array( 'fromWpBlock' => $post_id ) );
+		$response = rest_get_server()->dispatch( $request );
+		$data     = $response->get_data();
+
+		$this->assertEquals( 201, $response->get_status() );
+		$this->assertNull( get_post( $post_id ) );
+		$this->assertSame( array( $page ), wp_list_pluck( $data['repointed']['posts'], 'id' ) );
+		$this->assertSame(
+			array(
+				array(
+					'kind' => 'template-part',
+					'file' => 'parts/footer.html',
+				),
+				array(
+					'kind' => 'pattern',
+					'file' => 'patterns/landing.php',
+				),
+			),
+			$data['repointed']['files']
+		);
+
+		$this->assertSame( $moved, get_post( $page )->post_content );
+		$this->assertSame( '<!-- wp:block {"ref":' . ( $post_id + 1000 ) . '} /-->', get_post( $other )->post_content );
+		$this->assertSame( $moved, file_get_contents( $this->test_dir . '/parts/footer.html' ) );
+		$this->assertSame( $header . $moved, file_get_contents( $this->test_dir . '/patterns/landing.php' ) );
+	}
+
+	/**
+	 * There and back: a page that fills a slot ends where it began.
+	 */
+	public function test_a_reference_survives_the_round_trip() {
+		$this->copy_test_pattern( 'theme_synced_pattern.php' );
+		$reference = '<!-- wp:pattern {"slug":"simple-theme/theme-synced-pattern","content":{"headline":{"content":"Filled here"}}} /-->';
+		$page      = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_content' => $reference,
+			)
+		);
+
+		$request = $this->create_rest_request( 'PUT', '/pattern-builder/v1/patterns/simple-theme/theme-synced-pattern' );
+		$request->set_body_params( array( 'source' => 'user' ) );
+		$converted = rest_get_server()->dispatch( $request )->get_data();
+		$request   = $this->create_rest_request( 'POST', '/pattern-builder/v1/patterns' );
+		$request->set_body_params( array( 'fromWpBlock' => $converted['id'] ) );
+		rest_get_server()->dispatch( $request );
+
+		$this->assertSame( $reference, get_post( $page )->post_content );
+	}
+
+	public function test_the_preview_says_what_a_conversion_would_rewrite_and_changes_nothing() {
+		$post_id   = self::factory()->post->create( array( 'post_type' => 'wp_block' ) );
+		$reference = '<!-- wp:block {"ref":' . $post_id . '} /-->';
+		$pages     = self::factory()->post->create_many(
+			12,
+			array(
+				'post_type'    => 'page',
+				'post_content' => $reference,
+			)
+		);
+		mkdir( $this->test_dir . '/parts' );
+		file_put_contents( $this->test_dir . '/parts/footer.html', $reference );
+
+		$request = $this->create_rest_request( 'GET', '/pattern-builder/v1/conversion' );
+		$request->set_query_params(
+			array(
+				'type' => 'user',
+				'id'   => (string) $post_id,
+			)
+		);
+		$data = rest_get_server()->dispatch( $request )->get_data();
+
+		$this->assertSame( array(), $data['blockers'] );
+		$this->assertSame( 12, $data['postTotal'] );
+		$this->assertSame( array_slice( $pages, 0, 10 ), wp_list_pluck( $data['posts'], 'id' ) );
+		$this->assertSame(
+			array(
+				array(
+					'kind' => 'template-part',
+					'file' => 'parts/footer.html',
+				),
+			),
+			$data['files']
+		);
+		$this->assertSame( $reference, get_post( $pages[0] )->post_content );
+		$this->assertSame( $reference, file_get_contents( $this->test_dir . '/parts/footer.html' ) );
+	}
+
+	public function test_the_preview_names_what_blocks_a_theme_pattern() {
+		$this->copy_test_pattern( 'theme_synced_pattern.php' );
+		mkdir( $this->test_dir . '/templates' );
+		file_put_contents( $this->test_dir . '/templates/front-page.html', '<!-- wp:pattern {"slug":"simple-theme/theme-synced-pattern"} /-->' );
+
+		$request = $this->create_rest_request( 'GET', '/pattern-builder/v1/conversion' );
+		$request->set_query_params(
+			array(
+				'type' => 'theme',
+				'id'   => 'simple-theme/theme-synced-pattern',
+			)
+		);
+		$data = rest_get_server()->dispatch( $request )->get_data();
+
+		$this->assertSame(
+			array(
+				array(
+					'kind' => 'template',
+					'file' => 'templates/front-page.html',
+				),
+			),
+			$data['blockers']
+		);
+		$this->assertSame( array(), $data['files'] );
+	}
+
+	public function test_the_preview_is_for_whoever_may_convert() {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'editor' ) ) );
+
+		$request = $this->create_rest_request( 'GET', '/pattern-builder/v1/conversion' );
+		$request->set_query_params(
+			array(
+				'type' => 'user',
+				'id'   => '1',
+			)
+		);
+
+		$this->assertSame( 403, rest_get_server()->dispatch( $request )->get_status() );
+	}
+
 	public function test_convert_theme_image_pattern_exports_assets() {
 		$this->copy_test_pattern( 'theme_image_test.php' );
 		mkdir( $this->test_dir . '/assets' );
