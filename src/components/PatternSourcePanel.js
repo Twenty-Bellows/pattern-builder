@@ -1,4 +1,4 @@
-import { __, sprintf } from '@wordpress/i18n';
+import { __, _n, sprintf } from '@wordpress/i18n';
 import {
 	Button,
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
@@ -7,13 +7,20 @@ import {
 	__experimentalVStack as VStack,
 } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
+import { addQueryArgs } from '@wordpress/url';
 import { useDispatch, useSelect } from '@wordpress/data';
 import { store as noticesStore } from '@wordpress/notices';
 import { store as blockEditorStore } from '@wordpress/block-editor';
+import { store as editorStore } from '@wordpress/editor';
 import { useState } from '@wordpress/element';
 
 import { navigateToPattern } from '../utils/patternNavigation';
 import { PLUGIN_ORIGIN_SCHEME } from '../utils/origin';
+import {
+	addressOf,
+	syncEditorAfterConversion,
+} from '../utils/patternConversion';
+import { PatternConversionDialog } from './PatternConversionDialog';
 import {
 	usePatternCloudState,
 	PatternCloudControls,
@@ -55,14 +62,21 @@ function describeOrigin( origin ) {
  */
 export const PatternSourcePanel = ( { patternPost, postType } ) => {
 	const [ isConverting, setIsConverting ] = useState( false );
-	const { createErrorNotice } = useDispatch( noticesStore );
-	const { onNavigateToEntityRecord } = useSelect( ( select ) => {
-		return {
-			onNavigateToEntityRecord:
-				select( blockEditorStore ).getSettings()
-					.onNavigateToEntityRecord,
-		};
-	}, [] );
+	// What converting would touch, while the dialog asking about it is open.
+	const [ preview, setPreview ] = useState( null );
+	const { createErrorNotice, createSuccessNotice } =
+		useDispatch( noticesStore );
+	const { onNavigateToEntityRecord, onNavigateToPreviousEntityRecord } =
+		useSelect( ( select ) => {
+			return {
+				onNavigateToEntityRecord:
+					select( blockEditorStore ).getSettings()
+						.onNavigateToEntityRecord,
+				onNavigateToPreviousEntityRecord:
+					select( editorStore ).getEditorSettings()
+						.onNavigateToPreviousEntityRecord,
+			};
+		}, [] );
 
 	const isThemePattern = postType === 'pb_pattern';
 	const patternType = isThemePattern ? 'theme' : 'user';
@@ -79,6 +93,15 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 		typeof patternPost.content === 'string'
 			? patternPost.content
 			: patternPost.content?.raw || '';
+
+	const reportFailure = ( error ) => {
+		createErrorNotice(
+			error?.message ||
+				__( 'The pattern could not be converted.', 'pattern-builder' ),
+			{ type: 'snackbar' }
+		);
+		setIsConverting( false );
+	};
 
 	const convert = async () => {
 		setIsConverting( true );
@@ -100,6 +123,41 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 				} );
 			}
 
+			const posts = converted.repointed?.posts ?? [];
+			const moved =
+				posts.length + ( converted.repointed?.files?.length ?? 0 );
+
+			syncEditorAfterConversion(
+				addressOf( {
+					id: patternPost.id,
+					name: patternPost.name ?? patternPost.id,
+					source: patternType,
+				} ),
+				addressOf( converted ),
+				posts,
+				!! converted.synced
+			);
+
+			if ( moved > 0 ) {
+				createSuccessNotice(
+					sprintf(
+						/* translators: %d: how many places were updated. */
+						_n(
+							'Pattern converted. %d place that used it now points at the converted pattern.',
+							'Pattern converted. %d places that used it now point at the converted pattern.',
+							moved,
+							'pattern-builder'
+						),
+						moved
+					),
+					{ type: 'snackbar' }
+				);
+			}
+
+			// The pattern as it was is gone, so it comes off the editor's history first:
+			// Back from the converted pattern goes to wherever this one was opened from.
+			onNavigateToPreviousEntityRecord?.();
+
 			navigateToPattern(
 				{
 					id: converted.id,
@@ -109,16 +167,39 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 				onNavigateToEntityRecord
 			);
 		} catch ( error ) {
-			createErrorNotice(
-				error?.message ||
-					__(
-						'The pattern could not be converted.',
-						'pattern-builder'
-					),
-				{ type: 'snackbar' }
-			);
-			setIsConverting( false );
+			setPreview( null );
+			reportFailure( error );
 		}
+	};
+
+	// Asks the server what the conversion reaches. A pattern nothing uses converts straight
+	// away, as it always has; anything else is shown first.
+	const startConverting = async () => {
+		setIsConverting( true );
+
+		try {
+			const found = await apiFetch( {
+				path: addQueryArgs( '/pattern-builder/v1/conversion', {
+					type: patternType,
+					id: String( patternPost.id ),
+				} ),
+			} );
+
+			if (
+				found.blockers.length ||
+				found.files.length ||
+				found.postTotal
+			) {
+				setPreview( found );
+				setIsConverting( false );
+				return;
+			}
+		} catch ( error ) {
+			reportFailure( error );
+			return;
+		}
+
+		convert();
 	};
 
 	return (
@@ -135,9 +216,9 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 						variant="secondary"
 						isBusy={ isConverting }
 						disabled={ isConverting }
-						onClick={ convert }
+						onClick={ startConverting }
 						hovertip={ __(
-							'Converting moves the pattern into the database (exporting its images to the media library) and deletes the theme file.',
+							'Converting moves the pattern into the database (exporting its images to the media library), deletes the theme file, and updates the pages and patterns that use it.',
 							'pattern-builder'
 						) }
 					>
@@ -156,15 +237,25 @@ export const PatternSourcePanel = ( { patternPost, postType } ) => {
 						variant="secondary"
 						isBusy={ isConverting }
 						disabled={ isConverting }
-						onClick={ convert }
+						onClick={ startConverting }
 						hovertip={ __(
-							'Converting writes the pattern into a file in the active theme (importing its images as theme assets) and deletes the database copy. The last saved version is converted.',
+							'Converting writes the pattern into a file in the active theme (importing its images as theme assets), deletes the database copy, and updates everything that uses it. The last saved version is converted.',
 							'pattern-builder'
 						) }
 					>
 						{ __( 'Convert to Theme Pattern', 'pattern-builder' ) }
 					</Button>
 				</>
+			) }
+
+			{ preview && (
+				<PatternConversionDialog
+					preview={ preview }
+					toTheme={ ! isThemePattern }
+					isBusy={ isConverting }
+					onConfirm={ convert }
+					onCancel={ () => setPreview( null ) }
+				/>
 			) }
 
 			{ !! patternPost.origin && (
