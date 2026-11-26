@@ -121,6 +121,14 @@ The things that bite. Each is expanded in the document beside it.
   namespaced. A pattern registered under a bare name is one no `core/pattern`
   reference can reach, and an unresolved reference renders as nothing rather
   than as an error. ([architecture](docs/architecture.md))
+- **A conversion between theme and user moves every reference with it**, through
+  `Pattern_Builder_References`: `core/pattern` and a slug one way, `core/block`
+  and a post ID the other. A reference left behind renders as nothing. Theme to
+  user is refused while a theme file places the pattern, because a theme file
+  can't carry a database ID to another site. That rewrite changes one comment
+  in a file as text, and is the only write to a theme file that goes around the
+  two doors named here.
+  ([architecture](docs/architecture.md#converting-between-theme-and-user))
 - **Every template and template part write goes through
   `Pattern_Builder_Template_Store`**, into the active theme's own folders, and
   folds a Site Editor customization of the same slug into the file. A

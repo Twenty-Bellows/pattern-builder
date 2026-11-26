@@ -410,6 +410,77 @@ The product story: build with Pattern Builder, ship the theme with Synced
 Patterns for Themes. Swapping one for the other changes nothing about how the
 site renders.
 
+## Converting between theme and user
+
+A pattern has an address, and the address depends on where it's stored. A theme
+pattern is placed with `core/pattern` and its slug. A user pattern is placed
+with `core/block` and its post ID. Converting one into the other changes which
+of the two can reach it, so everything that placed it has to follow. A slug
+nobody registers and an ID whose post is gone both render as nothing, with no
+error, which is why a conversion that only moved the pattern looked fine until
+someone opened the page.
+
+`Pattern_Builder_References` does the following. `places()` finds every direct
+reference to an address: rows of any post type and status except revisions
+(pages, user patterns, Site Editor customizations), the pattern, template and
+template part files of the active theme and its parent, and the patterns a
+plugin registered. `repoint_everywhere()` rewrites them.
+
+**The rewrite is on text, not on parsed blocks.** `repoint()` matches the
+reference comment and replaces that comment alone, so the PHP in a pattern file
+and markup the block parser wouldn't round-trip are both still there, byte for
+byte, afterwards. The `content` attribute has the same shape on both blocks, so
+the slots a place fills move across untouched, along with every other
+attribute. This is the one write to a theme file that doesn't go through
+`update_theme_pattern()` or `Pattern_Builder_Template_Store`, for the same
+reason the 1.x migration's doesn't: those doors read a pattern by running it and
+write back what it rendered, and all that's wanted here is one comment changed.
+It can't put PHP into a file, since the attributes are written by
+`serialize_block_attributes()`, which escapes `<`.
+
+Rows are written with `wp_update_post()`, so each gets a revision and
+the save hooks fire for whatever caches the page. Two details matter there. The
+content is slashed first, because `wp_update_post()` unslashes an array and
+block attributes are full of `\u003c`. And kses is off for the duration: an
+administrator on multisite has no `unfiltered_html`, and moving one comment
+shouldn't cost a page the rest of its markup.
+
+**User to theme rewrites everything**, theme files included. A theme file that
+named a database ID ends up naming a slug, which is the state it should have
+been in. `convert_user_pattern_to_theme()` writes the file, then repoints, then
+deletes the post, so at every point each reference names something that exists.
+
+**Theme to user is refused while the theme places the pattern.** A theme file
+rewritten to `core/block` would name a database ID no other site has, so the
+theme would stop travelling. `blockers()` names the pattern, template and
+template part files that reference the slug, and any plugin pattern that does
+(nothing here can rewrite one of those), and
+`convert_theme_pattern_to_user()` answers `pattern_builder_theme_places_pattern`
+before anything changes. Rows are repointed once the post exists, and the file
+is deleted last.
+
+**Sync status belongs to the pattern, not to the reference.** A `core/block`
+follows its post whatever `wp_pattern_sync_status` says; the status decides
+what the inserter inserts, and neither core's render callback nor its edit
+component reads it. So the status carries over with the pattern as it always
+did, and references are repointed whatever it is.
+
+**The editor has to catch up too.** `GET /pattern-builder/v1/conversion` answers
+what a conversion would touch, and `PatternSourcePanel` asks it first: a pattern
+nothing uses converts straight away, and anything else gets
+`PatternConversionDialog`, which lists the places or the blockers. Afterwards
+`syncEditorAfterConversion()` brings the editor's own copies into line with the
+`repointed` list in the response. A post open in the same editor with unsaved
+edits holds its blocks as an edit, which would save the old reference back, so
+`repointBlocks()` makes the same move on those blocks. The pattern lists are
+re-read. The slug joins or leaves the list of synced slugs the runtime was
+loaded with, because the runtime flattens a `core/pattern` whose slug isn't on
+it. And the pattern as it was comes off the editor's history, so Back goes to
+wherever it was opened from.
+
+What isn't followed: revisions and autosaves, which are history; block widgets
+and markup kept in options or post meta; and themes that aren't active.
+
 ## Names
 
 A pattern installed from the cloud keeps its cloud name,
@@ -724,7 +795,7 @@ map*, then deletes the rows and the old capabilities.
 | `Pattern_Builder_Entity` | The rowless `pb_pattern` post type. |
 | `Pattern_Builder_REST_Patterns_Controller` | String-ID CRUD for theme patterns; the collection also lists `wp_block` so one request paints the library, and answers `?source=plugin` with the registered ones. |
 | `Pattern_File_Store` | The file pipeline: theme scanning, the registry read behind the Plugin tab, header round-trip, image import/export, conversions, cache flushing. |
-| `Pattern_Builder_API` | `POST /pattern-builder/v1/process-theme` (bulk localize / import images). |
+| `Pattern_Builder_API` | `POST /pattern-builder/v1/process-theme` (bulk localize / import images), and `GET /pattern-builder/v1/conversion`, what converting a pattern would touch. |
 | `Pattern_Builder_Admin` | Appearance → Pattern Builder: the browse grid and the edit-mode boot. |
 | `Pattern_Builder_Editor` | Enqueues the management bundle on block-editor screens. |
 | `Pattern_Builder_Preview` | Whole-page renders, the lab-theme swap, and the grid's tiles. |
@@ -737,6 +808,7 @@ map*, then deletes the rows and the old capabilities.
 | `Pattern_Builder_Template_Store` | The theme's templates and template parts: resolved as core resolves them, written only into the active theme. See [below](#templates-and-template-parts). |
 | `Pattern_Builder_Template_Checks` | The markup checks, plus what a theme file may not carry and what will not travel with it. |
 | `Pattern_Builder_Usage` | Where a pattern is used: the patterns, templates, template parts and posts that place it, directly or through another pattern. See [`abilities.md`](abilities.md). |
+| `Pattern_Builder_References` | Every place that names a pattern, and the rewrite that points them at its new address when it's converted. See [above](#converting-between-theme-and-user). |
 | `Pattern_Builder_Migration` | The one-time 1.x upgrade. |
 | `Pattern_Builder_Security` / `Pattern_Builder_Localization` | Path-validated filesystem helpers; pattern localization. |
 | Vendored runtime | `Pattern_Block`, `Pattern_Resolver`, `Block_Markup`, `Inner_HTML_Processor`, `Synced_Patterns`, `Editor_Support`. |
@@ -761,7 +833,7 @@ Three webpack bundles:
 Supporting modules: `src/admin/` (App, PatternBrowser, editor-boot),
 `src/cloud/` (see [`cloud.md`](cloud.md)), `src/components/`, `src/objects/`,
 `src/utils/` (`tileKey`, `patternTree`, `blockValidity`, `patternExport`,
-`telemetry`, `bindings`), and
+`telemetry`, `bindings`, `patternConversion`, `repointBlocks`), and
 `src/runtime/` (vendored; keep identical to the companion's `src/`).
 
 State comes from the core data stores (`core`, `core/editor`,
